@@ -1,0 +1,30 @@
+BasedOnStyle: Google
+ColumnLimit: 120
+IndentWidth: 4
+AccessModifierOffset: -2
+NamespaceIndentation: Inner
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortEnumsOnASingleLine: false
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+IncludeCategories:
+  # Zen headers
+  - Regex:           '<zen/core.*'
+    Priority:        50
+
+  - Regex:           '<zen/node.*'
+    Priority:        60
+
+  # C standard library
+  - Regex:           '<[[:alnum:]]+\.h>'
+    Priority:        10
+
+  # C++ standard library
+  - Regex:           '<[[:alnum:]_]+>'
+    Priority:        20
+
+  # Third-party libraries
+  - Regex:           '<.*'
+    Priority:        30
+

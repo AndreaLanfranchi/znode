@@ -1,0 +1,9 @@
+.idea
+.vscode
+.vs
+*.code-workspace
+build*
+cmake-build-*
+out
+xcode
+CMakeFiles

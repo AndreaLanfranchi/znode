@@ -1,0 +1,12 @@
+[submodule "third-party/expected"]
+	path = third-party/expected
+	url = https://github.com/TartanLlama/expected.git
+[submodule "third-party/libmdbx"]
+	path = third-party/libmdbx
+	url = https://gitflic.ru/project/erthink/libmdbx.git
+[submodule "cmake/cable"]
+	path = cmake/cable
+	url = https://github.com/ethereum/cable
+[submodule "third-party/magic_enum"]
+	path = third-party/magic_enum
+	url = https://github.com/Neargye/magic_enum.git
