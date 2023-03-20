@@ -66,11 +66,14 @@ void DataStream::shrink() {
 
 DataStream::size_type DataStream::size() const noexcept { return buffer_.size(); }
 
+DataStream::size_type DataStream::computed_size() const noexcept { return computed_size_; }
+
 DataStream::size_type DataStream::avail() const noexcept { return buffer_.size() - read_position_; }
 
 void DataStream::clear() noexcept {
     buffer_.clear();
     read_position_ = 0;
+    computed_size_ = 0;
 }
 
 void DataStream::get_clear(DataStream& dst) {

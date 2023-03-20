@@ -10,15 +10,19 @@
 #include <zen/core/serialization/stream.hpp>
 
 namespace zen::ser {
+
 //! \brief Public interface all serializable objects must implement
 class Serializable {
   public:
-    Serializable() = default;
+    [[nodiscard]] size_t serialized_size(DataStream& stream) {
+        serialization(stream, stream.scope(), Action::kComputeSize);
+        return stream.computed_size();
+    }
 
-    //! \brief Returns the size (in bytes) the serialized form will have
-    virtual size_t serialized_size(ser::DataStream& stream) = 0;
+    void serialize(DataStream& stream) { serialization(stream, stream.scope(), Action::kSerialize); }
 
-    virtual void serialize(ser::DataStream& stream) = 0;
-    virtual void deserialize(ser::DataStream&) = 0;
+  private:
+    friend class DataStream;
+    virtual void serialization(DataStream& stream, Scope scope, Action action) = 0;
 };
 }  // namespace zen::ser

@@ -14,6 +14,7 @@
 #include <zen/core/common/base.hpp>
 #include <zen/core/common/secure_bytes.hpp>
 #include <zen/core/serialization/base.hpp>
+#include <zen/core/serialization/serialize.hpp>
 
 namespace zen::ser {
 
@@ -75,6 +76,10 @@ class DataStream {
     //! \brief Returns the size of the contained data
     [[nodiscard]] size_type size() const noexcept;
 
+    //! \brief Returns the computed size of the to-be-contained data
+    //! \remarks Only when this stream is used as a calculator
+    [[nodiscard]] size_type computed_size() const noexcept;
+
     //! \brief Returns the size of yet-to-be-consumed data
     [[nodiscard]] size_type avail() const noexcept;
 
@@ -97,12 +102,30 @@ class DataStream {
     //! \brief Returns the hexed representation of the data buffer
     [[nodiscard]] std::string to_string() const;
 
+    // Serialization for fundamental types
+    template <class T>
+        requires std::is_fundamental_v<T>
+    void bind(T& object, Action action) {
+        switch (action) {
+            using enum Action;
+            case kComputeSize:
+                computed_size_ += ser_sizeof(object);
+                break;
+            case kSerialize:
+                write_data(*this, object);
+                break;
+            case kDeserialize:
+                read_data<T>(*this);
+                break;
+        }
+    }
+
   private:
     SecureBytes buffer_{};        // Data buffer
+    size_type computed_size_{0};  // Total accrued size (for size computing)
     size_type read_position_{0};  // Current read position;
 
     Scope scope_;
     int version_{0};
 };
-
 }  // namespace zen::ser

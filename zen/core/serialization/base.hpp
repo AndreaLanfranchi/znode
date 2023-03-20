@@ -18,9 +18,16 @@ enum class Scope : uint32_t {
     kHash = (1 << 2)
 };
 
-enum class SerializationError {
-    kSuccess,
+//! \brief Specifies the serialization action
+enum class Action : uint32_t {
+    kComputeSize = (1 << 0),  // Only calculates size of serialized data
+    kSerialize = (1 << 1),    // Actually performs serialization
+    kDeserialize = (1 << 2)   // Deserializes data into object
 };
+
+//enum class SerializationError {
+//    kSuccess,
+//};
 
 enum class DeserializationError {
     kSuccess,
