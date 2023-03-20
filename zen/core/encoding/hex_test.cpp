@@ -5,11 +5,31 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include <vector>
+
 #include <catch2/catch.hpp>
 
 #include <zen/core/encoding/hex.hpp>
 
-namespace zen {
+namespace zen::hex {
+
+struct TestCaseDecodeHex {
+    std::string hexstring;
+    DecodingError expected;
+    Bytes bytes;
+};
+
+static const std::vector<TestCaseDecodeHex> TestCasesDecodeHex{
+    {"0x", DecodingError::kSuccess, {}},
+    {"0xg", DecodingError::kInvalidHexDigit, {}},
+    {"0", DecodingError::kSuccess, {0x0}},
+    {"0x0", DecodingError::kSuccess, {0x0}},
+    {"0xa", DecodingError::kSuccess, {0x0a}},
+    {"0xa1f", DecodingError::kSuccess, {0x0a, 0x1f}},
+    {"0x0a1f", DecodingError::kSuccess, {0x0a, 0x1f}},
+    {"111111111111111111111111",
+     DecodingError::kSuccess,
+     {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}}};
 
 TEST_CASE("Decoding Hex", "[encoding]") {
     CHECK(hex::decode_digit('0'));
@@ -20,43 +40,15 @@ TEST_CASE("Decoding Hex", "[encoding]") {
     CHECK(hex::decode_digit('f'));
     CHECK_FALSE(hex::decode_digit('g'));
 
-    auto parsed_bytes{hex::decode("")};
-    CHECK((parsed_bytes && parsed_bytes->empty()));
-
-    parsed_bytes = hex::decode("0x");
-    CHECK((parsed_bytes && parsed_bytes->empty()));
-
-    parsed_bytes = hex::decode("0xg");
-    CHECK_FALSE(parsed_bytes);
-    CHECK(parsed_bytes.error() == DecodingError::kInvalidHexDigit);
-
-    Bytes expected_bytes{0x0};
-    parsed_bytes = hex::decode("0");
-    CHECK((parsed_bytes && *parsed_bytes == expected_bytes));
-    parsed_bytes = hex::decode("0x0");
-    CHECK((parsed_bytes && *parsed_bytes == expected_bytes));
-
-    expected_bytes = {0x0a};
-    parsed_bytes = hex::decode("0xa");
-    CHECK((parsed_bytes && *parsed_bytes == expected_bytes));
-    parsed_bytes = hex::decode("0x0a");
-    CHECK((parsed_bytes && *parsed_bytes == expected_bytes));
-
-    expected_bytes = {0x0a, 0x1f};
-    parsed_bytes = hex::decode("0xa1f");
-    CHECK((parsed_bytes && *parsed_bytes == expected_bytes));
-    parsed_bytes = hex::decode("0x0a1f");
-    CHECK((parsed_bytes && *parsed_bytes == expected_bytes));
-
-    std::string source(24, '1');
-    expected_bytes = Bytes(12, 0x11);
-    for (char& c : source) {
-        parsed_bytes = hex::decode(source);
-        CHECK(parsed_bytes);
-        c = 'k';
-        parsed_bytes = hex::decode(source);
-        CHECK_FALSE(parsed_bytes);
-        c = '1';
+    for (const auto& test : TestCasesDecodeHex) {
+        auto parsed_bytes{hex::decode(test.hexstring)};
+        if (test.expected != DecodingError::kSuccess) {
+            REQUIRE_FALSE(parsed_bytes);
+            REQUIRE(parsed_bytes.error() == test.expected);
+        } else {
+            REQUIRE(parsed_bytes);
+            REQUIRE(*parsed_bytes == test.bytes);
+        }
     }
 }
 
@@ -102,4 +94,4 @@ TEST_CASE("Hex encoding integrals", "[encoding]") {
     CHECK(expected_hex == obtained_hex);
 }
 
-}  // namespace zen
+}  // namespace zen::hex

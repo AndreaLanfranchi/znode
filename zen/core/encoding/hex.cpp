@@ -79,16 +79,17 @@ ByteView zeroless_view(ByteView data) {
 }
 
 std::string encode(ByteView bytes, bool with_prefix) noexcept {
-    static const char* kHexDigits{"0123456789abcdef"};
-    std::string out(bytes.length() * 2 + (with_prefix ? 2 : 0), '\0');
-    char* dest{&out[0]};
+    static const char kHexDigits[]{"0123456789abcdef"};
+    std::string out(bytes.length() * 2 + (with_prefix ? 2 : 0), 0x0);
+    auto dest{out.data()};
+    auto src{bytes.data()};
     if (with_prefix) {
         *dest++ = '0';
         *dest++ = 'x';
     }
-    for (const auto b : bytes) {
-        *dest++ = kHexDigits[b >> 4];    // Hi
-        *dest++ = kHexDigits[b & 0x0f];  // Lo
+    for (int i{0}; i < bytes.length(); ++i, ++src) {
+        *dest++ = kHexDigits[*src >> 4];
+        *dest++ = kHexDigits[*src & 0x0f];
     }
     return out;
 }
@@ -103,9 +104,9 @@ tl::expected<Bytes, DecodingError> decode(std::string_view source) noexcept {
 
     const size_t pos(source.length() & 1);  // "[0x]1" is legit and has to be treated as "[0x]01"
     Bytes out((source.length() + pos) / 2, '\0');
-    const char* src{const_cast<char*>(source.data())};
-    const char* last = src + source.length();
-    uint8_t* dst{&out[0]};
+    auto dst{out.data()};
+    const auto* src{source.data()};
+    const auto* last = src + source.length();
 
     if (pos) {
         const auto b{kUnhexTable[static_cast<uint8_t>(*src++)]};
@@ -118,14 +119,14 @@ tl::expected<Bytes, DecodingError> decode(std::string_view source) noexcept {
     // following "while" is unrolling the loop when we have >= 4 target bytes
     // this is optional, but 5-10% faster
     while (last - src >= 8) {
-        auto a{kUnhexTable4[static_cast<uint8_t>(*src++)]};
-        auto b{kUnhexTable[static_cast<uint8_t>(*src++)]};
-        auto c{kUnhexTable4[static_cast<uint8_t>(*src++)]};
-        auto d{kUnhexTable[static_cast<uint8_t>(*src++)]};
-        auto e{kUnhexTable4[static_cast<uint8_t>(*src++)]};
-        auto f{kUnhexTable[static_cast<uint8_t>(*src++)]};
-        auto g{kUnhexTable4[static_cast<uint8_t>(*src++)]};
-        auto h{kUnhexTable[static_cast<uint8_t>(*src++)]};
+        const auto a{kUnhexTable4[static_cast<uint8_t>(*src++)]};
+        const auto b{kUnhexTable[static_cast<uint8_t>(*src++)]};
+        const auto c{kUnhexTable4[static_cast<uint8_t>(*src++)]};
+        const auto d{kUnhexTable[static_cast<uint8_t>(*src++)]};
+        const auto e{kUnhexTable4[static_cast<uint8_t>(*src++)]};
+        const auto f{kUnhexTable[static_cast<uint8_t>(*src++)]};
+        const auto g{kUnhexTable4[static_cast<uint8_t>(*src++)]};
+        const auto h{kUnhexTable[static_cast<uint8_t>(*src++)]};
         if ((b | d | f | h) == 0xff || (a | c | e | g) == 0xff) {
             return tl::unexpected{DecodingError::kInvalidHexDigit};
         }
@@ -136,8 +137,8 @@ tl::expected<Bytes, DecodingError> decode(std::string_view source) noexcept {
     }
 
     while (src < last) {
-        auto a{kUnhexTable4[static_cast<uint8_t>(*src++)]};
-        auto b{kUnhexTable[static_cast<uint8_t>(*src++)]};
+        const auto a{kUnhexTable4[static_cast<uint8_t>(*src++)]};
+        const auto b{kUnhexTable[static_cast<uint8_t>(*src++)]};
         if (a == 0xff || b == 0xff) {
             return tl::unexpected{DecodingError::kInvalidHexDigit};
         }
