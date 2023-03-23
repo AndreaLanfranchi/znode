@@ -16,7 +16,7 @@
 #include <zen/core/serialization/base.hpp>
 #include <zen/core/serialization/serialize.hpp>
 
-namespace zen::ser {
+namespace zen::serialization {
 
 class Archive {
   public:
@@ -128,4 +128,4 @@ class Archive {
     Scope scope_;
     int version_{0};
 };
-}  // namespace zen::ser
+}  // namespace zen::serialization

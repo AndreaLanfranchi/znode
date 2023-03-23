@@ -7,7 +7,7 @@
 #pragma once
 #include <cstdint>
 
-namespace zen::ser {
+namespace zen::serialization {
 
 static constexpr uint32_t kMaxSerializedCompactSize{0x02000000};
 
@@ -25,14 +25,10 @@ enum class Action : uint32_t {
     kDeserialize = (1 << 2)   // Deserializes data into object
 };
 
-//enum class SerializationError {
-//    kSuccess,
-//};
-
 enum class DeserializationError {
     kSuccess,
     kReadBeyondData,
     kNonCanonicalCompactSize,
     kCompactSizeTooBig,
 };
-}  // namespace zen::ser
+}  // namespace zen::serialization

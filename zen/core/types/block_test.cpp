@@ -13,7 +13,7 @@ namespace zen {
 TEST_CASE("Block Serialization", "[serialization]") {
     BlockHeader header;
     header.version = 15;
-    ser::Archive stream(ser::Scope::kNetwork, 0);
+    serialization::Archive stream(serialization::Scope::kNetwork, 0);
     CHECK(header.serialized_size(stream) == 12);
     stream.clear();
     header.serialize(stream);

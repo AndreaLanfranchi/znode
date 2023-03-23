@@ -9,7 +9,7 @@
 #include <zen/core/encoding/hex.hpp>
 #include <zen/core/serialization/stream.hpp>
 
-namespace zen::ser {
+namespace zen::serialization {
 
 Scope Archive::scope() const noexcept { return scope_; }
 
@@ -80,4 +80,4 @@ void Archive::get_clear(Archive& dst) {
     dst.write({&buffer_[read_position_], avail()});
     clear();
 }
-}  // namespace zen::ser
+}  // namespace zen::serialization

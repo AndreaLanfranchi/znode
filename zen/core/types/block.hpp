@@ -15,7 +15,7 @@ namespace zen {
 
 static constexpr size_t kBlockHeaderSize{140};  // Excluding Equihash solution
 
-class BlockHeader : public ser::Serializable {
+class BlockHeader : public serialization::Serializable {
   public:
     BlockHeader() : Serializable(){};
 
@@ -30,7 +30,8 @@ class BlockHeader : public ser::Serializable {
     void reset();
 
   private:
-    void serialization(ser::Archive& stream, [[maybe_unused]] ser::Scope scope, ser::Action action) override {
+    void serialization(serialization::Archive& stream, [[maybe_unused]] serialization::Scope scope,
+                       serialization::Action action) override {
         stream.bind(version, action);
         stream.bind(time, action);
         stream.bind(bits, action);

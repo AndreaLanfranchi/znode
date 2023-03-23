@@ -9,7 +9,7 @@
 #include <zen/core/common/base.hpp>
 #include <zen/core/serialization/stream.hpp>
 
-namespace zen::ser {
+namespace zen::serialization {
 
 //! \brief Public interface all serializable objects must implement
 class Serializable {
@@ -25,4 +25,4 @@ class Serializable {
     friend class Archive;
     virtual void serialization(Archive& stream, Scope scope, Action action) = 0;
 };
-}  // namespace zen::ser
+}  // namespace zen::serialization

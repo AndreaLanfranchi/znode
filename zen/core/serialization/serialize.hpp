@@ -14,7 +14,7 @@
 #include <zen/core/serialization/base.hpp>
 
 //! \brief All functions dedicated to objects and types serialization
-namespace zen::ser {
+namespace zen::serialization {
 
 //! \brief Returns the serialized size of arithmetic types
 //! \remarks Do not define serializable classes members as size_t as it might lead to wrong results on
@@ -46,44 +46,44 @@ inline uint32_t ser_compact_sizeof(uint64_t value) {
 }
 
 //! \brief Lowest level serialization for integral arithmetic types
-template <class Stream, std::integral T>
-inline void write_data(Stream& s, T obj) {
+template <class Archive, std::integral T>
+inline void write_data(Archive& archive, T obj) {
     std::array<unsigned char, sizeof(obj)> bytes{};
     std::memcpy(bytes.data(), &obj, sizeof(obj));
-    s.write(bytes.data(), bytes.size());
+    archive.write(bytes.data(), bytes.size());
 }
 
 //! \brief Lowest level serialization for bool
-template <class Stream>
-inline void write_data(Stream& s, bool obj) {
-    const uint8_t out{static_cast<uint8_t>(obj ? 0x0 : 0x1)};
-    s.push_back(out);
+template <class Archive>
+inline void write_data(Archive& archive, bool obj) {
+    const uint8_t out{static_cast<uint8_t>(obj ? 0x00 : 0x01)};
+    archive.push_back(out);
 }
 
 //! \brief Lowest level serialization for float
-template <class Stream>
-inline void write_data(Stream& s, float obj) {
+template <class Archive>
+inline void write_data(Archive& archive, float obj) {
     auto casted{std::bit_cast<uint32_t>(obj)};
-    write_data(s, casted);
+    write_data(archive, casted);
 }
 
 //! \brief Lowest level serialization for double
-template <class Stream>
-inline void write_data(Stream& s, double obj) {
+template <class Archive>
+inline void write_data(Archive& archive, double obj) {
     auto casted{std::bit_cast<uint64_t>(obj)};
-    write_data(s, casted);
+    write_data(archive, casted);
 }
 
 //! \brief Lowest level serialization for compact integer
-template <class Stream>
-inline void write_compact(Stream& s, uint64_t obj) {
+template <class Archive>
+inline void write_compact(Archive& archive, uint64_t obj) {
     const auto casted{std::bit_cast<std::array<uint8_t, sizeof(obj)>>(obj)};
     const auto num_bytes{ser_compact_sizeof(obj)};
     uint8_t prefix{0x00};
 
     switch (num_bytes) {
         case 1:
-            s.push_back(casted[0]);
+            archive.push_back(casted[0]);
             return;  // Nothing else to append
         case 3:
             prefix = 253;
@@ -98,44 +98,44 @@ inline void write_compact(Stream& s, uint64_t obj) {
             ZEN_ASSERT(false);  // Should not happen - Houston we have a problem
     }
 
-    s.push_back(prefix);
-    s.write(casted.data(), num_bytes - 1);
+    archive.push_back(prefix);
+    archive.write(casted.data(), num_bytes - 1);
 }
 
 //! \brief Lowest level deserialization for arithmetic types
-template <typename T, class Stream>
+template <typename T, class Archive>
     requires std::is_arithmetic_v<T>
-inline tl::expected<T, DeserializationError> read_data(Stream& s) {
+inline tl::expected<T, DeserializationError> read_data(Archive& archive) {
     T ret{0};
     const uint32_t count{ser_sizeof(ret)};
-    const auto read_result{s.read(count)};
+    const auto read_result{archive.read(count)};
     if (!read_result) return tl::unexpected(read_result.error());
     std::memcpy(&ret, read_result->data(), count);
-    s.shrink();  // Remove consumed data
+    archive.shrink();  // Remove consumed data
     return ret;
 }
 
 //! \brief Lowest level deserialization for compact integer
-template <class Stream>
-inline tl::expected<uint64_t, DeserializationError> read_compact(Stream& s) {
-    const auto size{read_data<uint8_t>(s)};
+template <class Archive>
+inline tl::expected<uint64_t, DeserializationError> read_compact(Archive& archive) {
+    const auto size{read_data<uint8_t>(archive)};
     if (!size) return tl::unexpected(size.error());
 
     uint64_t ret;
     if (*size < 253) {
         ret = *size;
     } else if (*size == 253) {
-        const auto value{read_data<uint16_t>(s)};
+        const auto value{read_data<uint16_t>(archive)};
         if (!value) return tl::unexpected(value.error());
         if (*value < 253) return tl::unexpected(DeserializationError::kNonCanonicalCompactSize);
         ret = *value;
     } else if (*size == 254) {
-        const auto value{read_data<uint32_t>(s)};
+        const auto value{read_data<uint32_t>(archive)};
         if (!value) return tl::unexpected(value.error());
         if (*value < 0x10000U) return tl::unexpected(DeserializationError::kNonCanonicalCompactSize);
         ret = *value;
     } else {
-        const auto value{read_data<uint64_t>(s)};
+        const auto value{read_data<uint64_t>(archive)};
         if (!value) return tl::unexpected(value.error());
         if (*value < 0x100000000ULL) return tl::unexpected(DeserializationError::kNonCanonicalCompactSize);
         ret = *value;
@@ -143,4 +143,4 @@ inline tl::expected<uint64_t, DeserializationError> read_compact(Stream& s) {
     if (ret > kMaxSerializedCompactSize) return tl::unexpected(DeserializationError::kCompactSizeTooBig);
     return ret;
 }
-}  // namespace zen::ser
+}  // namespace zen::serialization
