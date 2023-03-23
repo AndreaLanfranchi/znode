@@ -18,7 +18,7 @@
 
 namespace zen::ser {
 
-class DataStream {
+class Archive {
   public:
     using reference_type = typename SecureBytes::reference;
     using size_type = typename SecureBytes::size_type;
@@ -26,7 +26,7 @@ class DataStream {
     using value_type = typename SecureBytes::value_type;
     using iterator_type = typename SecureBytes::iterator;
 
-    DataStream(Scope scope, int version) : scope_{scope}, version_{version} {};
+    Archive(Scope scope, int version) : scope_{scope}, version_{version} {};
 
     [[nodiscard]] Scope scope() const noexcept;
     [[nodiscard]] int version() const noexcept;
@@ -88,7 +88,7 @@ class DataStream {
     void clear() noexcept;
 
     //! \brief Copies unconsumed data into dest and clears
-    void get_clear(DataStream& dst);
+    void get_clear(Archive& dst);
 
     //! \brief Returns the current read position
     [[nodiscard]] size_type tellp() const noexcept;

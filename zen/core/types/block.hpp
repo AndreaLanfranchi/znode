@@ -30,7 +30,7 @@ class BlockHeader : public ser::Serializable {
     void reset();
 
   private:
-    void serialization(ser::DataStream& stream, [[maybe_unused]] ser::Scope scope, ser::Action action) override {
+    void serialization(ser::Archive& stream, [[maybe_unused]] ser::Scope scope, ser::Action action) override {
         stream.bind(version, action);
         stream.bind(time, action);
         stream.bind(bits, action);

@@ -88,7 +88,11 @@ class Hash {
     auto operator<=>(const Hash&) const = default;
 
     inline explicit operator bool() const noexcept {
-        return std::ranges::find_if_not(bytes_, [](const uint8_t b) { return b != 0; }) == bytes_.end();
+        auto ptr{bytes_.data()};
+        for (int i{0}; i < kSize; ++i) {
+            if (*ptr > 0) return true;
+        }
+        return false;
     }
 
   private:

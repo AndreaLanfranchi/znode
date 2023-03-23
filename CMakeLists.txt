@@ -135,14 +135,16 @@ else()
 
     add_compile_options(/permissive-)
 
-    add_compile_options(/we4018)  # Equivalent to -Wsign-conversion
     add_compile_options(/we4100)  # Unreferenced formal parameter
+
+    add_compile_options(/we4018)  # Equivalent to -Wsign-conversion
     add_compile_options(/we4245)  # Equivalent to -Wsign-conversion
     add_compile_options(/we4267)  # Equivalent to -Wsign-conversion
     add_compile_options(/we4389)  # Equivalent to -Wsign-conversion
 
     add_compile_options(/we6244)  # Equivalent to -Wshadow
     add_compile_options(/we6246)  # Equivalent to -Wshadow
+
     add_compile_options(/we26819) # Equivalent to -Wimplicit-fallthrough
 
 endif()

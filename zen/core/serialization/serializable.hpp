@@ -14,15 +14,15 @@ namespace zen::ser {
 //! \brief Public interface all serializable objects must implement
 class Serializable {
   public:
-    [[nodiscard]] size_t serialized_size(DataStream& stream) {
+    [[nodiscard]] size_t serialized_size(Archive& stream) {
         serialization(stream, stream.scope(), Action::kComputeSize);
         return stream.computed_size();
     }
 
-    void serialize(DataStream& stream) { serialization(stream, stream.scope(), Action::kSerialize); }
+    void serialize(Archive& stream) { serialization(stream, stream.scope(), Action::kSerialize); }
 
   private:
-    friend class DataStream;
-    virtual void serialization(DataStream& stream, Scope scope, Action action) = 0;
+    friend class Archive;
+    virtual void serialization(Archive& stream, Scope scope, Action action) = 0;
 };
 }  // namespace zen::ser

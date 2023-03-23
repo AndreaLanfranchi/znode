@@ -64,7 +64,7 @@ TEST_CASE("Float conversions", "[serialization]") {
 }
 
 TEST_CASE("Serialization stream", "[serialization]") {
-    DataStream stream(Scope::kStorage, 0);
+    Archive stream(Scope::kStorage, 0);
     CHECK(stream.eof());
 
     Bytes data{0x00, 0x01, 0x02, 0xff};
@@ -95,7 +95,7 @@ TEST_CASE("Serialization stream", "[serialization]") {
     CHECK(stream.size() == data.size() + 2);
     CHECK(stream[0] == 0);
 
-    stream.erase(stream.begin() + static_cast<DataStream::difference_type>(stream.size()) - 1);
+    stream.erase(stream.begin() + static_cast<Archive::difference_type>(stream.size()) - 1);
     CHECK(stream.size() == data.size() + 1);
     CHECK(stream[4] == 0xff);
 
@@ -106,7 +106,7 @@ TEST_CASE("Serialization stream", "[serialization]") {
     CHECK(stream[2] == 2);
     CHECK(stream[3] == 0xff);
 
-    DataStream dst(Scope::kStorage, 0);
+    Archive dst(Scope::kStorage, 0);
     stream.get_clear(dst);
     CHECK(stream.eof());
     CHECK(dst.avail() == data.size());
@@ -114,7 +114,7 @@ TEST_CASE("Serialization stream", "[serialization]") {
 
 TEST_CASE("Serialization of base types", "[serialization]") {
     SECTION("Write Types", "[serialization]") {
-        DataStream stream(Scope::kStorage, 0);
+        Archive stream(Scope::kStorage, 0);
 
         uint8_t u8{0x10};
         write_data(stream, u8);
@@ -141,7 +141,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
 
     SECTION("Floats serialization", "[serialization]") {
         static const double f64v{19880124.0};
-        DataStream stream(Scope::kStorage, 0);
+        Archive stream(Scope::kStorage, 0);
         write_data(stream, f64v);
         CHECK(stream.to_string() == "000000c08bf57241");
 
@@ -192,7 +192,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
     }
 
     SECTION("Write compact") {
-        DataStream stream(Scope::kStorage, 0);
+        Archive stream(Scope::kStorage, 0);
         uint64_t value{0};
         write_compact(stream, value);
         CHECK(stream.size() == 1);
@@ -258,8 +258,8 @@ TEST_CASE("Serialization of base types", "[serialization]") {
     }
 
     SECTION("Read Compact", "[serialization]") {
-        DataStream stream(Scope::kStorage, 0);
-        DataStream::size_type i;
+        Archive stream(Scope::kStorage, 0);
+        Archive::size_type i;
 
         for (i = 1; i <= kMaxSerializedCompactSize; i *= 2) {
             write_compact(stream, i - 1);
@@ -280,7 +280,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
     }
 
     SECTION("Non Canonical Compact", "[serialization]") {
-        DataStream stream(Scope::kStorage, 0);
+        Archive stream(Scope::kStorage, 0);
         auto value{read_compact(stream)};
         CHECK_FALSE(value);
         CHECK(value.error() == DeserializationError::kReadBeyondData);
