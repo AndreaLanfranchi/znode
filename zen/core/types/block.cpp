@@ -20,4 +20,19 @@ void BlockHeader::reset() {
     nonce = 0;
     solution.clear();
 }
+
+serialization::Error BlockHeader::serialization(serialization::Archive& archive, serialization::Action action) {
+    using namespace serialization;
+    using enum Error;
+    Error error{archive.bind(version, action)};
+    if (!error) archive.version = version;
+    if (!error) error = archive.bind(parent_hash, action);
+    if (!error) error = archive.bind(merkle_root, action);
+    if (!error) error = archive.bind(scct_root, action);
+    if (!error) error = archive.bind(time, action);
+    if (!error) error = archive.bind(bits, action);
+    if (!error) error = archive.bind(nonce, action);
+    if (!error) error = archive.bind(solution, action);
+    return error;
+}
 }  // namespace zen

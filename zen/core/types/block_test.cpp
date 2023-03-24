@@ -13,13 +13,16 @@ namespace zen {
 TEST_CASE("Block Serialization", "[serialization]") {
     BlockHeader header;
     header.version = 15;
-    serialization::Archive stream(serialization::Scope::kNetwork, 0);
-    CHECK(header.serialized_size(stream) == 12);
-    stream.clear();
-    header.serialize(stream);
+    header.parent_hash = h256(10);
+    serialization::Archive archive(serialization::Scope::kNetwork, 0);
+    CHECK(header.serialized_size(archive) == kBlockHeaderSize);
+    archive.clear();
+    CHECK(header.serialize(archive) == serialization::Error::kSuccess);
+
+    CHECK(archive.to_string() == "aa");
 
     // Check the version equals to 15
-    auto version_parsed{endian::load_little_u32(&stream[0])};
+    auto version_parsed{endian::load_little_u32(&archive[0])};
     CHECK(version_parsed == 15);
 }
 }  // namespace zen

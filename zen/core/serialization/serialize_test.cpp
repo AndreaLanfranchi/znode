@@ -8,8 +8,8 @@
 
 #include <zen/core/crypto/sha_2_256.hpp>
 #include <zen/core/encoding/hex.hpp>
+#include <zen/core/serialization/archive.hpp>
 #include <zen/core/serialization/serialize.hpp>
-#include <zen/core/serialization/stream.hpp>
 
 namespace zen::serialization {
 
@@ -254,7 +254,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         write_compact(stream, value);
         read_bytes = stream.read(stream.avail() + 1);
         CHECK_FALSE(read_bytes);
-        CHECK(read_bytes.error() == DeserializationError::kReadBeyondData);
+        CHECK(read_bytes.error() == Error::kReadBeyondData);
     }
 
     SECTION("Read Compact", "[serialization]") {
@@ -283,19 +283,19 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         Archive stream(Scope::kStorage, 0);
         auto value{read_compact(stream)};
         CHECK_FALSE(value);
-        CHECK(value.error() == DeserializationError::kReadBeyondData);
+        CHECK(value.error() == Error::kReadBeyondData);
 
         Bytes data{0xfd, 0x00, 0x00};  // Zero encoded with 3 bytes
         stream.write(data);
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == DeserializationError::kNonCanonicalCompactSize);
+        CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
         data.assign({0xfd, 0xfc, 0x00});  // 252 encoded with 3 bytes
         stream.write(data);
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == DeserializationError::kNonCanonicalCompactSize);
+        CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
         data.assign({0xfd, 0xfd, 0x00});  // 253 encoded with 3 bytes
         stream.write(data);
@@ -306,25 +306,25 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         stream.write(data);
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == DeserializationError::kNonCanonicalCompactSize);
+        CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
         data.assign({0xfe, 0xff, 0xff, 0x00, 0x00});  // 0xffff encoded with 5 bytes
         stream.write(data);
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == DeserializationError::kNonCanonicalCompactSize);
+        CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
         data.assign({0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});  // Zero encoded with 5 bytes
         stream.write(data);
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == DeserializationError::kNonCanonicalCompactSize);
+        CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
         data.assign({0xff, 0xff, 0xff, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00});  // 0x01ffffff encoded with nine bytes
         stream.write(data);
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == DeserializationError::kNonCanonicalCompactSize);
+        CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
         const uint64_t too_big_value{kMaxSerializedCompactSize + 1};
         Bytes too_big_data(reinterpret_cast<uint8_t*>(&too_big_data), sizeof(too_big_value));
@@ -332,7 +332,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         stream.write(too_big_data);
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == DeserializationError::kCompactSizeTooBig);
+        CHECK(value.error() == Error::kCompactSizeTooBig);
     }
 }
 }  // namespace zen::serialization

@@ -137,6 +137,8 @@ else()
 
     add_compile_options(/we4100)  # Unreferenced formal parameter
 
+    add_compile_options(/we4834)  # Discarded a [[nodiscard]] value
+
     add_compile_options(/we4018)  # Equivalent to -Wsign-conversion
     add_compile_options(/we4245)  # Equivalent to -Wsign-conversion
     add_compile_options(/we4267)  # Equivalent to -Wsign-conversion

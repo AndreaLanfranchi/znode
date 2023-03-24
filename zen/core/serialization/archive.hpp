@@ -18,6 +18,8 @@
 
 namespace zen::serialization {
 
+class Serializable;
+
 class Archive {
   public:
     using reference_type = typename SecureBytes::reference;
@@ -26,10 +28,7 @@ class Archive {
     using value_type = typename SecureBytes::value_type;
     using iterator_type = typename SecureBytes::iterator;
 
-    Archive(Scope scope, int version) : scope_{scope}, version_{version} {};
-
-    [[nodiscard]] Scope scope() const noexcept;
-    [[nodiscard]] int version() const noexcept;
+    Archive(Scope scope, int version) : scope{scope}, version{version} {};
 
     //! \brief Reserves capacity
     void reserve(size_type count);
@@ -60,7 +59,7 @@ class Archive {
 
     //! \brief Returns a view of requested bytes count from the actual read position
     //! \remarks After the view is returned the read position is advanced by count
-    [[nodiscard]] tl::expected<ByteView, DeserializationError> read(size_t count);
+    [[nodiscard]] tl::expected<ByteView, Error> read(size_t count);
 
     //! \brief Advances the read position by count
     //! \remarks If the count of bytes to be skipped exceeds the boundary of the buffer the read position
@@ -102,10 +101,11 @@ class Archive {
     //! \brief Returns the hexed representation of the data buffer
     [[nodiscard]] std::string to_string() const;
 
-    // Serialization for fundamental types
+    // Serialization for arithmetic types
     template <class T>
-        requires std::is_fundamental_v<T>
-    void bind(T& object, Action action) {
+        requires std::is_arithmetic_v<T>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        Error result{Error::kSuccess};
         switch (action) {
             using enum Action;
             case kComputeSize:
@@ -115,9 +115,97 @@ class Archive {
                 write_data(*this, object);
                 break;
             case kDeserialize:
-                read_data<T>(*this);
+                result = read_data(*this, object);
+                shrink();
                 break;
         }
+        return result;
+    }
+
+    template <class T>
+        requires std::is_same_v<T, intx::uint256>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        ZEN_ASSERT(sizeof(object) == 32);
+        Error result{Error::kSuccess};
+        switch (action) {
+            using enum Action;
+            case kComputeSize:
+                computed_size_ += sizeof(object);
+                break;
+            case kSerialize:
+                for (size_t i{0}; i < 4; ++i) {
+                    write_data(*this, object[i]);
+                }
+                break;
+            case kDeserialize:
+                for (size_t i{0}; i < 4; ++i) {
+                    result = read_data(*this, object[i]);
+                    if (result != Error::kSuccess) break;
+                }
+                break;
+        }
+        return result;
+    }
+
+    // Serialization for Serializable classes
+    template <class T>
+        requires std::derived_from<T, Serializable>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        return object.serialization(*this, action);
+    }
+
+    // Serialization for bytes array (fixed size)
+    template <class T, std::size_t N>
+        requires std::is_fundamental_v<T>
+    [[nodiscard]] Error bind(std::array<T, N>& object, Action action) {
+        Error result{Error::kSuccess};
+        const auto element_size{ser_sizeof(object[0])};
+        const auto array_bytes_size{N * element_size};
+        switch (action) {
+            using enum Action;
+            case kComputeSize:
+                computed_size_ += array_bytes_size;
+                break;
+            case kSerialize:
+                write(static_cast<uint8_t*>(object.data()), array_bytes_size);
+                break;
+            case kDeserialize:
+                auto read_result{read(array_bytes_size)};
+                if (!read_result) {
+                    result = read_result.error();
+                } else {
+                    std::memcpy(&object[0], read_result->data(), array_bytes_size);
+                }
+                break;
+        }
+        return result;
+    }
+
+    // Serialization for basic_string<bytes>
+    // Note ! In Bitcoin's objects variable sizes strings of bytes are
+    // a special case as they're always the last element of a structure.
+    // Due to this the size of the member is not recorded
+    template <class T>
+        requires std::is_same_v<T, Bytes>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        Error result{Error::kSuccess};
+        switch (action) {
+            using enum Action;
+            case kComputeSize:
+                computed_size_ += object.size();
+                break;
+            case kSerialize:
+                write(object);
+                break;
+            case kDeserialize:
+                auto data_length{this->avail()};
+                auto data{read(data_length)};
+                ZEN_ASSERT(data);  // Should not return an error
+                object.assign(*data);
+                shrink();
+                break;
+        }
+        return result;
     }
 
   private:
@@ -125,7 +213,8 @@ class Archive {
     size_type computed_size_{0};  // Total accrued size (for size computing)
     size_type read_position_{0};  // Current read position;
 
-    Scope scope_;
-    int version_{0};
+  public:
+    Scope scope{0};
+    int version{0};
 };
 }  // namespace zen::serialization

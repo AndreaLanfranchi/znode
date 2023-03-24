@@ -7,22 +7,26 @@
 #pragma once
 
 #include <zen/core/common/base.hpp>
-#include <zen/core/serialization/stream.hpp>
+#include <zen/core/serialization/archive.hpp>
 
 namespace zen::serialization {
 
 //! \brief Public interface all serializable objects must implement
 class Serializable {
   public:
-    [[nodiscard]] size_t serialized_size(Archive& stream) {
-        serialization(stream, stream.scope(), Action::kComputeSize);
-        return stream.computed_size();
+    [[nodiscard]] size_t serialized_size(Archive& archive) {
+        std::ignore = serialization(archive, Action::kComputeSize);
+        return archive.computed_size();
     }
 
-    void serialize(Archive& stream) { serialization(stream, stream.scope(), Action::kSerialize); }
+    [[nodiscard]] serialization::Error serialize(Archive& archive) {
+        return serialization(archive, Action::kSerialize);
+    }
+
+    // Needed for derived classes implementing spaceship operator
+    constexpr auto operator<=>(const Serializable&) const = default;
 
   private:
-    friend class Archive;
-    virtual void serialization(Archive& stream, Scope scope, Action action) = 0;
+    virtual Error serialization(Archive& archive, Action action) = 0;
 };
 }  // namespace zen::serialization

@@ -25,10 +25,13 @@ enum class Action : uint32_t {
     kDeserialize = (1 << 2)   // Deserializes data into object
 };
 
-enum class DeserializationError {
-    kSuccess,
+enum class Error {
+    kSuccess,  // Actually not an error
     kReadBeyondData,
     kNonCanonicalCompactSize,
     kCompactSizeTooBig,
 };
+
+inline bool operator!(Error e) { return e == static_cast<Error>(0); }
+
 }  // namespace zen::serialization

@@ -13,10 +13,11 @@
 #include <zen/core/common/endian.hpp>
 #include <zen/core/crypto/jenkins.hpp>
 #include <zen/core/encoding/hex.hpp>
+#include <zen/core/serialization/serializable.hpp>
 
 namespace zen {
 template <uint32_t BITS>
-class Hash {
+class Hash : public serialization::Serializable {
   public:
     static_assert(BITS >= 8 && BITS % 8 == 0, "Must be a multiple of 8");
     enum : uint32_t {
@@ -85,7 +86,7 @@ class Hash {
 
     const_iterator_type cend() { return bytes_.cend(); }
 
-    auto operator<=>(const Hash&) const = default;
+    constexpr auto operator<=>(const Hash&) const = default;
 
     inline explicit operator bool() const noexcept {
         auto ptr{bytes_.data()};
@@ -97,6 +98,11 @@ class Hash {
 
   private:
     alignas(uint32_t) std::array<uint8_t, kSize> bytes_{0};
+
+    friend class serialization::Archive;
+    [[nodiscard]] serialization::Error serialization(serialization::Archive& archive, serialization::Action action) override {
+        return archive.bind(bytes_, action);
+    }
 };
 
 using h160 = Hash<160>;

@@ -105,19 +105,30 @@ inline void write_compact(Archive& archive, uint64_t obj) {
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Archive>
     requires std::is_arithmetic_v<T>
-inline tl::expected<T, DeserializationError> read_data(Archive& archive) {
-    T ret{0};
-    const uint32_t count{ser_sizeof(ret)};
+inline Error read_data(Archive& archive, T& object) {
+    const uint32_t count{ser_sizeof(object)};
     const auto read_result{archive.read(count)};
-    if (!read_result) return tl::unexpected(read_result.error());
-    std::memcpy(&ret, read_result->data(), count);
+    if (!read_result) return read_result.error();
+    std::memcpy(&object, read_result->data(), count);
     archive.shrink();  // Remove consumed data
+    return Error::kSuccess;
+}
+
+//! \brief Lowest level deserialization for arithmetic types
+template <typename T, class Archive>
+    requires std::is_arithmetic_v<T>
+inline tl::expected<T, Error> read_data(Archive& archive) {
+    T ret{0};
+    auto result{read_data(archive, ret)};
+    if (result != Error::kSuccess) {
+        return tl::unexpected{result};
+    }
     return ret;
 }
 
 //! \brief Lowest level deserialization for compact integer
 template <class Archive>
-inline tl::expected<uint64_t, DeserializationError> read_compact(Archive& archive) {
+inline tl::expected<uint64_t, Error> read_compact(Archive& archive) {
     const auto size{read_data<uint8_t>(archive)};
     if (!size) return tl::unexpected(size.error());
 
@@ -127,20 +138,20 @@ inline tl::expected<uint64_t, DeserializationError> read_compact(Archive& archiv
     } else if (*size == 253) {
         const auto value{read_data<uint16_t>(archive)};
         if (!value) return tl::unexpected(value.error());
-        if (*value < 253) return tl::unexpected(DeserializationError::kNonCanonicalCompactSize);
+        if (*value < 253) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
     } else if (*size == 254) {
         const auto value{read_data<uint32_t>(archive)};
         if (!value) return tl::unexpected(value.error());
-        if (*value < 0x10000U) return tl::unexpected(DeserializationError::kNonCanonicalCompactSize);
+        if (*value < 0x10000U) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
     } else {
         const auto value{read_data<uint64_t>(archive)};
         if (!value) return tl::unexpected(value.error());
-        if (*value < 0x100000000ULL) return tl::unexpected(DeserializationError::kNonCanonicalCompactSize);
+        if (*value < 0x100000000ULL) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
     }
-    if (ret > kMaxSerializedCompactSize) return tl::unexpected(DeserializationError::kCompactSizeTooBig);
+    if (ret > kMaxSerializedCompactSize) return tl::unexpected(Error::kCompactSizeTooBig);
     return ret;
 }
 }  // namespace zen::serialization

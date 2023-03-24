@@ -7,13 +7,9 @@
 */
 
 #include <zen/core/encoding/hex.hpp>
-#include <zen/core/serialization/stream.hpp>
+#include <zen/core/serialization/archive.hpp>
 
 namespace zen::serialization {
-
-Scope Archive::scope() const noexcept { return scope_; }
-
-int Archive::version() const noexcept { return version_; }
 
 void Archive::reserve(size_type count) { buffer_.reserve(count); }
 
@@ -37,10 +33,10 @@ void Archive::erase(iterator_type where) { buffer_.erase(where); }
 
 void Archive::push_back(uint8_t byte) { buffer_.push_back(byte); }
 
-tl::expected<ByteView, DeserializationError> Archive::read(size_t count) {
+tl::expected<ByteView, Error> Archive::read(size_t count) {
     auto next_read_position{read_position_ + count};
     if (next_read_position > buffer_.length()) {
-        return tl::unexpected(DeserializationError::kReadBeyondData);
+        return tl::unexpected(Error::kReadBeyondData);
     }
     ByteView ret(&buffer_[read_position_], count);
     std::swap(read_position_, next_read_position);

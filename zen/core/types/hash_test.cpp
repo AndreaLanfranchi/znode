@@ -58,7 +58,7 @@ TEST_CASE("Hash", "[types]") {
     REQUIRE(parsed_hash1);
     auto parsed_hash2 = h256::from_hex("0x02");
     REQUIRE(parsed_hash2);
-    REQUIRE((parsed_hash1 != parsed_hash2));
+    REQUIRE((*parsed_hash1 != *parsed_hash2));
 }
 
 TEST_CASE("Hash to jenkins hash", "[types]") {

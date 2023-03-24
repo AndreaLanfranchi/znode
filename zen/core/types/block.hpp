@@ -27,14 +27,12 @@ class BlockHeader : public serialization::Serializable {
     uint32_t bits{0};
     intx::uint256 nonce{0};
     Bytes solution{};
+
     void reset();
 
   private:
-    void serialization(serialization::Archive& stream, [[maybe_unused]] serialization::Scope scope,
-                       serialization::Action action) override {
-        stream.bind(version, action);
-        stream.bind(time, action);
-        stream.bind(bits, action);
-    }
+    friend class serialization::Archive;
+    serialization::Error serialization(serialization::Archive& archive,
+                                                      serialization::Action action) override;
 };
 }  // namespace zen
