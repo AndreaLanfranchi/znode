@@ -87,7 +87,7 @@ std::string encode(ByteView bytes, bool with_prefix) noexcept {
         *dest++ = '0';
         *dest++ = 'x';
     }
-    for (int i{0}; i < bytes.length(); ++i, ++src) {
+    for (ByteView::size_type i{0}; i < bytes.length(); ++i, ++src) {
         *dest++ = kHexDigits[*src >> 4];
         *dest++ = kHexDigits[*src & 0x0f];
     }

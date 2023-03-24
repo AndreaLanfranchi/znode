@@ -138,11 +138,13 @@ else()
     add_compile_options(/we4100)  # Unreferenced formal parameter
 
     add_compile_options(/we4834)  # Discarded a [[nodiscard]] value
+    add_compile_options(/we5204)  # Missing Virtual Destructor
 
-    add_compile_options(/we4018)  # Equivalent to -Wsign-conversion
-    add_compile_options(/we4245)  # Equivalent to -Wsign-conversion
-    add_compile_options(/we4267)  # Equivalent to -Wsign-conversion
-    add_compile_options(/we4389)  # Equivalent to -Wsign-conversion
+    add_compile_options(/we4018)  # Signedness
+    add_compile_options(/we4388)  # Signedness
+    add_compile_options(/we4245)  # Signedness
+    add_compile_options(/we4267)  # Signedness
+    add_compile_options(/we4389)  # Signedness
 
     add_compile_options(/we6244)  # Equivalent to -Wshadow
     add_compile_options(/we6246)  # Equivalent to -Wshadow

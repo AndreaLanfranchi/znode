@@ -14,6 +14,9 @@ namespace zen::serialization {
 //! \brief Public interface all serializable objects must implement
 class Serializable {
   public:
+
+    virtual ~Serializable() = default;
+
     [[nodiscard]] size_t serialized_size(Archive& archive) {
         std::ignore = serialization(archive, Action::kComputeSize);
         return archive.computed_size();

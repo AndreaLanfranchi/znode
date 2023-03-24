@@ -41,7 +41,7 @@ template <UnsignedIntegralEx T>
     uint8_t bytes[sizeof(T)];
     intx::be::store(bytes, value);
     std::string hexed{encode(zeroless_view(bytes), with_prefix)};
-    if (hexed.length() == (with_prefix ? 2 : 0)) {
+    if (hexed.length() == (with_prefix ? 2U : 0U)) {
         hexed += "00";
     }
     return hexed;
