@@ -10,3 +10,15 @@ if (ZEN_TESTS)
     add_subdirectory(test)      # The testing suites
     add_subdirectory(benchmark) # The benchmarking suites
 endif ()
+
+if(NOT ZEN_CORE_ONLY)
+
+    find_package(absl REQUIRED)
+    find_package(Boost REQUIRED)
+    find_package(CLI11 REQUIRED)
+
+    # The node itself
+    add_executable(zend "zend.cpp")
+    target_link_libraries(zend PRIVATE zen_node zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
+
+endif()
