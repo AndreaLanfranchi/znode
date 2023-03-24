@@ -90,7 +90,7 @@ class Hash : public serialization::Serializable {
 
     inline explicit operator bool() const noexcept {
         auto ptr{bytes_.data()};
-        for (int i{0}; i < kSize; ++i) {
+        for (uint32_t i{0}; i < kSize; ++i) {
             if (*ptr > 0) return true;
         }
         return false;
@@ -100,7 +100,8 @@ class Hash : public serialization::Serializable {
     alignas(uint32_t) std::array<uint8_t, kSize> bytes_{0};
 
     friend class serialization::Archive;
-    [[nodiscard]] serialization::Error serialization(serialization::Archive& archive, serialization::Action action) override {
+    [[nodiscard]] serialization::Error serialization(serialization::Archive& archive,
+                                                     serialization::Action action) override {
         return archive.bind(bytes_, action);
     }
 };
