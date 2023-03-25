@@ -9,6 +9,8 @@
 #include <memory>
 #include <optional>
 
+#include <boost/asio/io_context.hpp>
+
 #include <zen/core/common/base.hpp>
 
 #include <zen/node/common/directories.hpp>
@@ -18,6 +20,7 @@ namespace zen {
 
 struct NodeSettings {
     std::string build_info{};                       // Human-readable build info
+    boost::asio::io_context asio_context;           // Async context (e.g. for timers)
     std::unique_ptr<DataDirectory> data_directory;  // Pointer to data folder
     db::EnvConfig chaindata_env_config{};           // Chaindata db config
     size_t batch_size{512_MiB};                     // Batch size to use in stages
