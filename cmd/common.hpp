@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <CLI/CLI.hpp>
+
 #include <zen/node/common/log.hpp>
 #include <zen/node/common/settings.hpp>
 
@@ -17,4 +19,4 @@ struct CoreSettings {
     zen::log::Settings log_settings;
 };
 
-} // namespace zen::cmd
+}  // namespace zen::cmd
