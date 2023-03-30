@@ -10,6 +10,7 @@ message(CHECK_START "Looking for required packages ...")
 find_package(absl CONFIG REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(prometheus-cpp CONFIG REQUIRED)
 
 file(GLOB_RECURSE ZEN_NODE_SRC CONFIGURE_DEPENDS "*.cpp" "*.hpp" "*.c" "*.h" "*.cc")
 list(FILTER ZEN_NODE_SRC EXCLUDE REGEX "_test\\.cpp$")
@@ -28,6 +29,8 @@ if(NOT ZEN_NODE_SRC_ITEMS EQUAL 0)
             mdbx-static
             nlohmann_json::nlohmann_json
             absl::time
+            prometheus-cpp::core
+            prometheus-cpp::pull
             )
 
     set(ZEN_NODE_PRIVATE_LIBS CLI11::CLI11)

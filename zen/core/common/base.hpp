@@ -28,6 +28,8 @@
 void boost::throw_exception(const std::exception& ex);
 #endif
 
+// Only 64 bit little endian arch allowed
+
 #if defined(_MSC_VER) || (defined(__INTEL_COMPILER) && defined(_WIN32))
 #if defined(_M_X64)
 #define BITNESS_64
@@ -48,6 +50,8 @@ void boost::throw_exception(const std::exception& ex);
 #endif
 #undef BITNESS_32
 #undef BITNESS_64
+
+static_assert(intx::byte_order_is_little_endian == true, "Target architecture MUST be little endian");
 
 namespace zen {
 
