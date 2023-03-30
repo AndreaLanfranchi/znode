@@ -65,14 +65,14 @@ int main(int argc, char* argv[]) {
         using asio_guard_type = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
         auto asio_guard = std::make_unique<asio_guard_type>(node_settings.asio_context.get_executor());
         std::thread asio_thread{[&node_settings]() -> void {
-            log::set_thread_name("Asio");
+            log::set_thread_name("asio");
             log::Trace("Boost Asio", {"state", "started"});
             node_settings.asio_context.run();
             log::Trace("Boost Asio", {"state", "stopped"});
         }};
 
         // Start sync loop
-        auto start_time{std::chrono::steady_clock::now()};
+        const auto start_time{std::chrono::steady_clock::now()};
         //        stagedsync::SyncLoop sync_loop(&node_settings, &chaindata_db, block_exchange);
         //        sync_loop.start(/*wait=*/false);
 
@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
             auto t2{std::chrono::steady_clock::now()};
             if ((t2 - t1) > std::chrono::seconds(10)) {
                 std::swap(t1, t2);
-                auto total_duration{t1 - start_time};
+                const auto total_duration{t1 - start_time};
 
                 log::Info("Resource usage", {
                                                 //
@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
         }
 
         t1 = std::chrono::steady_clock::now();
-        auto total_duration{t1 - start_time};
+        const auto total_duration{t1 - start_time};
         log::Info("All done", {"uptime", StopWatch::format(total_duration)});
 
         return 0;
