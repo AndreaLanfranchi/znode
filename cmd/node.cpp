@@ -8,15 +8,12 @@
 #include <iostream>
 #include <stdexcept>
 
-#include <zen/buildinfo.h>
-
 #include <zen/core/common/memory.hpp>
 
 #include <zen/node/common/stopwatch.hpp>
 #include <zen/node/concurrency/ossignals.hpp>
 
 #include "common.hpp"
-#include "zen/core/common/misc.hpp"
 
 using namespace zen;
 using namespace std::chrono;
@@ -30,12 +27,10 @@ int main(int argc, char* argv[]) {
     try {
         Ossignals::init();  // Intercept OS signals
 
-        cmd::CoreSettings settings;
+        cmd::Settings settings;
         auto& node_settings = settings.node_settings;
 
-        // TODO parse command line
-        (void)argc;
-        (void)argv;
+        cmd::parse_node_command_line(cli, argc, argv, settings);
 
         log::init(settings.log_settings);
         log::set_thread_name("main");
@@ -129,6 +124,8 @@ int main(int argc, char* argv[]) {
 
         return 0;
 
+    } catch (const CLI::ParseError& ex) {
+        return cli.exit(ex);
     } catch (const std::runtime_error& ex) {
         log::Error() << ex.what();
         return -1;

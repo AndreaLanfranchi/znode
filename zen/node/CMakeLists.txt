@@ -9,6 +9,7 @@
 message(CHECK_START "Looking for required packages ...")
 find_package(absl CONFIG REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
+find_package(CURL CONFIG REQUIRED) # Implicitly added by prometheus-cpp
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(prometheus-cpp CONFIG REQUIRED)
 
@@ -26,9 +27,10 @@ if(NOT ZEN_NODE_SRC_ITEMS EQUAL 0)
             ${ZEN_MAIN_DIR}/third-party/magic_enum/include)
 
     set(ZEN_NODE_PUBLIC_LIBS zen_core
+            absl::time
+            CURL::libcurl
             mdbx-static
             nlohmann_json::nlohmann_json
-            absl::time
             prometheus-cpp::core
             prometheus-cpp::pull
             )

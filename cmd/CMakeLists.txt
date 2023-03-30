@@ -18,7 +18,7 @@ if(NOT ZEN_CORE_ONLY)
     find_package(CLI11 REQUIRED)
 
     # The node itself
-    add_executable(zend "node.cpp;common.hpp")
+    add_executable(zend "node.cpp;common.hpp;common.cpp")
     target_link_libraries(zend PRIVATE zen_node zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
 
 endif()

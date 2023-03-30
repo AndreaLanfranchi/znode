@@ -99,6 +99,7 @@ if(NOT ZEN_CORE_ONLY)
     # Silence CMake policy warnings in submodules
     set(CMAKE_POLICY_DEFAULT_CMP0048 NEW) # project() command manages VERSION variables
     set(CMAKE_POLICY_DEFAULT_CMP0063 NEW) # Honor visibility properties for all target types
+    set(CMAKE_POLICY_DEFAULT_CMP0074 NEW)
 
     # MDBX
     set(MDBX_ENABLE_TESTS OFF)
