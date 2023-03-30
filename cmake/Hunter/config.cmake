@@ -42,6 +42,7 @@ hunter_config(
 hunter_cmake_args(
         prometheus-cpp
         CMAKE_ARGS
+        BUILD_SHARED_LIBS=ON
         ENABLE_PUSH=OFF
         ENABLE_COMPRESSION=OFF
 )

@@ -89,16 +89,16 @@ class ByteView : public std::basic_string_view<uint8_t> {
 };
 
 // Sizes base 10
-inline constexpr uint64_t kKB{1'000};        // 10^{3} bytes
-inline constexpr uint64_t kMB{kKB * 1'000};  // 10^{6} bytes
-inline constexpr uint64_t kGB{kMB * 1'000};  // 10^{9} bytes
-inline constexpr uint64_t kTB{kGB * 1'000};  // 10^{12} bytes
+static constexpr uint64_t kKB{1'000};        // 10^{3} bytes
+static constexpr uint64_t kMB{kKB * 1'000};  // 10^{6} bytes
+static constexpr uint64_t kGB{kMB * 1'000};  // 10^{9} bytes
+static constexpr uint64_t kTB{kGB * 1'000};  // 10^{12} bytes
 
 // Sizes base 2 https://en.wikipedia.org/wiki/Binary_prefix
-inline constexpr uint64_t kKiB{1024};        // 2^{10} bytes
-inline constexpr uint64_t kMiB{kKiB << 10};  // 2^{20} bytes
-inline constexpr uint64_t kGiB{kMiB << 10};  // 2^{30} bytes
-inline constexpr uint64_t kTiB{kGiB << 10};  // 2^{40} bytes
+static constexpr uint64_t kKiB{1024};        // 2^{10} bytes
+static constexpr uint64_t kMiB{kKiB << 10};  // 2^{20} bytes
+static constexpr uint64_t kGiB{kMiB << 10};  // 2^{30} bytes
+static constexpr uint64_t kTiB{kGiB << 10};  // 2^{40} bytes
 
 // Literals for sizes base 10
 constexpr uint64_t operator"" _KB(unsigned long long x) { return x * kKB; }
