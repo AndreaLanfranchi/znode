@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
         // Start boost asio
         using asio_guard_type = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
         auto asio_guard = std::make_unique<asio_guard_type>(node_settings.asio_context.get_executor());
-        std::thread asio_thread{[&node_settings]() -> void {
+        std::thread asio_thread{[&node_settings]() {
             log::set_thread_name("asio");
             log::Trace("Boost Asio", {"state", "started"});
             node_settings.asio_context.run();
@@ -72,8 +72,6 @@ int main(int argc, char* argv[]) {
 
         // Start sync loop
         const auto start_time{std::chrono::steady_clock::now()};
-        //        stagedsync::SyncLoop sync_loop(&node_settings, &chaindata_db, block_exchange);
-        //        sync_loop.start(/*wait=*/false);
 
         // Keep waiting till sync_loop stops
         // Signals are handled in sync_loop and below

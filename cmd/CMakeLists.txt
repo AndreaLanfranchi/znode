@@ -16,9 +16,10 @@ if(NOT ZEN_CORE_ONLY)
     find_package(absl REQUIRED)
     find_package(Boost REQUIRED)
     find_package(CLI11 REQUIRED)
+    find_package(prometheus-cpp REQUIRED)
 
     # The node itself
     add_executable(zend "node.cpp;common.hpp")
-    target_link_libraries(zend PRIVATE zen_node zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
+    target_link_libraries(zend PRIVATE zen_node zen-buildinfo CLI11::CLI11 prometheus-cpp $<$<BOOL:${MSVC}>:Kernel32.lib>)
 
 endif()
