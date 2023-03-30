@@ -28,6 +28,27 @@
 void boost::throw_exception(const std::exception& ex);
 #endif
 
+#if defined(_MSC_VER) || (defined(__INTEL_COMPILER) && defined(_WIN32))
+#if defined(_M_X64)
+#define BITNESS_64
+#else
+#define BITNESS_32
+#endif
+#elif defined(__clang__) || defined(__INTEL_COMPILER) || defined(__GNUC__)
+#if defined(__x86_64)
+#define BITNESS_64
+#else
+#define BITNESS_32
+#endif
+#else
+#error Cannot detect compiler or compiler is not supported
+#endif
+#if !defined(BITNESS_64)
+#error "Only 64 bit target architecture is supported"
+#endif
+#undef BITNESS_32
+#undef BITNESS_64
+
 namespace zen {
 
 using BlockNum = uint32_t;
@@ -37,7 +58,7 @@ concept UnsignedIntegral = std::unsigned_integral<T>;
 
 template <class T>
 concept UnsignedIntegralEx = UnsignedIntegral<T> || std::same_as<T, intx::uint128> || std::same_as<T, intx::uint256> ||
-    std::same_as<T, intx::uint512>;
+                             std::same_as<T, intx::uint512>;
 
 using Bytes = std::basic_string<uint8_t>;
 
