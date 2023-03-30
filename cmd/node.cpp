@@ -8,7 +8,6 @@
 #include <iostream>
 #include <stdexcept>
 
-#include <CLI/CLI.hpp>
 #include <zen/buildinfo.h>
 
 #include <zen/core/common/memory.hpp>
@@ -95,26 +94,32 @@ int main(int argc, char* argv[]) {
                 std::swap(t1, t2);
                 const auto total_duration{t1 - start_time};
 
-                log::Info("Resource usage", {
-                                                //
-                                                "mem", to_human_bytes(get_mem_usage(true), true),    //
-                                                "vmem", to_human_bytes(get_mem_usage(false), true),  //
-                                                //                        "chain",
-                                                //                        to_human_bytes((*node_settings.data_directory)["chaindata"].size(true),
-                                                //                        true),  //
-                                                //                        "etl-tmp",
-                                                //                        to_human_bytes((*node_settings.data_directory)["etl-tmp"].size(true),
-                                                //                        true),  //
-                                                "uptime", StopWatch::format(total_duration),  //
-                                            });
+                log::Info(
+                    "Resource usage",
+                    {
+                        //
+                        "mem", to_human_bytes(get_mem_usage(true), true),  //
+                        "vmem",
+                        to_human_bytes(
+                            get_mem_usage(false),
+                            true),  //
+                                    //                        "chain",
+                                    //                        to_human_bytes((*node_settings.data_directory)["chaindata"].size(true),
+                                    //                        true),  //
+                                    //                        "etl-tmp",
+                                    //                        to_human_bytes((*node_settings.data_directory)["etl-tmp"].size(true),
+                                    //                        true),  //
+                        "uptime", StopWatch::format(total_duration),  //
+                    });
             }
         }
 
         asio_guard.reset();
         asio_thread.join();
 
-        if(node_settings.data_directory) {
-            log::Message() << "Closing database chaindata path: " << (*node_settings.data_directory)["chaindata"].path();
+        if (node_settings.data_directory) {
+            log::Message() << "Closing database chaindata path: "
+                           << (*node_settings.data_directory)["chaindata"].path();
             // chaindata_db.close();
             log::Message() << "Database closed";
             // sync_loop.rethrow();  // Eventually throws the exception which caused the stop
