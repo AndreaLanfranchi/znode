@@ -7,6 +7,11 @@
 
 #include "common.hpp"
 
+#include <regex>
+
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/asio/ip/address.hpp>
+
 namespace zen::cmd {
 
 void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& settings) {
@@ -54,11 +59,19 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
         ->check(CLI::Range(1u, 7200u));
 
     cli.add_option("--sync.loop.log.interval", node_settings.sync_loop_log_interval_seconds,
-                   "Sets the interval between sync loop logs (in seconds)")
+                   "Sets the interval between sync loop INFO logs (in seconds)")
         ->capture_default_str()
         ->check(CLI::Range(10u, 600u));
 
     cli.add_flag("--fakepow", node_settings.fake_pow, "Disables proof-of-work verification");
+
+    cli.add_option("--prometheus.endpoint", node_settings.prometheus_endpoint,
+                   "Prometheus endpoint listening address\n"
+                   "Not set or empty means do not start metrics collection\n"
+                   "Use the form ip-address:port\n"
+                   "DO NOT EXPOSE TO THE PUBLIC INTERNET")
+        ->capture_default_str()
+        ->transform(IPEndPointValidator(/*allow_empty=*/true, /*default_port=*/8080));
 
     // Logging options
     auto& log_settings = settings.log_settings;
@@ -111,5 +124,69 @@ void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
     log_opts.add_flag("--log.threads", log_settings.log_threads, "Prints thread ids");
     log_opts.add_option("--log.file", log_settings.log_file, "Tee all log lines to given file name");
 }
+std::string get_node_name_from_build_info(const buildinfo* build_info) {
+    std::string node_name{"zen/"};
+    node_name.append(build_info->git_branch);
+    node_name.append(build_info->project_version);
+    node_name.append("/");
+    node_name.append(build_info->system_name);
+    node_name.append("-");
+    node_name.append(build_info->system_processor);
+    node_name.append("_");
+    node_name.append(build_info->build_type);
+    node_name.append("/");
+    node_name.append(build_info->compiler_id);
+    node_name.append("-");
+    node_name.append(build_info->compiler_version);
+    return node_name;
+}
 
+IPEndPointValidator::IPEndPointValidator(bool allow_empty, int default_port) {
+    func_ = [allow_empty, default_port](std::string& value) -> std::string {
+        if (value.empty() && allow_empty) {
+            return {};
+        }
+
+        const std::regex pattern(R"(^([\d\.]*|localhost)(:[\d]{1,4})?$)", std::regex_constants::icase);
+        std::smatch matches;
+        if (!std::regex_match(value, matches, pattern)) {
+            return "Value " + value + " is not a valid endpoint";
+        }
+
+        std::string address_part{matches[1].str()};
+        std::string port_part{matches[2].str()};
+
+        if (address_part.empty()) {
+            address_part = "0.0.0.0";
+        } else if (boost::iequals(address_part, "localhost")) {
+            address_part = "127.0.0.1";
+        }
+
+        if (!port_part.empty()) {
+            port_part.erase(0, 1);  // Get rid of initial ":"
+        } else {
+            if (default_port) {
+                port_part = std::to_string(default_port);
+            } else {
+                return "Value " + value + " does not contain a valid port";
+            }
+        }
+
+        // Validate IP address
+        boost::system::error_code err;
+        boost::asio::ip::make_address(address_part, err).to_string();
+        if (err) {
+            return "Value " + std::string(address_part) + " is not a valid ip address";
+        }
+
+        // Validate port
+        if (int port{std::stoi(port_part)}; port < 1 || port > 65535) {
+            return "Value " + port_part + " is not a valid port";
+        }
+
+        value = address_part + ":" + port_part;
+        std::cout << value << std::endl;
+        return {};
+    };
+}
 }  // namespace zen::cmd

@@ -54,7 +54,7 @@ struct HumanSizeParserValidator : public CLI::Validator {
 };
 
 struct IPEndPointValidator : public CLI::Validator {
-    explicit IPEndPointValidator(bool allow_empty = false);
+    explicit IPEndPointValidator(bool allow_empty = false, int default_port = 0);
 };
 
 //! \brief Set up options to populate log settings after cli.parse()
