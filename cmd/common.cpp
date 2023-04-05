@@ -127,6 +127,7 @@ void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
 std::string get_node_name_from_build_info(const buildinfo* build_info) {
     std::string node_name{"zen/"};
     node_name.append(build_info->git_branch);
+    node_name.append(" v");
     node_name.append(build_info->project_version);
     node_name.append("/");
     node_name.append(build_info->system_name);

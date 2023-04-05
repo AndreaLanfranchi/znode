@@ -67,10 +67,7 @@ int main(int argc, char* argv[]) {
         if (!node_settings.prometheus_endpoint.empty()) {
             log::Message("Service",
                          {"name", "prometheus", "status", "starting", "endpoint", node_settings.prometheus_endpoint});
-            node_settings.prometheus_exposer = std::make_unique<prometheus::Exposer>(node_settings.prometheus_endpoint);
-            log::Message("Service",
-                         {"name", "prometheus", "status", "started", "endpoint", node_settings.prometheus_endpoint});
-            node_settings.prometheus_registry = std::make_unique<prometheus::Registry>();
+            node_settings.prometheus_service = std::make_unique<zen::Prometheus>(node_settings.prometheus_endpoint);
         }
 
         // Start sync loop
@@ -79,7 +76,6 @@ int main(int argc, char* argv[]) {
         // Keep waiting till sync_loop stops
         // Signals are handled in sync_loop and below
         auto t1{std::chrono::steady_clock::now()};
-
         const auto chaindata_dir{(*node_settings.data_directory)["chaindata"]};
         const auto etltmp_dir{(*node_settings.data_directory)["etl-tmp"]};
 
@@ -95,22 +91,42 @@ int main(int argc, char* argv[]) {
             }
 
             auto t2{std::chrono::steady_clock::now()};
-            if ((t2 - t1) > std::chrono::seconds(60)) {
+            if ((t2 - t1) > std::chrono::seconds(30)) {
                 std::swap(t1, t2);
                 const auto total_duration{t1 - start_time};
 
+                const auto mem_usage{get_mem_usage(true)};
+                const auto vmem_usage{get_mem_usage(false)};
+                const auto chaindata_usage{chaindata_dir.size(true)};
+                const auto etltmp_usage{etltmp_dir.size(true)};
+
                 log::Info("Resource usage", {
                                                 "mem",
-                                                to_human_bytes(get_mem_usage(true), true),
+                                                to_human_bytes(mem_usage, true),
                                                 "vmem",
-                                                to_human_bytes(get_mem_usage(false), true),
+                                                to_human_bytes(vmem_usage, true),
                                                 "chain",
-                                                to_human_bytes(chaindata_dir.size(true), true),
+                                                to_human_bytes(chaindata_usage, true),
                                                 "etl-tmp",
-                                                to_human_bytes(etltmp_dir.size(true), true),
+                                                to_human_bytes(etltmp_usage, true),
                                                 "uptime",
                                                 StopWatch::format(total_duration),
                                             });
+
+                if (node_settings.prometheus_service) {
+                    static auto& resources_gauge{node_settings.prometheus_service->set_gauge(
+                        "resources_usage", "Node resources usage in bytes")};
+                    static auto& resident_memory_gauge{
+                        resources_gauge.Add({{"scope", "memory"}, {"type", "resident"}})};
+                    static auto& virtual_memory_gauge{resources_gauge.Add({{"scope", "memory"}, {"type", "virtual"}})};
+                    static auto& chaindata_gauge{resources_gauge.Add({{"scope", "storage"}, {"type", "chaindata"}})};
+                    static auto& etltmp_gauge{resources_gauge.Add({{"scope", "storage"}, {"type", "etl-tmp"}})};
+
+                    resident_memory_gauge.Set(static_cast<double>(mem_usage));
+                    virtual_memory_gauge.Set(static_cast<double>(vmem_usage));
+                    chaindata_gauge.Set(static_cast<double>(chaindata_usage));
+                    etltmp_gauge.Set(static_cast<double>(etltmp_usage));
+                }
             }
         }
 
