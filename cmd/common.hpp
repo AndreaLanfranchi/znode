@@ -7,7 +7,11 @@
 
 #pragma once
 
+#include <optional>
+
 #include <CLI/CLI.hpp>
+#include <curl/curl.h>
+#include <curl/easy.h>
 #include <zen/buildinfo.h>
 
 #include <zen/core/common/misc.hpp>
@@ -22,11 +26,19 @@ struct Settings {
     log::Settings log_settings;
 };
 
+//! \brief Callback for curl download progress
+int curl_download_progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal,
+                                    curl_off_t ulnow) noexcept;
+
+void curl_download_file(const std::string& url, const std::filesystem::path& destination_path,
+                        const std::optional<std::string> sha256sum = std::nullopt);
+
+void prime_zcash_params(const std::filesystem::path& params_dir);
+
+bool ask_user_confirmation(const std::string& message = "Confirm action?");
+
 //! \brief Parses command line arguments for node instance
 void parse_node_command_line(CLI::App& cli, int argc, char* argv[], Settings& settings);
-
-//! \brief Ensure database is ready to take off and consistent with command line arguments
-void run_preflight_checklist(NodeSettings& node_settings, bool init_if_empty = true);
 
 //! Assemble the full node name using the Cable build information
 std::string get_node_name_from_build_info(const buildinfo* build_info);

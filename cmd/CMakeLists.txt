@@ -20,5 +20,6 @@ if(NOT ZEN_CORE_ONLY)
     # The node itself
     add_executable(zend "node.cpp;common.hpp;common.cpp")
     target_link_libraries(zend PRIVATE zen_node zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
+    target_include_directories(zend PRIVATE ${ZEN_MAIN_DIR}/third-party/indicators/include)
 
 endif()

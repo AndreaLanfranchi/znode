@@ -104,6 +104,7 @@ class DataDirectory final : public Directory {
         std::ignore = operator[]("chaindata");
         std::ignore = operator[]("etl-tmp");
         std::ignore = operator[]("nodes");
+        std::ignore = operator[]("zcash-params");
     }
 };
 }  // namespace zen

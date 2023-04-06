@@ -14,11 +14,54 @@
 
 #include <zen/node/common/stopwatch.hpp>
 #include <zen/node/concurrency/ossignals.hpp>
+#include <zen/node/database/access_layer.hpp>
+#include <zen/node/database/mdbx_tables.hpp>
 
 #include "common.hpp"
 
 using namespace zen;
 using namespace std::chrono;
+
+//! \brief Ensures database is ready and consistent with command line arguments
+void prepare_chaindata_env(NodeSettings& node_settings, [[maybe_unused]] bool init_if_not_configured = true) {
+    bool chaindata_exclusive{node_settings.chaindata_env_config.exclusive};  // save setting
+    {
+        auto& config = node_settings.chaindata_env_config;
+        config.path = (*node_settings.data_directory)["chaindata"].path().string();
+        config.create = !std::filesystem::exists(db::get_datafile_path(config.path));
+        config.exclusive = true;  // Need to open exclusively to apply migrations (if any)
+    }
+
+    // Open chaindata environment and check tables
+    log::Message("Opening database", {"path", node_settings.chaindata_env_config.path});
+    auto chaindata_env{db::open_env(node_settings.chaindata_env_config)};
+    db::RWTxn tx(chaindata_env);
+    if (!chaindata_env.is_pristine()) {
+        // We have already initialized with schema
+        const auto detected_schema_version{db::read_schema_version(*tx)};
+        if (!detected_schema_version.has_value()) {
+            throw std::runtime_error("Unable to detect schema version");
+        }
+        log::Message("Database schema", {"version", detected_schema_version->to_string()});
+        if (*detected_schema_version < zen::db::tables::kRequiredSchemaVersion) {
+            // TODO Run migrations and update schema version
+            // for the moment an exception is thrown
+            std::string what{"Incompatible schema version:"};
+            what.append(" expected " + zen::db::tables::kRequiredSchemaVersion.to_string());
+            what.append(" got " + detected_schema_version->to_string());
+            throw std::runtime_error(what);
+        }
+    } else {
+        db::tables::deploy_tables(*tx, db::tables::kChainDataTables);
+        db::write_schema_version(*tx, zen::db::tables::kRequiredSchemaVersion);
+        tx.commit(/*renew=*/true);
+    }
+
+    tx.commit(/*renew=*/false);
+    chaindata_env.close();
+    node_settings.chaindata_env_config.exclusive = chaindata_exclusive;  // Restore from CLI
+    node_settings.chaindata_env_config.create = false;                   // Already created
+}
 
 int main(int argc, char* argv[]) {
     const auto build_info(zen_get_buildinfo());
@@ -33,8 +76,9 @@ int main(int argc, char* argv[]) {
         auto& node_settings = settings.node_settings;
 
         // This parses and validates command line arguments
-        // After return we're able to start services
+        // After return we're able to start services. Datadir has been deployed
         cmd::parse_node_command_line(cli, argc, argv, settings);
+        cmd::prime_zcash_params((*node_settings.data_directory)["zcash-params"].path());
 
         // Start logging
         log::init(settings.log_settings);
@@ -49,9 +93,12 @@ int main(int argc, char* argv[]) {
         auto const& mdbx_bld{mdbx::get_build()};
         log::Message("Using libmdbx",
                      {"version", mdbx_ver.git.describe, "build", mdbx_bld.target, "compiler", mdbx_bld.compiler});
-
         // Output OpenSSL build info
         log::Message("Using OpenSSL", {"version", OPENSSL_VERSION_TEXT});
+
+        // Check and open db
+        prepare_chaindata_env(node_settings, true);
+        auto chaindata_env{db::open_env(node_settings.chaindata_env_config)};
 
         // Start boost asio
         using asio_guard_type = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
@@ -81,7 +128,7 @@ int main(int argc, char* argv[]) {
 
         // TODO while (sync_loop.get_state() != Worker::State::kStopped) {
         while (true) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::this_thread::sleep_for(500ms);
 
             // Check signals
             if (Ossignals::signalled()) {
@@ -93,8 +140,8 @@ int main(int argc, char* argv[]) {
             auto t2{std::chrono::steady_clock::now()};
             if ((t2 - t1) > std::chrono::seconds(30)) {
                 std::swap(t1, t2);
-                const auto total_duration{t1 - start_time};
 
+                const auto total_duration{t1 - start_time};
                 const auto mem_usage{get_mem_usage(true)};
                 const auto vmem_usage{get_mem_usage(false)};
                 const auto chaindata_usage{chaindata_dir.size(true)};
@@ -135,7 +182,7 @@ int main(int argc, char* argv[]) {
 
         if (node_settings.data_directory) {
             log::Message("Closing database", {"path", (*node_settings.data_directory)["chaindata"].path().string()});
-            // chaindata_db.close();
+            chaindata_env.close();
             // sync_loop.rethrow();  // Eventually throws the exception which caused the stop
         }
 
