@@ -10,3 +10,6 @@
 [submodule "third-party/magic_enum"]
 	path = third-party/magic_enum
 	url = https://github.com/Neargye/magic_enum.git
+[submodule "third-party/indicators"]
+	path = third-party/indicators
+	url = https://github.com/p-ranav/indicators.git
