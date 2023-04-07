@@ -153,7 +153,7 @@ void curl_download_file(const std::string& url, const std::filesystem::path& des
         Bytes buffer(1_MiB, 0);
         crypto::Sha256 hasher;
         while (file_stream.good()) {
-            file_stream.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+            file_stream.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
             hasher.update(ByteView{buffer.data(), static_cast<std::size_t>(file_stream.gcount())});
         }
         file_stream.close();
