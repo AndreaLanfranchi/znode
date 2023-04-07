@@ -78,6 +78,7 @@ void curl_download_file(const std::string& url, const std::filesystem::path& des
                              option::PrefixText{"Downloading "},
                              option::PostfixText{file_name},
                              option::ForegroundColor{Color::green},
+                             option::ShowPercentage{true},
                              option::ShowElapsedTime{true},
                              option::ShowRemainingTime{true},
                              option::FontStyles{std::vector<FontStyle>{FontStyle::bold}}};
@@ -139,7 +140,7 @@ void curl_download_file(const std::string& url, const std::filesystem::path& des
         Bytes buffer(1_MiB, 0);
         crypto::Sha256 hasher;
         while (file_stream.good()) {
-            file_stream.read(reinterpret_cast<char*>(buffer.data()), 1_MiB);
+            file_stream.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
             hasher.update(ByteView{buffer.data(), static_cast<std::size_t>(file_stream.gcount())});
         }
         file_stream.close();
@@ -170,12 +171,13 @@ void prime_zcash_params(const std::filesystem::path& params_dir) {
         return;
     }
 
-    std::cout << "One or more required zcash param files are missing from this directory:\n"
-              << params_dir << "\n"
+    std::cout << "\n===============================================================================\n"
+              << "One or more required zcash param files are missing from this directory:\n"
+              << params_dir.string() << "\n"
               << "You can either allow me to download them now, or, if you have them already \n"
               << "under another data directory, you can copy those or link them there. \n"
               << "In any case I cannot proceed without this mandatory files. \n\n"
-              << "If you decide to download them now please allow some time: it's up to 1.57Gib download. \n\n";
+              << "If you decide to download them now please allow some time: it's up to 1.57Gib download. \n";
 
     if (!ask_user_confirmation("Do you want me to download them now?")) {
         throw std::runtime_error("Missing zcash params");

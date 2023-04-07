@@ -27,7 +27,7 @@ void prepare_chaindata_env(NodeSettings& node_settings, [[maybe_unused]] bool in
     bool chaindata_exclusive{node_settings.chaindata_env_config.exclusive};  // save setting
     {
         auto& config = node_settings.chaindata_env_config;
-        config.path = (*node_settings.data_directory)["chaindata"].path().string();
+        config.path = (*node_settings.data_directory)[DataDirectory::kChainDataName].path().string();
         config.create = !std::filesystem::exists(db::get_datafile_path(config.path));
         config.exclusive = true;  // Need to open exclusively to apply migrations (if any)
     }
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
         // This parses and validates command line arguments
         // After return we're able to start services. Datadir has been deployed
         cmd::parse_node_command_line(cli, argc, argv, settings);
-        cmd::prime_zcash_params((*node_settings.data_directory)["zcash-params"].path());
+        cmd::prime_zcash_params((*node_settings.data_directory)[DataDirectory::kZkParamsName].path());
 
         // Start logging
         log::init(settings.log_settings);
@@ -123,8 +123,8 @@ int main(int argc, char* argv[]) {
         // Keep waiting till sync_loop stops
         // Signals are handled in sync_loop and below
         auto t1{std::chrono::steady_clock::now()};
-        const auto chaindata_dir{(*node_settings.data_directory)["chaindata"]};
-        const auto etltmp_dir{(*node_settings.data_directory)["etl-tmp"]};
+        const auto chaindata_dir{(*node_settings.data_directory)[DataDirectory::kChainDataName]};
+        const auto etltmp_dir{(*node_settings.data_directory)[DataDirectory::kEtlTmpName]};
 
         // TODO while (sync_loop.get_state() != Worker::State::kStopped) {
         while (true) {
@@ -152,9 +152,9 @@ int main(int argc, char* argv[]) {
                                                 to_human_bytes(mem_usage, true),
                                                 "vmem",
                                                 to_human_bytes(vmem_usage, true),
-                                                "chain",
+                                                std::string(DataDirectory::kChainDataName),
                                                 to_human_bytes(chaindata_usage, true),
-                                                "etl-tmp",
+                                                std::string(DataDirectory::kEtlTmpName),
                                                 to_human_bytes(etltmp_usage, true),
                                                 "uptime",
                                                 StopWatch::format(total_duration),
@@ -166,8 +166,10 @@ int main(int argc, char* argv[]) {
                     static auto& resident_memory_gauge{
                         resources_gauge.Add({{"scope", "memory"}, {"type", "resident"}})};
                     static auto& virtual_memory_gauge{resources_gauge.Add({{"scope", "memory"}, {"type", "virtual"}})};
-                    static auto& chaindata_gauge{resources_gauge.Add({{"scope", "storage"}, {"type", "chaindata"}})};
-                    static auto& etltmp_gauge{resources_gauge.Add({{"scope", "storage"}, {"type", "etl-tmp"}})};
+                    static auto& chaindata_gauge{resources_gauge.Add(
+                        {{"scope", "storage"}, {"type", std::string(DataDirectory::kChainDataName)}})};
+                    static auto& etltmp_gauge{
+                        resources_gauge.Add({{"scope", "storage"}, {"type", std::string(DataDirectory::kEtlTmpName)}})};
 
                     resident_memory_gauge.Set(static_cast<double>(mem_usage));
                     virtual_memory_gauge.Set(static_cast<double>(vmem_usage));

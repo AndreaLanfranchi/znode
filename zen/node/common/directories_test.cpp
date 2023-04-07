@@ -113,25 +113,29 @@ TEST_CASE("Data Directory", "[misc]") {
     {
         DataDirectory data_dir{os_storage_path};
         zen_data_dir = data_dir.path();
-        CHECK_FALSE(std::filesystem::exists(data_dir.path() / "chaindata"));
-        CHECK_FALSE(std::filesystem::exists(data_dir.path() / "etl-tmp"));
-        CHECK_FALSE(std::filesystem::exists(data_dir.path() / "nodes"));
+        CHECK_FALSE(std::filesystem::exists(data_dir.path() / DataDirectory::kChainDataName));
+        CHECK_FALSE(std::filesystem::exists(data_dir.path() / DataDirectory::kEtlTmpName));
+        CHECK_FALSE(std::filesystem::exists(data_dir.path() / DataDirectory::kNodesName));
+        CHECK_FALSE(std::filesystem::exists(data_dir.path() / DataDirectory::kZkParamsName));
 
         data_dir.deploy();
-        CHECK(std::filesystem::exists(data_dir.path() / "chaindata"));
-        CHECK(std::filesystem::exists(data_dir.path() / "etl-tmp"));
-        CHECK(std::filesystem::exists(data_dir.path() / "nodes"));
+        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kChainDataName));
+        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kEtlTmpName));
+        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kNodesName));
+        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kNodesName));
 
         data_dir.clear(true);
-        CHECK(std::filesystem::exists(data_dir.path() / "chaindata"));
-        CHECK(std::filesystem::exists(data_dir.path() / "etl-tmp"));
-        CHECK(std::filesystem::exists(data_dir.path() / "nodes"));
+        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kChainDataName));
+        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kEtlTmpName));
+        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kNodesName));
+        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kZkParamsName));
     }
 
     // After destruction the path should be still in place
-    CHECK(std::filesystem::exists(zen_data_dir / "chaindata"));
-    CHECK(std::filesystem::exists(zen_data_dir / "etl-tmp"));
-    CHECK(std::filesystem::exists(zen_data_dir / "nodes"));
+    CHECK(std::filesystem::exists(zen_data_dir / DataDirectory::kChainDataName));
+    CHECK(std::filesystem::exists(zen_data_dir / DataDirectory::kEtlTmpName));
+    CHECK(std::filesystem::exists(zen_data_dir / DataDirectory::kNodesName));
+    CHECK(std::filesystem::exists(zen_data_dir / DataDirectory::kZkParamsName));
 
     // Clean up
     std::ignore = std::filesystem::remove_all(zen_data_dir);

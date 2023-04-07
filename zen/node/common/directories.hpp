@@ -99,12 +99,17 @@ class DataDirectory final : public Directory {
     //! \brief Override DataDirectory's clear method to avoid accidental loss of data
     void clear(bool) override{};
 
+    static constexpr std::string_view kChainDataName = "chaindata";
+    static constexpr std::string_view kEtlTmpName = "etl-tmp";
+    static constexpr std::string_view kNodesName = "nodes";
+    static constexpr std::string_view kZkParamsName = "zk-params";
+
     //! \brief Ensures all subdirs are properly created
     void deploy() {
-        std::ignore = operator[]("chaindata");
-        std::ignore = operator[]("etl-tmp");
-        std::ignore = operator[]("nodes");
-        std::ignore = operator[]("zcash-params");
+        std::ignore = operator[](kChainDataName);
+        std::ignore = operator[](kEtlTmpName);
+        std::ignore = operator[](kNodesName);
+        std::ignore = operator[](kZkParamsName);
     }
 };
 }  // namespace zen
