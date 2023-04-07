@@ -42,13 +42,15 @@ size_t get_mem_usage(bool resident) {
     // Reading from /proc/self/statm gives info on your own process, as one line of numbers that are:
     // virtual mem program size, resident set size, shared pages, text/code, data/stack, library, dirty pages.
     // The mem sizes should all be multiplied by the page size.
-    size_t vm_size = 0, rm_size = 0;
+    size_t vm_size{0};
+    size_t rm_size{0};
+    static const size_t page_size = static_cast<size_t>(getpagesize());
     FILE* file = fopen("/proc/self/statm", "r");
     if (file) {
         unsigned long vm = 0, rm = 0;
         if (fscanf(file, "%lu %lu", &vm, &rm) == 2) {  // the first 2 num: vm size, resident set size
-            vm_size = vm * static_cast<size_t>(getpagesize());
-            rm_size = rm * static_cast<size_t>(getpagesize());
+            vm_size = vm * page_size;
+            rm_size = rm * page_size;
         }
         fclose(file);
     }
