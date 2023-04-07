@@ -91,6 +91,7 @@ class TempDirectory final : public Directory {
 //! |-- chaindata <-- Where main chain database is stored
 //! |-- etl-tmp   <-- Where temporary files from etl collector are stored
 //! |-- nodes     <-- Where database for discovered nodes is stored
+//! |-- zk-params <-- Where zk-SNARK parameters are stored
 class DataDirectory final : public Directory {
   public:
     using Directory::Directory;

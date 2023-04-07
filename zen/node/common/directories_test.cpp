@@ -6,6 +6,7 @@
 */
 
 #include <fstream>
+#include <vector>
 
 #include <catch2/catch.hpp>
 
@@ -108,37 +109,35 @@ TEST_CASE("Temp Directory", "[misc]") {
 }
 
 TEST_CASE("Data Directory", "[misc]") {
-    const auto os_storage_path{get_os_default_storage_path()};
+
+    TempDirectory tmp_dir{};  // To not clash with existing data
+    const std::vector<std::string> subdirs{
+        std::string(DataDirectory::kChainDataName), std::string(DataDirectory::kEtlTmpName),
+        std::string(DataDirectory::kNodesName), std::string(DataDirectory::kZkParamsName)};
+
     std::filesystem::path zen_data_dir{};
     {
-        DataDirectory data_dir{os_storage_path};
+        DataDirectory data_dir{tmp_dir.path()};
         zen_data_dir = data_dir.path();
-        CHECK_FALSE(std::filesystem::exists(data_dir.path() / DataDirectory::kChainDataName));
-        CHECK_FALSE(std::filesystem::exists(data_dir.path() / DataDirectory::kEtlTmpName));
-        CHECK_FALSE(std::filesystem::exists(data_dir.path() / DataDirectory::kNodesName));
-        CHECK_FALSE(std::filesystem::exists(data_dir.path() / DataDirectory::kZkParamsName));
+        for (const auto& subdir : subdirs) {
+            CHECK_FALSE(std::filesystem::exists(zen_data_dir / subdir));
+        }
 
         data_dir.deploy();
-        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kChainDataName));
-        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kEtlTmpName));
-        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kNodesName));
-        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kNodesName));
+        for (const auto& subdir : subdirs) {
+            CHECK(std::filesystem::exists(zen_data_dir / subdir));
+        }
 
         data_dir.clear(true);
-        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kChainDataName));
-        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kEtlTmpName));
-        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kNodesName));
-        CHECK(std::filesystem::exists(data_dir.path() / DataDirectory::kZkParamsName));
+        for (const auto& subdir : subdirs) {
+            CHECK(std::filesystem::exists(zen_data_dir / subdir));
+        }
     }
 
-    // After destruction the path should be still in place
-    CHECK(std::filesystem::exists(zen_data_dir / DataDirectory::kChainDataName));
-    CHECK(std::filesystem::exists(zen_data_dir / DataDirectory::kEtlTmpName));
-    CHECK(std::filesystem::exists(zen_data_dir / DataDirectory::kNodesName));
-    CHECK(std::filesystem::exists(zen_data_dir / DataDirectory::kZkParamsName));
+    // After destruction of DataDirectory the paths should be still in place
+    for (const auto& subdir : subdirs) {
+        CHECK(std::filesystem::exists(zen_data_dir / subdir));
+    }
 
-    // Clean up
-    std::ignore = std::filesystem::remove_all(zen_data_dir);
 }
-
 }  // namespace zen
