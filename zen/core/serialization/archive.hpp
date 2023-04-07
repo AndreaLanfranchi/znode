@@ -28,7 +28,12 @@ class Archive {
     using value_type = typename SecureBytes::value_type;
     using iterator_type = typename SecureBytes::iterator;
 
-    Archive(Scope scope, int version) : scope{scope}, version{version} {};
+    Archive(Scope scope, int version) : scope_{scope}, version_{version} {};
+
+    [[nodiscard]] int get_version() const { return version_; }
+    [[nodiscard]] Scope get_scope() const { return scope_; }
+
+    void set_version(int version) { version_ = version; }
 
     //! \brief Reserves capacity
     void reserve(size_type count);
@@ -209,12 +214,10 @@ class Archive {
     }
 
   private:
+    Scope scope_{0};
+    int version_{0};
     SecureBytes buffer_{};        // Data buffer
     size_type computed_size_{0};  // Total accrued size (for size computing)
     size_type read_position_{0};  // Current read position;
-
-  public:
-    Scope scope{0};
-    int version{0};
 };
 }  // namespace zen::serialization

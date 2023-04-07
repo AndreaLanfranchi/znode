@@ -25,7 +25,7 @@ serialization::Error BlockHeader::serialization(serialization::Archive& archive,
     using namespace serialization;
     using enum Error;
     Error error{archive.bind(version, action)};
-    if (!error) archive.version = version;
+    if (!error) archive.set_version(version);
     if (!error) error = archive.bind(parent_hash, action);
     if (!error) error = archive.bind(merkle_root, action);
     if (!error) error = archive.bind(scct_root, action);
