@@ -49,7 +49,7 @@ Once the prerequisites are installed boostrap cmake by running
 ```shell
 $ mkdir build
 $ cd build
-$ cmake [-DCMAKE_BUILD_TYPE="[Debug|Release|RelWithDebInfo|MinSizeRel]"]..
+$ cmake [-DCMAKE_BUILD_TYPE="[Debug|Release|RelWithDebInfo|MinSizeRel]"] ..
 ```
 _On the very first run of this command the toolchain will download and build additional components like, for example, the Boost Library.
 This operation may take some time depending on the capabilities of your hardware and your internet connection.
@@ -159,7 +159,7 @@ We adhere to [Google's C++ Style Guide] with the following differences:
 - classes and struct names must be in Pascal Case (`class FancyFoo`)
 - prefer `using` instead of `typedef`
 - `.cpp/.hpp` file extensions for C++ : `.c/.h` are reserved for C
-- `using namespace foo` is allowed into source files (`.cpp`) but not inside headers
+- `using namespace foo` is allowed into source files (`.cpp`) but not inside headers unless limited in a reduced scope (i.e. inside a templatized class)
 - Exceptions are allowed **only outside** the `core` library
 - User-defined literals are allowed
 - Maximum line length is 120, indentation is 4 spaces - see [.clang-format](.clang-format)
