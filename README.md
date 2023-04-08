@@ -114,7 +114,7 @@ For Visual Studio setups follow this instructions:
 - To build simply `CTRL+Shift+B`
 - Build files, libraries and executable binaries are written to `"${projectDir}\build\` If you want to change this path simply edit `CMakeSettings.json` file and choose an output directory which does not pollute the source directory tree (e.g. `%USERPROFILE%\.cmake-builds\${projectName}\`)
 
-*We've deliberately chosen to force cmake generator to `Visual Studio 17 2022 Win64` even if it might result being slower than `Ninja`: fact is [Boost](https://www.boost.org/) libraries fail to build properly on windows using Ninja generator.*
+*We've deliberately chosen to force cmake generator to `Visual Studio 17 2022 Win64` even if it might result being slower than `Ninja`: fact is [Boost](https://www.boost.org/) libraries fail to build properly on MSVC toolchain using Ninja generator.*
 
 ### Memory compression on Windows 10/11
 
