@@ -7,6 +7,7 @@
 ]]
 
 message(CHECK_START "Looking for required packages ...")
+find_package(Boost CONFIG REQUIRED COMPONENTS context coroutine)
 find_package(absl CONFIG REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
 find_package(CURL CONFIG REQUIRED) # Implicitly added by prometheus-cpp
@@ -33,6 +34,8 @@ if(NOT ZEN_NODE_SRC_ITEMS EQUAL 0)
             nlohmann_json::nlohmann_json
             prometheus-cpp::core
             prometheus-cpp::pull
+            Boost::context
+            Boost::coroutine
             )
 
     set(ZEN_NODE_PRIVATE_LIBS CLI11::CLI11)

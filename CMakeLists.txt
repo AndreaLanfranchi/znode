@@ -136,10 +136,10 @@ else()
 
     add_compile_options(/permissive-)
 
-    add_compile_options(/we4100)  # Unreferenced formal parameter
+    #add_compile_options(/we4100)  # Unreferenced formal parameter
 
     add_compile_options(/we4834)  # Discarded a [[nodiscard]] value
-    add_compile_options(/we5204)  # Missing Virtual Destructor
+    #add_compile_options(/we5204)  # Missing Virtual Destructor
 
     add_compile_options(/we4018)  # Signedness
     add_compile_options(/we4388)  # Signedness

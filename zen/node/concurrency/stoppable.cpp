@@ -11,8 +11,7 @@
 
 namespace zen {
 
-bool Stoppable::stop(bool wait) noexcept {
-    std::ignore = wait;  // In non threaded components we don't need this
+bool Stoppable::stop([[maybe_unused]] /*in non-threaded components we don't need this*/ bool wait) noexcept {
     bool expected{false};
     return stop_requested_.compare_exchange_strong(expected, true);
 }

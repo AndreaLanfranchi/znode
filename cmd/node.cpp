@@ -16,6 +16,7 @@
 #include <zen/node/concurrency/ossignals.hpp>
 #include <zen/node/database/access_layer.hpp>
 #include <zen/node/database/mdbx_tables.hpp>
+#include <zen/node/network/server.hpp>
 
 #include "common.hpp"
 
@@ -40,7 +41,7 @@ void prepare_chaindata_env(NodeSettings& node_settings, [[maybe_unused]] bool in
         // We have already initialized with schema
         const auto detected_schema_version{db::read_schema_version(*tx)};
         if (!detected_schema_version.has_value()) {
-            throw std::runtime_error("Unable to detect schema version");
+            throw db::Exception("Unable to detect schema version");
         }
         log::Message("Database schema", {"version", detected_schema_version->to_string()});
         if (*detected_schema_version < zen::db::tables::kRequiredSchemaVersion) {
@@ -117,6 +118,11 @@ int main(int argc, char* argv[]) {
             node_settings.prometheus_service = std::make_unique<zen::Prometheus>(node_settings.prometheus_endpoint);
         }
 
+        // Start networking server
+        zen::network::Server net_server(node_settings.asio_context,
+                                        boost::asio::ip::tcp::endpoint{boost::asio::ip::tcp::v4(), 13383});
+        net_server.start();
+
         // Start sync loop
         const auto start_time{std::chrono::steady_clock::now()};
 
@@ -179,6 +185,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        net_server.stop();  // Stop networking server
         asio_guard.reset();
         asio_thread.join();
 
@@ -202,9 +209,12 @@ int main(int argc, char* argv[]) {
     } catch (const std::invalid_argument& ex) {
         std::cerr << "\tInvalid argument :" << ex.what() << "\n" << std::endl;
         return -3;
+    } catch (const db::Exception& ex) {
+        std::cerr << "\tUnexpected db error : " << ex.what() << "\n" << std::endl;
+        return -4;
     } catch (const std::exception& ex) {
         std::cerr << "\tUnexpected error : " << ex.what() << "\n" << std::endl;
-        return -4;
+        return -5;
     } catch (...) {
         std::cerr << "\tUnexpected undefined error\n" << std::endl;
         return -99;

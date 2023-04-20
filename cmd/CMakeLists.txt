@@ -14,7 +14,6 @@ endif ()
 if(NOT ZEN_CORE_ONLY)
 
     find_package(absl REQUIRED)
-    find_package(Boost REQUIRED)
     find_package(CLI11 REQUIRED)
 
     # The node itself
