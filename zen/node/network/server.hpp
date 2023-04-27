@@ -16,7 +16,7 @@
 
 namespace zen::network {
 
-class Server final: public zen::Stoppable, private boost::noncopyable {
+class Server final : public zen::Stoppable, private boost::noncopyable {
   public:
     Server(boost::asio::io_context& io_context, boost::asio::ip::tcp::endpoint endpoint)
         : io_context_{io_context}, acceptor_{io_context, endpoint} {}
@@ -28,7 +28,7 @@ class Server final: public zen::Stoppable, private boost::noncopyable {
                 boost::system::error_code ec;
                 boost::asio::ip::tcp::socket socket{io_context_};
                 acceptor_.async_accept(socket, yield[ec]);
-                if(ec == boost::asio::error::operation_aborted) break; // acceptor closed by programmatic request
+                if (ec == boost::asio::error::operation_aborted) break;  // acceptor closed by programmatic request
                 // TODO determine whether we can accept this new inbound connection or
                 // we have exceeded the maximum number of connections
 

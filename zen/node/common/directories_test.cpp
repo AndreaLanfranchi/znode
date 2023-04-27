@@ -109,7 +109,6 @@ TEST_CASE("Temp Directory", "[misc]") {
 }
 
 TEST_CASE("Data Directory", "[misc]") {
-
     TempDirectory tmp_dir{};  // To not clash with existing data
     const std::vector<std::string> subdirs{
         std::string(DataDirectory::kChainDataName), std::string(DataDirectory::kEtlTmpName),
@@ -138,6 +137,5 @@ TEST_CASE("Data Directory", "[misc]") {
     for (const auto& subdir : subdirs) {
         CHECK(std::filesystem::exists(zen_data_dir / subdir));
     }
-
 }
 }  // namespace zen

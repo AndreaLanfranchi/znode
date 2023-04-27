@@ -62,7 +62,7 @@ concept UnsignedIntegral = std::unsigned_integral<T>;
 
 template <class T>
 concept UnsignedIntegralEx = UnsignedIntegral<T> || std::same_as<T, intx::uint128> || std::same_as<T, intx::uint256> ||
-                             std::same_as<T, intx::uint512>;
+    std::same_as<T, intx::uint512>;
 
 using Bytes = std::basic_string<uint8_t>;
 

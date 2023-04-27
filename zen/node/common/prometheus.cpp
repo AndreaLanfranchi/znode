@@ -15,22 +15,21 @@ Prometheus::Prometheus(std::string listen_address) {
     registry_ = std::make_shared<prometheus::Registry>();
     exposer_->RegisterCollectable(registry_);
 
-//    auto& packet_counter =
-//        BuildCounter().Name("observed_packets_total").Help("Number of observed packets").Register(*registry_);
-//
-//
-//    // add and remember dimensional data, incrementing those is very cheap
-//    packet_counter.Add({{"protocol", "tcp"}, {"direction", "rx"}});
-//    packet_counter.Add({{"protocol", "tcp"}, {"direction", "tx"}});
-//    packet_counter.Add({{"protocol", "udp"}, {"direction", "rx"}});
-//    packet_counter.Add({{"protocol", "udp"}, {"direction", "tx"}});
-//
-//
-//
-//
-//    for(const auto& m : registry_->Collect()) {
-//        std::cout << m.name << std::endl;
-//    }
-
+    //    auto& packet_counter =
+    //        BuildCounter().Name("observed_packets_total").Help("Number of observed packets").Register(*registry_);
+    //
+    //
+    //    // add and remember dimensional data, incrementing those is very cheap
+    //    packet_counter.Add({{"protocol", "tcp"}, {"direction", "rx"}});
+    //    packet_counter.Add({{"protocol", "tcp"}, {"direction", "tx"}});
+    //    packet_counter.Add({{"protocol", "udp"}, {"direction", "rx"}});
+    //    packet_counter.Add({{"protocol", "udp"}, {"direction", "tx"}});
+    //
+    //
+    //
+    //
+    //    for(const auto& m : registry_->Collect()) {
+    //        std::cout << m.name << std::endl;
+    //    }
 }
 }  // namespace zen

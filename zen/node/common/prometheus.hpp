@@ -20,13 +20,15 @@ class Prometheus {
 
     prometheus::Registry& registry() { return *registry_; }
 
-    [[nodiscard]] prometheus::Family<prometheus::Counter>& set_counter(const std::string& name, const std::string& help) {
+    [[nodiscard]] prometheus::Family<prometheus::Counter>& set_counter(const std::string& name,
+                                                                       const std::string& help) {
         return prometheus::BuildCounter().Name(name).Help(help).Register(*registry_);
     }
     [[nodiscard]] prometheus::Family<prometheus::Gauge>& set_gauge(const std::string& name, const std::string& help) {
         return prometheus::BuildGauge().Name(name).Help(help).Register(*registry_);
     }
-    [[nodiscard]] prometheus::Family<prometheus::Histogram>& set_histogram(const std::string& name, const std::string& help) {
+    [[nodiscard]] prometheus::Family<prometheus::Histogram>& set_histogram(const std::string& name,
+                                                                           const std::string& help) {
         return prometheus::BuildHistogram().Name(name).Help(help).Register(*registry_);
     }
 
