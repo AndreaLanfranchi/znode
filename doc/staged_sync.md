@@ -2,6 +2,10 @@
 - [Documents Index](README.md)
 - [What is a Staged Sync](#what-is-a-staged-sync)
 - [How Staged Sync Works](#how-staged-sync-works)
+- [Verify the sync state](#verify-the-sync-state)
+
+[Erigon]: https://github.com/ledgerwatch/erigon
+[Silkworm]: https://github.com/torquem-ch/silkworm/
 
 ## What is a Staged Sync
 Staged sync is a new approach of synchronizing node's data up to the tip of the blockchain.
@@ -48,7 +52,7 @@ At its bare bones the Staged Sync can be explained as follows: let's assume a ne
 6. After the execution the node builds its internal indexes (if any)
 7. The loop of stages is now finished. As the phase from point 1. to 6. requires time is very likely the chain has also advanced hence we go-to point 2. again
 
-When, after several cycles, the node is running one full stage cycle processing 1 block at a time it's eventually in sync.
+When, after several cycles, the node is capable of running one full stage cycle processing only 1 block at a time, we can say the node is eventually in sync with the network.
 
 Should the application be restarted in the middle of stage loop, at next restart the cycle restarts from the beginning.
 Let's make an example:
@@ -58,5 +62,15 @@ Let's make an example:
 
 At subsequent restart is very likely the chain has advanced, say to 1.1M blocks, hence the node will download 100K headers, 100K blocks and the execution will restart from 500K up to 1.1M.
 
-[Erigon]: https://github.com/ledgerwatch/erigon
-[Silkworm]: https://github.com/torquem-ch/silkworm/
+## Verify the sync state
+According to what just described in the previous chapter, an attentive reader might argue : "How this kind of implementation can verify the correct state of the chain?" 
+Unlike traditional implementations, where the whole state is reconstructed and persisted (wrt the Merkle Tree) every time a new block is chained to the network (which, during initial sync, might result
+in a very expensive set of reads, writes and commits to the underlying database), in the staged sync model we have to wait for the completion of at least the very three first stages. In particular:
+- Stage 1: download of headers where we can verify the semantic validity of each header (i.e. the header is correctly chained to its ancestor)
+- Stage 2: download of blocks where we can verify the semantic validity of each block (i.e. the block is correctly formed)
+- Stage 3: execution of block's contents where we can verify the contextual validity of each transaction and, when applied, obtain the updated state which is summarized in the MerkleTree root.
+
+Should we record a failure in any of the above stages, the node will have different strategies to recover on behalf of which stage is the failing one:
+- Stage 1: the node will re-download the headers from the last known good header marking the failing one as _bad_ and not requesting it to peers anymore
+- Stage 2: the node will deem the associated header as _bad_ and will not request it to peers anymore. Eventually it will restart from Stage 1
+- Stage 3: the node will begin a backward binary search to the last valid blocking producing a consistent MerkleRoot

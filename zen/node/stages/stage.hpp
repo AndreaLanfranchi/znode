@@ -37,7 +37,7 @@ struct SyncContext : private boost::noncopyable {
 
 class Stage : public Stoppable {
   public:
-    enum class [[nodiscard]] Result{
+    enum class [[nodiscard("Return codes must always be checked")]] Result{
         kSuccess,                 //
         kDbError,                 //
         kAborted,                 //
@@ -62,7 +62,7 @@ class Stage : public Stoppable {
     };
 
     explicit Stage(SyncContext* sync_context, const char* stage_name, NodeSettings* node_settings);
-    virtual ~Stage() = default;
+    ~Stage() override = default;
 
     //! \brief Forward is called when the stage is executed. The main logic of the stage must be here.
     //! \param [in] txn : A db transaction holder
@@ -127,7 +127,7 @@ class StageError : public std::exception {
     [[nodiscard]] const char* what() const noexcept override { return message_.c_str(); }
     [[nodiscard]] int err() const noexcept { return err_; }
 
-  protected:
+  private:
     int err_;
     std::string message_;
 };

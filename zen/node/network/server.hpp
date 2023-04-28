@@ -24,11 +24,12 @@ class Server final : public zen::Stoppable, private boost::noncopyable {
 
     void start() {
         boost::asio::spawn(io_context_, [this](boost::asio::yield_context yield) {
-            while (!stopped_) {
+            while (!is_stopping()) {
                 boost::system::error_code ec;
                 boost::asio::ip::tcp::socket socket{io_context_};
                 acceptor_.async_accept(socket, yield[ec]);
                 if (ec == boost::asio::error::operation_aborted) break;  // acceptor closed by programmatic request
+
                 // TODO determine whether we can accept this new inbound connection or
                 // we have exceeded the maximum number of connections
 
@@ -40,7 +41,7 @@ class Server final : public zen::Stoppable, private boost::noncopyable {
                                 std::array<char, 1024> buffer;
                                 boost::system::error_code ec1;
                                 size_t len{0};
-                                while (!stopped_ &&
+                                while (!is_stopping() &&
                                        (len = socket.async_read_some(boost::asio::buffer(buffer), yield[ec1])) > 0 &&
                                        !ec1) {
                                     boost::asio::async_write(socket, boost::asio::buffer(buffer, len), yield[ec1]);
@@ -48,7 +49,7 @@ class Server final : public zen::Stoppable, private boost::noncopyable {
                                 }
                             } catch (const std::exception& e) {
                                 log::Error("Connection acceptor", {"status", "aborted", "reason", e.what()});
-                                stopped_ = true;
+                                std::ignore = Stoppable::stop(false);
                             }
                         });
                 } else {
@@ -58,15 +59,16 @@ class Server final : public zen::Stoppable, private boost::noncopyable {
         });
     }
 
-    void stop() {
-        stopped_ = true;
-        acceptor_.cancel();
+    bool stop(bool wait) override {
+        bool ret = Stoppable::stop(wait);
+        if (ret) {
+            acceptor_.cancel();
+        }
     }
 
   private:
     boost::asio::io_context& io_context_;
     boost::asio::ip::tcp::acceptor acceptor_;
-    bool stopped_{false};
 };
 
 }  // namespace zen::network

@@ -8,4 +8,4 @@ this as experimental. Still using Boost::format
 Will be available in C++23. As a result we make use of monadic from [tl/expected](https://github.com/TartanLlama/expected).
 std::optional is not an "option" as it looses info about reason for missed value generation
 ## OpenSSL 3
-Hunter does not support it yet. See WIP at https://github.com/cpp-pm/hunter/pull/668
+Version 1.x is going to be deprecated in Sept 2023.
