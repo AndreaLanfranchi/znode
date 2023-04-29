@@ -59,11 +59,12 @@ class Server final : public zen::Stoppable, private boost::noncopyable {
         });
     }
 
-    bool stop(bool wait) override {
+    bool stop(bool wait) noexcept override {
         bool ret = Stoppable::stop(wait);
         if (ret) {
             acceptor_.cancel();
         }
+        return ret;
     }
 
   private:

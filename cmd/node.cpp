@@ -185,7 +185,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        net_server.stop();  // Stop networking server
+        net_server.stop(true);  // Stop networking server
         asio_guard.reset();
         asio_thread.join();
 
