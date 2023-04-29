@@ -67,8 +67,6 @@ static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection di
 
     if (!config.create && !db_ondisk_file_size) {
         throw std::runtime_error("Unable to locate " + db_file.string() + ", which is required to exist");
-    } else if (config.create && db_ondisk_file_size) {
-        throw std::runtime_error("File " + db_file.string() + " already exists but create was set");
     }
 
     // Prevent mapping a file with a smaller map size than the size on disk.
@@ -115,7 +113,10 @@ static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection di
         auto growth_size = static_cast<intptr_t>(config.inmemory ? 8_MiB : config.growth_size);
         cp.geometry.make_dynamic(::mdbx::env::geometry::default_value, max_map_size);
         cp.geometry.growth_step = growth_size;
-        if (!db_ondisk_file_size) cp.geometry.pagesize = static_cast<intptr_t>(config.page_size);
+        if (!db_ondisk_file_size && config.page_size) {
+            // If file already exists we can't change the value
+            cp.geometry.pagesize = static_cast<intptr_t>(config.page_size);
+        }
     }
 
     using OP = ::mdbx::env::operate_parameters;
@@ -126,12 +127,19 @@ static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection di
     op.max_maps = config.max_tables;
     op.max_readers = config.max_readers;
 
+    // Try open the environment
     ::mdbx::env_managed ret{db_path.native(), cp, op, config.shared};
-    if (size_t db_page_size{ret.get_pagesize()}; db_page_size != config.page_size) {
-        throw std::length_error(
-            "Incompatible page size. "
-            "Requested " +
-            to_human_bytes(config.page_size) + " db has " + to_human_bytes(db_page_size));
+
+    // Check requested page_size matches the one already configured
+    if (!db_ondisk_file_size && config.page_size) {
+        const size_t db_page_size{ret.get_pagesize()};
+        if (db_page_size != config.page_size) {
+            ret.close();
+            throw std::length_error(
+                "Incompatible page size. "
+                "Requested " +
+                to_human_bytes(config.page_size, true) + " db has " + to_human_bytes(db_page_size, true));
+        }
     }
 
     if (!config.shared) {

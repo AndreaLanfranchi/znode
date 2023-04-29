@@ -139,7 +139,7 @@ using WalkFuncRef = absl::FunctionRef<void(ByteView key, ByteView value)>;
 //! \brief Essential environment settings
 struct EnvConfig {
     std::string path{};
-    bool create{false};         // Whether db file must be created
+    bool create{false};         // Whether db file must be created if it does not exist
     bool readonly{false};       // Whether db should be opened in RO mode
     bool exclusive{false};      // Whether this process has exclusive access
     bool inmemory{false};       // Whether this db is in memory

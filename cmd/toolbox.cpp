@@ -126,7 +126,7 @@ dbTablesInfo get_tablesInfo(::mdbx::txn& txn) {
     return ret;
 }
 
-void do_tables(db::EnvConfig& config) {
+void do_tables(const db::EnvConfig& config) {
     static std::string fmt_hdr{" %3s %-24s %10s %2s %10s %10s %10s %12s %10s %10s"};
     static std::string fmt_row{" %3i %-24s %10u %2u %10u %10u %10u %12s %10s %10s"};
 
@@ -136,7 +136,9 @@ void do_tables(db::EnvConfig& config) {
     auto dbTablesInfo{get_tablesInfo(txn)};
     auto dbFreeInfo{get_freeInfo(txn)};
 
-    std::cout << "\n Database tables          : " << dbTablesInfo.tables.size() << "\n" << std::endl;
+    std::cout << "\n Database tables    : " << dbTablesInfo.tables.size()
+              << "\n Database page size : " << to_human_bytes(env.get_pagesize(), true) << "\n"
+              << std::endl;
     // std::cout << " Effective pruning        : " << db::read_prune_mode(txn).to_string() << "\n" << std::endl;
 
     if (!dbTablesInfo.tables.empty()) {
@@ -191,7 +193,7 @@ int main(int argc, char* argv[]) {
     db_opts->get_formatter()->column_width(35);
     auto db_path = db_opts->add_option("--db", "Path to database")
                        ->capture_default_str()
-                       ->required(true)
+                       ->default_str((get_os_default_storage_path() / DataDirectory::kChainDataName).string())
                        ->check(CLI::ExistingDirectory);
     auto shared_opt = db_opts->add_flag("--shared", "Open database in shared mode");
     auto exclusive_opt = db_opts->add_flag("--exclusive", "Open database in exclusive mode")->excludes(shared_opt);
@@ -219,6 +221,7 @@ int main(int argc, char* argv[]) {
     try {
         Directory db_dir(fs::path(db_path->as<std::string>()));
         db::EnvConfig src_config{db_dir.path().string()};
+        src_config.create = false;  // Database must exist
         src_config.shared = static_cast<bool>(*shared_opt);
         src_config.exclusive = static_cast<bool>(*exclusive_opt);
 
