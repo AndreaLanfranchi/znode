@@ -40,7 +40,7 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include <zen/core/crypto/sha_2_256.hpp>
+#include <zen/core/crypto/md.hpp>
 #include <zen/core/encoding/hex.hpp>
 
 namespace zen::cmd {
@@ -168,7 +168,7 @@ void curl_download_file(const std::string& url, const std::filesystem::path& des
 
 void prime_zcash_params(const std::filesystem::path& params_dir) {
     // Filename -> SHA256 hash
-    static const std::map<std::string, std::string> params_files{
+    static const std::map</*file name*/ std::string, /*sha256 checksum*/ std::string> params_files{
         {"sprout-proving.key", "8bc20a7f013b2b58970cddd2e7ea028975c88ae7ceb9259a5344a16bc2c0eef7"},
         {"sprout-verifying.key", "4bd498dae0aacfd8e98dc306338d017d9c08dd0918ead18172bd0aec2fc5df82"},
         {"sapling-output.params", "2f0ebbcbb9bb0bcffe95a397e7eba89c29eb4dde6191c339db88570e3f3fb0e4"},

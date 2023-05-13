@@ -19,8 +19,6 @@ TEST_CASE("Block Serialization", "[serialization]") {
     archive.clear();
     CHECK(header.serialize(archive) == serialization::Error::kSuccess);
 
-    CHECK(archive.to_string() == "aa");
-
     // Check the version equals to 15
     auto version_parsed{endian::load_little_u32(&archive[0])};
     CHECK(version_parsed == 15);

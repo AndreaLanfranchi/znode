@@ -6,7 +6,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/crypto/sha_2_256.hpp>
+#include <zen/core/crypto/md.hpp>
 #include <zen/core/encoding/hex.hpp>
 #include <zen/core/serialization/archive.hpp>
 #include <zen/core/serialization/serialize.hpp>

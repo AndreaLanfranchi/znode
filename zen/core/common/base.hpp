@@ -64,6 +64,13 @@ template <class T>
 concept UnsignedIntegralEx = UnsignedIntegral<T> || std::same_as<T, intx::uint128> || std::same_as<T, intx::uint256> ||
     std::same_as<T, intx::uint512>;
 
+//! \brief Used to allow passing string literals as template arguments
+template <size_t N>
+struct StringLiteral {
+    constexpr StringLiteral(const char (&str)[N]) { std::copy_n(str, N, value); }
+    char value[N]{};
+};
+
 using Bytes = std::basic_string<uint8_t>;
 
 class ByteView : public std::basic_string_view<uint8_t> {

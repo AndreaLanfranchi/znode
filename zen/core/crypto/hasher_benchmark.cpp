@@ -9,10 +9,8 @@
 #include <zen/core/common/base.hpp>
 #include <zen/core/common/cast.hpp>
 #include <zen/core/common/misc.hpp>
-#include <zen/core/crypto/sha_1.hpp>
-#include <zen/core/crypto/sha_2_256.hpp>
+#include <zen/core/crypto/md.hpp>
 #include <zen/core/crypto/sha_2_256_old.hpp>
-#include <zen/core/crypto/sha_2_512.hpp>
 
 namespace zen {
 static constexpr size_t kInputSize{4_KiB};
@@ -21,7 +19,7 @@ void bench_sha1(benchmark::State& state) {
     using namespace zen;
     int bytes_processed{0};
     int items_processed{0};
-    zen::crypto::Sha1 hasher;
+    crypto::Sha1 hasher;
     for ([[maybe_unused]] auto _ : state) {
         hasher.init();
         std::string input{zen::get_random_alpha_string(kInputSize)};
@@ -38,7 +36,7 @@ void bench_sha256(benchmark::State& state) {
     using namespace zen;
     int bytes_processed{0};
     int items_processed{0};
-    zen::crypto::Sha256 hasher;
+    crypto::Sha256 hasher;
     for ([[maybe_unused]] auto _ : state) {
         hasher.init();
         std::string input{zen::get_random_alpha_string(kInputSize)};
@@ -74,7 +72,7 @@ void bench_sha512(benchmark::State& state) {
     using namespace zen;
     int bytes_processed{0};
     int items_processed{0};
-    zen::crypto::Sha512 hasher;
+    crypto::Sha512 hasher;
     for ([[maybe_unused]] auto _ : state) {
         hasher.init();
         std::string input{zen::get_random_alpha_string(kInputSize)};

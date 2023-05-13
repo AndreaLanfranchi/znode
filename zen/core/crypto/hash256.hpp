@@ -8,29 +8,29 @@
 
 #include <boost/noncopyable.hpp>
 
-#include <zen/core/crypto/sha_2_256.hpp>
+#include <zen/core/crypto/md.hpp>
 
 namespace zen::crypto {
 //! \brief A hasher class for Bitcoin's 256 bit hash (double Sha256)
-class Hash256 : public Hasher {
+class Hash256 : private boost::noncopyable {
   public:
-    Hash256();
-    ~Hash256() override = default;
+    Hash256() = default;
+    ~Hash256() = default;
 
     explicit Hash256(ByteView initial_data);
     explicit Hash256(std::string_view initial_data);
 
-    void init() noexcept override;
-    void init(ByteView initial_data) noexcept;
+    void init() noexcept;
+    void init(ByteView data) noexcept;
+    void init(std::string_view data) noexcept;
 
-    void update(ByteView data) noexcept override;
-    void update(std::string_view data) noexcept override;
-    [[nodiscard]] Bytes finalize() noexcept override;
+    void update(ByteView data) noexcept;
+    void update(std::string_view data) noexcept;
+    [[nodiscard]] Bytes finalize() noexcept;
+
+    [[nodiscard]] size_t digest_size() const noexcept { return hasher.digest_size(); }
 
   private:
     Sha256 hasher;
-
-    void init_context() override{/* Need to override from parent class*/};
-    void transform(const unsigned char*) override{/* Need to override from parent class*/};
 };
 }  // namespace zen::crypto

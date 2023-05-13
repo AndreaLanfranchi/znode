@@ -7,8 +7,8 @@
 #include <vector>
 
 #include <zen/core/common/cast.hpp>
-#include <zen/core/crypto/hasher_test.hpp>
 #include <zen/core/crypto/hmac.hpp>
+#include <zen/core/crypto/md_test.hpp>
 
 namespace zen::crypto {
 

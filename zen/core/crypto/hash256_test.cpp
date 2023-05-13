@@ -9,7 +9,7 @@
 #include <catch2/catch.hpp>
 
 #include <zen/core/crypto/hash256.hpp>
-#include <zen/core/crypto/hasher_test.hpp>
+#include <zen/core/crypto/md_test.hpp>
 
 namespace zen::crypto {
 

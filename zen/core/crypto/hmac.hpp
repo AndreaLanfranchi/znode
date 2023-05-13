@@ -8,14 +8,13 @@
 #include <boost/noncopyable.hpp>
 
 #include <zen/core/common/cast.hpp>
-#include <zen/core/crypto/sha_2_256.hpp>
-#include <zen/core/crypto/sha_2_512.hpp>
+#include <zen/core/crypto/md.hpp>
 
 namespace zen::crypto {
 
 //! \brief Wrapper around Hash-based Message Authentication Code
 //! \remarks Need implementation of SHA_xxx wrappers
-template <class SHA2_SIZE>
+template <class DIGEST>
 class Hmac : private boost::noncopyable {
   public:
     Hmac() = default;
@@ -58,13 +57,15 @@ class Hmac : private boost::noncopyable {
     void update(std::string_view data) noexcept { inner.update(data); };
 
     Bytes finalize() {
-        outer.update(inner.finalize());
+        Bytes tmp{inner.finalize()};
+        if (tmp.empty()) return tmp;
+        outer.update(tmp);
         return outer.finalize();
     };
 
   private:
-    SHA2_SIZE inner{};
-    SHA2_SIZE outer{};
+    DIGEST inner{};
+    DIGEST outer{};
 };
 
 using Hmac256 = Hmac<Sha256>;

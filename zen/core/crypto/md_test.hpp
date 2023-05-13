@@ -5,17 +5,16 @@
 */
 
 #pragma once
-
 #include <random>
 #include <vector>
 
 #include <catch2/catch.hpp>
 
 #include <zen/core/common/cast.hpp>
+#include <zen/core/crypto/md.hpp>
 #include <zen/core/encoding/hex.hpp>
 
 namespace zen::crypto {
-
 template <typename Hasher>
 void run_hasher_tests(Hasher& hasher, const std::vector<std::string>& inputs, const std::vector<std::string>& digests) {
     REQUIRE(inputs.size() == digests.size());
@@ -76,4 +75,5 @@ void run_hasher_tests(Hasher& hasher, const std::vector<std::pair<std::string, s
         }
     }
 }
-}  // namespace zen::crypto
+
+}
