@@ -14,19 +14,18 @@
 #include <zen/core/common/assert.hpp>
 #include <zen/core/common/base.hpp>
 #include <zen/core/common/cast.hpp>
-#include <zen/core/common/object_pool.hpp>
+#include <zen/core/common/endian.hpp>
 #include <zen/core/common/secure_bytes.hpp>
 
 namespace zen::crypto {
-
-// static ZEN_THREAD_LOCAL ObjectPool<EVP_MD_CTX> DigestContexts;
 
 //! \brief This class is templatized wrapper around OpenSSL's EVP Message Digests
 template <StringLiteral T>
 class MessageDigest {
   public:
-    MessageDigest() : digest_{EVP_get_digestbyname(T.value)} {
+    MessageDigest() : digest_{EVP_get_digestbyname(T.value)}, digest_context_{EVP_MD_CTX_new()} {
         ZEN_ASSERT(digest_ != nullptr);
+        ZEN_ASSERT(digest_context_ != nullptr);
         digest_size_ = static_cast<size_t>(EVP_MD_size(digest_));
         block_size_ = static_cast<size_t>(EVP_MD_block_size(digest_));
         init();
@@ -74,11 +73,26 @@ class MessageDigest {
     //! \brief Finalizes the digest process and produces the actual digest
     //! \remarks After this instance has called finalize() once the instance itself cannot receive new updates unless
     //! it's recycled by init() or reset(). In case of any error the returned digest will be zero length
-    [[nodiscard]] Bytes finalize() noexcept {
+    [[nodiscard]] Bytes finalize(bool compress = false) noexcept {
         Bytes ret(digest_size_, 0);
-        if (EVP_DigestFinal_ex(digest_context_, ret.data(), nullptr) == 0) {
-            ret.clear();
+        if (compress) [[unlikely]] {
+            // Only for Sha256 in Merkle tree composition
+            if (!(digest_name() == "SHA256" && ingested_size_ == block_size_)) {
+                ret.clear();
+            } else {
+                // See the structure of SHA256 which access is deprecated in OpenSSL 3.0.1
+                // We need only first 8 integers
+                const auto ctx_data{reinterpret_cast<unsigned int*>(EVP_MD_CTX_md_data(digest_context_))};
+                for (size_t i{0}; i < 8; ++i) {
+                    endian::store_big_u32(&ret[i << 2], ctx_data[i]);
+                }
+            }
+        } else {
+            if (EVP_DigestFinal_ex(digest_context_, ret.data(), nullptr) == 0 /* zero is failure not success */) {
+                ret.clear();
+            }
         }
+
         return ret;
     }
 
@@ -101,13 +115,8 @@ class MessageDigest {
     size_t block_size_{0};                 // The size in bytes of an input block
     size_t ingested_size_{0};              // Number of bytes ingested
 
-    //! \brief Obtain an instance of the context and initializes it
-    void init_context() {
-        if (!digest_context_) {
-            digest_context_ = EVP_MD_CTX_new();
-        }
-        EVP_DigestInit_ex(digest_context_, digest_, nullptr);
-    }
+    //! \brief Initialize the instance of the context
+    void init_context() { EVP_DigestInit_ex(digest_context_, digest_, nullptr); }
 };
 
 using Ripemd160 = MessageDigest<"RIPEMD160">;

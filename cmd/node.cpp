@@ -9,6 +9,7 @@
 #include <stdexcept>
 
 #include <openssl/opensslv.h>
+#include <openssl/ssl.h>
 
 #include <zen/core/common/memory.hpp>
 
@@ -71,6 +72,8 @@ int main(int argc, char* argv[]) {
     cli.get_formatter()->column_width(50);
 
     try {
+
+        OPENSSL_init();
         Ossignals::init();  // Intercept OS signals
 
         cmd::Settings settings;

@@ -50,8 +50,8 @@ using namespace indicators;
 int curl_download_progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
                                     [[maybe_unused]] curl_off_t ultotal, [[maybe_unused]] curl_off_t ulnow) noexcept {
     static size_t prev_progress{0};
-    const size_t progress{dltotal != 0 ? static_cast<size_t>(dlnow * 100 / dltotal) : 0};
-    if (progress != prev_progress) {
+    if (const size_t progress{dltotal != 0 ? static_cast<size_t>(dlnow * 100 / dltotal) : 0};
+        progress != prev_progress) {
         prev_progress = progress;
         auto* progress_bar = static_cast<ProgressBar*>(clientp);
         if (!progress_bar->is_completed()) {
@@ -114,8 +114,7 @@ void curl_download_file(const std::string& url, const std::filesystem::path& des
     if (return_code == CURLE_OK) {
         const auto target_file = (destination_path / file_name).string();
 #ifdef _MSC_VER  // Windows
-        auto error = fopen_s(&file_pointer, target_file.c_str(), "wb");
-        if (error) return_code = CURLE_WRITE_ERROR;
+        if (auto error = fopen_s(&file_pointer, target_file.c_str(), "wb")) return_code = CURLE_WRITE_ERROR;
 #else
         file_pointer = fopen(target_file.c_str(), "wb");
 #endif
@@ -168,7 +167,7 @@ void curl_download_file(const std::string& url, const std::filesystem::path& des
 
 void prime_zcash_params(const std::filesystem::path& params_dir) {
     // Filename -> SHA256 hash
-    static const std::map</*file name*/ std::string, /*sha256 checksum*/ std::string> params_files{
+    static const std::map</*file name*/ std::string, /*sha256 checksum*/ std::string, std::less<>> params_files{
         {"sprout-proving.key", "8bc20a7f013b2b58970cddd2e7ea028975c88ae7ceb9259a5344a16bc2c0eef7"},
         {"sprout-verifying.key", "4bd498dae0aacfd8e98dc306338d017d9c08dd0918ead18172bd0aec2fc5df82"},
         {"sapling-output.params", "2f0ebbcbb9bb0bcffe95a397e7eba89c29eb4dde6191c339db88570e3f3fb0e4"},
@@ -185,8 +184,8 @@ void prime_zcash_params(const std::filesystem::path& params_dir) {
         return;
     }
 
-    std::cout << "\n===============================================================================\n"
-              << "One or more required zcash param files are missing from this directory:\n"
+    std::cout << "\n============================================================================================\n"
+              << "One or more required param files are missing - or have wrong checksum - from this directory:\n"
               << params_dir.string() << "\n"
               << "You can either allow me to download them now, or, if you have them already \n"
               << "under another data directory, you can copy those or link them there. \n"

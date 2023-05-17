@@ -34,6 +34,7 @@ TEST_CASE("Sha1 test vectors", "[crypto]") {
     };
 
     Sha1 hasher;
+    CHECK(hasher.digest_name() == "SHA1");
     run_hasher_tests(hasher, inputs, digests);
 }
 
@@ -69,7 +70,40 @@ TEST_CASE("Sha2 test vectors", "[crypto]") {
         };
 
         Sha256 hasher;
+        CHECK(hasher.digest_name() == "SHA256");
         run_hasher_tests(hasher, inputs, digests);
+    }
+
+    SECTION("Sha256 compress no padding") {
+        Sha256 hasher;
+        CHECK(hasher.digest_name() == "SHA256");
+        Bytes input(hasher.block_size(), 0);
+
+        // Input the exact number of bytes as Digests' block size
+        hasher.update(input);
+        Bytes digest{hasher.finalize(/*compress=*/true)};
+        CHECK_FALSE(digest.empty());
+        // Notice the order of bytes is reversed (uint256S - from legacy code - does it)
+        CHECK(hex::encode(digest) == "da5698be17b9b46962335799779fbeca8ce5d491c0d26243bafef9ea1837a9d8");
+
+        // Alter the input length : should return an empty digest which means error
+        input.push_back(0);
+        hasher.init(input);
+        digest.assign(hasher.finalize(/*compress=*/true));
+        CHECK(digest.empty());
+
+        // Insert 'a', 'b', 'c', 'd' 16 times
+        input.assign({
+            'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd',
+            'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd',
+            'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd',
+            'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd',
+        });
+        hasher.init(input);
+        digest.assign(hasher.finalize(/*compress=*/true));
+        CHECK_FALSE(digest.empty());
+        CHECK(hex::encode(digest) == "867d9811862dbdab2f8fa343e3e841df7db2ded433172800b0369e8741ec70da");
+
     }
 
     SECTION("Sha512") {
@@ -99,6 +133,7 @@ TEST_CASE("Sha2 test vectors", "[crypto]") {
         };
 
         Sha512 hasher;
+        CHECK(hasher.digest_name() == "SHA512");
         run_hasher_tests(hasher, inputs, digests);
     }
 }
