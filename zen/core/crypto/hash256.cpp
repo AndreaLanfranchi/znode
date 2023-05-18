@@ -15,13 +15,25 @@ Hash256::Hash256(std::string_view data) : Hash256() { hasher.init(data); }
 
 void Hash256::init() noexcept { hasher.init(); }
 
-void Hash256::init(ByteView data) noexcept { hasher.init(data); }
+void Hash256::init(ByteView data) noexcept {
+    hasher.init(data);
+    ingested_size_ = hasher.ingested_size();
+}
 
-void Hash256::init(std::string_view data) noexcept { hasher.init(data); }
+void Hash256::init(std::string_view data) noexcept {
+    hasher.init(data);
+    ingested_size_ = hasher.ingested_size();
+}
 
-void Hash256::update(ByteView data) noexcept { hasher.update(data); }
+void Hash256::update(ByteView data) noexcept {
+    hasher.update(data);
+    ingested_size_ = hasher.ingested_size();
+}
 
-void Hash256::update(std::string_view data) noexcept { hasher.update(data); }
+void Hash256::update(std::string_view data) noexcept {
+    hasher.update(data);
+    ingested_size_ = hasher.ingested_size();
+}
 
 Bytes Hash256::finalize() noexcept {
     Bytes tmp{hasher.finalize()};

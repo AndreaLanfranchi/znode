@@ -19,6 +19,11 @@
 
 namespace zen::crypto {
 
+struct MDContextDeleter {  // default deleter for pooled cursors
+    constexpr MDContextDeleter() noexcept = default;
+    void operator()(EVP_MD_CTX* ptr) const noexcept { EVP_MD_CTX_free(ptr); }
+};
+
 //! \brief This class is templatized wrapper around OpenSSL's EVP Message Digests
 template <StringLiteral T>
 class MessageDigest {
@@ -31,13 +36,16 @@ class MessageDigest {
         init();
     }
 
+    MessageDigest(MessageDigest& other) = delete;
+    MessageDigest(MessageDigest&& other) = delete;
+    MessageDigest& operator=(const MessageDigest& other) = delete;
+    ~MessageDigest() = default;
+
     //! \brief Instantiation with data initialization
     explicit MessageDigest(ByteView data) : MessageDigest() { update(data); }
 
     //! \brief Instantiation with data initialization
     explicit MessageDigest(std::string_view data) : MessageDigest() { update(data); }
-
-    ~MessageDigest() { EVP_MD_CTX_free(digest_context_); }
 
     //! \brief Re-initialize the context pristine
     void init() noexcept {
@@ -64,7 +72,7 @@ class MessageDigest {
     //! \brief Accumulates more data into the digest
     int update(ByteView data) noexcept {
         ingested_size_ += data.size();
-        return EVP_DigestUpdate(digest_context_, data.data(), data.size());
+        return EVP_DigestUpdate(digest_context_.get(), data.data(), data.size());
     }
 
     //! \brief Accumulates more data into the digest
@@ -82,13 +90,13 @@ class MessageDigest {
             } else {
                 // See the structure of SHA256 which access is deprecated in OpenSSL 3.0.1
                 // We need only first 8 integers
-                const auto ctx_data{reinterpret_cast<unsigned int*>(EVP_MD_CTX_md_data(digest_context_))};
+                const auto ctx_data{static_cast<unsigned int*>(EVP_MD_CTX_md_data(digest_context_.get()))};
                 for (size_t i{0}; i < 8; ++i) {
                     endian::store_big_u32(&ret[i << 2], ctx_data[i]);
                 }
             }
         } else {
-            if (EVP_DigestFinal_ex(digest_context_, ret.data(), nullptr) == 0 /* zero is failure not success */) {
+            if (EVP_DigestFinal_ex(digest_context_.get(), ret.data(), nullptr) == 0 /* zero is failure not success */) {
                 ret.clear();
             }
         }
@@ -109,14 +117,14 @@ class MessageDigest {
     [[nodiscard]] size_t ingested_size() const noexcept { return ingested_size_; }
 
   private:
-    const EVP_MD* digest_{nullptr};        // The digest function
-    EVP_MD_CTX* digest_context_{nullptr};  // The digest context
-    size_t digest_size_{0};                // The size in bytes of this digest
-    size_t block_size_{0};                 // The size in bytes of an input block
-    size_t ingested_size_{0};              // Number of bytes ingested
+    const EVP_MD* digest_{nullptr};                                          // The digest function
+    std::unique_ptr<EVP_MD_CTX, MDContextDeleter> digest_context_{nullptr};  // The digest context
+    size_t digest_size_{0};                                                  // The size in bytes of this digest
+    size_t block_size_{0};                                                   // The size in bytes of an input block
+    size_t ingested_size_{0};                                                // Number of bytes ingested
 
     //! \brief Initialize the instance of the context
-    void init_context() { EVP_DigestInit_ex(digest_context_, digest_, nullptr); }
+    void init_context() const { EVP_DigestInit_ex(digest_context_.get(), digest_, nullptr); }
 };
 
 using Ripemd160 = MessageDigest<"RIPEMD160">;

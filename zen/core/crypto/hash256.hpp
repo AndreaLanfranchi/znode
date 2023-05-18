@@ -29,8 +29,10 @@ class Hash256 : private boost::noncopyable {
     [[nodiscard]] Bytes finalize() noexcept;
 
     [[nodiscard]] size_t digest_size() const noexcept { return hasher.digest_size(); }
+    [[nodiscard]] size_t ingested_size() const noexcept { return ingested_size_; }
 
   private:
     Sha256 hasher;
+    size_t ingested_size_{0};  // Number of bytes ingested
 };
 }  // namespace zen::crypto

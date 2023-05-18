@@ -25,6 +25,7 @@ void run_hasher_tests(Hasher& hasher, const std::vector<std::string>& inputs, co
     for (size_t i{0}; i < inputs.size(); ++i) {
         hasher.init();
         auto input(string_view_to_byte_view(inputs[i]));
+        auto input_size{input.size()};
 
         // Consume input in pieces to ensure partial updates don't break anything
         while (!input.empty()) {
@@ -36,6 +37,7 @@ void run_hasher_tests(Hasher& hasher, const std::vector<std::string>& inputs, co
         }
 
         const auto hash{hasher.finalize()};
+        CHECK(hasher.ingested_size() == input_size);
         CHECK(hash.size() == hasher.digest_size());
         CHECK(zen::hex::encode(hash) == digests[i]);
     }
@@ -76,4 +78,4 @@ void run_hasher_tests(Hasher& hasher, const std::vector<std::pair<std::string, s
     }
 }
 
-}
+}  // namespace zen::crypto
