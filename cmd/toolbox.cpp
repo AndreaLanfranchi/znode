@@ -72,7 +72,7 @@ dbFreeInfo get_freeInfo(::mdbx::txn& txn) {
         size_t pagesSize = pagesCount * page_size;
         ret.pages += pagesCount;
         ret.size += pagesSize;
-        ret.entries.emplace_back(txId, pagesCount, pagesSize);
+        ret.entries.push_back(dbFreeEntry{txId, pagesCount, pagesSize});
     }};
 
     auto free_crs{txn.open_cursor(free_map)};
@@ -202,8 +202,8 @@ int main(int argc, char* argv[]) {
      * Common opts and flags
      */
 
-    auto app_yes_opt = app_main.add_flag("-Y,--yes", "Assume yes to all requests of confirmation");
-    auto app_dry_opt = app_main.add_flag("--dry", "Don't commit to db. Only simulate");
+    // auto app_yes_opt = app_main.add_flag("-Y,--yes", "Assume yes to all requests of confirmation");
+    // auto app_dry_opt = app_main.add_flag("--dry", "Don't commit to db. Only simulate");
 
     /*
      * Subcommands
@@ -211,7 +211,7 @@ int main(int argc, char* argv[]) {
 
     // List tables and gives info about storage
     auto cmd_tables = app_main.add_subcommand("tables", "List db and tables info");
-    auto cmd_tables_scan_opt = cmd_tables->add_flag("--scan", "Scan real data size (long)");
+    // auto cmd_tables_scan_opt = cmd_tables->add_flag("--scan", "Scan real data size (long)");
 
     /*
      * Parse arguments and validate
