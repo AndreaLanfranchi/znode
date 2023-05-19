@@ -13,7 +13,6 @@ file(GLOB_RECURSE ZEN_CORE_TESTS CONFIGURE_DEPENDS "${ZEN_MAIN_SRC_DIR}/core/*_t
 list(LENGTH ZEN_CORE_TESTS ZEN_CORE_SOURCE_ITEMS)
 if (NOT ZEN_CORE_SOURCE_ITEMS EQUAL 0)
     add_executable(core_test unit_test.cpp ${ZEN_CORE_TESTS})
-    target_link_libraries(core_test zen_core Catch2::Catch2)
 
     # No exceptions here
     target_compile_definitions(core_test PRIVATE BOOST_NO_EXCEPTIONS)
@@ -22,6 +21,8 @@ if (NOT ZEN_CORE_SOURCE_ITEMS EQUAL 0)
     else ()
         target_compile_options(core_test PRIVATE -fno-exceptions)
     endif ()
+
+    target_link_libraries(core_test zen_core Catch2::Catch2)
 
 endif ()
 

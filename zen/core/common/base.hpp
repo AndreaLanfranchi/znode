@@ -25,7 +25,9 @@
 
 #if defined(BOOST_NO_EXCEPTIONS)
 #include <boost/throw_exception.hpp>
-void boost::throw_exception(const std::exception& ex);
+namespace boost {
+void throw_exception(const std::exception& ex);
+}
 #endif
 
 // Only 64 bit little endian arch allowed
@@ -62,7 +64,7 @@ concept UnsignedIntegral = std::unsigned_integral<T>;
 
 template <class T>
 concept UnsignedIntegralEx = UnsignedIntegral<T> || std::same_as<T, intx::uint128> || std::same_as<T, intx::uint256> ||
-    std::same_as<T, intx::uint512>;
+                             std::same_as<T, intx::uint512>;
 
 //! \brief Used to allow passing string literals as template arguments
 template <size_t N>
