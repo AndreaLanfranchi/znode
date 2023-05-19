@@ -18,7 +18,7 @@ C++ Implementation of ZEN node based on Thorax Architecture
 [Visual Studio]: https://www.visualstudio.com/downloads
 [VSCode]: https://www.visualstudio.com/downloads
 [CLion]: https://www.jetbrains.com/clion/download/
-[submodules]: https://git-scm.com/book/en/v2/Git-Tools-Submoduleshttps://git-scm.com/book/en/v2/Git-Tools-Submodules
+[submodules]: https://git-scm.com/book/en/v2/Git-Tools-Submodules
 
 ## About Moria
 
