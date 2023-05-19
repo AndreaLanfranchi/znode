@@ -103,7 +103,6 @@ TEST_CASE("Sha2 test vectors", "[crypto]") {
         digest.assign(hasher.finalize(/*compress=*/true));
         CHECK_FALSE(digest.empty());
         CHECK(hex::encode(digest) == "867d9811862dbdab2f8fa343e3e841df7db2ded433172800b0369e8741ec70da");
-
     }
 
     SECTION("Sha512") {

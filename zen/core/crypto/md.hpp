@@ -6,8 +6,7 @@
 
 #pragma once
 
-#include <array>
-#include <iostream>
+#include <memory>
 
 #include <openssl/evp.h>
 
@@ -15,11 +14,11 @@
 #include <zen/core/common/base.hpp>
 #include <zen/core/common/cast.hpp>
 #include <zen/core/common/endian.hpp>
-#include <zen/core/common/secure_bytes.hpp>
 
 namespace zen::crypto {
 
-struct MDContextDeleter {  // default deleter for pooled cursors
+//! \brief Explicit deleter for EVP_MD_CTXes
+struct MDContextDeleter {
     constexpr MDContextDeleter() noexcept = default;
     void operator()(EVP_MD_CTX* ptr) const noexcept { EVP_MD_CTX_free(ptr); }
 };
