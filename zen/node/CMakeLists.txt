@@ -19,7 +19,7 @@ list(FILTER ZEN_NODE_SRC EXCLUDE REGEX "_test\\.cpp$")
 list(FILTER ZEN_NODE_SRC EXCLUDE REGEX "_benchmark\\.cpp$")
 list(LENGTH ZEN_NODE_SRC ZEN_NODE_SRC_ITEMS)
 
-if(NOT ZEN_NODE_SRC_ITEMS EQUAL 0)
+if (NOT ZEN_NODE_SRC_ITEMS EQUAL 0)
 
     add_library(zen_node ${ZEN_NODE_SRC})
 
@@ -34,17 +34,17 @@ if(NOT ZEN_NODE_SRC_ITEMS EQUAL 0)
             nlohmann_json::nlohmann_json
             prometheus-cpp::core
             prometheus-cpp::pull
-            Boost::context
-            Boost::coroutine
+            Boost::coroutine # Mind the order
+            Boost::context   # of this two
             )
 
     set(ZEN_NODE_PRIVATE_LIBS CLI11::CLI11)
 
-    if(MSVC)
+    if (MSVC)
         list(APPEND ZEN_NODE_PRIVATE_LIBS ntdll.lib)
-    endif(MSVC)
+    endif (MSVC)
 
     target_link_libraries(zen_node PUBLIC ${ZEN_NODE_PUBLIC_LIBS} PRIVATE ${ZEN_NODE_PRIVATE_LIBS})
 
-endif()
+endif ()
 
