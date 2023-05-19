@@ -108,7 +108,7 @@ void Ossignals::init(std::function<void(int)> custom_handler) {
 void Ossignals::handle(int sig_code) {
     if (bool expected{false}; signalled_.compare_exchange_strong(expected, true)) {
         sig_code_ = sig_code;
-        std::cerr << boost::format("Caught OS signal %s, shutting down ...") % sig_name(sig_code) << std::endl;
+        std::cerr << boost::format("\nCaught OS signal %s, shutting down ...\n") % sig_name(sig_code) << std::endl;
     }
     const uint32_t sig_count = ++sig_count_;
     if (sig_count >= 10) {
