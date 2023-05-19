@@ -51,7 +51,7 @@ class CappedSet {
     [[nodiscard]] bool empty() const noexcept { return items_.empty(); }
     void clear() noexcept {
         items_.clear();
-        std::queue<typename std::unordered_set<T>::iterator> empty_queue;
+        std::queue<iterator_t> empty_queue;
         std::swap(items_queue_, empty_queue);
     }
 

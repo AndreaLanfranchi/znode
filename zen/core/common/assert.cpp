@@ -11,8 +11,10 @@
 
 namespace zen {
 void abort_due_to_assertion_failure(std::string_view message, const char* file, long line) {
-    std::cerr << "Assert failed: " << message << "\n"
-              << "Source: " << file << ", line " << line << std::endl;
+    std::cerr << "\nAssertion failed: " << message << "\n"
+              << "Source: " << file << ", line " << line << "\n"
+              << "Please report this to developers. Aborting ...\n"
+              << std::endl;
     std::abort();
 }
 }  // namespace zen
