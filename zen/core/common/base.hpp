@@ -26,7 +26,7 @@
 #if defined(BOOST_NO_EXCEPTIONS)
 #include <boost/throw_exception.hpp>
 namespace boost {
-[[noreturn]] void throw_exception(const std::exception& ex);
+BOOST_NORETURN void throw_exception(const std::exception& ex);
 }
 #endif
 
