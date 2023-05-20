@@ -14,6 +14,9 @@ enum class DecodingError : uint32_t {
     kSuccess,
     kInvalidHexDigit,
     kInvalidInput,
+    kInputTooShort,
+    kInvalidBase58Input,
+    kInvalidBase58Checksum,
     kInvalidBase64Input,
     kInvalidAmountRange
 };

@@ -14,5 +14,5 @@ void throw_exception(const std::exception&) {
     std::cerr << "Aborted due to unallowed exception" << std::endl;
     std::abort();
 }
-} // namespace boost
+}  // namespace boost
 #endif

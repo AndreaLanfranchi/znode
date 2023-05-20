@@ -21,8 +21,8 @@ namespace zen::base64 {
 //! \remark If provided an empty input the return string is empty as well
 [[nodiscard]] tl::expected<std::string, EncodingError> encode(std::string_view data) noexcept;
 
-//! \brief Returns a string of ascii chars with the decoded base64 payload
-//! \remark If provided an empty input the return string is empty as well
+//! \brief Returns a string of bytes with the decoded base64 payload
+//! \remark If provided an empty input the returned bytes are empty as well
 [[nodiscard]] tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept;
 
 }  // namespace zen::base64
