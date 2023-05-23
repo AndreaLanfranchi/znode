@@ -7,6 +7,7 @@
 
 #include "ossignals.hpp"
 
+#include <array>
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
@@ -81,7 +82,7 @@ static const char* sig_name(int sig_code) {
     }
 }
 
-inline constexpr int kHandleableCodes[] {
+constexpr std::array<int, 3> kHandleableCodes {
 #if defined(SIGBREAK)
     SIGBREAK,  // Windows keyboard CTRL+Break
 #endif
