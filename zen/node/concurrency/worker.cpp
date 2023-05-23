@@ -11,8 +11,6 @@
 
 namespace zen {
 
-Worker::~Worker() { stop(/*wait=*/true); }
-
 void Worker::start(bool kicked, bool wait) noexcept {
     if (State expected_state{State::kStopped}; !state_.compare_exchange_strong(expected_state, State::kStarting)) {
         return;
@@ -23,7 +21,7 @@ void Worker::start(bool kicked, bool wait) noexcept {
     kicked_.store(kicked);
     id_.store(0);
 
-    thread_ = std::make_unique<std::thread>([&]() {
+    thread_ = std::make_unique<std::thread>([this]() {
         log::set_thread_name(name_.c_str());
 
         // Retrieve the id
@@ -54,7 +52,7 @@ void Worker::start(bool kicked, bool wait) noexcept {
     }
 }
 bool Worker::stop(bool wait) noexcept {
-    bool already_requested{!Stoppable::stop(wait)};  // Sets stop_requested_ == true;
+    bool already_requested{!Stoppable::stop(wait)};
     if (!already_requested) kick();
     if (wait && thread_) {
         thread_->join();

@@ -14,6 +14,7 @@
 #include <zen/core/common/base.hpp>
 #include <zen/core/common/cast.hpp>
 #include <zen/core/common/endian.hpp>
+#include <zen/core/common/object_pool.hpp>
 
 namespace zen::crypto {
 
@@ -23,11 +24,22 @@ struct MDContextDeleter {
     void operator()(EVP_MD_CTX* ptr) const noexcept { EVP_MD_CTX_free(ptr); }
 };
 
+//! \brief A collection of recycle-able MD Contexts
+static ObjectPool<EVP_MD_CTX, MDContextDeleter> MDContexts(/*thread_safe=*/ true);
+
+//! \brief Explicit deleter for EVP_MD_CTXes
+struct MDContextRecycler {
+    constexpr MDContextRecycler() noexcept = default;
+    void operator()(EVP_MD_CTX* ptr) const noexcept { MDContexts.add(ptr); }
+};
+
 //! \brief This class is templatized wrapper around OpenSSL's EVP Message Digests
 template <StringLiteral T>
 class MessageDigest {
   public:
-    MessageDigest() : digest_{EVP_get_digestbyname(T.value)}, digest_context_{EVP_MD_CTX_new()} {
+    MessageDigest()
+        : digest_{EVP_get_digestbyname(T.value)},
+          digest_context_{MDContexts.empty() ? EVP_MD_CTX_new() : MDContexts.acquire()} {
         ZEN_ASSERT(digest_ != nullptr);
         ZEN_ASSERT(digest_context_ != nullptr);
         digest_size_ = static_cast<size_t>(EVP_MD_size(digest_));
@@ -116,11 +128,11 @@ class MessageDigest {
     [[nodiscard]] size_t ingested_size() const noexcept { return ingested_size_; }
 
   private:
-    const EVP_MD* digest_{nullptr};                                          // The digest function
-    std::unique_ptr<EVP_MD_CTX, MDContextDeleter> digest_context_{nullptr};  // The digest context
-    size_t digest_size_{0};                                                  // The size in bytes of this digest
-    size_t block_size_{0};                                                   // The size in bytes of an input block
-    size_t ingested_size_{0};                                                // Number of bytes ingested
+    const EVP_MD* digest_{nullptr};                                           // The digest function
+    std::unique_ptr<EVP_MD_CTX, MDContextRecycler> digest_context_{nullptr};  // The digest context
+    size_t digest_size_{0};                                                   // The size in bytes of this digest
+    size_t block_size_{0};                                                    // The size in bytes of an input block
+    size_t ingested_size_{0};                                                 // Number of bytes ingested
 
     //! \brief Initialize the instance of the context
     void init_context() const { EVP_DigestInit_ex(digest_context_.get(), digest_, nullptr); }
