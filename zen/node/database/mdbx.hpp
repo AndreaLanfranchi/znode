@@ -22,7 +22,7 @@
 namespace zen::db {
 
 inline constexpr std::string_view kDbDataFileName{"mdbx.dat"};
-inline constexpr size_t kMdbxMaxPages{2147483648ULL};
+inline constexpr size_t kMdbxMaxPages{0x80000000ULL};
 
 inline mdbx::slice to_slice(ByteView value) { return {value.data(), value.length()}; }
 inline mdbx::slice to_slice(std::string_view value) { return {value}; }

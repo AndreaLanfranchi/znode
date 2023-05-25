@@ -41,7 +41,7 @@ class Timer {
         }
     };
 
-    ~Timer() { stop(); }
+    ~Timer() = default;
 
     //! \brief Starts timer and waits for interval to expire. Eventually call back action is executed and timer
     //! resubmitted for another interval
@@ -56,18 +56,18 @@ class Timer {
     void stop() {
         bool expected_running{true};
         if (is_running.compare_exchange_strong(expected_running, false)) {
-            (void)timer_.cancel();
+            std::ignore = timer_.cancel();
         }
     }
 
     //! \brief Cancels execution of awaiting callback and, if still in running state, submits timer for a new interval
-    void reset() { (void)timer_.cancel(); }
+    void reset() { std::ignore = timer_.cancel(); }
 
   private:
     //! \brief Launches async timer
     void launch() {
         timer_.expires_from_now(boost::posix_time::milliseconds(interval_));
-        (void)timer_.async_wait([&, this](const boost::system::error_code& ec) {
+        (void)timer_.async_wait([this](const boost::system::error_code& ec) {
             if (!ec && call_back_) {
                 call_back_();
             }
