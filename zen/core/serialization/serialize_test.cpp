@@ -198,7 +198,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         CHECK(stream.size() == 1);
 
         auto read_bytes(stream.read(stream.avail()));
-        CHECK(read_bytes);
+        REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "00");
         CHECK(stream.eof());
 
@@ -207,7 +207,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         write_compact(stream, value);
         CHECK(stream.size() == 1);
         read_bytes = stream.read(1);
-        CHECK(read_bytes);
+        REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "fc");
         CHECK(stream.eof());
 
@@ -216,11 +216,11 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         write_compact(stream, value);
         CHECK(stream.size() == 3);
         read_bytes = stream.read(1);
-        CHECK(read_bytes);
+        REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "fd");
         CHECK(stream.tellp() == 1);
         read_bytes = stream.read(stream.avail());
-        CHECK(read_bytes);
+        REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "feff" /*swapped*/);
         CHECK(stream.eof());
 
@@ -229,11 +229,11 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         write_compact(stream, value);
         CHECK(stream.size() == 5);
         read_bytes = stream.read(1);
-        CHECK(read_bytes);
+        REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "fe");
         CHECK(stream.tellp() == 1);
         read_bytes = stream.read(stream.avail());
-        CHECK(read_bytes);
+        REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "feffffff" /*swapped*/);
         CHECK(stream.eof());
 
@@ -242,18 +242,18 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         write_compact(stream, value);
         CHECK(stream.size() == 9);
         read_bytes = stream.read(1);
-        CHECK(read_bytes);
+        REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "ff");
         CHECK(stream.tellp() == 1);
         read_bytes = stream.read(stream.avail());
-        CHECK(read_bytes);
+        REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "a0ffffffff000000" /*swapped*/);
 
         // Try read more bytes than avail
         stream.clear();
         write_compact(stream, value);
         read_bytes = stream.read(stream.avail() + 1);
-        CHECK_FALSE(read_bytes);
+        REQUIRE_FALSE(read_bytes);
         CHECK(read_bytes.error() == Error::kReadBeyondData);
     }
 
@@ -268,10 +268,10 @@ TEST_CASE("Serialization of base types", "[serialization]") {
 
         for (i = 1; i <= kMaxSerializedCompactSize; i *= 2) {
             auto value{read_compact(stream)};
-            CHECK(value);
+            REQUIRE(value);
             CHECK(*value == i - 1);
             value = read_compact(stream);
-            CHECK(value);
+            REQUIRE(value);
             CHECK(*value == i);
         }
 
@@ -282,25 +282,25 @@ TEST_CASE("Serialization of base types", "[serialization]") {
     SECTION("Non Canonical Compact", "[serialization]") {
         Archive stream(Scope::kStorage, 0);
         auto value{read_compact(stream)};
-        CHECK_FALSE(value);
+        REQUIRE_FALSE(value);
         CHECK(value.error() == Error::kReadBeyondData);
 
         Bytes data{0xfd, 0x00, 0x00};  // Zero encoded with 3 bytes
         stream.write(data);
         value = read_compact(stream);
-        CHECK_FALSE(value);
+        REQUIRE_FALSE(value);
         CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
         data.assign({0xfd, 0xfc, 0x00});  // 252 encoded with 3 bytes
         stream.write(data);
         value = read_compact(stream);
-        CHECK_FALSE(value);
+        REQUIRE_FALSE(value);
         CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
         data.assign({0xfd, 0xfd, 0x00});  // 253 encoded with 3 bytes
         stream.write(data);
         value = read_compact(stream);
-        CHECK(value);
+        REQUIRE(value);
 
         data.assign({0xfe, 0x00, 0x00, 0x00, 0x00});  // Zero encoded with 5 bytes
         stream.write(data);
@@ -314,7 +314,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         CHECK_FALSE(value);
         CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
-        data.assign({0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});  // Zero encoded with 5 bytes
+        data.assign({0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});  // Zero encoded with 9 bytes
         stream.write(data);
         value = read_compact(stream);
         CHECK_FALSE(value);
@@ -326,9 +326,9 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         CHECK_FALSE(value);
         CHECK(value.error() == Error::kNonCanonicalCompactSize);
 
-        const uint64_t too_big_value{kMaxSerializedCompactSize + 1};
-        Bytes too_big_data(reinterpret_cast<uint8_t*>(&too_big_data), sizeof(too_big_value));
-        too_big_data.insert(too_big_data.begin(), 0xff);  // 9 bytes
+        const uint32_t too_big_value{kMaxSerializedCompactSize + 1};
+        Bytes too_big_data(reinterpret_cast<const uint8_t*>(&too_big_value), sizeof(too_big_value));
+        too_big_data.insert(too_big_data.begin(), 0xfe);
         stream.write(too_big_data);
         value = read_compact(stream);
         CHECK_FALSE(value);

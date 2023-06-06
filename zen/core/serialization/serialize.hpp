@@ -20,8 +20,10 @@ namespace zen::serialization {
 //! \remarks Do not define serializable classes members as size_t as it might lead to wrong results on
 //! MacOS/Xcode bundles
 template <class T>
-requires std::is_arithmetic_v<T>
-inline uint32_t ser_sizeof(T obj) { return sizeof(obj); }
+    requires std::is_arithmetic_v<T>
+inline uint32_t ser_sizeof(T obj) {
+    return sizeof(obj);
+}
 
 //! \brief Returns the serialized size of arithmetic types
 //! \remarks Specialization for bool which is stored in at least 1 byte
@@ -97,12 +99,12 @@ inline void write_compact(Archive& archive, uint64_t obj) {
     }
 
     archive.push_back(prefix);
-    archive.write(casted.data(), num_bytes - 1);
+    archive.write(casted.data(), num_bytes - 1 /* num_bytes count includes the prefix */);
 }
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Archive>
-requires std::is_arithmetic_v<T>
+    requires std::is_arithmetic_v<T>
 inline Error read_data(Archive& archive, T& object) {
     const uint32_t count{ser_sizeof(object)};
     const auto read_result{archive.read(count)};
@@ -114,7 +116,7 @@ inline Error read_data(Archive& archive, T& object) {
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Archive>
-requires std::is_arithmetic_v<T>
+    requires std::is_arithmetic_v<T>
 inline tl::expected<T, Error> read_data(Archive& archive) {
     T ret{0};
     auto result{read_data(archive, ret)};
@@ -130,7 +132,8 @@ inline tl::expected<uint64_t, Error> read_compact(Archive& archive) {
     const auto size{read_data<uint8_t>(archive)};
     if (!size) return tl::unexpected(size.error());
 
-    uint64_t ret;
+    uint64_t ret{0};
+
     if (*size < 253) {
         ret = *size;
     } else if (*size == 253) {
@@ -141,9 +144,9 @@ inline tl::expected<uint64_t, Error> read_compact(Archive& archive) {
     } else if (*size == 254) {
         const auto value{read_data<uint32_t>(archive)};
         if (!value) return tl::unexpected(value.error());
-        if (*value < 0x10000U) return tl::unexpected(Error::kNonCanonicalCompactSize);
+        if (*value < 0x10000UL) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
-    } else {
+    } else if (*size == 255) {
         const auto value{read_data<uint64_t>(archive)};
         if (!value) return tl::unexpected(value.error());
         if (*value < 0x100000000ULL) return tl::unexpected(Error::kNonCanonicalCompactSize);

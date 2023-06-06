@@ -25,7 +25,7 @@ struct MDContextDeleter {
 };
 
 //! \brief A collection of recycle-able MD Contexts
-static ObjectPool<EVP_MD_CTX, MDContextDeleter> MDContexts(/*thread_safe=*/ true);
+static ObjectPool<EVP_MD_CTX, MDContextDeleter> MDContexts(/*thread_safe=*/true);
 
 //! \brief Explicit deleter for EVP_MD_CTXes
 struct MDContextRecycler {
@@ -42,9 +42,9 @@ class MessageDigest {
           digest_context_{MDContexts.empty() ? EVP_MD_CTX_new() : MDContexts.acquire()} {
         ZEN_ASSERT(digest_ != nullptr);
         ZEN_ASSERT(digest_context_ != nullptr);
+        ZEN_ASSERT(EVP_DigestInit_ex(digest_context_.get(), digest_, nullptr) == 1);
         digest_size_ = static_cast<size_t>(EVP_MD_size(digest_));
         block_size_ = static_cast<size_t>(EVP_MD_block_size(digest_));
-        init();
     }
 
     MessageDigest(MessageDigest& other) = delete;
@@ -59,9 +59,9 @@ class MessageDigest {
     explicit MessageDigest(std::string_view data) : MessageDigest() { update(data); }
 
     //! \brief Re-initialize the context pristine
-    void init() noexcept {
+    void inline init() noexcept {
         ingested_size_ = 0;
-        init_context();
+        EVP_DigestInit_ex(digest_context_.get(), nullptr, nullptr);
     }
 
     //! \brief Re-initialize the context to provided initial data
@@ -81,20 +81,24 @@ class MessageDigest {
     void reset() noexcept { init(); }
 
     //! \brief Accumulates more data into the digest
-    int update(ByteView data) noexcept {
+    void update(ByteView data) noexcept {
         ingested_size_ += data.size();
-        return EVP_DigestUpdate(digest_context_.get(), data.data(), data.size());
+        EVP_DigestUpdate(digest_context_.get(), data.data(), data.size());
     }
 
     //! \brief Accumulates more data into the digest
-    int update(std::string_view data) noexcept { return update(string_view_to_byte_view(data)); };
+    void update(std::string_view data) noexcept { update(string_view_to_byte_view(data)); };
 
     //! \brief Finalizes the digest process and produces the actual digest
     //! \remarks After this instance has called finalize() once the instance itself cannot receive new updates unless
     //! it's recycled by init() or reset(). In case of any error the returned digest will be zero length
     [[nodiscard]] Bytes finalize(bool compress = false) noexcept {
         Bytes ret(digest_size_, 0);
-        if (compress) [[unlikely]] {
+        if(!compress) [[likely]] {
+            if (EVP_DigestFinal_ex(digest_context_.get(), ret.data(), nullptr) == 0 /* zero is failure not success */) {
+                ret.clear();
+            }
+        } else {
             // Only for Sha256 in Merkle tree composition
             if (!(digest_name() == "SHA256" && ingested_size_ == block_size_)) {
                 ret.clear();
@@ -106,12 +110,7 @@ class MessageDigest {
                     endian::store_big_u32(&ret[i << 2], ctx_data[i]);
                 }
             }
-        } else {
-            if (EVP_DigestFinal_ex(digest_context_.get(), ret.data(), nullptr) == 0 /* zero is failure not success */) {
-                ret.clear();
-            }
         }
-
         return ret;
     }
 
@@ -133,9 +132,6 @@ class MessageDigest {
     size_t digest_size_{0};                                                   // The size in bytes of this digest
     size_t block_size_{0};                                                    // The size in bytes of an input block
     size_t ingested_size_{0};                                                 // Number of bytes ingested
-
-    //! \brief Initialize the instance of the context
-    void init_context() const { EVP_DigestInit_ex(digest_context_.get(), digest_, nullptr); }
 };
 
 using Ripemd160 = MessageDigest<"RIPEMD160">;
