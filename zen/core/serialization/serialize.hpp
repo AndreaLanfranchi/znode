@@ -127,8 +127,10 @@ inline tl::expected<T, Error> read_data(Archive& archive) {
 }
 
 //! \brief Lowest level deserialization for compact integer
+//! \remarks As these are primarily used to decode the size of vector-like serializations, by default a range
+//! check is performed. When used as a generic number encoding, range_check should be set to false.
 template <class Archive>
-inline tl::expected<uint64_t, Error> read_compact(Archive& archive) {
+inline tl::expected<uint64_t, Error> read_compact(Archive& archive, bool range_check = true) {
     const auto size{read_data<uint8_t>(archive)};
     if (!size) return tl::unexpected(size.error());
 
@@ -152,7 +154,7 @@ inline tl::expected<uint64_t, Error> read_compact(Archive& archive) {
         if (*value < 0x100000000ULL) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
     }
-    if (ret > kMaxSerializedCompactSize) return tl::unexpected(Error::kCompactSizeTooBig);
+    if (range_check && ret > kMaxSerializedCompactSize) return tl::unexpected(Error::kCompactSizeTooBig);
     return ret;
 }
 }  // namespace zen::serialization
