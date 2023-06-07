@@ -59,7 +59,7 @@ static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection di
     if (!fs::exists(db_path)) {
         fs::create_directories(db_path);
     } else if (!fs::is_directory(db_path)) {
-        throw std::runtime_error("Path " + db_path.string() + " is not valid");
+        throw std::invalid_argument("Invalid argument : path " + db_path.string() + " is not a valid directory");
     }
 
     fs::path db_file{db::get_datafile_path(db_path)};
@@ -109,8 +109,8 @@ static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection di
 
     ::mdbx::env_managed::create_parameters cp{};  // Default create parameters
     if (!config.shared) {
-        auto max_map_size = static_cast<intptr_t>(config.inmemory ? 128_MiB : config.max_size);
-        auto growth_size = static_cast<intptr_t>(config.inmemory ? 8_MiB : config.growth_size);
+        const auto max_map_size{static_cast<intptr_t>(config.inmemory ? 128_MiB : config.max_size)};
+        const auto growth_size{static_cast<intptr_t>(config.inmemory ? 8_MiB : config.growth_size)};
         cp.geometry.make_dynamic(::mdbx::env::geometry::default_value, max_map_size);
         cp.geometry.growth_step = growth_size;
         if (!db_ondisk_file_size && config.page_size) {
@@ -131,7 +131,7 @@ static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection di
     ::mdbx::env_managed ret{db_path.native(), cp, op, config.shared};
 
     // Check requested page_size matches the one already configured
-    if (!db_ondisk_file_size && config.page_size) {
+    if (db_ondisk_file_size && config.page_size) {
         const size_t db_page_size{ret.get_pagesize()};
         if (db_page_size != config.page_size) {
             ret.close();

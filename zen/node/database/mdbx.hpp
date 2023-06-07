@@ -153,7 +153,7 @@ struct EnvConfig {
     uint32_t max_readers{100};  // Default max number of readers
 };
 
-//! \brief Configuration settings for a "map" (aka a table)
+//! \brief Configuration settings for a "map" (aka "table" or "subdb")
 struct MapConfig {
     const char* name{nullptr};                                        // Name of the table (is key in MAIN_DBI)
     const ::mdbx::key_mode key_mode{::mdbx::key_mode::usual};         // Key collation order

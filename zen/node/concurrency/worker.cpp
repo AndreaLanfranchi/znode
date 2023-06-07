@@ -11,6 +11,8 @@
 
 namespace zen {
 
+Worker::~Worker() { Worker::stop(/*wait=*/true); }
+
 void Worker::start(bool kicked, bool wait) noexcept {
     if (State expected_state{State::kStopped}; !state_.compare_exchange_strong(expected_state, State::kStarting)) {
         return;

@@ -34,7 +34,7 @@ class Worker : public Stoppable, private boost::noncopyable {
     explicit Worker(const std::string& name) : name_{name} {}
     explicit Worker(std::string&& name) : name_{std::move(name)} {}
 
-    ~Worker() override = default;
+    ~Worker() override;
 
     virtual void start(bool kicked,
                        bool wait) noexcept;  // Start worker thread with provided kicked state (optionally waits
