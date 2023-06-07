@@ -21,7 +21,7 @@ class CappedSet {
 
   public:
     explicit CappedSet(const size_t capacity) : capacity_{capacity} {
-        ZEN_ASSERT(capacity != 0);  // Can't create zero capped container
+        ZEN_REQUIRE(capacity != 0);  // Can't create zero capped container
     }
     ~CappedSet() = default;
 
@@ -58,7 +58,7 @@ class CappedSet {
     friend bool operator==(const CappedSet<T>& Lhs_, const CappedSet<T>& Rhs_) { return Lhs_.items_ == Rhs_.items_; }
 
   private:
-    size_t capacity_;
+    const size_t capacity_;
     std::unordered_set<T> items_{};
     std::queue<iterator_t> items_queue_;
 };

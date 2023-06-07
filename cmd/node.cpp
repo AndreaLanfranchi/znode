@@ -151,8 +151,8 @@ int main(int argc, char* argv[]) {
                 std::swap(t1, t2);
 
                 const auto total_duration{t1 - start_time};
-                const auto mem_usage{get_mem_usage(true)};
-                const auto vmem_usage{get_mem_usage(false)};
+                const auto mem_usage{get_memory_usage(true)};
+                const auto vmem_usage{get_memory_usage(false)};
                 const auto chaindata_usage{chaindata_dir.size(true)};
                 const auto etltmp_usage{etltmp_dir.size(true)};
 

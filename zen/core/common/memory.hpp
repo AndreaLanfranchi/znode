@@ -22,7 +22,7 @@ namespace zen {
 //! \brief The amount of memory currently being used by this process, in bytes.
 //! \remarks if resident=true it will report the resident set in RAM (if supported specific OS) otherwise returns the
 //! full virtual arena
-[[nodiscard]] size_t get_mem_usage(bool resident = true);
+[[nodiscard]] size_t get_memory_usage(bool resident = true);
 
 //! \brief Returns system's page size in bytes
 [[nodiscard]] size_t get_system_page_size();
@@ -37,10 +37,9 @@ class LockedPagesManagerBase : private boost::noncopyable {
   public:
     LockedPagesManagerBase() : LockedPagesManagerBase(get_system_page_size()){};
 
-    explicit LockedPagesManagerBase(size_t page_size) : page_size_{page_size} {
-        ZEN_ASSERT((page_size >= 512 && page_size <= 1_GiB));  // Martian values
-        ZEN_ASSERT((page_size & (page_size - 1)) == 0);        // Must be power of two
-        page_mask_ = ~(page_size - 1);
+    explicit LockedPagesManagerBase(size_t page_size) : page_size_{page_size}, page_mask_{~(page_size - 1)} {
+        ZEN_REQUIRE((page_size >= 512 && page_size <= 1_GiB));  // Martian values
+        ZEN_REQUIRE((page_size & (page_size - 1)) == 0);        // Must be power of two
     };
 
     ~LockedPagesManagerBase() { clear(); }
@@ -77,7 +76,7 @@ class LockedPagesManagerBase : private boost::noncopyable {
         for (size_t page{start}; page <= end; page += page_size_) {
             auto item = locked_pages_.find(page);
             if (item == locked_pages_.end()) continue;  // Not previously locked
-            ZEN_ASSERT(item->second > 0);               // It MUST have a value
+            ZEN_ENSURE(item->second > 0);               // It MUST have a value
             if (--item->second == 0) {                  // Decrement lock count
                 if (!locker_.unlock(reinterpret_cast<void*>(page), page_size_)) {
                     ret = false;
@@ -113,18 +112,18 @@ class LockedPagesManagerBase : private boost::noncopyable {
         std::scoped_lock lock(mutex_);
         for (auto it{locked_pages_.cbegin()}; it != locked_pages_.cend();) {
             if (locker_.unlock(reinterpret_cast<void*>(it->first), page_size_)) {
-                locked_pages_.erase(it++);
-            } else {
-                ++it;
+                it = locked_pages_.erase(it);
+                continue;
             }
+            ++it;
         }
     }
 
   private:
     Locker locker_;
     mutable std::mutex mutex_;
-    size_t page_size_{0};
-    size_t page_mask_{0};
+    const size_t page_size_{0};
+    const size_t page_mask_{0};
     std::map<size_t, intptr_t> locked_pages_;
 
     [[nodiscard]] std::pair<size_t, size_t> get_range_boundaries(const void* address, size_t size) const {

@@ -35,7 +35,7 @@
 namespace zen {
 // Inspired by:
 // https://stackoverflow.com/questions/372484/how-do-i-programmatically-check-memory-use-in-a-fairly-portable-way-c-c
-size_t get_mem_usage(bool resident) {
+size_t get_memory_usage(bool resident) {
     size_t ret{0};
 #if defined(__linux__)
     // getrusage doesn't work well on Linux. Try grabbing info directly from the /proc pseudo-filesystem.

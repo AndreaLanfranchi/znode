@@ -16,9 +16,9 @@
 namespace zen {
 
 TEST_CASE("Memory Usage", "[memory]") {
-    size_t memory_usage_resident{get_mem_usage(true)};
+    size_t memory_usage_resident{get_memory_usage(true)};
     REQUIRE(memory_usage_resident > 0);
-    size_t memory_usage_virtual{get_mem_usage(false)};
+    size_t memory_usage_virtual{get_memory_usage(false)};
     REQUIRE(memory_usage_virtual > 0);
 }
 

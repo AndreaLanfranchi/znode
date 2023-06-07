@@ -7,6 +7,10 @@
 
 #pragma once
 
+// Clang-format off
+#include "preprocessor.hpp" // Must be first
+// clang-format on
+
 #include <compare>
 #include <concepts>
 #include <cstddef>
@@ -17,41 +21,12 @@
 
 #include <intx/intx.hpp>
 
-#if defined(__wasm__)
-#define ZEN_THREAD_LOCAL
-#else
-#define ZEN_THREAD_LOCAL thread_local
-#endif
-
 #if defined(BOOST_NO_EXCEPTIONS)
 #include <boost/throw_exception.hpp>
 namespace boost {
 BOOST_NORETURN void throw_exception(const std::exception& ex);
 }
 #endif
-
-// Only 64 bit little endian arch allowed
-
-#if defined(_MSC_VER) || (defined(__INTEL_COMPILER) && defined(_WIN32))
-#if defined(_M_X64)
-#define BITNESS_64
-#else
-#define BITNESS_32
-#endif
-#elif defined(__clang__) || defined(__INTEL_COMPILER) || defined(__GNUC__)
-#if defined(__x86_64)
-#define BITNESS_64
-#else
-#define BITNESS_32
-#endif
-#else
-#error Cannot detect compiler or compiler is not supported
-#endif
-#if !defined(BITNESS_64)
-#error "Only 64 bit target architecture is supported"
-#endif
-#undef BITNESS_32
-#undef BITNESS_64
 
 static_assert(intx::byte_order_is_little_endian == true, "Target architecture MUST be little endian");
 
