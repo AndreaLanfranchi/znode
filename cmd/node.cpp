@@ -18,6 +18,7 @@
 #include <zen/node/database/access_layer.hpp>
 #include <zen/node/database/mdbx_tables.hpp>
 #include <zen/node/network/server.hpp>
+#include <zen/node/zcash/params.hpp>
 
 #include "common.hpp"
 
@@ -72,7 +73,6 @@ int main(int argc, char* argv[]) {
     cli.get_formatter()->column_width(50);
 
     try {
-
         OPENSSL_init();
         Ossignals::init();  // Intercept OS signals
 
@@ -82,7 +82,6 @@ int main(int argc, char* argv[]) {
         // This parses and validates command line arguments
         // After return we're able to start services. Datadir has been deployed
         cmd::parse_node_command_line(cli, argc, argv, settings);
-        cmd::prime_zcash_params((*node_settings.data_directory)[DataDirectory::kZkParamsName].path());
 
         // Start logging
         log::init(settings.log_settings);
@@ -99,6 +98,15 @@ int main(int argc, char* argv[]) {
                      {"version", mdbx_ver.git.describe, "build", mdbx_bld.target, "compiler", mdbx_bld.compiler});
         // Output OpenSSL build info
         log::Message("Using OpenSSL", {"version", OPENSSL_VERSION_TEXT});
+
+        // Validate mandatory zcash params
+        StopWatch sw(true);
+        log::Message("Validating Zcash params",
+                     {"directory", (*node_settings.data_directory)[DataDirectory::kZkParamsName].path().string()});
+        if (!zcash::validate_param_files((*node_settings.data_directory)[DataDirectory::kZkParamsName].path())) {
+            throw std::runtime_error("Invalid Zcash params");
+        }
+        log::Message("Validated  Zcash params", {"elapsed", sw.format(sw.since_start())});
 
         // Check and open db
         prepare_chaindata_env(node_settings, true);

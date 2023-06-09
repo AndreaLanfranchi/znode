@@ -25,7 +25,8 @@ if (NOT ZEN_NODE_SRC_ITEMS EQUAL 0)
 
     target_include_directories(zen_node PUBLIC
             ${CMAKE_SOURCE_DIR}
-            ${ZEN_MAIN_DIR}/third-party/magic_enum/include)
+            ${ZEN_MAIN_DIR}/third-party/magic_enum/include
+            ${ZEN_MAIN_DIR}/third-party/indicators/include)
 
     set(ZEN_NODE_PUBLIC_LIBS zen_core
             absl::time

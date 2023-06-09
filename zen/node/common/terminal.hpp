@@ -6,6 +6,9 @@
 */
 
 #pragma once
+
+#include <string>
+
 namespace zen {
 
 // Reset sequence
@@ -78,5 +81,8 @@ inline constexpr const char* kColorTealUnderline = "\x1b[4;36m";    // Cyan
 //! \brief Initializes terminal code page to UTF-8 and enables control escape sequences
 //! \remarks Is actually needed on Windows only
 void init_terminal();
+
+//! \brief Prompt user for a confirmation
+bool ask_user_confirmation(const std::string message = "Confirm action ?");
 
 }  // namespace zen

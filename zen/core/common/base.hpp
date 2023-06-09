@@ -8,7 +8,7 @@
 #pragma once
 
 // Clang-format off
-#include "preprocessor.hpp" // Must be first
+#include "preprocessor.hpp"  // Must be first
 // clang-format on
 
 #include <compare>
@@ -96,10 +96,10 @@ constexpr uint64_t operator"" _MiB(unsigned long long x) { return x * kMiB; }
 constexpr uint64_t operator"" _GiB(unsigned long long x) { return x * kGiB; }
 constexpr uint64_t operator"" _TiB(unsigned long long x) { return x * kTiB; }
 
-static constexpr int64_t kCoinMaxDecimals = 8;         // Max number of denomination decimals
-static constexpr int64_t kCoin = 100'000'000;          // As many zeroes as kCoinMaxDecimals
-static constexpr int64_t kCoinCent = kCoin / 100;      // One coin cent
-static constexpr int64_t kCoinMaxSupply = 21'000'000;  // Max tokens supply
+static constexpr int64_t kCoinMaxDecimals{8};         // Max number of denomination decimals
+static constexpr int64_t kCoin{100'000'000};          // As many zeroes as kCoinMaxDecimals
+static constexpr int64_t kCoinCent{kCoin / 100};      // One coin cent
+static constexpr int64_t kCoinMaxSupply{21'000'000};  // Max tokens supply
 static constexpr std::string_view kCurrency{"ZEN"};
 
 }  // namespace zen

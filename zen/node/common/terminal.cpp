@@ -14,6 +14,9 @@
 #endif
 #endif
 
+#include <iostream>
+#include <regex>
+
 namespace zen {
 
 void init_terminal() {
@@ -30,5 +33,21 @@ void init_terminal() {
         }
     }
 #endif
+}
+bool ask_user_confirmation(const std::string message) {
+    static std::regex pattern{"^([yY])?([nN])?$"};
+    std::smatch matches;
+    std::string answer;
+    do {
+        std::cout << "\n" << message << " [y/N] ";
+        std::cin >> answer;
+        std::cin.clear();
+        if (std::regex_search(answer, matches, pattern, std::regex_constants::match_default)) {
+            break;
+        }
+        std::cout << "Hmmm... maybe you didn't read carefully. I repeat:" << std::endl;
+    } while (true);
+
+    return matches[1].length() > 0;
 }
 }  // namespace zen
