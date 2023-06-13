@@ -14,6 +14,7 @@
 // clang-format on
 #endif
 #include <array>
+#include <fstream>
 
 #include <boost/process/environment.hpp>
 
@@ -51,14 +52,14 @@ std::filesystem::path get_unique_temporary_path(std::optional<std::filesystem::p
     }
 
     // We were unable to find a valid unique non-existent path
-    throw std::runtime_error("Unable to find a valid unique non-existent under " + base_path->string());
+    throw std::filesystem::filesystem_error("Unable to find a valid unique non-existent name in " + base_path->string(),
+                                            *base_path, std::make_error_code(std::errc::file_exists));
 }
 std::filesystem::path get_os_default_storage_path() {
     std::string base_path_str{};
     auto environment{boost::this_process::environment()};
-    auto env_value{environment["XDG_DATA_HOME"]};
 
-    if (!env_value.empty()) {
+    if (auto env_value{environment["XDG_DATA_HOME"]}; !env_value.empty()) {
         // Got storage path from docker
         base_path_str.assign(env_value.to_string());
     } else {
@@ -127,14 +128,35 @@ size_t Directory::size(bool recurse) const {
     }
     return ret;
 }
-bool Directory::exists() const { return std::filesystem::exists(path_) && std::filesystem::is_directory(path_); }
+bool Directory::exists() const { return std::filesystem::exists(path_); }
 
-void Directory::create() {
+void Directory::create() const {
     if (exists()) return;
-    std::filesystem::create_directories(path_);
+    if (!std::filesystem::create_directories(path_)) {
+        throw std::filesystem::filesystem_error("Unable to create directory " + path_.string(), path_,
+                                                std::make_error_code(std::errc::io_error));
+    }
 }
-Directory Directory::operator[](const std::filesystem::path& path) {
+Directory Directory::operator[](const std::filesystem::path& path) const {
     if (path.empty() || path.is_absolute() || !path.has_filename()) throw std::invalid_argument("Invalid Path");
-    return Directory(path_ / path);
+    const auto target{path_ / path};
+    if (!std::filesystem::exists(target) && !std::filesystem::create_directories(target)) {
+        throw std::filesystem::filesystem_error("Unable to create directory " + target.string(), target,
+                                                std::make_error_code(std::errc::io_error));
+    }
+    return Directory(target);
+}
+bool Directory::is_writable() const noexcept {
+    std::filesystem::path test_file_name{get_random_alpha_string(8)};
+    while (std::filesystem::exists(path_ / test_file_name)) {
+        test_file_name = get_random_alpha_string(8);
+    }
+    std::filesystem::path test_file_path{path_ / test_file_name};
+    std::ofstream test_file{test_file_path.string()};
+    if (!test_file.is_open()) return false;
+    test_file << "test";
+    test_file.close();
+    std::filesystem::remove(test_file_path);
+    return true;
 }
 }  // namespace zen

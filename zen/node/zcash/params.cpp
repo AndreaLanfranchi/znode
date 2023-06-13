@@ -189,7 +189,9 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
         digest.update(ByteView{buffer.data(), static_cast<size_t>(file.gcount())});
         progress_bar.set_progress(progress_bar.current() + file.gcount());
     }
-    progress_bar.mark_as_completed();
+    if (!progress_bar.is_completed()) {
+        progress_bar.mark_as_completed();
+    }
     indicators::show_console_cursor(true);
 
     file.close();
@@ -208,10 +210,7 @@ static int download_progress_callback(void* clientp, curl_off_t dltotal, curl_of
             progress_bar->set_progress(progress);
         }
     }
-    if (Ossignals::signalled()) {
-        return 1;
-    }
-    return 0;
+    return Ossignals::signalled() ? 1 : 0;
 }
 
 bool download_param_file(const std::filesystem::path& directory, const ParamFile& param_file) {

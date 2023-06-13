@@ -85,7 +85,6 @@ TEST_CASE("Temp Directory", "[misc]") {
     SECTION("Create from current process path") {
         const auto process_path{get_process_absolute_full_path()};
         std::filesystem::path tmp_generated_path;
-
         {
             TempDirectory tmp_dir(process_path.parent_path());
             tmp_generated_path = tmp_dir.path();
@@ -121,7 +120,7 @@ TEST_CASE("Data Directory", "[misc]") {
         for (const auto& subdir : subdirs) {
             CHECK_FALSE(std::filesystem::exists(zen_data_dir / subdir));
         }
-
+        REQUIRE(data_dir.is_writable());
         data_dir.deploy();
         for (const auto& subdir : subdirs) {
             CHECK(std::filesystem::exists(zen_data_dir / subdir));

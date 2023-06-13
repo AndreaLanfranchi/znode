@@ -45,7 +45,7 @@ class Directory : private boost::noncopyable {
     [[nodiscard]] bool exists() const;
 
     //! \brief Creates the filesystem entry if it does not exist
-    void create();
+    void create() const;
 
     //! \brief Returns the cumulative size of all contained files and subdirectories
     //! \param [in] recursive : whether to recurse subdirectories
@@ -54,13 +54,16 @@ class Directory : private boost::noncopyable {
     //! \brief Returns the std::filesystem::path of this Directory instance
     [[nodiscard]] const std::filesystem::path& path() const noexcept;
 
+    //! \brief Returns whether this Directory is writable
+    [[nodiscard]] bool is_writable() const noexcept;
+
     //! \brief Removes all contained files and, optionally, subdirectories
     virtual void clear(bool recurse);
 
     //! \brief Accesses a subdirectory.
     //! \param [in] path : a relative subpath
     //! \remark Should the requested dir not exist then it is created
-    Directory operator[](const std::filesystem::path& path);
+    Directory operator[](const std::filesystem::path& path) const;
 
   private:
     std::filesystem::path path_;  // The actual absolute path of this instance

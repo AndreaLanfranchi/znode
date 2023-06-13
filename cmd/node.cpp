@@ -52,7 +52,8 @@ void prepare_chaindata_env(NodeSettings& node_settings, [[maybe_unused]] bool in
             std::string what{"Incompatible schema version:"};
             what.append(" expected " + zen::db::tables::kRequiredSchemaVersion.to_string());
             what.append(" got " + detected_schema_version->to_string());
-            throw std::runtime_error(what);
+            chaindata_env.close(/*dont_sync=*/true);
+            throw std::filesystem::filesystem_error(what, std::make_error_code(std::errc::not_supported));
         }
     } else {
         db::tables::deploy_tables(*tx, db::tables::kChainDataTables);
@@ -104,9 +105,10 @@ int main(int argc, char* argv[]) {
         log::Message("Validating Zcash params",
                      {"directory", (*node_settings.data_directory)[DataDirectory::kZkParamsName].path().string()});
         if (!zcash::validate_param_files((*node_settings.data_directory)[DataDirectory::kZkParamsName].path())) {
-            throw std::runtime_error("Invalid Zcash params");
+            throw std::filesystem::filesystem_error("Invalid Zcash file params",
+                                                    std::make_error_code(std::errc::no_such_file_or_directory));
         }
-        log::Message("Validated  Zcash params", {"elapsed", sw.format(sw.since_start())});
+        log::Message("Validated  Zcash params", {"elapsed", StopWatch::format(sw.since_start())});
 
         // Check and open db
         prepare_chaindata_env(node_settings, true);
@@ -214,15 +216,18 @@ int main(int argc, char* argv[]) {
 
     } catch (const CLI::ParseError& ex) {
         return cli.exit(ex);
-    } catch (const std::runtime_error& ex) {
-        log::Error() << ex.what();
-        return -1;
+    } catch (const std::filesystem::filesystem_error& ex) {
+        log::Error() << "\tFilesystem error :" << ex.what();
+        return -2;
     } catch (const std::invalid_argument& ex) {
         std::cerr << "\tInvalid argument :" << ex.what() << "\n" << std::endl;
         return -3;
     } catch (const db::Exception& ex) {
         std::cerr << "\tUnexpected db error : " << ex.what() << "\n" << std::endl;
         return -4;
+    } catch (const std::runtime_error& ex) {
+        log::Error() << ex.what();
+        return -1;
     } catch (const std::exception& ex) {
         std::cerr << "\tUnexpected error : " << ex.what() << "\n" << std::endl;
         return -5;
