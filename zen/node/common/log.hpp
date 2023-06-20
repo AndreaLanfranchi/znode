@@ -51,6 +51,9 @@ void set_verbosity(Level level);
 //! \brief Sets the name for this thread when logging traces also threads
 void set_thread_name(const char* name);
 
+//! \brief Sets the name for this thread when logging traces also threads
+void set_thread_name(const std::string_view& name);
+
 //! \brief Returns the id of current thread in a printable form
 uint64_t get_thread_id();
 

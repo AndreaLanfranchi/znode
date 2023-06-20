@@ -114,15 +114,19 @@ int main(int argc, char* argv[]) {
         prepare_chaindata_env(node_settings, true);
         auto chaindata_env{db::open_env(node_settings.chaindata_env_config)};
 
-        // Start boost asio
+        // Start boost asio with the number of threads specified by the concurrency hint
         using asio_guard_type = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
         auto asio_guard = std::make_unique<asio_guard_type>(node_settings.asio_context.get_executor());
-        std::thread asio_thread{[&node_settings]() {
-            log::set_thread_name("asio");
-            log::Trace("Service", {"name", "asio", "status", "starting"});
-            node_settings.asio_context.run();
-            log::Trace("Service", {"name", "asio", "status", "stopped"});
-        }};
+        std::vector<std::thread> asio_threads;
+        for(int i{0}; i < 4; ++i) {
+            asio_threads.emplace_back([&node_settings, i]() {
+                std::string thread_name{"asio-" + std::to_string(i)};
+                log::set_thread_name(thread_name);
+                log::Trace("Service", {"name", thread_name, "status", "starting"});
+                node_settings.asio_context.run();
+                log::Trace("Service", {"name", thread_name, "status", "stopped"});
+            });
+        }
 
         // Start prometheus endpoint if required
         if (!node_settings.prometheus_endpoint.empty()) {
@@ -200,7 +204,8 @@ int main(int argc, char* argv[]) {
         net_server.stop();  // Stop networking server
 
         asio_guard.reset(); // Ensure asio is stopped last
-        asio_thread.join();
+        for (auto& asio_thread : asio_threads) asio_thread.join();
+
 
         if (node_settings.data_directory) {
             log::Message("Closing database", {"path", (*node_settings.data_directory)["chaindata"].path().string()});

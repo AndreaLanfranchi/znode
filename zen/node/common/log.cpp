@@ -47,6 +47,8 @@ bool test_verbosity(Level level) { return level <= settings_.log_verbosity; }
 
 void set_thread_name(const char* name) { thread_name_ = std::string(name); }
 
+void set_thread_name(const std::string_view& name) { thread_name_ = std::string(name); }
+
 uint64_t get_thread_id() {
     std::stringstream ss;
     ss << std::this_thread::get_id();
