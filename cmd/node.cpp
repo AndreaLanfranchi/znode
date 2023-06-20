@@ -119,9 +119,9 @@ int main(int argc, char* argv[]) {
         auto asio_guard = std::make_unique<asio_guard_type>(node_settings.asio_context.get_executor());
         std::thread asio_thread{[&node_settings]() {
             log::set_thread_name("asio");
-            log::Message("Service", {"name", "asio", "status", "starting"});
+            log::Trace("Service", {"name", "asio", "status", "starting"});
             node_settings.asio_context.run();
-            log::Message("Service", {"name", "asio", "status", "stopped"});
+            log::Trace("Service", {"name", "asio", "status", "stopped"});
         }};
 
         // Start prometheus endpoint if required
@@ -132,8 +132,7 @@ int main(int argc, char* argv[]) {
         }
 
         // Start networking server
-        zen::network::Server net_server(node_settings.asio_context,
-                                        boost::asio::ip::tcp::endpoint{boost::asio::ip::tcp::v4(), 13383});
+        zen::network::TCPServer net_server(node_settings.asio_context, nullptr, 13383, 30, 10);
         net_server.start();
 
         // Start sync loop
@@ -198,8 +197,9 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        net_server.stop(true);  // Stop networking server
-        asio_guard.reset();
+        net_server.stop();  // Stop networking server
+
+        asio_guard.reset(); // Ensure asio is stopped last
         asio_thread.join();
 
         if (node_settings.data_directory) {

@@ -6,70 +6,44 @@
 
 #pragma once
 #include <iostream>
+#include <memory>
+#include <unordered_set>
 
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
 #include <boost/noncopyable.hpp>
 
-#include <zen/node/common/log.hpp>
 #include <zen/node/concurrency/stoppable.hpp>
+#include <zen/node/network/node.hpp>
 
 namespace zen::network {
 
-class Server final : public zen::Stoppable, private boost::noncopyable {
+class TCPServer {
   public:
-    Server(boost::asio::io_context& io_context, boost::asio::ip::tcp::endpoint endpoint)
-        : io_context_{io_context}, acceptor_{io_context, endpoint} {}
-    ~Server() override = default;
+    TCPServer(boost::asio::io_context& io_context, SSL_CTX* ssl_context, uint16_t port, uint32_t idle_timeout_seconds,
+              uint32_t max_connections);
 
-    void start() {
-        boost::asio::spawn(io_context_, [this](boost::asio::yield_context yield) {
-            while (!is_stopping()) {
-                boost::system::error_code ec;
-                boost::asio::ip::tcp::socket socket{io_context_};
-                acceptor_.async_accept(socket, yield[ec]);
-                if (ec == boost::asio::error::operation_aborted) break;  // acceptor closed by programmatic request
+    // Not copyable or movable
+    TCPServer(TCPServer& other) = delete;
+    TCPServer(TCPServer&& other) = delete;
+    TCPServer& operator=(const TCPServer& other) = delete;
+    ~TCPServer() = default;
 
-                // TODO determine whether we can accept this new inbound connection or
-                // we have exceeded the maximum number of connections
-
-                if (!ec) {
-                    log::Info("Accepted connection", {"ip", socket.remote_endpoint().address().to_string()});
-                    boost::asio::spawn(
-                        io_context_, [this, socket = std::move(socket)](boost::asio::yield_context yield) mutable {
-                            try {
-                                std::array<char, 1024> buffer;
-                                boost::system::error_code ec1;
-                                size_t len{0};
-                                while (!is_stopping() &&
-                                       (len = socket.async_read_some(boost::asio::buffer(buffer), yield[ec1])) > 0 &&
-                                       !ec1) {
-                                    boost::asio::async_write(socket, boost::asio::buffer(buffer, len), yield[ec1]);
-                                    if (ec1) break;
-                                }
-                            } catch (const std::exception& e) {
-                                log::Error("Connection acceptor", {"status", "aborted", "reason", e.what()});
-                                std::ignore = Stoppable::stop(false);
-                            }
-                        });
-                } else {
-                    log::Error("Connection acceptor", {"status", "aborted", "reason", ec.message()});
-                }
-            }
-        });
-    }
-
-    bool stop(bool wait) noexcept override {
-        bool ret = Stoppable::stop(wait);
-        if (ret) {
-            acceptor_.cancel();
-        }
-        return ret;
-    }
+    void start();
+    void stop();
 
   private:
-    boost::asio::io_context& io_context_;
-    boost::asio::ip::tcp::acceptor acceptor_;
-};
+    void start_accept();
+    void remove_node(std::shared_ptr<Node> node);
 
+    boost::asio::io_context& io_context_;
+    boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
+    boost::asio::ip::tcp::acceptor acceptor_;
+    SSL_CTX* ssl_context_;
+    uint32_t idle_timeout_seconds_;
+    uint32_t max_connections_;
+    std::atomic_uint32_t current_connections_{0};
+    std::unordered_set<std::shared_ptr<Node>> nodes_;
+    std::mutex nodes_mutex_;
+};
 }  // namespace zen::network
