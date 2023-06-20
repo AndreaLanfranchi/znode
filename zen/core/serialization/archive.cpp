@@ -62,6 +62,8 @@ void Archive::shrink() {
 
 Archive::size_type Archive::size() const noexcept { return buffer_.size(); }
 
+bool Archive::empty() const noexcept { return buffer_.empty(); }
+
 Archive::size_type Archive::computed_size() const noexcept { return computed_size_; }
 
 Archive::size_type Archive::avail() const noexcept { return buffer_.size() - read_position_; }

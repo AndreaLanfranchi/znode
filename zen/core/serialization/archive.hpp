@@ -80,6 +80,9 @@ class Archive {
     //! \brief Returns the size of the contained data
     [[nodiscard]] size_type size() const noexcept;
 
+    //! \brief Whether this archive contains any data
+    [[nodiscard]] bool empty() const noexcept;
+
     //! \brief Returns the computed size of the to-be-contained data
     //! \remarks Only when this stream is used as a calculator
     [[nodiscard]] size_type computed_size() const noexcept;

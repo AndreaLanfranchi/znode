@@ -13,7 +13,7 @@
 
 namespace zen {
 
-static constexpr size_t kBlockHeaderSize{140};  // Excluding Equihash solution
+static constexpr size_t kBlockHeaderSerializedSize{140};  // Excluding Equihash solution
 
 class BlockHeader : public serialization::Serializable {
   public:

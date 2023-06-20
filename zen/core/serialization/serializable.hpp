@@ -25,6 +25,10 @@ class Serializable {
         return serialization(archive, Action::kSerialize);
     }
 
+    [[nodiscard]] serialization::Error deserialize(Archive& archive) {
+        return serialization(archive, Action::kDeserialize);
+    }
+
     // Needed for derived classes implementing spaceship operator
     constexpr auto operator<=>(const Serializable&) const = default;
 

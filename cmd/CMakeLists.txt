@@ -26,4 +26,10 @@ if(NOT ZEN_CORE_ONLY)
     target_link_libraries(zentool PRIVATE zen_node zen-buildinfo CLI11::CLI11)
     target_include_directories(zentool PRIVATE ${ZEN_MAIN_DIR}/third-party/indicators/include)
 
+    # Flood executable
+    add_executable(flood "flood.cpp")
+    target_link_libraries(flood PRIVATE zen_node zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
+    target_include_directories(flood PRIVATE ${ZEN_MAIN_DIR}/third-party/indicators/include)
+
+
 endif()
