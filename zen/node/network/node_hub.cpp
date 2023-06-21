@@ -4,7 +4,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "server.hpp"
+#include "node_hub.hpp"
 
 #include <zen/core/common/misc.hpp>
 
@@ -15,8 +15,8 @@ namespace zen::network {
 
 using boost::asio::ip::tcp;
 
-TCPServer::TCPServer(boost::asio::io_context& io_context, SSL_CTX* ssl_context, uint16_t port,
-                     uint32_t idle_timeout_seconds, uint32_t max_connections)
+NodeHub::NodeHub(boost::asio::io_context& io_context, SSL_CTX* ssl_context, uint16_t port,
+                 uint32_t idle_timeout_seconds, uint32_t max_connections)
     : io_context_(io_context),
       io_strand_(io_context),
       acceptor_(io_context, tcp::endpoint(tcp::v4(), port)),
@@ -25,12 +25,12 @@ TCPServer::TCPServer(boost::asio::io_context& io_context, SSL_CTX* ssl_context, 
       connection_idle_timeout_seconds_(idle_timeout_seconds),
       max_active_connections_(max_connections) {}
 
-void TCPServer::start() {
+void NodeHub::start() {
     start_info_timer();
     start_accept();
 }
 
-void TCPServer::start_info_timer() {
+void NodeHub::start_info_timer() {
     info_timer_.expires_after(std::chrono::seconds(kInfoTimerSeconds_));
     info_timer_.async_wait([this](const boost::system::error_code& ec) {
         if (ec == boost::asio::error::operation_aborted) {
@@ -45,7 +45,7 @@ void TCPServer::start_info_timer() {
     });
 }
 
-void TCPServer::print_info() {
+void NodeHub::print_info() {
     std::vector<std::string> info_data;
 
     auto current_total_bytes_received{total_bytes_received_.load()};
@@ -70,7 +70,7 @@ void TCPServer::print_info() {
     log::Info("Network usage", info_data);
 }
 
-void TCPServer::stop() {
+void NodeHub::stop() {
     info_timer_.cancel();
     acceptor_.close();
     std::scoped_lock lock(nodes_mutex_);
@@ -80,7 +80,7 @@ void TCPServer::stop() {
     }
 }
 
-void TCPServer::start_accept() {
+void NodeHub::start_accept() {
     log::Trace("Service", {"name", "TCP Server", "status", "Listening"});
     auto new_node = std::make_shared<Node>(
         NodeConnectionMode::kInbound, io_context_, ssl_context_, connection_idle_timeout_seconds_,
@@ -91,7 +91,7 @@ void TCPServer::start_accept() {
                            [this, new_node](const boost::system::error_code& ec) { handle_accept(new_node, ec); });
 }
 
-void TCPServer::handle_accept(std::shared_ptr<Node> new_node, const boost::system::error_code& ec) {
+void NodeHub::handle_accept(std::shared_ptr<Node> new_node, const boost::system::error_code& ec) {
     std::string origin{"unknown"};
     if (auto remote_endpoint{get_remote_endpoint(new_node->socket())}; remote_endpoint) {
         origin = to_string(remote_endpoint.value());
@@ -130,7 +130,7 @@ void TCPServer::handle_accept(std::shared_ptr<Node> new_node, const boost::syste
     io_strand_.post([this]() { start_accept(); });  // Continue listening for new connections
 }
 
-void TCPServer::on_node_disconnected(std::shared_ptr<Node> node) {
+void NodeHub::on_node_disconnected(std::shared_ptr<Node> node) {
     if (current_active_connections_) --current_active_connections_;
     switch (node->mode()) {
         case NodeConnectionMode::kInbound:
@@ -145,7 +145,7 @@ void TCPServer::on_node_disconnected(std::shared_ptr<Node> node) {
     nodes_.erase(node);
 }
 
-void TCPServer::on_node_data(zen::network::DataDirectionMode direction, const size_t bytes_transferred) {
+void NodeHub::on_node_data(zen::network::DataDirectionMode direction, const size_t bytes_transferred) {
     switch (direction) {
         case DataDirectionMode::kInbound:
             total_bytes_received_ += bytes_transferred;

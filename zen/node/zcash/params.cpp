@@ -37,9 +37,8 @@
 #pragma GCC diagnostic pop
 #endif
 
-#include <curl/curl.h>
-#include <curl/easy.h>
 #include <magic_enum.hpp>
+#include <openssl/ssl.h>
 
 #include <zen/core/common/misc.hpp>
 #include <zen/core/crypto/md.hpp>
@@ -51,7 +50,7 @@
 
 namespace zen::zcash {
 
-bool validate_param_files(const std::filesystem::path& directory) {
+bool validate_param_files(boost::asio::io_context& asio_context, const std::filesystem::path& directory) {
     std::vector<ParamFile> errored_param_files{};
 
     for (const auto& param_file : kParamFiles) {
@@ -123,7 +122,7 @@ bool validate_param_files(const std::filesystem::path& directory) {
             return false;
         }
         const auto file_path{directory / param_file.name};
-        if (!download_param_file(directory, param_file)) {
+        if (!download_param_file(asio_context, directory, param_file)) {
             log::Critical("Failed to download param file", {"file", file_path.string()});
             return false;
         }
@@ -207,42 +206,55 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
     return digest.finalize();
 }
 
-static int download_progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
-                                      [[maybe_unused]] curl_off_t ultotal, [[maybe_unused]] curl_off_t ulnow) noexcept {
+bool download_param_file(boost::asio::io_context& asio_context, const std::filesystem::path& directory,
+                         const ParamFile& param_file) {
     using namespace indicators;
-    static size_t prev_progress{0};
-    if (const size_t progress{dltotal != 0 ? static_cast<size_t>(dlnow * 100 / dltotal) : 0};
-        progress != prev_progress) {
-        prev_progress = progress;
-        auto* progress_bar = static_cast<ProgressBar*>(clientp);
-        if (!progress_bar->is_completed()) {
-            progress_bar->set_progress(progress);
-        }
-    }
-    return Ossignals::signalled() ? 1 : 0;
-}
+    namespace ssl = boost::asio::ssl;
+    namespace ip = boost::asio::ip;
 
-bool download_param_file(const std::filesystem::path& directory, const ParamFile& param_file) {
-    using namespace indicators;
+    ssl::context ssl_context(ssl::context::tlsv13_client);
+    SSL_CTX_set_options(ssl_context.native_handle(), SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
 
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    CURL* curl = curl_easy_init();
-    FILE* file_pointer{nullptr};
-    if (!curl) {
-        log::Critical("Failed to initialize curl");
+    ssl_context.set_default_verify_paths();
+    ssl::stream<ip::tcp::socket> ssl_stream{asio_context, ssl_context};
+
+    ip::tcp::resolver resolver{asio_context};
+    ip::tcp::resolver::query query(kTrustedDownloadHost.data(), "https");
+    auto endpoints = resolver.resolve(query);
+
+    boost::system::error_code ec;
+    boost::asio::connect(ssl_stream.next_layer(), endpoints, ec);
+    if (ec) {
+        log::Error("Failed to connect to server", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
+        return false;
+    };
+
+    ssl_stream.set_verify_mode(ssl::verify_none);  // Todo ! Verify certificate
+    ssl_stream.handshake(ssl::stream_base::client, ec);
+    if (ec) {
+        log::Error("Failed to perform SSL handshake",
+                   {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
         return false;
     }
-    auto free_curl{gsl::finally([curl] { curl_easy_cleanup(curl); })};
 
-    std::string url{kTrustedDownloadBaseUrl};
-    ZEN_REQUIRE(url.ends_with("/"));
-    url.append(param_file.name);
+    const auto target_file = (directory / param_file.name);
+    std::ofstream file{target_file, std::ios_base::out | std::ios_base::binary};
+    if (!file.is_open()) {
+        log::Error("Failed to open file", {"file", target_file.string()});
+        return false;
+    }
+    auto close_file{gsl::finally([&file] { file.close(); })};
 
-    auto return_code = curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    if (return_code == CURLE_OK) return_code = curl_easy_setopt(curl, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-    if (return_code == CURLE_OK) return_code = curl_easy_setopt(curl, CURLOPT_SSL_ENABLE_ALPN, 1);
-    if (return_code == CURLE_OK)
-        return_code = curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);  // Todo : set verififypeer
+    // Send request ...
+    std::string request = "GET " + std::string(kTrustedDownloadPath) + std::string(param_file.name) +
+                          " HTTP/1.1\r\nHost: " + std::string(kTrustedDownloadHost) + "\r\n" + "User-Agent: zen++\r\n" +
+                          "Accept: */*\r\n" + "Connection: close\r\n\r\n";
+
+    boost::asio::write(ssl_stream, boost::asio::buffer(request), ec);
+    if (ec) {
+        log::Error("Failed to send request", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
+        return false;
+    }
 
     // Initialize progress bar
     show_console_cursor(false);
@@ -259,7 +271,8 @@ bool download_param_file(const std::filesystem::path& directory, const ParamFile
         option::ShowPercentage{true},
         option::ShowElapsedTime{true},
         option::ShowRemainingTime{true},
-        option::FontStyles{std::vector<FontStyle>{FontStyle::bold}}};
+        option::FontStyles{std::vector<FontStyle>{FontStyle::bold}},
+        option::MaxProgress{param_file.expected_size}};
 
     auto free_progress{gsl::finally([&progress_bar] {
         if (!progress_bar.is_completed()) {
@@ -268,37 +281,19 @@ bool download_param_file(const std::filesystem::path& directory, const ParamFile
         show_console_cursor(true);
     })};
 
-    if (return_code == CURLE_OK)
-        return_code = curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, download_progress_callback);
-    if (return_code == CURLE_OK) return_code = curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &progress_bar);
-    if (return_code == CURLE_OK) return_code = curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0);
-    if (return_code == CURLE_OK) return_code = curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1_KiB * 8);
-    if (return_code == CURLE_OK) return_code = curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 10);
-
-    const auto target_file = (directory / param_file.name);
-    if (return_code == CURLE_OK) {
-#ifdef _MSC_VER  // Windows
-        if (auto error = fopen_s(&file_pointer, target_file.string().c_str(), "wb")) return_code = CURLE_WRITE_ERROR;
-#else
-        file_pointer = fopen(target_file.string().c_str(), "wb");
-#endif
-        if (!file_pointer) {
-            log::Critical("Failed to open target file", {"file", target_file.string(), "mode", "wb"});
+    // Read response ...
+    constexpr size_t buffer_size{256_KiB};
+    std::array<char, buffer_size> buffer;
+    size_t bytes_read{0};
+    do {
+        bytes_read = boost::asio::read(ssl_stream, boost::asio::buffer(buffer), ec);
+        if (ec && ec != boost::asio::error::eof) {
+            log::Error("Failed to read response", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
             return false;
         }
-    }
-
-    if (return_code == CURLE_OK) return_code = curl_easy_setopt(curl, CURLOPT_WRITEDATA, file_pointer);
-    if (return_code == CURLE_OK) return_code = curl_easy_perform(curl);
-
-    if (file_pointer) fclose(file_pointer);
-
-    if (return_code != CURLE_OK) {
-        log::Error("Failed to download file",
-                   {"file", std::string(param_file.name), "curl_error", std::string(curl_easy_strerror(return_code))});
-        std::filesystem::remove(target_file);
-        return false;
-    }
+        file.write(buffer.data(), bytes_read);
+        progress_bar.set_progress(progress_bar.current() + bytes_read);
+    } while (bytes_read > 0);
 
     // This task is done. The validity of the file will be checked elsewhere
     return true;

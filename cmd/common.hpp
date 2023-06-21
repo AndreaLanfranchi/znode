@@ -10,8 +10,6 @@
 #include <optional>
 
 #include <CLI/CLI.hpp>
-#include <curl/curl.h>
-#include <curl/easy.h>
 #include <zen/buildinfo.h>
 
 #include <zen/core/common/misc.hpp>

@@ -14,7 +14,6 @@
 #include <zen/core/common/base.hpp>
 
 #include <zen/node/common/directories.hpp>
-#include <zen/node/common/prometheus.hpp>
 #include <zen/node/database/mdbx.hpp>
 
 namespace zen {
@@ -24,8 +23,6 @@ struct NodeSettings {
     boost::asio::io_context asio_context{4};              // Async context (e.g. for timers)
     std::unique_ptr<DataDirectory> data_directory;        // Pointer to data folder
     db::EnvConfig chaindata_env_config{};                 // Chaindata db config
-    std::string prometheus_endpoint{};                    // Prometheus endpoint
-    std::unique_ptr<zen::Prometheus> prometheus_service;  // Prometheus service
     size_t batch_size{512_MiB};                           // Batch size to use in stages
     size_t etl_buffer_size{256_MiB};                      // Buffer size for ETL operations
     bool fake_pow{false};                                 // Whether to verify Proof-of-Work (PoW)

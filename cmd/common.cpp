@@ -69,14 +69,6 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
 
     cli.add_flag("--fakepow", node_settings.fake_pow, "Disables proof-of-work verification");
 
-    cli.add_option("--prometheus.endpoint", node_settings.prometheus_endpoint,
-                   "Prometheus endpoint listening address\n"
-                   "Not set or empty means do not start metrics collection\n"
-                   "Use the form ip-address:port\n"
-                   "DO NOT EXPOSE TO THE PUBLIC INTERNET")
-        ->capture_default_str()
-        ->transform(IPEndPointValidator(/*allow_empty=*/true, /*default_port=*/8080));
-
     // Logging options
     auto& log_settings = settings.log_settings;
     add_logging_options(cli, log_settings);

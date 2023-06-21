@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 
+#include <gsl/gsl_util>
 #include <openssl/opensslv.h>
 #include <openssl/ssl.h>
 
@@ -17,7 +18,7 @@
 #include <zen/node/concurrency/ossignals.hpp>
 #include <zen/node/database/access_layer.hpp>
 #include <zen/node/database/mdbx_tables.hpp>
-#include <zen/node/network/server.hpp>
+#include <zen/node/network/node_hub.hpp>
 #include <zen/node/zcash/params.hpp>
 
 #include "common.hpp"
@@ -100,16 +101,6 @@ int main(int argc, char* argv[]) {
         // Output OpenSSL build info
         log::Message("Using OpenSSL", {"version", OPENSSL_VERSION_TEXT});
 
-        // Validate mandatory zcash params
-        StopWatch sw(true);
-        log::Message("Validating Zcash params",
-                     {"directory", (*node_settings.data_directory)[DataDirectory::kZkParamsName].path().string()});
-        if (!zcash::validate_param_files((*node_settings.data_directory)[DataDirectory::kZkParamsName].path())) {
-            throw std::filesystem::filesystem_error("Invalid Zcash file params",
-                                                    std::make_error_code(std::errc::no_such_file_or_directory));
-        }
-        log::Message("Validated  Zcash params", {"elapsed", StopWatch::format(sw.since_start())});
-
         // Check and open db
         prepare_chaindata_env(node_settings, true);
         auto chaindata_env{db::open_env(node_settings.chaindata_env_config)};
@@ -118,7 +109,7 @@ int main(int argc, char* argv[]) {
         using asio_guard_type = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
         auto asio_guard = std::make_unique<asio_guard_type>(node_settings.asio_context.get_executor());
         std::vector<std::thread> asio_threads;
-        for(int i{0}; i < 4; ++i) {
+        for (int i{0}; i < 4; ++i) {
             asio_threads.emplace_back([&node_settings, i]() {
                 std::string thread_name{"asio-" + std::to_string(i)};
                 log::set_thread_name(thread_name);
@@ -127,17 +118,31 @@ int main(int argc, char* argv[]) {
                 log::Trace("Service", {"name", thread_name, "status", "stopped"});
             });
         }
+        auto stop_asio{gsl::finally([&node_settings, &asio_guard, &asio_threads]() {
+            node_settings.asio_context.stop();
+            asio_guard.reset();
+            for (auto& t : asio_threads) {
+                if (t.joinable()) t.join();
+            }
+        })};
 
-        // Start prometheus endpoint if required
-        if (!node_settings.prometheus_endpoint.empty()) {
-            log::Message("Service",
-                         {"name", "prometheus", "status", "starting", "endpoint", node_settings.prometheus_endpoint});
-            node_settings.prometheus_service = std::make_unique<zen::Prometheus>(node_settings.prometheus_endpoint);
+        // Let some time to allow threads to properly start
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+
+        // Validate mandatory zcash params
+        StopWatch sw(true);
+        auto zcash_params_path{(*node_settings.data_directory)[DataDirectory::kZkParamsName].path()};
+        log::Message("Validating Zcash params", {"directory", zcash_params_path.string()});
+        if (!zcash::validate_param_files(node_settings.asio_context, zcash_params_path)) {
+            throw std::filesystem::filesystem_error("Invalid Zcash file params",
+                                                    std::make_error_code(std::errc::no_such_file_or_directory));
         }
+        log::Message("Validated  Zcash params", {"elapsed", StopWatch::format(sw.since_start())});
 
         // Start networking server
-        zen::network::TCPServer net_server(node_settings.asio_context, nullptr, 13383, 30, 10);
-        net_server.start();
+        zen::network::NodeHub node_hub(node_settings.asio_context, nullptr, 13383, 30, 10);
+        node_hub.start();
 
         // Start sync loop
         const auto start_time{std::chrono::steady_clock::now()};
@@ -181,31 +186,13 @@ int main(int argc, char* argv[]) {
                                                 "uptime",
                                                 StopWatch::format(total_duration),
                                             });
-
-                if (node_settings.prometheus_service) {
-                    static auto& resources_gauge{node_settings.prometheus_service->set_gauge(
-                        "resources_usage", "Node resources usage in bytes")};
-                    static auto& resident_memory_gauge{
-                        resources_gauge.Add({{"scope", "memory"}, {"type", "resident"}})};
-                    static auto& virtual_memory_gauge{resources_gauge.Add({{"scope", "memory"}, {"type", "virtual"}})};
-                    static auto& chaindata_gauge{resources_gauge.Add(
-                        {{"scope", "storage"}, {"type", std::string(DataDirectory::kChainDataName)}})};
-                    static auto& etltmp_gauge{
-                        resources_gauge.Add({{"scope", "storage"}, {"type", std::string(DataDirectory::kEtlTmpName)}})};
-
-                    resident_memory_gauge.Set(static_cast<double>(mem_usage));
-                    virtual_memory_gauge.Set(static_cast<double>(vmem_usage));
-                    chaindata_gauge.Set(static_cast<double>(chaindata_usage));
-                    etltmp_gauge.Set(static_cast<double>(etltmp_usage));
-                }
             }
         }
 
-        net_server.stop();  // Stop networking server
-
-        asio_guard.reset(); // Ensure asio is stopped last
-        for (auto& asio_thread : asio_threads) asio_thread.join();
-
+        node_hub.stop();  // Stop networking server
+        //        node_settings.asio_context.stop();                          // Ensure asio is stopped last ...
+        //        asio_guard.reset();                                         // ... its guard is released ...
+        //        for (auto& asio_thread : asio_threads) asio_thread.join();  // ... and threads are joined
 
         if (node_settings.data_directory) {
             log::Message("Closing database", {"path", (*node_settings.data_directory)["chaindata"].path().string()});
@@ -222,22 +209,22 @@ int main(int argc, char* argv[]) {
     } catch (const CLI::ParseError& ex) {
         return cli.exit(ex);
     } catch (const std::filesystem::filesystem_error& ex) {
-        log::Error() << "\tFilesystem error :" << ex.what();
+        ZEN_ERROR << "Filesystem error :" << ex.what();
         return -2;
     } catch (const std::invalid_argument& ex) {
-        std::cerr << "\tInvalid argument :" << ex.what() << "\n" << std::endl;
+        ZEN_ERROR << "Invalid argument :" << ex.what();
         return -3;
     } catch (const db::Exception& ex) {
-        std::cerr << "\tUnexpected db error : " << ex.what() << "\n" << std::endl;
+        ZEN_ERROR << "Unexpected db error : " << ex.what();
         return -4;
     } catch (const std::runtime_error& ex) {
-        log::Error() << ex.what();
+        ZEN_ERROR << "Unexpected runtime error : " << ex.what();
         return -1;
     } catch (const std::exception& ex) {
-        std::cerr << "\tUnexpected error : " << ex.what() << "\n" << std::endl;
+        ZEN_ERROR << "Unexpected error : " << ex.what();
         return -5;
     } catch (...) {
-        std::cerr << "\tUnexpected undefined error\n" << std::endl;
+        ZEN_ERROR << "Unexpected undefined error";
         return -99;
     }
 }

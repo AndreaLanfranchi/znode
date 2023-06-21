@@ -9,9 +9,12 @@
 #include <stdint.h>
 
 #include <array>
-#include <optional>
 #include <filesystem>
+#include <optional>
 #include <string_view>
+
+#include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 
 #include <zen/core/common/base.hpp>
 
@@ -22,6 +25,9 @@ struct ParamFile {
     const std::string_view expected_checksum{};  // SHA256 checksum of the file
     const uintmax_t expected_size{0};            // Size of the file in bytes
 };
+static constexpr std::string_view kTrustedDownloadHost{"downloads.horizen.io"};
+static constexpr std::string_view kTrustedDownloadPath{"/file/TrustedSetup/"};
+
 static constexpr std::string_view kTrustedDownloadBaseUrl{"https://downloads.horizen.io/file/TrustedSetup/"};
 
 static constexpr ParamFile kSproutProvingKey{
@@ -43,10 +49,10 @@ static constexpr std::array<ParamFile, 5> kParamFiles{kSproutProvingKey, kSprout
                                                       kSaplingSpendParams, kSproutGroth16Params};
 
 //! \brief Validate the existence and correctness of the params files in the given directory
-bool validate_param_files(const std::filesystem::path& directory);
+bool validate_param_files(boost::asio::io_context& asio_context, const std::filesystem::path& directory);
 
 //! \brief Download the params files from the trusted source and save them in the given directory
-bool download_param_file(const std::filesystem::path& directory, const ParamFile& param_file);
+bool download_param_file(boost::asio::io_context& asio_context, const std::filesystem::path& directory, const ParamFile& param_file);
 
 //! \brief Computes the SHA256 checksum of the given file
 //! \remarks Throws std::runtime_error if the file cannot be opened

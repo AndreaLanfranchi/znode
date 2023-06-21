@@ -18,16 +18,16 @@
 
 namespace zen::network {
 
-class TCPServer {
+class NodeHub {
   public:
-    TCPServer(boost::asio::io_context& io_context, SSL_CTX* ssl_context, uint16_t port, uint32_t idle_timeout_seconds,
-              uint32_t max_connections);
+    NodeHub(boost::asio::io_context& io_context, SSL_CTX* ssl_context, uint16_t port, uint32_t idle_timeout_seconds,
+            uint32_t max_connections);
 
     // Not copyable or movable
-    TCPServer(TCPServer& other) = delete;
-    TCPServer(TCPServer&& other) = delete;
-    TCPServer& operator=(const TCPServer& other) = delete;
-    ~TCPServer() = default;
+    NodeHub(NodeHub& other) = delete;
+    NodeHub(NodeHub&& other) = delete;
+    NodeHub& operator=(const NodeHub& other) = delete;
+    ~NodeHub() = default;
 
     void start();
     void stop();
