@@ -10,15 +10,18 @@
 
 namespace zen::network {
 
-Node::Node(boost::asio::io_context& io_context, SSL_CTX* ssl_context, uint32_t idle_timeout_seconds,
-           std::function<void(std::shared_ptr<Node>)> on_disconnect)
-    : io_context_(io_context),
+Node::Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_context, SSL_CTX* ssl_context,
+           uint32_t idle_timeout_seconds, std::function<void(std::shared_ptr<Node>)> on_disconnect,
+           std::function<void(DataDirectionMode, size_t)> on_data)
+    : connection_mode_(connection_mode),
+      io_context_(io_context),
       io_strand_(io_context),
       socket_(io_context),
       ssl_context_(ssl_context),
       idle_timer_(io_context),
       idle_timeout_seconds_{idle_timeout_seconds},
-      on_disconnect_(std::move(on_disconnect)) {}
+      on_disconnect_(std::move(on_disconnect)),
+      on_data_(std::move(on_data)) {}
 
 void Node::start() {
     if (ssl_context_ != nullptr) {
@@ -124,7 +127,8 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
             }
         }
         if (bytes_transferred > 0) {
-            bytes_read_ += bytes_transferred;
+            bytes_received_ += bytes_transferred;
+            if (on_data_) on_data_(DataDirectionMode::kInbound, bytes_transferred);
             std::string message{read_buffer_.data(), bytes_transferred};
             read_buffer_.erase(0, bytes_transferred);
             log::Debug("Node::handle_read()", {"message", message});
@@ -134,7 +138,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
         // Socket has been closed by stop(), do nothing
     } else {
         log::Error("Node::handle_read()", {"error", ec.message()});
-        auto this_node = shared_from_this(); // Might have already been destructed elsewhere
+        auto this_node = shared_from_this();  // Might have already been destructed elsewhere
         io_strand_.post([this_node]() { this_node->stop(); });
     }
 }
