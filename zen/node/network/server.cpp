@@ -58,8 +58,7 @@ void TCPServer::print_info() {
     info_data.insert(info_data.end(), {"data i/o", to_human_bytes(current_total_bytes_received, true) + " " +
                                                        to_human_bytes(current_total_bytes_sent, true)});
 
-    auto period_bytes_received_per_second{to_human_bytes(period_total_bytes_received / kInfoTimerSeconds_, true) +
-                                          "s"};
+    auto period_bytes_received_per_second{to_human_bytes(period_total_bytes_received / kInfoTimerSeconds_, true) + "s"};
     auto period_bytes_sent_per_second{to_human_bytes(period_total_bytes_sent / kInfoTimerSeconds_, true) + "s"};
 
     info_data.insert(info_data.end(),
@@ -132,11 +131,18 @@ void TCPServer::handle_accept(std::shared_ptr<Node> new_node, const boost::syste
 }
 
 void TCPServer::on_node_disconnected(std::shared_ptr<Node> node) {
+    if (current_active_connections_) --current_active_connections_;
+    switch (node->mode()) {
+        case NodeConnectionMode::kInbound:
+            if (current_active_inbound_connections_) --current_active_inbound_connections_;
+            break;
+        case NodeConnectionMode::kOutbound:
+            if (current_active_outbound_connections_) --current_active_outbound_connections_;
+            break;
+    }
+    ++total_disconnections_;
     std::scoped_lock lock(nodes_mutex_);
     nodes_.erase(node);
-    if (current_active_connections_) --current_active_connections_;
-
-    ++total_disconnections_;
 }
 
 void TCPServer::on_node_data(zen::network::DataDirectionMode direction, const size_t bytes_transferred) {

@@ -13,6 +13,8 @@
 #include <boost/asio.hpp>
 #include <openssl/ssl.h>
 
+#include <zen/core/common/base.hpp>
+
 namespace zen::network {
 
 enum class NodeConnectionMode {
@@ -88,7 +90,9 @@ class Node : public std::enable_shared_from_this<Node> {
     std::function<void(DataDirectionMode, size_t)> on_data_;  // To gather receive data stats at higher level
 
     std::atomic_bool is_connected_{true};
-    std::string read_buffer_{};
+
+    boost::asio::streambuf receive_buffer_;
+    boost::asio::streambuf send_buffer_;
 
     std::atomic<size_t> bytes_received_{0};
     std::atomic<size_t> bytes_sent_{0};

@@ -108,13 +108,20 @@ void Node::start_read() {
         return;
     }
 
-    boost::asio::async_read(socket_, boost::asio::buffer(read_buffer_), boost::asio::transfer_at_least(24),
+    socket_.async_read_some(receive_buffer_.prepare(65_KiB),
                             [this](const boost::system::error_code& ec, const size_t bytes_transferred) {
                                 handle_read(ec, bytes_transferred);
                             });
 }
 
 void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_transferred) {
+    // Due to the nature of asio, this function might be called late after stop() has been called
+    // and the socket has been closed. In this case we should do nothing as the payload received (if any)
+    // is not relevant anymore.
+    if (!is_connected()) {
+        return;
+    }
+
     if (!ec) {
         // Check SSL shutdown status
         if (ssl_ != nullptr) {
@@ -129,13 +136,12 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
         if (bytes_transferred > 0) {
             bytes_received_ += bytes_transferred;
             if (on_data_) on_data_(DataDirectionMode::kInbound, bytes_transferred);
-            std::string message{read_buffer_.data(), bytes_transferred};
-            read_buffer_.erase(0, bytes_transferred);
-            log::Debug("Node::handle_read()", {"message", message});
+
+            // TODO implement reading into messages
+
+            receive_buffer_.consume(bytes_transferred);
         }
         io_strand_.post([this]() { start_read(); });
-    } else if (!is_connected_.load()) {
-        // Socket has been closed by stop(), do nothing
     } else {
         log::Error("Node::handle_read()", {"error", ec.message()});
         auto this_node = shared_from_this();  // Might have already been destructed elsewhere
