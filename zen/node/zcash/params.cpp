@@ -156,10 +156,11 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
     }
 
     const auto total_bytes{std::filesystem::file_size(file_path)};
-    std::basic_ifstream<unsigned char, std::char_traits<unsigned char>> file{file_path.string().c_str(),
-                                                                             std::ios::in | std::ios::binary};
-    if (!file.good()) {
-        file.close();
+    // Note ! On linux opening a basic_fstream<unsigned char> in binary mode
+    // causes the stream to never read anything. Hence we open it as char and
+    // cast the buffer accordingly. No issues instead with Windows and MSVC
+    std::ifstream file{file_path.string().c_str(), std::ios_base::in | std::ios_base::binary};
+    if (!file.is_open()) {
         log::Warning("Failed to open file", {"file", file_path.string()});
         return std::nullopt;
     }
@@ -183,9 +184,14 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
         option::MaxProgress{total_bytes}};
 
     crypto::Sha256 digest;
-    Bytes buffer(128_MiB, 0);
+    Bytes buffer(32_MiB, 0);
+    auto buffer_data{reinterpret_cast<char*>(buffer.data())};
+    file.seekg(0, std::ios::beg);
     while (!file.eof()) {
-        file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+        // Note ! Ignore the result of file.read() as it may be 0
+        // also when the number of bytes read is LT the number of max bytes
+        // requested
+        file.read(buffer_data, static_cast<std::streamsize>(buffer.size()));
         auto bytes_read{static_cast<size_t>(file.gcount())};
         if (bytes_read != 0) {
             digest.update(ByteView{buffer.data(), bytes_read});
