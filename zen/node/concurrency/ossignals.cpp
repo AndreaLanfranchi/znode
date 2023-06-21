@@ -82,7 +82,7 @@ static const char* sig_name(int sig_code) {
     }
 }
 
-constexpr std::array<int, 3> kHandleableCodes {
+constexpr int kHandleableCodes[] {
 #if defined(SIGBREAK)
     SIGBREAK,  // Windows keyboard CTRL+Break
 #endif
