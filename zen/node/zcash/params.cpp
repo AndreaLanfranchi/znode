@@ -156,7 +156,7 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
     }
 
     const auto total_bytes{std::filesystem::file_size(file_path)};
-    std::basic_ifstream<unsigned char, std::char_traits<unsigned char>> file{file_path,
+    std::basic_ifstream<unsigned char, std::char_traits<unsigned char>> file{file_path.string().c_str(),
                                                                              std::ios::in | std::ios::binary};
     if (!file.good()) {
         file.close();
