@@ -184,10 +184,13 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
 
     crypto::Sha256 digest;
     Bytes buffer(128_MiB, 0);
-    while (file.good()) {
+    while (!file.eof()) {
         file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-        digest.update(ByteView{buffer.data(), static_cast<size_t>(file.gcount())});
-        progress_bar.set_progress(progress_bar.current() + static_cast<size_t>(file.gcount()));
+        auto bytes_read{static_cast<size_t>(file.gcount())};
+        if (bytes_read != 0) {
+            digest.update(ByteView{buffer.data(), bytes_read});
+            progress_bar.set_progress(progress_bar.current() + bytes_read);
+        }
     }
     if (!progress_bar.is_completed()) {
         progress_bar.mark_as_completed();
