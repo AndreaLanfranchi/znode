@@ -33,7 +33,7 @@ void bench_sha1(benchmark::State& state) {
 
 void bench_sha256(benchmark::State& state) {
     static crypto::Sha256 hasher;
-    const ByteView data(byte_ptr_cast(random_alpha_string.data()), state.range());
+    const ByteView data(byte_ptr_cast(random_alpha_string.data()), static_cast<size_t>(state.range()));
     for ([[maybe_unused]] auto _ : state) {
         hasher.init(data);
         auto hash{hasher.finalize()};
@@ -44,7 +44,7 @@ void bench_sha256(benchmark::State& state) {
 
 void bench_sha256_old(benchmark::State& state) {
     static crypto::Sha256Old hasher;
-    const ByteView data(byte_ptr_cast(random_alpha_string.data()), state.range());
+    const ByteView data(byte_ptr_cast(random_alpha_string.data()), static_cast<size_t>(state.range()));
     Bytes hash(hasher.OUTPUT_SIZE, '\0');
     for ([[maybe_unused]] auto _ : state) {
         hasher.Reset();
@@ -57,7 +57,7 @@ void bench_sha256_old(benchmark::State& state) {
 
 void bench_sha512(benchmark::State& state) {
     static crypto::Sha512 hasher;
-    const ByteView data(byte_ptr_cast(random_alpha_string.data()), state.range());
+    const ByteView data(byte_ptr_cast(random_alpha_string.data()), static_cast<size_t>(state.range()));
     for ([[maybe_unused]] auto _ : state) {
         hasher.init(data);
         auto hash{hasher.finalize()};
