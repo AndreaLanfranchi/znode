@@ -22,7 +22,7 @@ std::string random_alpha_string{zen::get_random_alpha_string(kMaxInputSize)};
 
 void bench_sha1(benchmark::State& state) {
     static crypto::Sha1 hasher;
-    const ByteView data(byte_ptr_cast(random_alpha_string.data()), state.range());
+    const ByteView data(byte_ptr_cast(random_alpha_string.data()), static_cast<size_t>(state.range()));
     for ([[maybe_unused]] auto _ : state) {
         hasher.init(data);
         auto hash{hasher.finalize()};
@@ -71,4 +71,4 @@ BENCHMARK(bench_sha256)->RangeMultiplier(kInputSizeMultiplier)->Range(kMinInputS
 BENCHMARK(bench_sha256_old)->RangeMultiplier(kInputSizeMultiplier)->Range(kMinInputSize, kMaxInputSize);
 BENCHMARK(bench_sha512)->RangeMultiplier(kInputSizeMultiplier)->Range(kMinInputSize, kMaxInputSize);
 
-}  // namespace zen
+}  // namespace zen::crypto
