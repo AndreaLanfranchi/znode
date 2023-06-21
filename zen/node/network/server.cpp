@@ -34,49 +34,58 @@ void TCPServer::stop() {
 }
 
 void TCPServer::start_accept() {
-
     log::Trace("Service", {"name", "TCP Server", "status", "Listening"});
     auto new_node = std::make_shared<Node>(io_context_, ssl_context_, idle_timeout_seconds_,
                                            [this](std::shared_ptr<Node> node) { remove_node(node); });
 
-    acceptor_.async_accept(new_node->socket(), [this, new_node](const boost::system::error_code& ec) {
-        std::string origin{"unknown"};
-        if (auto remote_endpoint{get_remote_endpoint(new_node->socket())}; remote_endpoint) {
-            origin = to_string(remote_endpoint.value());
-        }
-        log::Trace("Service", {"name", "TCP Server", "status", "accept", "origin", origin});
-        if (!ec) {
-            if (current_connections_ < max_connections_) {
-                ++current_connections_;
-                new_node->start();
-                {
-                    std::scoped_lock lock(nodes_mutex_);
-                    nodes_.insert(new_node);
-                }
-                log::Info("Service", {"name", "TCP Server", "peers", std::to_string(current_connections_)});
-            } else {
-                log::Trace("Service",
-                           {"name", "TCP Server", "peers", std::to_string(max_connections_), "action", "reject"});
-                new_node->stop();
-            }
-            io_strand_.post([this]() { start_accept(); });  // Continue listening for new connections
-
-        } else if (ec == boost::asio::error::operation_aborted) {
-            log::Trace("Service", {"name", "TCP Server", "status", "stop"});
-        } else {
-            log::Error("Service", {"name", "TCP Server", "error", ec.message()});
-            io_strand_.post(
-                [this]() { start_accept(); });  // Continue listening for new connections (maybe is recoverable)
-        }
-    });
+    acceptor_.async_accept(new_node->socket(),
+                           [this, new_node](const boost::system::error_code& ec) { handle_accept(new_node, ec); });
 }
-void TCPServer::remove_node(std::shared_ptr<Node> node) {
-    {
-        std::scoped_lock lock(nodes_mutex_);
-        nodes_.erase(node);
-        if (current_connections_) --current_connections_;
+
+void TCPServer::handle_accept(std::shared_ptr<Node> new_node, const boost::system::error_code& ec) {
+    std::string origin{"unknown"};
+    if (auto remote_endpoint{get_remote_endpoint(new_node->socket())}; remote_endpoint) {
+        origin = to_string(remote_endpoint.value());
     }
-    log::Info("Service", {"name", "TCP Server", "peers", std::to_string(current_connections_)});
+
+    log::Trace("Service", {"name", "TCP Server", "status", "handle_accept", "origin", origin});
+
+    if (ec == boost::asio::error::operation_aborted) {
+        log::Trace("Service", {"name", "TCP Server", "status", "stop"});
+        return;  // No other operation allowed
+    } else if (ec) {
+        log::Error("Service", {"name", "TCP Server", "error", ec.message()});
+        // Fall through and continue listening for new connections
+    } else if (!ec) {
+
+        ++total_connections_;
+
+        // Check we do not exceed the maximum number of connections
+        if (current_connections_ >= max_connections_) {
+            log::Trace("Service",
+                       {"name", "TCP Server", "peers", std::to_string(max_connections_), "action", "reject"});
+            new_node->stop();
+            ++total_rejected_connections_;
+            return;
+        }
+
+        ++current_connections_;
+        new_node->start();
+        std::scoped_lock lock(nodes_mutex_);
+        nodes_.insert(new_node);
+        log::Info("Service", {"name", "TCP Server", "new peer", origin, "peers", std::to_string(current_connections_)});
+        // Fall through and continue listening for new connections
+    }
+
+    io_strand_.post([this]() { start_accept(); });  // Continue listening for new connections
 }
 
+void TCPServer::remove_node(std::shared_ptr<Node> node) {
+
+    std::scoped_lock lock(nodes_mutex_);
+    nodes_.erase(node);
+    if (current_connections_) --current_connections_;
+    ++total_disconnections_;
+
+}
 }  // namespace zen::network

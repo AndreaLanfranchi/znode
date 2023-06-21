@@ -34,6 +34,8 @@ class TCPServer {
 
   private:
     void start_accept();
+    void handle_accept(std::shared_ptr<Node> new_node, const boost::system::error_code& ec);
+
     void remove_node(std::shared_ptr<Node> node);
 
     boost::asio::io_context& io_context_;
@@ -45,5 +47,12 @@ class TCPServer {
     std::atomic_uint32_t current_connections_{0};
     std::unordered_set<std::shared_ptr<Node>> nodes_;
     std::mutex nodes_mutex_;
+
+    size_t total_connections_{0};
+    size_t total_disconnections_{0};
+    size_t total_rejected_connections_{0};
+    size_t total_bytes_received_{0};
+    size_t total_bytes_sent_{0};
+
 };
 }  // namespace zen::network
