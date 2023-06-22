@@ -309,12 +309,12 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
                 auto bytes_to_write{static_cast<std::streamsize>(bytes_read - pos - 4)};
                 if (bytes_to_write > 0) {
                     file.write(response.data() + pos + 4, bytes_to_write);
-                    progress_bar.set_progress(progress_bar.current() + bytes_to_write);
+                    progress_bar.set_progress(progress_bar.current() + static_cast<size_t>(bytes_to_write));
                 }
             }
         } else {
             file.write(data.data(), bytes_read);
-            progress_bar.set_progress(progress_bar.current() + bytes_read);
+            progress_bar.set_progress(progress_bar.current() + static_cast<size_t>(bytes_read));
         }
         bytes_read = static_cast<std::streamsize>(boost::asio::read(ssl_stream, buffer, ec));
     }
