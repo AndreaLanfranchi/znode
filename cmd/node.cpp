@@ -75,7 +75,14 @@ int main(int argc, char* argv[]) {
     cli.get_formatter()->column_width(50);
 
     try {
+
+        // Initialize OpenSSL
         OPENSSL_init();
+        SSL_library_init();
+        SSL_load_error_strings();
+        OpenSSL_add_ssl_algorithms();
+        ERR_load_crypto_strings();
+
         Ossignals::init();  // Intercept OS signals
 
         cmd::Settings settings;

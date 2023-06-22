@@ -2,73 +2,123 @@
 // Created by Andrea on 15/06/2023.
 //
 
+#include <fstream>
 #include <iostream>
-#include <boost/asio.hpp>
-#include <boost/asio/ssl.hpp>
+#include <string>
 
+#include <openssl/bio.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
 
-using boost::asio::ip::tcp;
-
-int main() {
-    boost::asio::io_context io_context;
-    boost::asio::ssl::context ssl_context(boost::asio::ssl::context::tlsv12_client);
-
-    std::string nodeIP = "95.216.230.111"; // Replace with the IP address of the target peer
-    std::string nodePort = "9033"; // Replace with the port number of the target peer
-
-    try {
-        ssl_context.set_default_verify_paths();
-
-        tcp::resolver resolver(io_context);
-        tcp::resolver::results_type endpoints = resolver.resolve(tcp::v4(), nodeIP, nodePort);
-
-        boost::asio::ssl::stream<tcp::socket> socket(io_context, ssl_context);
-        boost::asio::connect(socket.lowest_layer(), endpoints);
-        socket.handshake(boost::asio::ssl::stream_base::client);
-
-        std::cout << "Connected to peer: " << nodeIP << ":" << nodePort << std::endl;
-
-        // Send a "version" message to the peer otherwise we get penalized
-        // for every message we send
-
-        // Begin to hammer the peer with unknown messages
-
-
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-
-        boost::system::error_code ec;
-        socket.shutdown(ec);
-        socket.lowest_layer().close(ec);
-
-        if (ec) {
-            std::cerr << "Error during disconnection: " << ec.message() << std::endl;
+// Function to extract host from URL
+std::string GetHostFromURL(const std::string& url) {
+    std::string host;
+    size_t startPos = url.find("://");
+    if (startPos != std::string::npos) {
+        startPos += 3;  // Skip the "://"
+        size_t endPos = url.find('/', startPos);
+        if (endPos == std::string::npos) {
+            host = url.substr(startPos);
         } else {
-            std::cout << "Disconnected from peer." << std::endl;
+            host = url.substr(startPos, endPos - startPos);
         }
+    }
+    return host;
+}
 
-//        // Send a "version" message to the peer
-//        std::string versionMessage = "version message payload"; // Replace with your version message payload
-//
-//        boost::system::error_code error;
-//        boost::asio::write(socket, boost::asio::buffer(versionMessage), error);
-//        if (error) {
-//            throw boost::system::system_error(error);
-//        }
-//
-//
-//
-//        // Read data from the peer
-//        boost::asio::streambuf receiveBuffer;
-//        boost::asio::read(socket, receiveBuffer);
-//
-//        std::istream responseStream(&receiveBuffer);
-//        std::string responseData;
-//        std::getline(responseStream, responseData);
-//
-//        std::cout << "Received data: " << responseData << std::endl;
-    } catch (std::exception& e) {
-        std::cerr << "Exception: " << e.what() << std::endl;
+// Function to download a file from a URL using HTTPS
+bool DownloadFile(const std::string& url, const std::string& outputPath) {
+    std::string host = GetHostFromURL(url);
+    if (host.empty()) {
+        std::cout << "Invalid URL: " << url << std::endl;
+        return false;
     }
 
+    // Initialize OpenSSL
+    SSL_load_error_strings();
+    OpenSSL_add_ssl_algorithms();
+
+    // Create SSL context
+    SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
+    if (!ctx) {
+        std::cout << "Failed to create SSL context." << std::endl;
+        return false;
+    }
+
+    SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
+    SSL_CTX_set_min_proto_version(ctx, TLS1_3_VERSION);
+    SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
+    SSL_CTX_set_options(ctx, SSL_OP_NO_RENEGOTIATION | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+    SSL_CTX_set_cipher_list(ctx, "HIGH:!aNULL:!eNULL:!NULL:kRSA:!PSK:!SRP:!MD5:!RC4");
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, nullptr);
+
+    // Create SSL BIO
+    BIO* bio = BIO_new_ssl_connect(ctx);
+    if (!bio) {
+        std::cout << "Failed to create SSL BIO." << std::endl;
+        SSL_CTX_free(ctx);
+        return false;
+    }
+
+    // Get SSL pointer and set the hostname (this is required by SNI)
+    SSL* ssl{nullptr};
+    BIO_get_ssl(bio, nullptr);
+    SSL_set_tlsext_host_name(ssl, host.c_str());
+
+    // Set SSL BIO options
+    BIO_set_conn_hostname(bio, host.c_str());
+    BIO_set_conn_port(bio, "https");
+
+    BIO_set_nbio(bio, 1);
+
+    // Attempt to connect
+    if (BIO_do_connect(bio) <= 0) {
+        ERR_print_errors_fp(stderr);
+        std::cout << "Failed to connect to the host." << std::endl;
+        BIO_free_all(bio);
+        SSL_CTX_free(ctx);
+        return false;
+    }
+
+    // Verify SSL certificate
+    if (BIO_do_handshake(bio) <= 0) {
+        std::cout << "Failed to perform SSL handshake." << std::endl;
+        BIO_free_all(bio);
+        SSL_CTX_free(ctx);
+        return false;
+    }
+
+    // Open output file
+    std::ofstream outputFile(outputPath, std::ios::binary);
+    if (!outputFile.is_open()) {
+        std::cout << "Failed to open output file." << std::endl;
+        BIO_free_all(bio);
+        SSL_CTX_free(ctx);
+        return false;
+    }
+
+    // Download the file
+    char buffer[4096];
+    int bytesRead = 0;
+    while ((bytesRead = BIO_read(bio, buffer, sizeof(buffer))) > 0) {
+        outputFile.write(buffer, bytesRead);
+    }
+
+    // Cleanup
+    BIO_free_all(bio);
+    SSL_CTX_free(ctx);
+    outputFile.close();
+
+    std::cout << "File downloaded successfully." << std::endl;
+    return true;
+}
+
+int main() {
+    std::string url = "https://downloads.horizen.io/file/TrustedSetup/sprout-verifying.key";
+    std::string outputPath = "sprout-verifying.key";
+    bool success = DownloadFile(url, outputPath);
+    if (success) {
+        std::cout << "Downloaded file saved as: " << outputPath << std::endl;
+    }
     return 0;
 }

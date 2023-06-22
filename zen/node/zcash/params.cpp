@@ -212,11 +212,21 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     namespace ssl = boost::asio::ssl;
     namespace ip = boost::asio::ip;
 
-    ssl::context ssl_context(ssl::context::tlsv13_client);
-    SSL_CTX_set_options(ssl_context.native_handle(), SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1);
+    ssl::context ssl_context(ssl::context::tls_client);
 
+    SSL_CTX_set_mode(ssl_context.native_handle(), SSL_MODE_AUTO_RETRY);
+    SSL_CTX_set_min_proto_version(ssl_context.native_handle(), TLS1_2_VERSION);
+    SSL_CTX_set_max_proto_version(ssl_context.native_handle(), TLS1_3_VERSION);
+    SSL_CTX_set_options(ssl_context.native_handle(), SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_COMPRESSION |
+                                                         SSL_OP_NO_RENEGOTIATION |
+                                                         SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
+
+    SSL_CTX_set_cipher_list(ssl_context.native_handle(), "HIGH:!aNULL:!eNULL:!NULL:kRSA:!PSK:!SRP:!MD5:!RC4:");
+    ssl_context.set_verify_mode(ssl::verify_none);
     ssl_context.set_default_verify_paths();
+
     ssl::stream<ip::tcp::socket> ssl_stream{asio_context, ssl_context};
+    SSL_set_tlsext_host_name(static_cast<SSL*>(ssl_stream.native_handle()), kTrustedDownloadHost.data());
 
     ip::tcp::resolver resolver{asio_context};
     ip::tcp::resolver::query query(kTrustedDownloadHost.data(), "https");
@@ -229,7 +239,8 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
         return false;
     };
 
-    ssl_stream.set_verify_mode(ssl::verify_none);  // Todo ! Verify certificate
+    ssl_stream.set_verify_mode(ssl::verify_none);  // TODO ! Verify certificate
+
     ssl_stream.handshake(ssl::stream_base::client, ec);
     if (ec) {
         log::Error("Failed to perform SSL handshake",
@@ -283,17 +294,31 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
 
     // Read response ...
     constexpr size_t buffer_size{256_KiB};
-    std::array<char, buffer_size> buffer;
+    std::array<char, buffer_size> data{0};
+    auto buffer = boost::asio::buffer(data);
     size_t bytes_read{0};
-    do {
-        bytes_read = boost::asio::read(ssl_stream, boost::asio::buffer(buffer), ec);
-        if (ec && ec != boost::asio::error::eof) {
-            log::Error("Failed to read response", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
-            return false;
+    bool headers_completed{false};
+    while ((bytes_read = boost::asio::read(ssl_stream, buffer, ec)) != 0 /* avoid MSVC's C4706 */) {
+        if (!headers_completed) [[unlikely]] {
+            std::string response(data.data(), bytes_read);
+            auto pos = response.find("\r\n\r\n");
+            if (pos != std::string::npos) {
+                headers_completed = true;
+                auto bytes_to_write{bytes_read - pos - 4};
+                if (bytes_to_write > 0) {
+                    file.write(response.data() + pos + 4, bytes_to_write);
+                    progress_bar.set_progress(progress_bar.current() + bytes_to_write);
+                }
+            }
+        } else {
+            file.write(data.data(), bytes_read);
+            progress_bar.set_progress(progress_bar.current() + bytes_read);
         }
-        file.write(buffer.data(), bytes_read);
-        progress_bar.set_progress(progress_bar.current() + bytes_read);
-    } while (bytes_read > 0);
+    }
+    if (ec && ec != boost::asio::error::eof) {
+        log::Error("Failed to read response", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
+        return false;
+    }
 
     // This task is done. The validity of the file will be checked elsewhere
     return true;
