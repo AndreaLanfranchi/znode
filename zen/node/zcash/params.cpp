@@ -158,7 +158,7 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
 
     const auto total_bytes{std::filesystem::file_size(file_path)};
     // Note ! On linux opening a basic_fstream<unsigned char> in binary mode
-    // causes the stream to never read anything. Hence we open it as char and
+    // causes the stream to never read anything. Hence, we open it as char and
     // cast the buffer accordingly. No issues instead with Windows and MSVC
     std::ifstream file{file_path.string().c_str(), std::ios_base::in | std::ios_base::binary};
     if (!file.is_open()) {
@@ -298,15 +298,15 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     constexpr size_t buffer_size{256_KiB};
     std::array<char, buffer_size> data{0};
     auto buffer = boost::asio::buffer(data);
-    size_t bytes_read{0};
     bool headers_completed{false};
-    while ((bytes_read = boost::asio::read(ssl_stream, buffer, ec)) != 0 /* avoid MSVC's C4706 */) {
+    std::streamsize bytes_read{static_cast<std::streamsize>(boost::asio::read(ssl_stream, buffer, ec))};
+    while (bytes_read != 0) {
         if (!headers_completed) [[unlikely]] {
             std::string response(data.data(), bytes_read);
             auto pos = response.find("\r\n\r\n");
             if (pos != std::string::npos) {
                 headers_completed = true;
-                auto bytes_to_write{bytes_read - pos - 4};
+                auto bytes_to_write{static_cast<std::streamsize>(bytes_read - pos - 4)};
                 if (bytes_to_write > 0) {
                     file.write(response.data() + pos + 4, bytes_to_write);
                     progress_bar.set_progress(progress_bar.current() + bytes_to_write);
@@ -316,6 +316,7 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
             file.write(data.data(), bytes_read);
             progress_bar.set_progress(progress_bar.current() + bytes_read);
         }
+        bytes_read = static_cast<std::streamsize>(boost::asio::read(ssl_stream, buffer, ec));
     }
     if (ec && ec != boost::asio::error::eof) {
         log::Error("Failed to read response", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
