@@ -50,8 +50,9 @@ void NodeHub::print_info() {
 
     // In the unlucky case this fires with subsecond duration (i.e. returns 0), we'll just skip this lap
     // to avoid division by zero
-    const auto info_lap_duration{duration_cast<std::chrono::seconds>(info_stopwatch_.since_start()).count()};
-    if (info_lap_duration <= 0) {
+    const auto info_lap_duration{
+        static_cast<uint32_t>(duration_cast<std::chrono::seconds>(info_stopwatch_.since_start()).count())};
+    if (info_lap_duration == 0) {
         return;
     }
 
