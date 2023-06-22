@@ -36,7 +36,7 @@ std::pair<StopWatch::TimePoint, StopWatch::Duration> StopWatch::lap() noexcept {
     if (!started_ || laps_.empty()) {
         return {};
     }
-    const auto lap_time{std::chrono::high_resolution_clock::now()};
+    const auto lap_time{TimeClock::now()};
     const auto& [t, d] = laps_.back();
     laps_.emplace_back(lap_time, std::chrono::duration_cast<Duration>(lap_time - t));
     return laps_.back();

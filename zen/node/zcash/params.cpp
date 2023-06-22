@@ -50,7 +50,8 @@
 
 namespace zen::zcash {
 
-bool validate_param_files(boost::asio::io_context& asio_context, const std::filesystem::path& directory) {
+bool validate_param_files(boost::asio::io_context& asio_context, const std::filesystem::path& directory,
+                          bool no_zcash_checksums) {
     std::vector<ParamFile> errored_param_files{};
 
     for (const auto& param_file : kParamFiles) {
@@ -81,6 +82,7 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
             continue;
         }
 
+        if (no_zcash_checksums) continue;  // Only first cycle. If we have to download the checksums are already checked
         const auto expected_checksum{hex::decode(param_file.expected_checksum)};
         if (!validate_file_checksum(file_path, *expected_checksum)) {
             if (!std::filesystem::remove(file_path)) {

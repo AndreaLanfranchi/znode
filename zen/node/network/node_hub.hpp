@@ -13,6 +13,7 @@
 #include <boost/asio/spawn.hpp>
 #include <boost/noncopyable.hpp>
 
+#include <zen/node/common/stopwatch.hpp>
 #include <zen/node/concurrency/stoppable.hpp>
 #include <zen/node/network/node.hpp>
 
@@ -34,10 +35,10 @@ class NodeHub {
 
   private:
     void start_accept();
-    void handle_accept(std::shared_ptr<Node> new_node, const boost::system::error_code& ec);
+    void handle_accept(const std::shared_ptr<Node>& new_node, const boost::system::error_code& ec);
 
-    void on_node_disconnected(std::shared_ptr<Node> node);
-    void on_node_data(DataDirectionMode direction, const size_t bytes_transferred);
+    void on_node_disconnected(const std::shared_ptr<Node>& node);
+    void on_node_data(DataDirectionMode direction, size_t bytes_transferred);
 
     void start_info_timer();
     void print_info();
@@ -48,7 +49,9 @@ class NodeHub {
     boost::asio::steady_timer info_timer_;         // Prints out stat info periodically
     static const uint32_t kInfoTimerSeconds_{10};  // Delay interval for info_timer_
 
-    SSL_CTX* ssl_context_;
+    SSL_CTX* ssl_server_context_{nullptr};  // For dial-in connections
+    SSL_CTX* ssl_client_context_{nullptr};  // For dial-out connections
+
     const uint32_t connection_idle_timeout_seconds_;
     const uint32_t max_active_connections_;
     std::atomic_uint32_t current_active_connections_{0};
@@ -65,5 +68,7 @@ class NodeHub {
     std::atomic<size_t> total_bytes_sent_{0};
     std::atomic<size_t> last_info_total_bytes_received_{0};
     std::atomic<size_t> last_info_total_bytes_sent_{0};
+    StopWatch info_stopwatch_{/*auto_start=*/false};  // To measure the effective elapsed amongst two info_timer_ events
+                                                      // (for bandwidth calculation)
 };
 }  // namespace zen::network

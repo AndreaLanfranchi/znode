@@ -75,7 +75,6 @@ int main(int argc, char* argv[]) {
     cli.get_formatter()->column_width(50);
 
     try {
-
         // Initialize OpenSSL
         OPENSSL_init();
         SSL_library_init();
@@ -136,12 +135,12 @@ int main(int argc, char* argv[]) {
         // Let some time to allow threads to properly start
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-
         // Validate mandatory zcash params
         StopWatch sw(true);
         auto zcash_params_path{(*node_settings.data_directory)[DataDirectory::kZkParamsName].path()};
         log::Message("Validating Zcash params", {"directory", zcash_params_path.string()});
-        if (!zcash::validate_param_files(node_settings.asio_context, zcash_params_path)) {
+        if (!zcash::validate_param_files(node_settings.asio_context, zcash_params_path,
+                                         node_settings.no_zcash_checksums)) {
             throw std::filesystem::filesystem_error("Invalid Zcash file params",
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }

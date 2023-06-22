@@ -21,7 +21,7 @@ NodeHub::NodeHub(boost::asio::io_context& io_context, SSL_CTX* ssl_context, uint
       io_strand_(io_context),
       acceptor_(io_context, tcp::endpoint(tcp::v4(), port)),
       info_timer_(io_context),
-      ssl_context_(ssl_context),
+      ssl_server_context_(ssl_context),
       connection_idle_timeout_seconds_(idle_timeout_seconds),
       max_active_connections_(max_connections) {}
 
@@ -48,6 +48,13 @@ void NodeHub::start_info_timer() {
 void NodeHub::print_info() {
     std::vector<std::string> info_data;
 
+    // In the unlucky case this fires with subsecond duration (i.e. returns 0), we'll just skip this lap
+    // to avoid division by zero
+    const auto info_lap_duration{duration_cast<std::chrono::seconds>(info_stopwatch_.since_start()).count()};
+    if (info_lap_duration <= 0) {
+        return;
+    }
+
     auto current_total_bytes_received{total_bytes_received_.load()};
     auto current_total_bytes_sent{total_bytes_sent_.load()};
     auto period_total_bytes_received{current_total_bytes_received - last_info_total_bytes_received_.load()};
@@ -58,8 +65,8 @@ void NodeHub::print_info() {
     info_data.insert(info_data.end(), {"data i/o", to_human_bytes(current_total_bytes_received, true) + " " +
                                                        to_human_bytes(current_total_bytes_sent, true)});
 
-    auto period_bytes_received_per_second{to_human_bytes(period_total_bytes_received / kInfoTimerSeconds_, true) + "s"};
-    auto period_bytes_sent_per_second{to_human_bytes(period_total_bytes_sent / kInfoTimerSeconds_, true) + "s"};
+    auto period_bytes_received_per_second{to_human_bytes(period_total_bytes_received / info_lap_duration, true) + "s"};
+    auto period_bytes_sent_per_second{to_human_bytes(period_total_bytes_sent / info_lap_duration, true) + "s"};
 
     info_data.insert(info_data.end(),
                      {"speed i/o", period_bytes_received_per_second + " " + period_bytes_sent_per_second});
@@ -81,17 +88,17 @@ void NodeHub::stop() {
 }
 
 void NodeHub::start_accept() {
-    log::Trace("Service", {"name", "TCP Server", "status", "Listening"});
+    log::Trace("Service", {"name", "TCP Server", "status", "Listening", "secure", ssl_server_context_ ? "yes" : "no"});
     auto new_node = std::make_shared<Node>(
-        NodeConnectionMode::kInbound, io_context_, ssl_context_, connection_idle_timeout_seconds_,
-        [this](std::shared_ptr<Node> node) { on_node_disconnected(node); },
+        NodeConnectionMode::kInbound, io_context_, ssl_server_context_, connection_idle_timeout_seconds_,
+        [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
         [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); });
 
     acceptor_.async_accept(new_node->socket(),
                            [this, new_node](const boost::system::error_code& ec) { handle_accept(new_node, ec); });
 }
 
-void NodeHub::handle_accept(std::shared_ptr<Node> new_node, const boost::system::error_code& ec) {
+void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::system::error_code& ec) {
     std::string origin{"unknown"};
     if (auto remote_endpoint{get_remote_endpoint(new_node->socket())}; remote_endpoint) {
         origin = to_string(remote_endpoint.value());
@@ -130,7 +137,7 @@ void NodeHub::handle_accept(std::shared_ptr<Node> new_node, const boost::system:
     io_strand_.post([this]() { start_accept(); });  // Continue listening for new connections
 }
 
-void NodeHub::on_node_disconnected(std::shared_ptr<Node> node) {
+void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
     if (current_active_connections_) --current_active_connections_;
     switch (node->mode()) {
         case NodeConnectionMode::kInbound:

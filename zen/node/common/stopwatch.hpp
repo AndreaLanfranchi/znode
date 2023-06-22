@@ -19,7 +19,8 @@ namespace zen {
 //! \brief Mimics the behavior of a wrist stopwatch. Used to measure timings of operations.
 class StopWatch {
   public:
-    using TimePoint = std::chrono::time_point<std::chrono::high_resolution_clock>;
+    using TimeClock = std::chrono::steady_clock;
+    using TimePoint = std::chrono::time_point<TimeClock>;
     using Duration = std::chrono::nanoseconds;
 
     static inline bool kStart = true;

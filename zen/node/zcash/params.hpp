@@ -49,7 +49,7 @@ static constexpr std::array<ParamFile, 5> kParamFiles{kSproutProvingKey, kSprout
                                                       kSaplingSpendParams, kSproutGroth16Params};
 
 //! \brief Validate the existence and correctness of the params files in the given directory
-bool validate_param_files(boost::asio::io_context& asio_context, const std::filesystem::path& directory);
+bool validate_param_files(boost::asio::io_context& asio_context, const std::filesystem::path& directory, bool no_zcash_checksums);
 
 //! \brief Download the params files from the trusted source and save them in the given directory
 bool download_param_file(boost::asio::io_context& asio_context, const std::filesystem::path& directory, const ParamFile& param_file);
