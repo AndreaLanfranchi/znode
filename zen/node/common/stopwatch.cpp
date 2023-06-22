@@ -21,7 +21,7 @@ StopWatch::TimePoint StopWatch::start(bool with_reset) noexcept {
 
     started_ = true;
     if (start_time_ == TimePoint()) {
-        start_time_ = std::chrono::high_resolution_clock::now();
+        start_time_ = TimeClock::now();
     }
     if (!laps_.empty()) {
         const auto& [t, d] = laps_.back();
@@ -49,7 +49,7 @@ StopWatch::Duration StopWatch::since_start(const TimePoint& origin) noexcept {
     return Duration(origin - start_time_);
 }
 
-StopWatch::Duration StopWatch::since_start() noexcept { return since_start(std::chrono::high_resolution_clock::now()); }
+StopWatch::Duration StopWatch::since_start() noexcept { return since_start(TimeClock::now()); }
 
 std::pair<StopWatch::TimePoint, StopWatch::Duration> StopWatch::stop() noexcept {
     if (!started_) {
