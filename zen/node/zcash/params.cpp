@@ -299,24 +299,24 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     std::array<char, buffer_size> data{0};
     auto buffer = boost::asio::buffer(data);
     bool headers_completed{false};
-    std::streamsize bytes_read{static_cast<std::streamsize>(boost::asio::read(ssl_stream, buffer, ec))};
+    size_t bytes_read{static_cast<size_t>(boost::asio::read(ssl_stream, buffer, ec))};
     while (bytes_read != 0) {
         if (!headers_completed) [[unlikely]] {
             std::string response(data.data(), bytes_read);
             auto pos = response.find("\r\n\r\n");
             if (pos != std::string::npos) {
                 headers_completed = true;
-                auto bytes_to_write{static_cast<std::streamsize>(bytes_read - pos - 4)};
+                auto bytes_to_write{bytes_read - pos - 4};
                 if (bytes_to_write > 0) {
-                    file.write(response.data() + pos + 4, bytes_to_write);
-                    progress_bar.set_progress(progress_bar.current() + static_cast<size_t>(bytes_to_write));
+                    file.write(response.data() + pos + 4, static_cast<std::streamsize>(bytes_to_write));
+                    progress_bar.set_progress(progress_bar.current() + bytes_to_write);
                 }
             }
         } else {
-            file.write(data.data(), bytes_read);
-            progress_bar.set_progress(progress_bar.current() + static_cast<size_t>(bytes_read));
+            file.write(data.data(), static_cast<std::streamsize>(bytes_read));
+            progress_bar.set_progress(progress_bar.current() + bytes_read);
         }
-        bytes_read = static_cast<std::streamsize>(boost::asio::read(ssl_stream, buffer, ec));
+        bytes_read = static_cast<size_t>(boost::asio::read(ssl_stream, buffer, ec));
     }
     if (ec && ec != boost::asio::error::eof) {
         log::Error("Failed to read response", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
