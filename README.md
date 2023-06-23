@@ -10,7 +10,7 @@ C++ Implementation of ZEN node based on Thorax Architecture
 - [Building on Windows](#building-on-windows)
 - [Tree Map](#tree-map)
 - [Style Guide](#style-guide)
-- Go to [Documentation](./doc)
+- [Detailed Documentation](./doc)
 
 [CMake]: http://cmake.org
 [Google's C++ Style Guide]: https://google.github.io/styleguide/cppguide.html
