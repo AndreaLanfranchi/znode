@@ -41,8 +41,18 @@ Arguments are divided in two categories:
 - **Options**: arguments which have a default value and can be changed by the user. For example `--data-dir` is an option. 
 
 Arguments can be passed in two ways:
-- **Long form**: `--<argument-name>=<argument-value>`
-- **Short form**: `--<argument-name> <argument-value>`
+- **'=' form**: `--<argument-name>=<argument-value>`
+- **space form**: `--<argument-name> <argument-value>`
+
+Arguments specifying `size` values can be expressed in two ways:
+- **absolute**: where the number is fully expressed. For example to indicate a value of 2 kilo bytes we'd use the form `--<argument-name>=2048`
+- **suffixed**: where the number is expressed as a multiplier of a suffix. For example to indicate a value of 2 kilo bytes we'd use the form `--<argument-name>=2KiB`
+
+Accepted suffixes are:
+- `KiB`, `MiB`, `GiB`, `TiB` for [binary multiples](https://en.wikipedia.org/wiki/Binary_prefix) of bytes. (i.e. 5 KiB == (5*2**10) == 5'120 bytes)
+- `KB`, `MB`, `GB`, `TB` for decimal multiples of bytes. (i.e. 5 KB == (5*10**3) 1'000 bytes)
+
+It goes without saying that the suffixed form is more readable and recommended.
 
 Here we analyze the usage and meaning of each argument.
 
@@ -116,7 +126,7 @@ This argument is an option. It specifies the page size MDBX has to use.
 **Important: this value MUST be a power of 2**
 
 _MDBX segments its database file in pages where each page has the size here specified.
-MDBX's databases can have very large data sizes but are capped to a maximum 2147483648 (0x80000000ULL) hence
+MDBX's databases can have very large data sizes but are capped to a maximum 2147483648 (0x80000000ULL) data pages, hence
 the maximum size a database file can reach is a function of pagesize.
 The min value is 256B (which translates into a max db file size of 512GiB) while the max value is 65KiB (which translates into a max db file size of 128TiB)_
 
