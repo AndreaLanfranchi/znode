@@ -117,17 +117,18 @@ TEST_CASE("Data Directory", "[misc]") {
     {
         DataDirectory data_dir{tmp_dir.path()};
         zen_data_dir = data_dir.path();
-        for (const auto& subdir : subdirs) {
-            CHECK_FALSE(std::filesystem::exists(zen_data_dir / subdir));
-        }
+        REQUIRE(data_dir.is_pristine());
         REQUIRE(data_dir.is_writable());
+
+        // Deploy and verify all mandatory subdirs are present
         data_dir.deploy();
-        for (const auto& subdir : subdirs) {
+        for (auto& subdir : DataDirectory::kSubdirs) {
             CHECK(std::filesystem::exists(zen_data_dir / subdir));
         }
 
+        // Clear and verify all mandatory subdirs are still there
         data_dir.clear(true);
-        for (const auto& subdir : subdirs) {
+        for (auto& subdir : DataDirectory::kSubdirs) {
             CHECK(std::filesystem::exists(zen_data_dir / subdir));
         }
     }

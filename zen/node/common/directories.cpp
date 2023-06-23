@@ -83,6 +83,7 @@ std::filesystem::path get_os_default_storage_path() {
     base_dir_path /= ".zen";
 #elif __APPLE__
     base_dir_path /= "Library";
+    base_dir_path /= "Application Support";
     base_dir_path /= "zen";
 #else
     base_dir_path /= ".local";

@@ -50,26 +50,35 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
         ->capture_default_str()
         ->check(HumanSizeParserValidator("32MiB", {"128TiB"}));
 
-    cli.add_option("--batchsize", batch_size_str, "Batch size for stage execution")
-        ->capture_default_str()
-        ->check(HumanSizeParserValidator("64MiB", {"16GiB"}));
     cli.add_option("--etl.buffersize", etl_buffer_size_str, "Buffer size for ETL operations")
         ->capture_default_str()
         ->check(HumanSizeParserValidator("64MiB", {"1GiB"}));
 
-    cli.add_option("--sync.loop.throttle", node_settings.sync_loop_throttle_seconds,
+    cli.add_option("--syncloop.batchsize", batch_size_str, "Batch size for stage execution")
+        ->capture_default_str()
+        ->check(HumanSizeParserValidator("64MiB", {"16GiB"}));
+
+    cli.add_option("--syncloop.throttle", node_settings.sync_loop_throttle_seconds,
                    "Sets the minimum delay between sync loop starts (in seconds)")
         ->capture_default_str()
         ->check(CLI::Range(1u, 7200u));
 
-    cli.add_option("--sync.loop.log.interval", node_settings.sync_loop_log_interval_seconds,
+    cli.add_option("--syncloop.loginterval", node_settings.sync_loop_log_interval_seconds,
                    "Sets the interval between sync loop INFO logs (in seconds)")
         ->capture_default_str()
         ->check(CLI::Range(10u, 600u));
 
     cli.add_flag("--fakepow", node_settings.fake_pow, "Disables proof-of-work verification");
-    cli.add_flag("--no-zcash-checksums", node_settings.no_zcash_checksums,
-                 "Disables initial verification of Zcash's files checksums");
+    cli.add_flag("--zk.nochecksums", node_settings.no_zcash_checksums,
+                 "Disables initial verification of zk proofs files checksums");
+
+    // Asio settings
+    const size_t available_hw_concurrency{std::thread::hardware_concurrency()};
+    size_t user_asio_concurrency{std::max((available_hw_concurrency / 2), 2ULL)};
+
+    cli.add_option("--asio.concurrency", user_asio_concurrency, "Concurrency level for asio")
+        ->capture_default_str()
+        ->check(CLI::Range(2ULL, available_hw_concurrency));
 
     // Logging options
     auto& log_settings = settings.log_settings;
@@ -104,6 +113,9 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
 
     node_settings.batch_size = *parse_human_bytes(batch_size_str);
     node_settings.etl_buffer_size = *parse_human_bytes(etl_buffer_size_str);
+
+    node_settings.asio_concurrency = user_asio_concurrency;
+    node_settings.asio_context = std::make_unique<boost::asio::io_context>(static_cast<int>(user_asio_concurrency));
 }
 
 void add_logging_options(CLI::App& cli, log::Settings& log_settings) {

@@ -147,7 +147,7 @@ struct EnvConfig {
     bool read_ahead{false};     // Whether to enable mdbx read ahead
     bool write_map{false};      // Whether to enable mdbx write map
     size_t page_size{4_KiB};    // Mdbx page size
-    size_t max_size{3_TiB};     // Mdbx max map size
+    size_t max_size{1_TiB};     // Mdbx max map size
     size_t growth_size{2_GiB};  // Increment size for each extension
     uint32_t max_tables{128};   // Default max number of named tables
     uint32_t max_readers{100};  // Default max number of readers

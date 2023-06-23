@@ -113,19 +113,19 @@ int main(int argc, char* argv[]) {
 
         // Start boost asio with the number of threads specified by the concurrency hint
         using asio_guard_type = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
-        auto asio_guard = std::make_unique<asio_guard_type>(node_settings.asio_context.get_executor());
+        auto asio_guard = std::make_unique<asio_guard_type>(node_settings.asio_context->get_executor());
         std::vector<std::thread> asio_threads;
-        for (int i{0}; i < 4; ++i) {
+        for (size_t i{0}; i < node_settings.asio_concurrency; ++i) {
             asio_threads.emplace_back([&node_settings, i]() {
                 std::string thread_name{"asio-" + std::to_string(i)};
                 log::set_thread_name(thread_name);
                 log::Trace("Service", {"name", thread_name, "status", "starting"});
-                node_settings.asio_context.run();
+                node_settings.asio_context->run();
                 log::Trace("Service", {"name", thread_name, "status", "stopped"});
             });
         }
         auto stop_asio{gsl::finally([&node_settings, &asio_guard, &asio_threads]() {
-            node_settings.asio_context.stop();
+            node_settings.asio_context->stop();
             asio_guard.reset();
             for (auto& t : asio_threads) {
                 if (t.joinable()) t.join();
@@ -139,15 +139,15 @@ int main(int argc, char* argv[]) {
         StopWatch sw(true);
         auto zcash_params_path{(*node_settings.data_directory)[DataDirectory::kZkParamsName].path()};
         log::Message("Validating Zcash params", {"directory", zcash_params_path.string()});
-        if (!zcash::validate_param_files(node_settings.asio_context, zcash_params_path,
+        if (!zcash::validate_param_files(*node_settings.asio_context, zcash_params_path,
                                          node_settings.no_zcash_checksums)) {
             throw std::filesystem::filesystem_error("Invalid Zcash file params",
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }
         log::Message("Validated  Zcash params", {"elapsed", StopWatch::format(sw.since_start())});
 
-        // Start networking server
-        zen::network::NodeHub node_hub(node_settings.asio_context, nullptr, 13383, 30, 10);
+        // 1) Start networking server
+        zen::network::NodeHub node_hub(*node_settings.asio_context, nullptr, 13383, 30, 10);
         node_hub.start();
 
         // Start sync loop
@@ -195,10 +195,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        node_hub.stop();  // Stop networking server
-        //        node_settings.asio_context.stop();                          // Ensure asio is stopped last ...
-        //        asio_guard.reset();                                         // ... its guard is released ...
-        //        for (auto& asio_thread : asio_threads) asio_thread.join();  // ... and threads are joined
+        node_hub.stop();  // 1) Stop networking server
 
         if (node_settings.data_directory) {
             log::Message("Closing database", {"path", (*node_settings.data_directory)["chaindata"].path().string()});

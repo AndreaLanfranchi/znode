@@ -6,6 +6,7 @@
 */
 
 #pragma once
+#include <array>
 #include <filesystem>
 #include <optional>
 #include <stdexcept>
@@ -107,6 +108,10 @@ class DataDirectory final : public Directory {
     static constexpr std::string_view kEtlTmpName = "etl-tmp";
     static constexpr std::string_view kNodesName = "nodes";
     static constexpr std::string_view kZkParamsName = "zk-params";
+    static constexpr std::string_view kSSLCert = "ssl-cert";
+
+    static constexpr std::array<std::string_view, 5> kSubdirs = {kChainDataName, kEtlTmpName, kNodesName, kZkParamsName,
+                                                                 kSSLCert};
 
     //! \brief Ensures all subdirs are properly created
     void deploy() {
@@ -114,6 +119,7 @@ class DataDirectory final : public Directory {
         std::ignore = operator[](kEtlTmpName);
         std::ignore = operator[](kNodesName);
         std::ignore = operator[](kZkParamsName);
+        std::ignore = operator[](kSSLCert);
     }
 };
 }  // namespace zen
