@@ -8,6 +8,7 @@
   - [--chaindata.readahead](#--chaindatareadahead)
   - [--chaindata.maxsize](#--chaindatamaxsize)
   - [--chaindata.growthsize](#--chaindatagrowthsize)
+  - [--chaindata.pagesize](#--chaindatapagesize)
 - [--etl.buffersize](#--etlbuffersize)
 - [Syncloop arguments](#syncloop)
   - [--syncloop.batchsize](#--syncloopbatchsize)
@@ -111,6 +112,8 @@ $ ./zend++ --chaindata.growthsize=4GiB
 
 ### `--chaindata.pagesize`
 This argument is an option. It specifies the page size MDBX has to use.
+
+**Important: this value MUST be a power of 2**
 
 _MDBX segments its database file in pages where each page has the size here specified.
 MDBX's databases can have very large data sizes but are capped to a maximum 2147483648 (0x80000000ULL) hence
