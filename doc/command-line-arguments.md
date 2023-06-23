@@ -3,18 +3,18 @@
 - [Usage](#usage)
 - [--help](#--help)
 - [--data-dir](#--data-dir)
-- [--chaindata.*](#--chaindata)
-  - [--chaindata.exclusive](#--chaindata.exclusive)
-  - [--chaindata.readahead](#--chaindata.readahead)
-  - [--chaindata.maxsize](#--chaindata.maxsize)
-  - [--chaindata.growthsize](#--chaindata.growthsize)
-- [--etl.buffersize](#--etl.buffersize)
-- [--syncloop.](#--syncloop)
-  - [--syncloop.batchsize](#--syncloop.batchsize)
-  - [--syncloop.throttle](#--syncloop.throttle)
-  - [--syncloop.loginterval](#--syncloop.loginterval)
+- [Chaindata arguments](#chaindata)
+  - [--chaindata.exclusive](#--chaindataexclusive)
+  - [--chaindata.readahead](#--chaindatareadahead)
+  - [--chaindata.maxsize](#--chaindatamaxsize)
+  - [--chaindata.growthsize](#--chaindatagrowthsize)
+- [--etl.buffersize](#--etlbuffersize)
+- [Syncloop arguments](#syncloop)
+  - [--syncloop.batchsize](#--syncloopbatchsize)
+  - [--syncloop.throttle](#--syncloopthrottle)
+  - [--syncloop.loginterval](#--synclooploginterval)
 - [--fakepow](#--fakepow)
-- [--zk.nochecksums](#--zk.nochecksums)
+- [--zk.nochecksums](#--zknochecksums)
 
 ## Usage
 Executing the node instance is, in most of the cases, pretty straight forward.
@@ -80,7 +80,7 @@ $ ./zend++ --data-dir=../zen
 **Warning. zend is a quite intensive IO application and it is recommended to have access to a storage directory on a directly attached support. For decent performance SSD is recommended. NVMe is even better. Avoid usage of network attached supports: IO throughput is not as important as access latency (a lot of random accesses are performed on the database).
 If you intend to install and run zend++ on an AWS instance be advised that using gp2/gp3 storage performances might result disappointing**
 
-## `--chaindata.`
+## Chaindata
 In this section we analyze all the arguments related to the chaindata db parameters.
 
 ### `--chaindata.exlusive`
@@ -136,7 +136,7 @@ where `128MiB` is the new maximum amount of ETL data you're willing to allow in 
 
 **Note. Adopting too small values might have an impact on overall performances as the process requires more IO operations**
 
-## `--syncloop.`
+## Syncloop
 In this section we analyze all the arguments related to the [syncronization loop](staged_sync.md).
 
 ### `--syncloop.batchsize`
@@ -174,7 +174,7 @@ On tesnets instead can help speed up the sync process.
 
 ## `--zk.nochecksums`
 This argument is a flag.
-As `zend++` requires the presence of some zkSNARKs parameters files to be able to verify certain types transactions, it is essential that those files are not corrupted.
+As `zend++` requires the presence of some zkSNARKs parameters files to be able to verify certain transaction types, it is essential that those files are not corrupted.
 Due to this reason, `zend++` checks the checksum of the parameters files before loading them and if the test fails it attempts to download them again from a trusted location.
 The verification of the checksum requires a few seconds (~10) to complete and it is performed every time the node starts.
 If you are sure that the parameters files you have are not corrupted you can skip the checksum verification by setting this flag as:
