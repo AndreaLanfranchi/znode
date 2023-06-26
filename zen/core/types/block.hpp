@@ -31,7 +31,7 @@ class BlockHeader : public serialization::Serializable {
     void reset();
 
   private:
-    friend class serialization::Archive;
-    serialization::Error serialization(serialization::Archive& archive, serialization::Action action) override;
+    friend class serialization::DataStream;
+    serialization::Error serialization(serialization::DataStream& archive, serialization::Action action) override;
 };
 }  // namespace zen

@@ -11,29 +11,25 @@
 
 namespace zen::serialization {
 
-void Archive::reserve(size_type count) { buffer_.reserve(count); }
+void DataStream::reserve(size_type count) { buffer_.reserve(count); }
 
-void Archive::resize(size_type new_size, value_type item) { buffer_.resize(new_size, item); }
+void DataStream::resize(size_type new_size, value_type item) { buffer_.resize(new_size, item); }
 
-void Archive::write(ByteView data) { buffer_.append(data); }
+void DataStream::write(ByteView data) { buffer_.append(data); }
 
-void Archive::write(const uint8_t* const ptr, Archive::size_type count) { write({ptr, count}); }
+void DataStream::write(const uint8_t* const ptr, DataStream::size_type count) { write({ptr, count}); }
 
-Archive::iterator_type Archive::begin() {
-    auto ret{buffer_.begin()};
-    std::advance(ret, read_position_);
-    return ret;
-}
+DataStream::iterator_type DataStream::begin() { return buffer_.begin() + static_cast<difference_type>(read_position_); }
 
-Archive::iterator_type Archive::end() { return buffer_.end(); }
+DataStream::iterator_type DataStream::end() { return buffer_.end(); }
 
-void Archive::insert(iterator_type where, value_type item) { buffer_.insert(where, item); }
+void DataStream::insert(iterator_type where, value_type item) { buffer_.insert(where, item); }
 
-void Archive::erase(iterator_type where) { buffer_.erase(where); }
+void DataStream::erase(iterator_type where) { buffer_.erase(where); }
 
-void Archive::push_back(uint8_t byte) { buffer_.push_back(byte); }
+void DataStream::push_back(uint8_t byte) { buffer_.push_back(byte); }
 
-tl::expected<ByteView, Error> Archive::read(size_t count) {
+tl::expected<ByteView, Error> DataStream::read(size_t count) {
     auto next_read_position{read_position_ + count};
     if (next_read_position > buffer_.length()) {
         return tl::unexpected(Error::kReadBeyondData);
@@ -43,38 +39,38 @@ tl::expected<ByteView, Error> Archive::read(size_t count) {
     return ret;
 }
 
-void Archive::skip(Archive::size_type count) noexcept {
+void DataStream::skip(DataStream::size_type count) noexcept {
     read_position_ = std::min(read_position_ + count, buffer_.size());
 }
 
-bool Archive::eof() const noexcept { return read_position_ >= buffer_.size(); }
+bool DataStream::eof() const noexcept { return read_position_ >= buffer_.size(); }
 
-Archive::size_type Archive::tellp() const noexcept { return read_position_; }
+DataStream::size_type DataStream::tellp() const noexcept { return read_position_; }
 
-void Archive::seekp(size_type p) noexcept { read_position_ = std::min(p, buffer_.size()); }
+void DataStream::seekp(size_type p) noexcept { read_position_ = std::min(p, buffer_.size()); }
 
-std::string Archive::to_string() const { return zen::hex::encode({buffer_.data(), buffer_.size()}, false); }
+std::string DataStream::to_string() const { return zen::hex::encode({buffer_.data(), buffer_.size()}, false); }
 
-void Archive::shrink() {
+void DataStream::shrink() {
     buffer_.erase(0, read_position_);
     read_position_ = 0;
 }
 
-Archive::size_type Archive::size() const noexcept { return buffer_.size(); }
+DataStream::size_type DataStream::size() const noexcept { return buffer_.size(); }
 
-bool Archive::empty() const noexcept { return buffer_.empty(); }
+bool DataStream::empty() const noexcept { return buffer_.empty(); }
 
-Archive::size_type Archive::computed_size() const noexcept { return computed_size_; }
+DataStream::size_type DataStream::computed_size() const noexcept { return computed_size_; }
 
-Archive::size_type Archive::avail() const noexcept { return buffer_.size() - read_position_; }
+DataStream::size_type DataStream::avail() const noexcept { return buffer_.size() - read_position_; }
 
-void Archive::clear() noexcept {
+void DataStream::clear() noexcept {
     buffer_.clear();
     read_position_ = 0;
     computed_size_ = 0;
 }
 
-void Archive::get_clear(Archive& dst) {
+void DataStream::get_clear(DataStream& dst) {
     dst.write({&buffer_[read_position_], avail()});
     clear();
 }

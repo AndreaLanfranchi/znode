@@ -17,7 +17,7 @@ void NetMessageHeader::reset() noexcept {
     checksum = 0;
 }
 
-serialization::Error NetMessageHeader::serialization(serialization::Archive& archive, serialization::Action action) {
+serialization::Error NetMessageHeader::serialization(serialization::DataStream& archive, serialization::Action action) {
     using namespace serialization;
     using enum Error;
     Error error{archive.bind(magic, action)};

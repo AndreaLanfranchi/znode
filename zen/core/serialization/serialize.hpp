@@ -20,10 +20,8 @@ namespace zen::serialization {
 //! \remarks Do not define serializable classes members as size_t as it might lead to wrong results on
 //! MacOS/Xcode bundles
 template <class T>
-    requires std::is_arithmetic_v<T>
-inline uint32_t ser_sizeof(T obj) {
-    return sizeof(obj);
-}
+requires std::is_arithmetic_v<T>
+inline uint32_t ser_sizeof(T obj) { return sizeof(obj); }
 
 //! \brief Returns the serialized size of arithmetic types
 //! \remarks Specialization for bool which is stored in at least 1 byte
@@ -104,7 +102,7 @@ inline void write_compact(Archive& archive, uint64_t obj) {
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Archive>
-    requires std::is_arithmetic_v<T>
+requires std::is_arithmetic_v<T>
 inline Error read_data(Archive& archive, T& object) {
     const uint32_t count{ser_sizeof(object)};
     const auto read_result{archive.read(count)};
@@ -116,7 +114,7 @@ inline Error read_data(Archive& archive, T& object) {
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Archive>
-    requires std::is_arithmetic_v<T>
+requires std::is_arithmetic_v<T>
 inline tl::expected<T, Error> read_data(Archive& archive) {
     T ret{0};
     auto result{read_data(archive, ret)};

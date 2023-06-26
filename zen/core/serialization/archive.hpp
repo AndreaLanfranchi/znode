@@ -20,7 +20,7 @@ namespace zen::serialization {
 
 class Serializable;
 
-class Archive {
+class DataStream {
   public:
     using reference_type = typename SecureBytes::reference;
     using size_type = typename SecureBytes::size_type;
@@ -28,7 +28,7 @@ class Archive {
     using value_type = typename SecureBytes::value_type;
     using iterator_type = typename SecureBytes::iterator;
 
-    Archive(Scope scope, int version) : scope_{scope}, version_{version} {};
+    DataStream(Scope scope, int version) : scope_{scope}, version_{version} {};
 
     [[nodiscard]] int get_version() const { return version_; }
     [[nodiscard]] Scope get_scope() const { return scope_; }
@@ -38,7 +38,7 @@ class Archive {
     //! \brief Reserves capacity
     void reserve(size_type count);
 
-    //! \brief Reserves capacity
+    //! \brief Adjusts the size of the underlying buffer
     void resize(size_type new_size, value_type item = 0);
 
     //! \brief Appends provided data to internal buffer
@@ -95,7 +95,7 @@ class Archive {
     void clear() noexcept;
 
     //! \brief Copies unconsumed data into dest and clears
-    void get_clear(Archive& dst);
+    void get_clear(DataStream& dst);
 
     //! \brief Returns the current read position
     [[nodiscard]] size_type tellp() const noexcept;

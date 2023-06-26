@@ -94,7 +94,7 @@ class MessageDigest {
     //! it's recycled by init() or reset(). In case of any error the returned digest will be zero length
     [[nodiscard]] Bytes finalize(bool compress = false) noexcept {
         Bytes ret(digest_size_, 0);
-        if(!compress) [[likely]] {
+        if (!compress) [[likely]] {
             if (EVP_DigestFinal_ex(digest_context_.get(), ret.data(), nullptr) == 0 /* zero is failure not success */) {
                 ret.clear();
             }

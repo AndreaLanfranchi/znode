@@ -21,7 +21,7 @@ void BlockHeader::reset() {
     solution.clear();
 }
 
-serialization::Error BlockHeader::serialization(serialization::Archive& archive, serialization::Action action) {
+serialization::Error BlockHeader::serialization(serialization::DataStream& archive, serialization::Action action) {
     using namespace serialization;
     using enum Error;
     Error error{archive.bind(version, action)};

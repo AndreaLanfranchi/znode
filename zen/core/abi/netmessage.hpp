@@ -15,7 +15,8 @@
 
 namespace zen {
 
-static constexpr uint32_t kMaxProtocolMessageLength{static_cast<uint32_t>(4_MiB)};  // Maximum length of a protocol message
+static constexpr uint32_t kMaxProtocolMessageLength{
+    static_cast<uint32_t>(4_MiB)};  // Maximum length of a protocol message
 
 class NetMessageHeader : public serialization::Serializable {
   public:
@@ -33,7 +34,7 @@ class NetMessageHeader : public serialization::Serializable {
         std::optional<uint32_t> expected_magic) const noexcept;  // Whether the message is validly formatted
 
   private:
-    friend class serialization::Archive;
-    serialization::Error serialization(serialization::Archive& archive, serialization::Action action) override;
+    friend class serialization::DataStream;
+    serialization::Error serialization(serialization::DataStream& archive, serialization::Action action) override;
 };
 }  // namespace zen

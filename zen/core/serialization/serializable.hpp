@@ -16,16 +16,16 @@ class Serializable {
   public:
     virtual ~Serializable() = default;
 
-    [[nodiscard]] size_t serialized_size(Archive& archive) {
+    [[nodiscard]] size_t serialized_size(DataStream& archive) {
         std::ignore = serialization(archive, Action::kComputeSize);
         return archive.computed_size();
     }
 
-    [[nodiscard]] serialization::Error serialize(Archive& archive) {
+    [[nodiscard]] serialization::Error serialize(DataStream& archive) {
         return serialization(archive, Action::kSerialize);
     }
 
-    [[nodiscard]] serialization::Error deserialize(Archive& archive) {
+    [[nodiscard]] serialization::Error deserialize(DataStream& archive) {
         return serialization(archive, Action::kDeserialize);
     }
 
@@ -33,6 +33,6 @@ class Serializable {
     constexpr auto operator<=>(const Serializable&) const = default;
 
   private:
-    virtual Error serialization(Archive& archive, Action action) = 0;
+    virtual Error serialization(DataStream& archive, Action action) = 0;
 };
 }  // namespace zen::serialization

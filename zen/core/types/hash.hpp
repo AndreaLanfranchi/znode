@@ -99,8 +99,8 @@ class Hash : public serialization::Serializable {
   private:
     alignas(uint32_t) std::array<uint8_t, kSize> bytes_{0};
 
-    friend class serialization::Archive;
-    [[nodiscard]] serialization::Error serialization(serialization::Archive& archive,
+    friend class serialization::DataStream;
+    [[nodiscard]] serialization::Error serialization(serialization::DataStream& archive,
                                                      serialization::Action action) override {
         return archive.bind(bytes_, action);
     }

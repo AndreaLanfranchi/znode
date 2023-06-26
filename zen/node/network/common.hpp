@@ -21,4 +21,4 @@ std::optional<boost::asio::ip::tcp::endpoint> get_local_endpoint(const boost::as
 //! \brief Returns a string representation of a socket endpoint (i.e. IP:PORT)
 std::string to_string(const boost::asio::ip::tcp::endpoint& endpoint);
 
-} // namespace zen::network
+}  // namespace zen::network

@@ -14,7 +14,7 @@ TEST_CASE("Block Serialization", "[serialization]") {
     BlockHeader header;
     header.version = 15;
     header.parent_hash = h256(10);
-    serialization::Archive archive(serialization::Scope::kNetwork, 0);
+    serialization::DataStream archive(serialization::Scope::kNetwork, 0);
     CHECK(header.serialized_size(archive) == kBlockHeaderSerializedSize);
     archive.clear();
     REQUIRE(header.serialize(archive) == serialization::Error::kSuccess);
@@ -25,8 +25,7 @@ TEST_CASE("Block Serialization", "[serialization]") {
     CHECK(archive.size() == 0);
 
     // Check the version equals to 15
-//    auto version_parsed{endian::load_little_u32(&archive[0])};
-//    CHECK(version_parsed == 15);
-
+    //    auto version_parsed{endian::load_little_u32(&archive[0])};
+    //    CHECK(version_parsed == 15);
 }
 }  // namespace zen
