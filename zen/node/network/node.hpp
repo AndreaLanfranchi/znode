@@ -9,23 +9,29 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include <boost/asio.hpp>
 #include <openssl/ssl.h>
 
+#include <zen/core/abi/netmessage.hpp>
 #include <zen/core/common/base.hpp>
 
 namespace zen::network {
 
 enum class NodeConnectionMode {
-    kInbound,
-    kOutbound
+    kInbound,        // Node is accepting connections
+    kOutbound,       // Node is connecting to other nodes
+    kManualOutbound  // Forced connection to a specific node
 };
 
 enum class DataDirectionMode {
     kInbound,
     kOutbound
 };
+
+//! \brief Maximum number of messages to parse in a single read operation
+static constexpr size_t kMaxMessagesPerRead = 100;
 
 class Node : public std::enable_shared_from_this<Node> {
   public:
@@ -72,6 +78,8 @@ class Node : public std::enable_shared_from_this<Node> {
     //! \brief Begin reading from the socket asychronously
     void start_read();
     void handle_read(const boost::system::error_code& ec, size_t bytes_transferred);
+    serialization::Error parse_messages(
+        size_t bytes_transferred);  // Reads messages from the receive buffer and consumes buffered data
 
     //! \brief Begin writing to the socket asychronously
     void start_write();
@@ -91,11 +99,21 @@ class Node : public std::enable_shared_from_this<Node> {
 
     std::atomic_bool is_connected_{true};
 
-    boost::asio::streambuf receive_buffer_;
-    boost::asio::streambuf send_buffer_;
+    boost::asio::streambuf receive_buffer_;  // Socket receive buffer
+    boost::asio::streambuf send_buffer_;     // Socket send buffer
+
+    std::chrono::steady_clock::time_point last_receive_time_;
+    std::chrono::steady_clock::time_point last_send_time_;
+
+    serialization::SDataStream send_stream_{serialization::Scope::kNetwork, 0};
 
     std::atomic<size_t> bytes_received_{0};
     std::atomic<size_t> bytes_sent_{0};
-};
 
+    bool receive_mode_header_{true};  // Whether we have switched from parsing header to accepting payload
+    std::unique_ptr<NetMessageHeader> inbound_header_{nullptr};            // The header of the message being received
+    std::unique_ptr<serialization::SDataStream> inbound_stream_{nullptr};  // The message data
+    std::vector<std::shared_ptr<NetMessage>> inbound_messages_{};          // Queue of received messages
+    std::mutex inbound_messages_mutex_{};                                  // Lock guard for received messages
+};
 }  // namespace zen::network

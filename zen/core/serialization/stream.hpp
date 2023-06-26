@@ -90,7 +90,6 @@ class DataStream {
     //! \brief Whether this archive contains any data
     [[nodiscard]] bool empty() const noexcept;
 
-
     //! \brief Returns the size of yet-to-be-consumed data
     [[nodiscard]] size_type avail() const noexcept;
 

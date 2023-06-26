@@ -31,6 +31,13 @@ enum class Error {
     kReadBeyondData,
     kNonCanonicalCompactSize,
     kCompactSizeTooBig,
+    kMessageHeaderMagicMismatch,     // Message header addressed to another network
+    kMessageHeaderEmptyCommand,      // Message header command is empty
+    kMessageHeaderUnknownCommand,    // Message header command is unknown
+    kMessageHeaderMalformedCommand,  // Message header's command is malformed (e.g. not null padded)
+    kMessageHeaderOversizedPayload,  // Message header's declared payload size is too big
+    kMessageHeaderInvalidChecksum,   // Message header's checksum is invalid
+    KMessagesFlooding,               // Message flooding detected
 };
 
 inline bool operator!(Error e) { return e == static_cast<Error>(0); }

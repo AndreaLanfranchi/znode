@@ -26,6 +26,7 @@ NodeHub::NodeHub(boost::asio::io_context& io_context, SSL_CTX* ssl_context, uint
       max_active_connections_(max_connections) {}
 
 void NodeHub::start() {
+    info_stopwatch_.start(true);
     start_info_timer();
     start_accept();
 }
@@ -76,6 +77,7 @@ void NodeHub::print_info() {
     last_info_total_bytes_sent_.store(current_total_bytes_sent);
 
     log::Info("Network usage", info_data);
+    info_stopwatch_.start(true);
 }
 
 void NodeHub::stop() {

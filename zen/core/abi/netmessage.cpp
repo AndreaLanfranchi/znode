@@ -14,7 +14,7 @@ void NetMessageHeader::reset() noexcept {
     magic = 0;
     command.fill(0);
     length = 0;
-    checksum = 0;
+    checksum.fill(0);
 }
 
 serialization::Error NetMessageHeader::serialization(serialization::SDataStream& stream, serialization::Action action) {
@@ -26,9 +26,11 @@ serialization::Error NetMessageHeader::serialization(serialization::SDataStream&
     if (!error) error = stream.bind(checksum, action);
     return error;
 }
-bool NetMessageHeader::is_valid(std::optional<uint32_t> expected_magic) const noexcept {
-    if (expected_magic && magic != *expected_magic) return false;
-    if (command[0] == 0) return false;  // reject empty commands
+
+serialization::Error NetMessageHeader::validate(std::optional<uint32_t> expected_magic) const noexcept {
+    using enum serialization::Error;
+    if (expected_magic && magic != *expected_magic) return kMessageHeaderMagicMismatch;
+    if (command[0] == 0) return kMessageHeaderEmptyCommand;  // reject empty commands
 
     // Check the command string is made of printable characters
     // eventually right padded to 12 bytes with NUL (0x00) characters.
@@ -39,14 +41,30 @@ bool NetMessageHeader::is_valid(std::optional<uint32_t> expected_magic) const no
                 null_matched = true;
                 continue;
             }
-            if (c < 32 || c > 126) return false;
+            if (c < 32 || c > 126) return kMessageHeaderMalformedCommand;
         } else if (c) {
-            return false;
+            return kMessageHeaderMalformedCommand;
         }
     }
 
-    if (length > kMaxProtocolMessageLength) return false;
+    // Identify the command amongst the known ones
+    for (const auto msg_def : kMessageDefinitions) {
+        const auto cmp_len{strnlen_s(msg_def.command, 12)};
+        if (memcmp(msg_def.command, command.data(), cmp_len) == 0) {
+            command_id = msg_def.command_id;  // Found the command
 
-    return true;
+            // Check max size of payload if applicable
+            if (msg_def.max_payload_length.has_value()) {
+                if (length > *msg_def.max_payload_length) return kMessageHeaderOversizedPayload;
+            }
+
+            break;
+        }
+    }
+
+    if (command_id == MessageCommand::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
+    if (length > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
+
+    return kSuccess;
 }
 }  // namespace zen

@@ -58,12 +58,12 @@ void DataStream::erase(iterator where) { buffer_.erase(std::move(where)); }
 void DataStream::push_back(uint8_t byte) { buffer_.push_back(byte); }
 
 tl::expected<ByteView, Error> DataStream::read(size_t count) {
-    auto next_read_position{read_position_ + count};
-    if (next_read_position > buffer_.length()) {
+    auto next_read_position{safe_add(read_position_, count)};
+    if (!next_read_position || *next_read_position > buffer_.length()) {
         return tl::unexpected(Error::kReadBeyondData);
     }
     ByteView ret(&buffer_[read_position_], count);
-    std::swap(read_position_, next_read_position);
+    std::swap(read_position_, *next_read_position);
     return ret;
 }
 
@@ -107,7 +107,8 @@ void DataStream::get_clear(DataStream& dst) {
 
 SDataStream::SDataStream(Scope scope, int version) : DataStream(), scope_(scope), version_(version) {}
 
-SDataStream::SDataStream(ByteView data, Scope scope, int version) : DataStream(data), scope_(scope), version_(version) {}
+SDataStream::SDataStream(ByteView data, Scope scope, int version)
+    : DataStream(data), scope_(scope), version_(version) {}
 
 SDataStream::SDataStream(const std::span<value_type> data, Scope scope, int version)
     : DataStream(data), scope_(scope), version_(version) {}

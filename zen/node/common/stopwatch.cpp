@@ -63,7 +63,9 @@ std::pair<StopWatch::TimePoint, StopWatch::Duration> StopWatch::stop() noexcept 
 void StopWatch::reset() noexcept {
     (void)stop();
     start_time_ = TimePoint();
-    std::vector<std::pair<TimePoint, Duration>>().swap(laps_);
+    if (!laps_.empty()) {
+        std::vector<std::pair<TimePoint, Duration>>().swap(laps_);
+    }
 }
 
 std::string StopWatch::format(Duration duration) noexcept {

@@ -6,7 +6,14 @@
 
 #include "node.hpp"
 
+#include <magic_enum.hpp>
+
+#include <zen/core/common/assert.hpp>
+#include <zen/core/crypto/hash256.hpp>
+
 #include <zen/node/common/log.hpp>
+
+#include "zen/core/common/misc.hpp"
 
 namespace zen::network {
 
@@ -24,10 +31,13 @@ Node::Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_conte
       on_data_(std::move(on_data)) {}
 
 void Node::start() {
+    inbound_stream_ = std::make_unique<serialization::SDataStream>(serialization::Scope::kNetwork, 0);
+    inbound_header_ = std::make_unique<NetMessageHeader>();
     if (ssl_context_ != nullptr) {
         io_strand_.post([this]() { start_ssl_handshake(); });
     } else {
         io_strand_.post([this]() {
+            last_receive_time_ = std::chrono::steady_clock::now();  // We don't want to disconnect immediately
             start_idle_timer();
             start_read();
         });
@@ -50,6 +60,7 @@ void Node::stop() {
 }
 
 void Node::start_ssl_handshake() {
+    ZEN_REQUIRE(ssl_context_ != nullptr);
     ssl_ = SSL_new(ssl_context_);
     SSL_set_fd(ssl_, static_cast<int>(socket_.native_handle()));
 
@@ -95,8 +106,14 @@ void Node::start_idle_timer() {
             log::Error("Node::start_idle_timer()", {"error", ec.message()});
             return;
         }
-        // Timer has ticked, disconnect
-        // TODO check effective idle timeout
+
+        // Check if node has been idle too much
+        auto now{std::chrono::steady_clock::now()};
+        if (auto elapsed{std::chrono::duration_cast<std::chrono::seconds>(now - last_receive_time_).count()};
+            static_cast<uint32_t>(elapsed) < idle_timeout_seconds_) {
+            start_idle_timer();
+            return;
+        }
         log::Warning("Node inactivity timeout", {"seconds", std::to_string(idle_timeout_seconds_)})
             << "Forcing disconnect ...";
         stop();
@@ -122,35 +139,119 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
         return;
     }
 
-    if (!ec) {
-        // Check SSL shutdown status
-        if (ssl_ != nullptr) {
-            int ssl_shutdown_status = SSL_get_shutdown(ssl_);
-            if (ssl_shutdown_status & SSL_RECEIVED_SHUTDOWN) {
-                SSL_shutdown(ssl_);
-                log::Trace("Node::handle_read()", {"message", "SSL_RECEIVED_SHUTDOWN"});
-                io_strand_.post([this]() { stop(); });
-                return;
-            }
-        }
-        if (bytes_transferred > 0) {
-            bytes_received_ += bytes_transferred;
-            if (on_data_) on_data_(DataDirectionMode::kInbound, bytes_transferred);
-
-            // TODO implement reading into messages
-
-            receive_buffer_.consume(bytes_transferred);
-        }
-        io_strand_.post([this]() { start_read(); });
-    } else {
+    if (ec) {
         log::Error("Node::handle_read()", {"error", ec.message()});
         auto this_node = shared_from_this();  // Might have already been destructed elsewhere
         io_strand_.post([this_node]() { this_node->stop(); });
+        return;
     }
+
+    // Check SSL shutdown status
+    if (ssl_ != nullptr) {
+        int ssl_shutdown_status = SSL_get_shutdown(ssl_);
+        if (ssl_shutdown_status & SSL_RECEIVED_SHUTDOWN) {
+            SSL_shutdown(ssl_);
+            log::Trace("Node::handle_read()", {"message", "SSL_RECEIVED_SHUTDOWN"});
+            io_strand_.post([this]() { stop(); });
+            return;
+        }
+    }
+
+    if (bytes_transferred > 0) {
+        last_receive_time_ = std::chrono::steady_clock::now();
+        bytes_received_ += bytes_transferred;
+        if (on_data_) on_data_(DataDirectionMode::kInbound, bytes_transferred);
+
+        const auto parse_result{parse_messages(bytes_transferred)};
+        if (parse_result != serialization::Error::kSuccess) {
+            log::Warning("P2P message (malformed)",
+                         {"peer", "unknown", "error", std::string(magic_enum::enum_name(parse_result))})
+                << "Disconnecting ...";
+            io_strand_.post([this]() { stop(); });
+            return;
+        }
+    }
+
+    // Continue reading
+    io_strand_.post([this]() { start_read(); });
 }
 
 void Node::start_write() {
     // TODO implement
 }
 
+serialization::Error Node::parse_messages(size_t bytes_transferred) {
+    using enum serialization::Error;
+    serialization::Error ec{kSuccess};
+
+    size_t messages_parsed{0};
+
+    ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
+    while (!data.empty()) {
+        if (receive_mode_header_) {
+            auto bytes_to_header_completion{kMessageHeaderLength - inbound_stream_->size()};
+            bytes_to_header_completion = std::min(bytes_to_header_completion, data.size());
+            inbound_stream_->write(data.substr(0, bytes_to_header_completion));
+            data.remove_prefix(bytes_to_header_completion);
+
+            // If header not complete yet we continue gathering
+            if (inbound_stream_->size() != kMessageHeaderLength) continue;
+
+            // Otherwise deserialize header
+            if ((ec = inbound_header_->deserialize(*inbound_stream_)) != kSuccess) break;
+            if ((ec = inbound_header_->validate(std::nullopt /* TODO Put network magic here */)) != kSuccess) break;
+            receive_mode_header_ = false;  // Switch to body
+
+        } else {
+            auto bytes_to_body_completion{inbound_header_->length - inbound_stream_->avail()};
+            bytes_to_body_completion = std::min(bytes_to_body_completion, data.size());
+            inbound_stream_->write(data.substr(0, bytes_to_body_completion));
+            data.remove_prefix(bytes_to_body_completion);
+
+            // If body not complete yet we continue gathering
+            if (inbound_stream_->avail() != inbound_header_->length) continue;
+
+            // Check if body is valid (checksum verification)
+            auto payload{inbound_stream_->read(inbound_stream_->avail())};
+            if (!payload) {
+                ec = payload.error();
+                break;
+            }
+            crypto::Hash256 payload_digest(payload.value());
+            if (auto payload_hash{payload_digest.finalize()};
+                memcmp(payload_hash.data(), inbound_header_->checksum.data(),
+                       sizeof(inbound_header_->checksum.size())) != 0) {
+                ec = kMessageHeaderInvalidChecksum;
+                break;
+            }
+            inbound_stream_->rewind(payload->size());  // !!! Important
+
+            // Body and header complete - Time to start a new message
+            if (log::test_verbosity(log::Level::kTrace)) {
+                log::Trace("P2P message", {"peer", "unknown", "command",
+                                           std::string(magic_enum::enum_name(inbound_header_->get_command())), "size",
+                                           to_human_bytes(inbound_header_->length, true)});
+            }
+
+            // Protect against small messages flooding
+            if (++messages_parsed > kMaxMessagesPerRead) {
+                ec = KMessagesFlooding;
+                break;
+            }
+
+            receive_mode_header_ = true;
+            std::unique_lock lock{inbound_messages_mutex_};
+            inbound_messages_.emplace_back(std::make_shared<NetMessage>(inbound_header_, inbound_stream_));
+            lock.unlock();
+
+            // TODO Notify higher level
+
+            inbound_stream_ = std::make_unique<serialization::SDataStream>(serialization::Scope::kNetwork, 0);
+            inbound_header_ = std::make_unique<NetMessageHeader>();
+        }
+    }
+
+    receive_buffer_.consume(bytes_transferred);
+    return ec;
+}
 }  // namespace zen::network
