@@ -195,7 +195,7 @@ serialization::Error Node::parse_messages(size_t bytes_transferred) {
             inbound_stream_->write(data.substr(0, bytes_to_header_completion));
             data.remove_prefix(bytes_to_header_completion);
 
-            // If header not complete yet we continue gathering
+            // If header not complete yet we continue harvesting
             if (inbound_stream_->size() != kMessageHeaderLength) continue;
 
             // Otherwise deserialize header
@@ -209,7 +209,7 @@ serialization::Error Node::parse_messages(size_t bytes_transferred) {
             inbound_stream_->write(data.substr(0, bytes_to_body_completion));
             data.remove_prefix(bytes_to_body_completion);
 
-            // If body not complete yet we continue gathering
+            // If body not complete yet we continue harvesting
             if (inbound_stream_->avail() != inbound_header_->length) continue;
 
             // Check if body is valid (checksum verification)
