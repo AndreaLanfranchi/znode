@@ -74,11 +74,11 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
 
     // Asio settings
     const size_t available_hw_concurrency{std::thread::hardware_concurrency()};
-    size_t user_asio_concurrency{std::max((available_hw_concurrency / 2), 2ULL)};
+    size_t user_asio_concurrency{std::max((available_hw_concurrency / 2), size_t(2))};
 
     cli.add_option("--asio.concurrency", user_asio_concurrency, "Concurrency level for asio")
         ->capture_default_str()
-        ->check(CLI::Range(2ULL, available_hw_concurrency));
+        ->check(CLI::Range(size_t(2), available_hw_concurrency));
 
     // Logging options
     auto& log_settings = settings.log_settings;
