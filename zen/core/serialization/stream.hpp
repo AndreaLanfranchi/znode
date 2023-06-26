@@ -36,6 +36,7 @@ class DataStream {
     explicit DataStream() = default;
     explicit DataStream(ByteView data);
     explicit DataStream(std::span<value_type> data);
+    virtual ~DataStream() = default;
 
     //! \brief Reserves capacity
     void reserve(size_type count);
