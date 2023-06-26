@@ -17,9 +17,9 @@ if(NOT ZEN_CORE_ONLY)
     find_package(CLI11 REQUIRED)
 
     # The node itself
-    add_executable(zend "node.cpp;common.hpp;common.cpp")
-    target_link_libraries(zend PRIVATE zen_node zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
-    target_include_directories(zend PRIVATE ${ZEN_MAIN_DIR}/third-party/indicators/include)
+    add_executable(zend++ "node.cpp;common.hpp;common.cpp")
+    target_link_libraries(zend++ PRIVATE zen_node zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
+    target_include_directories(zend++ PRIVATE ${ZEN_MAIN_DIR}/third-party/indicators/include)
 
     # The toolbox executable
     add_executable(zentool "toolbox.cpp;common.hpp;common.cpp")
