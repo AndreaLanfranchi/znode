@@ -7,7 +7,7 @@
 #pragma once
 
 #include <zen/core/common/base.hpp>
-#include <zen/core/serialization/archive.hpp>
+#include <zen/core/serialization/stream.hpp>
 
 namespace zen::serialization {
 
@@ -16,23 +16,23 @@ class Serializable {
   public:
     virtual ~Serializable() = default;
 
-    [[nodiscard]] size_t serialized_size(DataStream& archive) {
-        std::ignore = serialization(archive, Action::kComputeSize);
-        return archive.computed_size();
+    [[nodiscard]] size_t serialized_size(SDataStream& stream) {
+        std::ignore = serialization(stream, Action::kComputeSize);
+        return stream.computed_size();
     }
 
-    [[nodiscard]] serialization::Error serialize(DataStream& archive) {
-        return serialization(archive, Action::kSerialize);
+    [[nodiscard]] serialization::Error serialize(SDataStream& stream) {
+        return serialization(stream, Action::kSerialize);
     }
 
-    [[nodiscard]] serialization::Error deserialize(DataStream& archive) {
-        return serialization(archive, Action::kDeserialize);
+    [[nodiscard]] serialization::Error deserialize(SDataStream& stream) {
+        return serialization(stream, Action::kDeserialize);
     }
 
     // Needed for derived classes implementing spaceship operator
     constexpr auto operator<=>(const Serializable&) const = default;
 
   private:
-    virtual Error serialization(DataStream& archive, Action action) = 0;
+    virtual Error serialization(SDataStream& stream, Action action) = 0;
 };
 }  // namespace zen::serialization

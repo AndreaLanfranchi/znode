@@ -8,6 +8,8 @@
 
 #pragma once
 #include <functional>
+#include <optional>
+#include <span>
 
 #include <tl/expected.hpp>
 
@@ -22,45 +24,49 @@ class Serializable;
 
 class DataStream {
   public:
-    using reference_type = typename SecureBytes::reference;
     using size_type = typename SecureBytes::size_type;
     using difference_type = typename SecureBytes::difference_type;
+    using reference = typename SecureBytes::reference;
+    using const_reference = typename SecureBytes::const_reference;
     using value_type = typename SecureBytes::value_type;
-    using iterator_type = typename SecureBytes::iterator;
+    using iterator = typename SecureBytes::iterator;
+    using const_iterator = typename SecureBytes::const_iterator;
+    using reverse_iterator = typename SecureBytes::reverse_iterator;
 
-    DataStream(Scope scope, int version) : scope_{scope}, version_{version} {};
-
-    [[nodiscard]] int get_version() const { return version_; }
-    [[nodiscard]] Scope get_scope() const { return scope_; }
-
-    void set_version(int version) { version_ = version; }
+    explicit DataStream() = default;
+    explicit DataStream(ByteView data);
+    explicit DataStream(std::span<value_type> data);
 
     //! \brief Reserves capacity
     void reserve(size_type count);
 
     //! \brief Adjusts the size of the underlying buffer
-    void resize(size_type new_size, value_type item = 0);
+    void resize(size_type new_size, value_type item = value_type{});
 
     //! \brief Appends provided data to internal buffer
-    void write(ByteView data);
+    Error write(ByteView data);
 
     //! \brief Appends provided data to internal buffer
-    void write(const uint8_t* ptr, size_type count);
+    Error write(const uint8_t* ptr, size_type count);
 
     //! \brief Returns an iterator to beginning of the unconsumed part of data
-    iterator_type begin();
+    iterator begin();
+
+    //! \brief Rewinds the read position by count
+    //! \remarks If count is not provided the read position is moved at the beginning of the buffer
+    void rewind(std::optional<size_type> count = std::nullopt) noexcept;
 
     //! \brief Returns an iterator to end of the unconsumed part of data
-    iterator_type end();
+    iterator end();
 
     //! \brief Appends a single byte to internal buffer
     void push_back(value_type item);
 
     //! \brief Inserts new element at specified position
-    void insert(iterator_type where, value_type item);
+    void insert(iterator where, value_type item);
 
     //! \brief Erase an element from specified position
-    void erase(iterator_type where);
+    void erase(iterator where);
 
     //! \brief Returns a view of requested bytes count from the actual read position
     //! \remarks After the view is returned the read position is advanced by count
@@ -69,13 +75,13 @@ class DataStream {
     //! \brief Advances the read position by count
     //! \remarks If the count of bytes to be skipped exceeds the boundary of the buffer the read position
     //! is moved at the end and eof() will return true
-    void skip(size_type count) noexcept;
+    Error skip(size_type count) noexcept;
 
     //! \brief Whether the end of stream's data has been reached
     [[nodiscard]] bool eof() const noexcept;
 
     //! \brief Accesses one element of the buffer
-    constexpr reference_type operator[](size_type pos) { return buffer_[pos + read_position_]; }
+    constexpr reference operator[](size_type pos) { return buffer_[pos + read_position_]; }
 
     //! \brief Returns the size of the contained data
     [[nodiscard]] size_type size() const noexcept;
@@ -83,16 +89,13 @@ class DataStream {
     //! \brief Whether this archive contains any data
     [[nodiscard]] bool empty() const noexcept;
 
-    //! \brief Returns the computed size of the to-be-contained data
-    //! \remarks Only when this stream is used as a calculator
-    [[nodiscard]] size_type computed_size() const noexcept;
 
     //! \brief Returns the size of yet-to-be-consumed data
     [[nodiscard]] size_type avail() const noexcept;
 
     //! \brief Clears data and moves the read position to the beginning
     //! \remarks After this operation eof() == true
-    void clear() noexcept;
+    virtual void clear() noexcept;
 
     //! \brief Copies unconsumed data into dest and clears
     void get_clear(DataStream& dst);
@@ -109,9 +112,34 @@ class DataStream {
     //! \brief Returns the hexed representation of the data buffer
     [[nodiscard]] std::string to_string() const;
 
+  private:
+    SecureBytes buffer_{};        // Data buffer
+    size_type read_position_{0};  // Current read position;
+};
+
+//! \brief Stream for serialization / deserialization of Bitcoin objects
+class SDataStream : public DataStream {
+  public:
+    SDataStream() = default;
+    SDataStream(Scope scope, int version);
+    SDataStream(ByteView data, Scope scope, int version);
+    SDataStream(std::span<value_type> data, Scope scope, int version);
+
+    [[nodiscard]] Scope get_scope() const noexcept { return scope_; }
+    [[nodiscard]] int get_version() const noexcept { return version_; }
+    void set_version(int version) noexcept { version_ = version; }
+
+    //! \brief Returns the computed size of the to-be-contained data
+    //! \remarks Only when this stream is used as a calculator
+    [[nodiscard]] size_type computed_size() const noexcept;
+
+    //! \brief Clears data and moves the read position to the beginning
+    //! \remarks After this operation eof() == true
+    void clear() noexcept override;
+
     // Serialization for arithmetic types
     template <class T>
-    requires std::is_arithmetic_v<T>
+        requires std::is_arithmetic_v<T>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
@@ -131,7 +159,7 @@ class DataStream {
     }
 
     template <class T>
-    requires std::is_same_v<T, intx::uint256>
+        requires std::is_same_v<T, intx::uint256>
     [[nodiscard]] Error bind(T& object, Action action) {
         ZEN_ASSERT(sizeof(object) == 32);
         Error result{Error::kSuccess};
@@ -157,12 +185,14 @@ class DataStream {
 
     // Serialization for Serializable classes
     template <class T>
-    requires std::derived_from<T, Serializable>
-    [[nodiscard]] Error bind(T& object, Action action) { return object.serialization(*this, action); }
+        requires std::derived_from<T, Serializable>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        return object.serialization(*this, action);
+    }
 
     // Serialization for bytes array (fixed size)
     template <class T, std::size_t N>
-    requires std::is_fundamental_v<T>
+        requires std::is_fundamental_v<T>
     [[nodiscard]] Error bind(std::array<T, N>& object, Action action) {
         Error result{Error::kSuccess};
         const auto element_size{ser_sizeof(object[0])};
@@ -192,7 +222,7 @@ class DataStream {
     // a special case as they're always the last element of a structure.
     // Due to this the size of the member is not recorded
     template <class T>
-    requires std::is_same_v<T, Bytes>
+        requires std::is_same_v<T, Bytes>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
@@ -215,10 +245,9 @@ class DataStream {
     }
 
   private:
-    Scope scope_{0};
+    Scope scope_;
     int version_{0};
-    SecureBytes buffer_{};        // Data buffer
     size_type computed_size_{0};  // Total accrued size (for size computing)
-    size_type read_position_{0};  // Current read position;
 };
+
 }  // namespace zen::serialization

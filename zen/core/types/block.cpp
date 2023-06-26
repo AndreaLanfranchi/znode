@@ -21,18 +21,18 @@ void BlockHeader::reset() {
     solution.clear();
 }
 
-serialization::Error BlockHeader::serialization(serialization::DataStream& archive, serialization::Action action) {
+serialization::Error BlockHeader::serialization(serialization::SDataStream& stream, serialization::Action action) {
     using namespace serialization;
     using enum Error;
-    Error error{archive.bind(version, action)};
-    if (!error) archive.set_version(version);
-    if (!error) error = archive.bind(parent_hash, action);
-    if (!error) error = archive.bind(merkle_root, action);
-    if (!error) error = archive.bind(scct_root, action);
-    if (!error) error = archive.bind(time, action);
-    if (!error) error = archive.bind(bits, action);
-    if (!error) error = archive.bind(nonce, action);
-    if (!error) error = archive.bind(solution, action);
+    Error error{stream.bind(version, action)};
+    if (!error) stream.set_version(version);
+    if (!error) error = stream.bind(parent_hash, action);
+    if (!error) error = stream.bind(merkle_root, action);
+    if (!error) error = stream.bind(scct_root, action);
+    if (!error) error = stream.bind(time, action);
+    if (!error) error = stream.bind(bits, action);
+    if (!error) error = stream.bind(nonce, action);
+    if (!error) error = stream.bind(solution, action);
     return error;
 }
 }  // namespace zen

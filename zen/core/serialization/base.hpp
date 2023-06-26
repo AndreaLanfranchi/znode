@@ -27,6 +27,7 @@ enum class Action : uint32_t {
 
 enum class Error {
     kSuccess,  // Actually not an error
+    kOverflow,
     kReadBeyondData,
     kNonCanonicalCompactSize,
     kCompactSizeTooBig,

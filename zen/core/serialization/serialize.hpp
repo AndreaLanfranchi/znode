@@ -44,44 +44,44 @@ inline uint32_t ser_compact_sizeof(uint64_t value) {
 }
 
 //! \brief Lowest level serialization for integral arithmetic types
-template <class Archive, std::integral T>
-inline void write_data(Archive& archive, T obj) {
+template <class Stream, std::integral T>
+inline void write_data(Stream& stream, T obj) {
     std::array<unsigned char, sizeof(obj)> bytes{};
     std::memcpy(bytes.data(), &obj, sizeof(obj));
-    archive.write(bytes.data(), bytes.size());
+    stream.write(bytes.data(), bytes.size());
 }
 
 //! \brief Lowest level serialization for bool
-template <class Archive>
-inline void write_data(Archive& archive, bool obj) {
+template <class Stream>
+inline void write_data(Stream& stream, bool obj) {
     const uint8_t out{static_cast<uint8_t>(obj ? 0x00 : 0x01)};
-    archive.push_back(out);
+    stream.push_back(out);
 }
 
 //! \brief Lowest level serialization for float
-template <class Archive>
-inline void write_data(Archive& archive, float obj) {
+template <class Stream>
+inline void write_data(Stream& stream, float obj) {
     auto casted{std::bit_cast<uint32_t>(obj)};
-    write_data(archive, casted);
+    write_data(stream, casted);
 }
 
 //! \brief Lowest level serialization for double
-template <class Archive>
-inline void write_data(Archive& archive, double obj) {
+template <class Stream>
+inline void write_data(Stream& stream, double obj) {
     auto casted{std::bit_cast<uint64_t>(obj)};
-    write_data(archive, casted);
+    write_data(stream, casted);
 }
 
 //! \brief Lowest level serialization for compact integer
-template <class Archive>
-inline void write_compact(Archive& archive, uint64_t obj) {
+template <class Stream>
+inline void write_compact(Stream& stream, uint64_t obj) {
     const auto casted{std::bit_cast<std::array<uint8_t, sizeof(obj)>>(obj)};
     const auto num_bytes{ser_compact_sizeof(obj)};
     uint8_t prefix{0x00};
 
     switch (num_bytes) {
         case 1:
-            archive.push_back(casted[0]);
+            stream.push_back(casted[0]);
             return;  // Nothing else to append
         case 3:
             prefix = 253;
@@ -96,28 +96,28 @@ inline void write_compact(Archive& archive, uint64_t obj) {
             ZEN_ASSERT(false);  // Should not happen - Houston we have a problem
     }
 
-    archive.push_back(prefix);
-    archive.write(casted.data(), num_bytes - 1 /* num_bytes count includes the prefix */);
+    stream.push_back(prefix);
+    stream.write(casted.data(), num_bytes - 1 /* num_bytes count includes the prefix */);
 }
 
 //! \brief Lowest level deserialization for arithmetic types
-template <typename T, class Archive>
+template <typename T, class Stream>
 requires std::is_arithmetic_v<T>
-inline Error read_data(Archive& archive, T& object) {
+inline Error read_data(Stream& stream, T& object) {
     const uint32_t count{ser_sizeof(object)};
-    const auto read_result{archive.read(count)};
+    const auto read_result{stream.read(count)};
     if (!read_result) return read_result.error();
     std::memcpy(&object, read_result->data(), count);
-    archive.shrink();  // Remove consumed data
+    stream.shrink();  // Remove consumed data
     return Error::kSuccess;
 }
 
 //! \brief Lowest level deserialization for arithmetic types
-template <typename T, class Archive>
+template <typename T, class Stream>
 requires std::is_arithmetic_v<T>
-inline tl::expected<T, Error> read_data(Archive& archive) {
+inline tl::expected<T, Error> read_data(Stream& stream) {
     T ret{0};
-    auto result{read_data(archive, ret)};
+    auto result{read_data(stream, ret)};
     if (result != Error::kSuccess) {
         return tl::unexpected{result};
     }
@@ -127,9 +127,9 @@ inline tl::expected<T, Error> read_data(Archive& archive) {
 //! \brief Lowest level deserialization for compact integer
 //! \remarks As these are primarily used to decode the size of vector-like serializations, by default a range
 //! check is performed. When used as a generic number encoding, range_check should be set to false.
-template <class Archive>
-inline tl::expected<uint64_t, Error> read_compact(Archive& archive, bool range_check = true) {
-    const auto size{read_data<uint8_t>(archive)};
+template <class Stream>
+inline tl::expected<uint64_t, Error> read_compact(Stream& stream, bool range_check = true) {
+    const auto size{read_data<uint8_t>(stream)};
     if (!size) return tl::unexpected(size.error());
 
     uint64_t ret{0};
@@ -137,17 +137,17 @@ inline tl::expected<uint64_t, Error> read_compact(Archive& archive, bool range_c
     if (*size < 253) {
         ret = *size;
     } else if (*size == 253) {
-        const auto value{read_data<uint16_t>(archive)};
+        const auto value{read_data<uint16_t>(stream)};
         if (!value) return tl::unexpected(value.error());
         if (*value < 253) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
     } else if (*size == 254) {
-        const auto value{read_data<uint32_t>(archive)};
+        const auto value{read_data<uint32_t>(stream)};
         if (!value) return tl::unexpected(value.error());
         if (*value < 0x10000UL) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
     } else if (*size == 255) {
-        const auto value{read_data<uint64_t>(archive)};
+        const auto value{read_data<uint64_t>(stream)};
         if (!value) return tl::unexpected(value.error());
         if (*value < 0x100000000ULL) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;

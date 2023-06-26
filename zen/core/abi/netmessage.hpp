@@ -34,7 +34,7 @@ class NetMessageHeader : public serialization::Serializable {
         std::optional<uint32_t> expected_magic) const noexcept;  // Whether the message is validly formatted
 
   private:
-    friend class serialization::DataStream;
-    serialization::Error serialization(serialization::DataStream& archive, serialization::Action action) override;
+    friend class serialization::SDataStream;
+    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 }  // namespace zen

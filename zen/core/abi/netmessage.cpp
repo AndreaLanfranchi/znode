@@ -17,13 +17,13 @@ void NetMessageHeader::reset() noexcept {
     checksum = 0;
 }
 
-serialization::Error NetMessageHeader::serialization(serialization::DataStream& archive, serialization::Action action) {
+serialization::Error NetMessageHeader::serialization(serialization::SDataStream& stream, serialization::Action action) {
     using namespace serialization;
     using enum Error;
-    Error error{archive.bind(magic, action)};
-    if (!error) error = archive.bind(command, action);
-    if (!error) error = archive.bind(length, action);
-    if (!error) error = archive.bind(checksum, action);
+    Error error{stream.bind(magic, action)};
+    if (!error) error = stream.bind(command, action);
+    if (!error) error = stream.bind(length, action);
+    if (!error) error = stream.bind(checksum, action);
     return error;
 }
 bool NetMessageHeader::is_valid(std::optional<uint32_t> expected_magic) const noexcept {
