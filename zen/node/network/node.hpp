@@ -72,8 +72,8 @@ class Node : public std::enable_shared_from_this<Node> {
     void start_ssl_handshake();
     void handle_ssl_handshake(const boost::system::error_code& ec);
 
-    //! \brief Start measuring idle time
-    void start_idle_timer();
+    //! \brief Start maintenance timer
+    void start_service_timer();
 
     //! \brief Begin reading from the socket asychronously
     void start_read();
@@ -90,8 +90,8 @@ class Node : public std::enable_shared_from_this<Node> {
     boost::asio::ip::tcp::socket socket_;
     SSL_CTX* ssl_context_;
     SSL* ssl_{nullptr};
-    boost::asio::steady_timer idle_timer_;
-    std::atomic_bool idle_timer_started_{false};
+    boost::asio::steady_timer service_timer_;
+    std::atomic_bool service_timer_started_{false};
     uint32_t idle_timeout_seconds_;
 
     std::function<void(std::shared_ptr<Node>)> on_disconnect_;

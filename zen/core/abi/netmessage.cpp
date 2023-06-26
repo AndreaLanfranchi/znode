@@ -48,14 +48,14 @@ serialization::Error NetMessageHeader::validate(std::optional<uint32_t> expected
     }
 
     // Identify the command amongst the known ones
-    for (const auto msg_def : kMessageDefinitions) {
+    for (const auto& msg_def : kMessageDefinitions) {
         const auto cmp_len{strnlen_s(msg_def.command, 12)};
         if (memcmp(msg_def.command, command.data(), cmp_len) == 0) {
             command_id = msg_def.command_id;  // Found the command
 
             // Check max size of payload if applicable
-            if (msg_def.max_payload_length.has_value()) {
-                if (length > *msg_def.max_payload_length) return kMessageHeaderOversizedPayload;
+            if (msg_def.max_payload_length.has_value() && length > *msg_def.max_payload_length) {
+                return kMessageHeaderOversizedPayload;
             }
 
             break;

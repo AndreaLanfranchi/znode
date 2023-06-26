@@ -25,7 +25,7 @@ Node::Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_conte
       io_strand_(io_context),
       socket_(io_context),
       ssl_context_(ssl_context),
-      idle_timer_(io_context),
+      service_timer_(io_context),
       idle_timeout_seconds_{idle_timeout_seconds},
       on_disconnect_(std::move(on_disconnect)),
       on_data_(std::move(on_data)) {}
@@ -38,7 +38,7 @@ void Node::start() {
     } else {
         io_strand_.post([this]() {
             last_receive_time_ = std::chrono::steady_clock::now();  // We don't want to disconnect immediately
-            start_idle_timer();
+            start_service_timer();
             start_read();
         });
     }
@@ -48,7 +48,7 @@ void Node::stop() {
     bool expected{true};
     if (is_connected_.compare_exchange_strong(expected, false)) {
         boost::system::error_code ec;
-        idle_timer_.cancel(ec);
+        service_timer_.cancel(ec);
         if (ssl_ != nullptr) {
             SSL_shutdown(ssl_);  // We send our_close_notify and don't care about peer's
             SSL_free(ssl_);
@@ -79,7 +79,7 @@ void Node::start_ssl_handshake() {
 void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
     if (!ec) {
         io_strand_.post([this]() {
-            start_idle_timer();
+            start_service_timer();
             start_read();
         });
     } else {
@@ -88,22 +88,22 @@ void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
     }
 }
 
-void Node::start_idle_timer() {
-    if (bool expected{false}; !idle_timer_started_.compare_exchange_strong(expected, true)) {
+void Node::start_service_timer() {
+    if (bool expected{false}; !service_timer_started_.compare_exchange_strong(expected, true)) {
         // Timer has already been started, do nothing
         return;
     }
 
-    idle_timer_.expires_from_now(std::chrono::seconds(idle_timeout_seconds_));
-    idle_timer_.async_wait([this](const boost::system::error_code& ec) {
-        idle_timer_started_.store(false);
+    service_timer_.expires_from_now(std::chrono::seconds(idle_timeout_seconds_));
+    service_timer_.async_wait([this](const boost::system::error_code& ec) {
+        service_timer_started_.store(false);
         if (ec == boost::asio::error::operation_aborted) {
             // Timer was cancelled, do nothing
             return;
         } else if (ec) {
             // Some error has happened with the timer log it
             // and shutdown
-            log::Error("Node::start_idle_timer()", {"error", ec.message()});
+            log::Error("Node::start_service_timer()", {"error", ec.message()});
             return;
         }
 
@@ -111,7 +111,7 @@ void Node::start_idle_timer() {
         auto now{std::chrono::steady_clock::now()};
         if (auto elapsed{std::chrono::duration_cast<std::chrono::seconds>(now - last_receive_time_).count()};
             static_cast<uint32_t>(elapsed) < idle_timeout_seconds_) {
-            start_idle_timer();
+            start_service_timer();
             return;
         }
         log::Warning("Node inactivity timeout", {"seconds", std::to_string(idle_timeout_seconds_)})
@@ -140,7 +140,8 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
     }
 
     if (ec) {
-        log::Error("Node::handle_read()", {"error", ec.message()});
+        log::Error("P2P node", {"peer", "unknown", "action", "handle_read", "error", ec.message()})
+            << "Disconnecting ...";
         auto this_node = shared_from_this();  // Might have already been destructed elsewhere
         io_strand_.post([this_node]() { this_node->stop(); });
         return;
@@ -151,7 +152,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
         int ssl_shutdown_status = SSL_get_shutdown(ssl_);
         if (ssl_shutdown_status & SSL_RECEIVED_SHUTDOWN) {
             SSL_shutdown(ssl_);
-            log::Trace("Node::handle_read()", {"message", "SSL_RECEIVED_SHUTDOWN"});
+            log::Info("P2P node", {"peer", "unknown", "action", "handle_read", "message", "SSL_RECEIVED_SHUTDOWN"});
             io_strand_.post([this]() { stop(); });
             return;
         }
