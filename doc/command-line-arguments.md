@@ -150,7 +150,7 @@ where `128MiB` is the new maximum amount of ETL data you're willing to allow in 
 **Note. Adopting too small values might have an impact on overall performances as the process requires more IO operations**
 
 ## Syncloop
-In this section we analyze all the arguments related to the [syncronization loop](staged_sync.md).
+In this section we analyze all the arguments related to the [syncronization loop](concepts-staged-sync.md).
 
 ### `--syncloop.batchsize`
 This argument is an option. It specifies, for each stage, the maximum amount of bytes to process before committing to the database.

@@ -8,7 +8,6 @@ C++ Implementation of ZEN node based on Thorax Architecture
 - [Obtaining source code](#obtaining-source-code)
 - [Building on Linux & MacOS](#building-on-linux--macos)
 - [Building on Windows](#building-on-windows)
-- [Tree Map](#tree-map)
 - [Style Guide](#style-guide)
 - [Detailed Documentation](./doc)
 
@@ -124,29 +123,6 @@ Use the following steps to detect/enable/disable memory compression:
 * Run `Get-MMAgent` (check whether memory compression is enabled)
 * To disable memory compression : `Disable-MMAgent -mc` and reboot
 * To enable memory compression : `Enable-MMAgent -mc` and reboot
-
-## Tree Map
-This projects contains the following directory components:
-* [`cmake`](./cmake)
-  <br /> Where main cmake components are stored. Generally you don't need to edit anything there.
-* [`cmd`](./cmd) 
-  <br /> The basic source code of project's executable binaries (daemon and support tools).
-  <br /> Nothing in this directory gets built when you choose the `ZEN_CORE_ONLY` build option
-* [`doc`](./doc)
-  <br /> The documentation area. No source code is allowed here
-* [`third-party`](./third-party)
-  <br /> Where most of the dependencies of the project are stored. Some directories may be bound to [submodules] while other may contain imported code.
-* [`zen/core`](./zen/core)
-  <br /> This module contains the heart of the Zen protocol logic.
-  Source code within `core` is suitable for export (as a library) to third-party applications and cannot make use of C++ exceptions (build flags explicitly voids them)
-* [`zen/node`](./zen/node)
-  <br /> This module contains the database, the staged sync loop and other logic necessary to function as a Zen node.
-  This module depends on the `core` module.
-
-To simplify the building process cmake is configured to make use of GLOB lists of files. As a result a strict naming convention of files (see [Style Guide](#style-guide)).
-In addition to that we establish two file names suffix (before extension) reservations:
-* `_test` explicitly mark a file to be included in the unit tests target
-* `_benchmark` explicitly mark a file to be included in the benchmarks target
 
 ## Style guide
 We use standard C++20 programming language.

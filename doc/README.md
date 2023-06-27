@@ -1,8 +1,9 @@
 # Table of Contents
 - [System Requirements](#system-requirements)
 - [Command line arguments](command-line-arguments.md)
-- [About Staged Sync](staged_sync.md)
+- [About Staged Sync](concepts-staged-sync.md)
 - [TO DOs](todos.md)
+- [Code tree map](#code-tree-map)
 
 ## System Requirements
 To run an archive node on `zend++` we recommend the following minimum system requirements:
@@ -14,3 +15,17 @@ To run an archive node on `zend++` we recommend the following minimum system req
 We strongly discourage running a node on mechanical hard drives (HDD) as it will lead to degraded performance and will struggle to keep up with the tip of the chain.
 We also discourage running a node on a VPS __unless__ you have dedicated CPU cores and a dedicated directly attached SSD drive (experiments on AWS with gp2/gp3 storage showed terrible performance).
 Do not even try on AWS LightSail instances.
+
+## Code Tree Map
+This projects contains the following directory components:
+* [`cmake`](../cmake) Where main cmake components are stored. Generally you don't need to edit anything there.
+* [`cmd`](../cmd) The basic source code of project's executable binaries (daemon and support tools). Nothing in this directory gets built when you choose the `ZEN_CORE_ONLY` build option
+* [`doc`](../doc) The documentation area. No source code is allowed here
+* [`third-party`](../third-party) Where most of the dependencies of the project are stored. Some directories may be bound to [submodules] while other may contain imported code.
+* [`zen/core`](../zen/core) This module contains the heart of the Zen protocol logic. Source code within `core` is suitable for export (as a library) to third-party applications and cannot make use of C++ exceptions (build flags explicitly voids them)
+* [`zen/node`](../zen/node) This module contains the database, the staged sync loop and other logic necessary to function as a Zen node. This module depends on the `core` module.
+  
+To simplify the building process cmake is configured to make use of GLOB lists of files. As a result a strict naming convention of files (see [Style Guide](../README.md#style-guide)). In addition to that we establish two file names suffix (before extension) reservations:
+* `_test` explicitly mark a file to be included in the unit tests target
+* `_benchmark` explicitly mark a file to be included in the benchmarks target
+
