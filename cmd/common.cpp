@@ -80,6 +80,28 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
         ->capture_default_str()
         ->check(CLI::Range(size_t(2), available_hw_concurrency));
 
+    // Network settings
+    auto& network_opts = *cli.add_option_group("Network", "Networking options");
+    network_opts
+        .add_option("--network.localendpoint", node_settings.network.local_endpoint, "Local node listening address")
+        ->capture_default_str()
+        ->check(IPEndPointValidator(/*allow_empty=*/true,
+                                    /*default_port=*/13383));  // TODO the port will be on behalf of network
+
+    network_opts.add_flag("--network.tls", node_settings.network.use_tls, "Enable TLS secure communications");
+
+    network_opts
+        .add_option("--network.maxactiveconnections", node_settings.network.max_active_connections,
+                    "Maximum number of actively connected nodes")
+        ->capture_default_str()
+        ->check(CLI::Range(size_t(20), size_t(200)));
+
+    network_opts
+        .add_option("--network.idletimeout", node_settings.network.idle_timeout_seconds,
+                    "Number of seconds after which an idle node gets disconnected")
+        ->capture_default_str()
+        ->check(CLI::Range(size_t(30), size_t(3600)));
+
     // Logging options
     auto& log_settings = settings.log_settings;
     add_logging_options(cli, log_settings);
@@ -97,7 +119,8 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
     parsed_size_value = parse_human_bytes(chaindata_max_size_str);
     if (*parsed_size_value > mdbx_max_size_hard_limit) {
         throw std::invalid_argument("--chaindata.maxsize is invalid or > " +
-                                    to_human_bytes(mdbx_max_size_hard_limit, /*binary=*/true));
+                                    to_human_bytes(mdbx_max_size_hard_limit, /*binary=*/
+                                                   true));
     }
     node_settings.chaindata_env_config.max_size = *parsed_size_value;
 
@@ -161,7 +184,7 @@ IPEndPointValidator::IPEndPointValidator(bool allow_empty, int default_port) {
             return {};
         }
 
-        const std::regex pattern(R"(^([\d\.]*|localhost)(:[\d]{1,4})?$)", std::regex_constants::icase);
+        const std::regex pattern(R"(^([\d\.]*|\*|localhost)(:[\d]{1,4})?$)", std::regex_constants::icase);
         std::smatch matches;
         if (!std::regex_match(value, matches, pattern)) {
             return "Value " + value + " is not a valid endpoint";
@@ -170,7 +193,7 @@ IPEndPointValidator::IPEndPointValidator(bool allow_empty, int default_port) {
         std::string address_part{matches[1].str()};
         std::string port_part{matches[2].str()};
 
-        if (address_part.empty()) {
+        if (address_part.empty() || boost::iequals(address_part, "*")) {
             address_part = "0.0.0.0";
         } else if (boost::iequals(address_part, "localhost")) {
             address_part = "127.0.0.1";

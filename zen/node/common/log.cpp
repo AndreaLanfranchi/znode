@@ -106,7 +106,7 @@ BufferBase::BufferBase(Level level) : should_print_(level <= settings_.log_verbo
     // TimeStamp
     static const absl::TimeZone tz{settings_.log_utc ? absl::LocalTimeZone() : absl::UTCTimeZone()};
     absl::Time now{absl::Now()};
-    ss_ << kColorCyan << "[" << absl::FormatTime("%m-%d|%H:%M:%E3S", now, tz) << " " << tz << "] " << kColorReset;
+    ss_ << kColorCyan << absl::FormatTime("[%m-%d|%H:%M:%E3S] ", now, tz) << kColorReset;
 
     // ThreadId
     if (settings_.log_threads) {

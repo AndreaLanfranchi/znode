@@ -75,7 +75,6 @@ int main(int argc, char* argv[]) {
     cli.get_formatter()->column_width(50);
 
     try {
-
         // Initialize OpenSSL
         OPENSSL_init();
         SSL_library_init();
@@ -149,7 +148,7 @@ int main(int argc, char* argv[]) {
         log::Message("Validated  Zcash params", {"elapsed", StopWatch::format(sw.since_start())});
 
         // 1) Start networking server
-        zen::network::NodeHub node_hub(*node_settings.asio_context, nullptr, 13383, 30, 10);
+        zen::network::NodeHub node_hub(node_settings);
         node_hub.start();
 
         // Start sync loop
@@ -213,6 +212,9 @@ int main(int argc, char* argv[]) {
 
     } catch (const CLI::ParseError& ex) {
         return cli.exit(ex);
+    } catch (const boost::system::error_code& ec) {
+        ZEN_ERROR << "Boost error code :" << ec.message();
+        return -1;
     } catch (const std::filesystem::filesystem_error& ex) {
         ZEN_ERROR << "Filesystem error :" << ex.what();
         return -2;

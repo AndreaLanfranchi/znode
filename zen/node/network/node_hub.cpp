@@ -6,6 +6,9 @@
 
 #include "node_hub.hpp"
 
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
+
 #include <zen/core/common/misc.hpp>
 
 #include <zen/node/common/log.hpp>
@@ -15,45 +18,34 @@ namespace zen::network {
 
 using boost::asio::ip::tcp;
 
-NodeHub::NodeHub(boost::asio::io_context& io_context, SSL_CTX* ssl_context, uint16_t port,
-                 uint32_t idle_timeout_seconds, uint32_t max_connections)
-    : io_context_(io_context),
-      io_strand_(io_context),
-      acceptor_(io_context, tcp::endpoint(tcp::v4(), port)),
-      info_timer_(io_context),
-      ssl_server_context_(ssl_context),
-      connection_idle_timeout_seconds_(idle_timeout_seconds),
-      max_active_connections_(max_connections) {}
-
 void NodeHub::start() {
+    initialize_acceptor();
     info_stopwatch_.start(true);
-    start_info_timer();
+    start_service_timer();
     start_accept();
 }
 
-void NodeHub::start_info_timer() {
-    info_timer_.expires_after(std::chrono::seconds(kInfoTimerSeconds_));
-    info_timer_.async_wait([this](const boost::system::error_code& ec) {
+void NodeHub::start_service_timer() {
+    service_timer_.expires_after(std::chrono::seconds(kServiceTimerIntervalSeconds_));
+    service_timer_.async_wait([this](const boost::system::error_code& ec) {
         if (ec == boost::asio::error::operation_aborted) {
             return;  // No other operation allowed
         } else if (ec) {
-            log::Error("Service", {"name", "TCP Server", "action", "info_timer_tick", "error", ec.message()});
+            log::Error("Service", {"name", "Node Hub", "action", "info_timer_tick", "error", ec.message()});
             // Fall through and resubmit
         } else if (!ec) {
             print_info();
         }
-        start_info_timer();
+        start_service_timer();
     });
 }
 
 void NodeHub::print_info() {
-    std::vector<std::string> info_data;
-
     // In the unlucky case this fires with subsecond duration (i.e. returns 0), we'll just skip this lap
     // to avoid division by zero
     const auto info_lap_duration{
         static_cast<uint32_t>(duration_cast<std::chrono::seconds>(info_stopwatch_.since_start()).count())};
-    if (info_lap_duration == 0) {
+    if (info_lap_duration < 5) {
         return;
     }
 
@@ -62,6 +54,7 @@ void NodeHub::print_info() {
     auto period_total_bytes_received{current_total_bytes_received - last_info_total_bytes_received_.load()};
     auto period_total_bytes_sent{current_total_bytes_sent - last_info_total_bytes_sent_.load()};
 
+    std::vector<std::string> info_data;
     info_data.insert(info_data.end(), {"peers i/o", std::to_string(current_active_inbound_connections_.load()) + "/" +
                                                         std::to_string(current_active_outbound_connections_.load())});
     info_data.insert(info_data.end(), {"data i/o", to_human_bytes(current_total_bytes_received, true) + " " +
@@ -81,8 +74,8 @@ void NodeHub::print_info() {
 }
 
 void NodeHub::stop() {
-    info_timer_.cancel();
-    acceptor_.close();
+    service_timer_.cancel();
+    socket_acceptor_.close();
     std::scoped_lock lock(nodes_mutex_);
     for (auto& node : nodes_) {
         if (!node->is_connected()) continue;
@@ -91,37 +84,41 @@ void NodeHub::stop() {
 }
 
 void NodeHub::start_accept() {
-    log::Trace("Service", {"name", "TCP Server", "status", "Listening", "secure", ssl_server_context_ ? "yes" : "no"});
+    log::Trace("Service", {"name", "Node Hub", "status", "Listening", "secure", ssl_server_context_ ? "yes" : "no"});
     auto new_node = std::make_shared<Node>(
-        NodeConnectionMode::kInbound, io_context_, ssl_server_context_, connection_idle_timeout_seconds_,
+        NodeConnectionMode::kInbound, *node_settings_.asio_context, ssl_server_context_,
+        node_settings_.network.idle_timeout_seconds,
         [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
         [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); });
 
-    acceptor_.async_accept(new_node->socket(),
-                           [this, new_node](const boost::system::error_code& ec) { handle_accept(new_node, ec); });
+    socket_acceptor_.async_accept(
+        new_node->socket(), [this, new_node](const boost::system::error_code& ec) { handle_accept(new_node, ec); });
 }
 
 void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::system::error_code& ec) {
-    std::string origin{"unknown"};
+    std::string remote{"unknown"};
+    std::string local{"unknown"};
     if (auto remote_endpoint{get_remote_endpoint(new_node->socket())}; remote_endpoint) {
-        origin = to_string(remote_endpoint.value());
+        remote = to_string(remote_endpoint.value());
+    }
+    if (auto local_endpoint{get_local_endpoint(new_node->socket())}; local_endpoint) {
+        local = to_string(local_endpoint.value());
     }
 
-    log::Trace("Service", {"name", "TCP Server", "status", "handle_accept", "origin", origin});
+    log::Trace("Service", {"name", "Node Hub", "status", "handle_accept", "local", local, "remote", remote});
 
     if (ec == boost::asio::error::operation_aborted) {
-        log::Trace("Service", {"name", "TCP Server", "status", "stop"});
+        log::Trace("Service", {"name", "Node Hub", "status", "stop"});
         return;  // No other operation allowed
     } else if (ec) {
-        log::Error("Service", {"name", "TCP Server", "error", ec.message()});
+        log::Error("Service", {"name", "Node Hub", "error", ec.message()});
         // Fall through and continue listening for new connections
     } else if (!ec) {
         ++total_connections_;
-
         // Check we do not exceed the maximum number of connections
-        if (current_active_connections_ >= max_active_connections_) {
-            log::Trace("Service",
-                       {"name", "TCP Server", "peers", std::to_string(max_active_connections_), "action", "reject"});
+        if (current_active_connections_ >= node_settings_.network.max_active_connections) {
+            log::Trace("Service", {"name", "Node Hub", "peers",
+                                   std::to_string(node_settings_.network.max_active_connections), "action", "reject"});
             new_node->stop();
             ++total_rejected_connections_;
             return;
@@ -129,15 +126,47 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
 
         ++current_active_connections_;
         ++current_active_inbound_connections_;
+
+        log::Trace("Service", {"name", "Node Hub", "total connections", std::to_string(total_connections_),
+                               "total disconnections", std::to_string(total_disconnections_),
+                               "total rejected connections", std::to_string(total_rejected_connections_)});
+
+        new_node->socket().set_option(tcp::no_delay(true));
+        new_node->socket().set_option(tcp::socket::keep_alive(true));
+        new_node->socket().set_option(boost::asio::socket_base::linger(true, 5));
+        new_node->socket().set_option(boost::asio::socket_base::receive_buffer_size(static_cast<int>(64_KiB)));
+        new_node->socket().set_option(boost::asio::socket_base::send_buffer_size(static_cast<int>(64_KiB)));
         new_node->start();
+
         std::scoped_lock lock(nodes_mutex_);
         nodes_.insert(new_node);
-        log::Info("Service",
-                  {"name", "TCP Server", "new peer", origin, "peers", std::to_string(current_active_connections_)});
         // Fall through and continue listening for new connections
     }
 
     io_strand_.post([this]() { start_accept(); });  // Continue listening for new connections
+}
+
+void NodeHub::initialize_acceptor() {
+    std::vector<std::string> address_parts;
+    boost::split(address_parts, node_settings_.network.local_endpoint, boost::is_any_of(":"));
+    if (address_parts.size() != 2) {
+        throw std::runtime_error("Invalid local endpoint: " + node_settings_.network.local_endpoint);
+    }
+
+    auto port{boost::lexical_cast<uint16_t>(address_parts[1])};
+    const auto local_endpoint{tcp::endpoint(boost::asio::ip::make_address(address_parts[0]), port)};
+
+    socket_acceptor_.open(tcp::v4());
+    socket_acceptor_.set_option(tcp::acceptor::reuse_address(true));
+    socket_acceptor_.set_option(tcp::no_delay(true));
+    socket_acceptor_.set_option(boost::asio::socket_base::keep_alive(true));
+    socket_acceptor_.set_option(boost::asio::socket_base::receive_buffer_size(static_cast<int>(64_KiB)));
+    socket_acceptor_.set_option(boost::asio::socket_base::send_buffer_size(static_cast<int>(64_KiB)));
+    socket_acceptor_.bind(local_endpoint);
+    socket_acceptor_.listen();
+
+    log::Info("Service", {"name", "Node Hub", "secure", (node_settings_.network.use_tls ? "yes" : "no"), "listening on",
+                          to_string(local_endpoint)});
 }
 
 void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
@@ -151,6 +180,11 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
             break;
     }
     ++total_disconnections_;
+
+    log::Trace("Service", {"name", "Node Hub", "total connections", std::to_string(total_connections_),
+                           "total disconnections", std::to_string(total_disconnections_), "total rejected connections",
+                           std::to_string(total_rejected_connections_)});
+
     std::scoped_lock lock(nodes_mutex_);
     nodes_.erase(node);
 }

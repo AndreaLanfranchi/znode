@@ -18,6 +18,13 @@
 
 namespace zen {
 
+struct NetworkSettings {
+    std::string local_endpoint{"0.0.0.0:13383"};  // Local node listen address
+    uint32_t max_active_connections{100};         // Maximum allowed number of connected nodes
+    uint32_t idle_timeout_seconds{300};           // Number of seconds after which an inactive node is disconnected
+    bool use_tls{false};                          // Whether to enforce SSL/TLS on network connections
+};
+
 struct NodeSettings {
     std::string build_info{};                               // Human-readable build info
     std::unique_ptr<boost::asio::io_context> asio_context;  // Async context
@@ -30,6 +37,7 @@ struct NodeSettings {
     bool no_zcash_checksums{false};                         // Whether to verify zcash files' checksums
     uint32_t sync_loop_throttle_seconds{0};                 // Minimum interval amongst sync cycle
     uint32_t sync_loop_log_interval_seconds{30};            // Interval for sync loop to emit logs
+    NetworkSettings network{};                              // Network related settings
 };
 
 }  // namespace zen
