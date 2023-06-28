@@ -43,11 +43,3 @@ hunter_config(
         #URL https://github.com/openssl/openssl/archive/openssl-3.1.0.tar.gz
         #SHA1 1adb0f773af645b9f54738301920e5c74360b76d
 )
-
-hunter_cmake_args(
-        prometheus-cpp
-        CMAKE_ARGS
-        BUILD_SHARED_LIBS=ON
-        ENABLE_PUSH=OFF
-        ENABLE_COMPRESSION=OFF
-)

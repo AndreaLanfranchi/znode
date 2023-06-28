@@ -9,4 +9,3 @@
 hunter_add_package(abseil)
 hunter_add_package(Boost COMPONENTS context coroutine)
 hunter_add_package(CLI11)
-hunter_add_package(prometheus-cpp)
