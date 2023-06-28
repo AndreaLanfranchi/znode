@@ -20,11 +20,8 @@ void throw_exception(const std::exception&) {
 //! \brief Portable strnlen_s
 #if !defined(_MSC_VER)
 unsigned long long strnlen_s(const char* str, size_t strsz) noexcept {
-        if (str == nullptr) return 0;
-        const char* end = static_cast<const char*>(std::memchr(str, 0, strsz));
-        return end ? static_cast<unsigned long long>(end - str) : strsz;
+    if (str == nullptr) return 0;
+    const char* end = static_cast<const char*>(std::memchr(str, 0, strsz));
+    return end ? static_cast<unsigned long long>(end - str) : strsz;
 }
 #endif
-
-
-
