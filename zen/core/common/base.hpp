@@ -48,6 +48,11 @@ struct StringLiteral {
     char value[N]{};
 };
 
+//! \brief Portable strnlen_s
+#if !defined(_MSC_VER)
+unsigned long long strnlen_s(const char* str, size_t strsz) noexcept;
+#endif
+
 using Bytes = std::basic_string<uint8_t>;
 
 class ByteView : public std::basic_string_view<uint8_t> {
