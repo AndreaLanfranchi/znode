@@ -19,7 +19,7 @@
 
 namespace zen::network {
 
-class NodeHub {
+class NodeHub : public Stoppable {
   public:
     explicit NodeHub(NodeSettings& node_settings)
         : node_settings_{node_settings},
@@ -34,7 +34,7 @@ class NodeHub {
     ~NodeHub() = default;
 
     void start();
-    void stop();
+    bool stop(bool wait) noexcept override;
 
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
@@ -52,8 +52,8 @@ class NodeHub {
 
     boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;
-    boost::asio::steady_timer service_timer_;                // Service scheduler for this instance
-    static const uint32_t kServiceTimerIntervalSeconds_{1};  // Delay interval for service_timer_
+    boost::asio::steady_timer service_timer_;         // Service scheduler for this instance
+    const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_
 
     SSL_CTX* ssl_server_context_{nullptr};  // For dial-in connections
     SSL_CTX* ssl_client_context_{nullptr};  // For dial-out connections

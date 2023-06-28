@@ -40,9 +40,12 @@ struct Settings {
 //! \note This function is not thread safe as it's meant to be used at start of process and never called again
 void init(const Settings& settings);
 
+//! \brief Returns the current logging settings
+Settings& get_settings() noexcept;
+
 //! \brief Get the current logging verbosity
 //! \note This function is not thread safe as it's meant to be used in tests
-Level get_verbosity();
+Level get_verbosity() noexcept;
 
 //! \brief Sets logging verbosity
 //! \note This function is not thread safe as it's meant to be used at start of process and never called again

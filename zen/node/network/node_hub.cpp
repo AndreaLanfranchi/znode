@@ -73,29 +73,42 @@ void NodeHub::print_info() {
     info_stopwatch_.start(true);
 }
 
-void NodeHub::stop() {
-    service_timer_.cancel();
-    socket_acceptor_.close();
-    std::scoped_lock lock(nodes_mutex_);
-    for (auto& node : nodes_) {
-        if (!node->is_connected()) continue;
-        node->stop();
+bool NodeHub::stop(bool wait) noexcept {
+    const auto ret{Stoppable::stop(wait)};
+    if (ret) /* not already stopping */ {
+        service_timer_.cancel();
+        socket_acceptor_.close();
+        std::scoped_lock lock(nodes_mutex_);
+        // Stop all nodes
+        for (auto& node : nodes_) {
+            node->stop(false);
+        }
     }
+    return ret;
 }
 
 void NodeHub::start_accept() {
     log::Trace("Service", {"name", "Node Hub", "status", "Listening", "secure", ssl_server_context_ ? "yes" : "no"});
-    auto new_node = std::make_shared<Node>(
-        NodeConnectionMode::kInbound, *node_settings_.asio_context, ssl_server_context_,
-        node_settings_.network.idle_timeout_seconds,
-        [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
-        [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); });
+
+    std::shared_ptr<Node> new_node(new Node(
+                                       NodeConnectionMode::kInbound, *node_settings_.asio_context, ssl_server_context_,
+                                       node_settings_.network.idle_timeout_seconds,
+                                       [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
+                                       [this](DataDirectionMode direction, size_t bytes_transferred) {
+                                           on_node_data(direction, bytes_transferred);
+                                       }),
+                                   Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
     socket_acceptor_.async_accept(
         new_node->socket(), [this, new_node](const boost::system::error_code& ec) { handle_accept(new_node, ec); });
 }
 
 void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::system::error_code& ec) {
+    if (ec == boost::asio::error::operation_aborted) {
+        log::Trace("Service", {"name", "Node Hub", "status", "stop"});
+        return;  // No other operation allowed
+    }
+
     std::string remote{"unknown"};
     std::string local{"unknown"};
     if (auto remote_endpoint{get_remote_endpoint(new_node->socket())}; remote_endpoint) {
@@ -107,10 +120,7 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
 
     log::Trace("Service", {"name", "Node Hub", "status", "handle_accept", "local", local, "remote", remote});
 
-    if (ec == boost::asio::error::operation_aborted) {
-        log::Trace("Service", {"name", "Node Hub", "status", "stop"});
-        return;  // No other operation allowed
-    } else if (ec) {
+    if (ec) {
         log::Error("Service", {"name", "Node Hub", "error", ec.message()});
         // Fall through and continue listening for new connections
     } else if (!ec) {
@@ -119,7 +129,7 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
         if (current_active_connections_ >= node_settings_.network.max_active_connections) {
             log::Trace("Service", {"name", "Node Hub", "peers",
                                    std::to_string(node_settings_.network.max_active_connections), "action", "reject"});
-            new_node->stop();
+            new_node->stop(false);
             ++total_rejected_connections_;
             return;
         }
@@ -171,11 +181,14 @@ void NodeHub::initialize_acceptor() {
 
 void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
     if (current_active_connections_) --current_active_connections_;
+
     switch (node->mode()) {
-        case NodeConnectionMode::kInbound:
+        using enum NodeConnectionMode;
+        case kInbound:
             if (current_active_inbound_connections_) --current_active_inbound_connections_;
             break;
-        case NodeConnectionMode::kOutbound:
+        case kOutbound:
+        case kManualOutbound:
             if (current_active_outbound_connections_) --current_active_outbound_connections_;
             break;
     }

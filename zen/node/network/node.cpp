@@ -21,7 +21,6 @@ Node::Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_conte
            uint32_t idle_timeout_seconds, std::function<void(std::shared_ptr<Node>)> on_disconnect,
            std::function<void(DataDirectionMode, size_t)> on_data)
     : connection_mode_(connection_mode),
-      io_context_(io_context),
       io_strand_(io_context),
       socket_(io_context),
       ssl_context_(ssl_context),
@@ -31,6 +30,9 @@ Node::Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_conte
       on_data_(std::move(on_data)) {}
 
 void Node::start() {
+    if (bool expected{false}; !is_started_.compare_exchange_strong(expected, true)) {
+        return;  // Already started
+    }
     inbound_stream_ = std::make_unique<serialization::SDataStream>(serialization::Scope::kNetwork, 0);
     inbound_header_ = std::make_unique<NetMessageHeader>();
     if (ssl_context_ != nullptr) {
@@ -44,9 +46,9 @@ void Node::start() {
     }
 }
 
-void Node::stop() {
-    bool expected{true};
-    if (is_connected_.compare_exchange_strong(expected, false)) {
+bool Node::stop(bool wait) noexcept {
+    const auto ret{Stoppable::stop(wait)};
+    if (ret) /* not already stopped */ {
         boost::system::error_code ec;
         service_timer_.cancel(ec);
         if (ssl_ != nullptr) {
@@ -54,9 +56,13 @@ void Node::stop() {
             SSL_free(ssl_);
             ssl_ = nullptr;
         }
+        socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);  // Shutdown both send and receive
         socket_.close(ec);
-        io_strand_.post([this]() { on_disconnect_(shared_from_this()); });
+        if(bool expected{true}; is_started_.compare_exchange_strong(expected, false)) {
+            io_strand_.post([this]() { on_disconnect_(shared_from_this()); });
+        }
     }
+    return ret;
 }
 
 void Node::start_ssl_handshake() {
@@ -84,7 +90,7 @@ void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
         });
     } else {
         log::Error("Node::handle_ssl_handshake()", {"error", ec.message()});
-        io_strand_.post([this]() { stop(); });
+        io_strand_.post([this]() { stop(false); });
     }
 }
 
@@ -116,7 +122,7 @@ void Node::start_service_timer() {
         }
         log::Warning("Node inactivity timeout", {"seconds", std::to_string(idle_timeout_seconds_)})
             << "Forcing disconnect ...";
-        stop();
+        stop(true);
     });
 }
 
@@ -143,7 +149,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
         log::Error("P2P node", {"peer", "unknown", "action", "handle_read", "error", ec.message()})
             << "Disconnecting ...";
         auto this_node = shared_from_this();  // Might have already been destructed elsewhere
-        io_strand_.post([this_node]() { this_node->stop(); });
+        io_strand_.post([this_node]() { this_node->stop(false); });
         return;
     }
 
@@ -153,7 +159,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
         if (ssl_shutdown_status & SSL_RECEIVED_SHUTDOWN) {
             SSL_shutdown(ssl_);
             log::Info("P2P node", {"peer", "unknown", "action", "handle_read", "message", "SSL_RECEIVED_SHUTDOWN"});
-            io_strand_.post([this]() { stop(); });
+            io_strand_.post([this]() { stop(false); });
             return;
         }
     }
@@ -168,7 +174,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
             log::Warning("P2P message (malformed)",
                          {"peer", "unknown", "error", std::string(magic_enum::enum_name(parse_result))})
                 << "Disconnecting ...";
-            io_strand_.post([this]() { stop(); });
+            io_strand_.post([this]() { stop(false); });
             return;
         }
     }
@@ -254,5 +260,12 @@ serialization::Error Node::parse_messages(size_t bytes_transferred) {
 
     receive_buffer_.consume(bytes_transferred);
     return ec;
+}
+
+void Node::clean_up(Node* ptr) noexcept {
+    if (ptr) {
+        ptr->stop(true);
+        delete ptr;
+    }
 }
 }  // namespace zen::network

@@ -17,6 +17,8 @@
 #include <zen/core/abi/netmessage.hpp>
 #include <zen/core/common/base.hpp>
 
+#include <zen/node/concurrency/stoppable.hpp>
+
 namespace zen::network {
 
 enum class NodeConnectionMode {
@@ -33,7 +35,7 @@ enum class DataDirectionMode {
 //! \brief Maximum number of messages to parse in a single read operation
 static constexpr size_t kMaxMessagesPerRead = 100;
 
-class Node : public std::enable_shared_from_this<Node> {
+class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
     Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_context, SSL_CTX* ssl_context,
          uint32_t idle_timeout_seconds, std::function<void(std::shared_ptr<Node>)> on_disconnect,
@@ -48,7 +50,11 @@ class Node : public std::enable_shared_from_this<Node> {
     void start();
 
     //! \brief Stops the asynchronous read/write operations and disconnects
-    void stop();
+    bool stop(bool wait) noexcept override;
+
+    //! \brief Used as custom deleter for shared_ptr<Node> to ensure proper closure of the socket
+    //! \attention Do not call directly, use in std::shared_ptr<Node> instead
+    static void clean_up(Node* ptr) noexcept;
 
     //! \brief Whether the node is inbound or outbound
     [[nodiscard]] NodeConnectionMode mode() const noexcept { return connection_mode_; }
@@ -60,7 +66,7 @@ class Node : public std::enable_shared_from_this<Node> {
     [[nodiscard]] bool is_secure() const noexcept { return ssl_ != nullptr; }
 
     //! \brief Returns whether the node is currently connected
-    [[nodiscard]] bool is_connected() const noexcept { return is_connected_.load(); }
+    [[nodiscard]] bool is_connected() const noexcept { return !is_stopping() && is_connected_.load(); }
 
     //! \brief Returns the total number of bytes read from the socket
     [[nodiscard]] size_t bytes_received() const noexcept { return bytes_received_.load(); }
@@ -85,7 +91,6 @@ class Node : public std::enable_shared_from_this<Node> {
     void start_write();
 
     const NodeConnectionMode connection_mode_;
-    boost::asio::io_context& io_context_;
     boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
     boost::asio::ip::tcp::socket socket_;
     SSL_CTX* ssl_context_;
@@ -97,6 +102,7 @@ class Node : public std::enable_shared_from_this<Node> {
     std::function<void(std::shared_ptr<Node>)> on_disconnect_;
     std::function<void(DataDirectionMode, size_t)> on_data_;  // To gather receive data stats at higher level
 
+    std::atomic_bool is_started_{false}; // Guards against multiple calls to start()
     std::atomic_bool is_connected_{true};
 
     boost::asio::streambuf receive_buffer_;  // Socket receive buffer

@@ -196,7 +196,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        node_hub.stop();  // 1) Stop networking server
+        node_hub.stop(true);  // 1) Stop networking server
 
         if (node_settings.data_directory) {
             log::Message("Closing database", {"path", (*node_settings.data_directory)["chaindata"].path().string()});

@@ -31,6 +31,8 @@ void init(const Settings& settings) {
     init_terminal();
 }
 
+Settings& get_settings() noexcept { return settings_; }
+
 void tee_file(const std::filesystem::path& path) {
     file_ = std::make_unique<std::fstream>(path.string(), std::ios::out | std::ios::app);
     if (!file_->is_open()) {
@@ -39,7 +41,7 @@ void tee_file(const std::filesystem::path& path) {
     }
 }
 
-Level get_verbosity() { return settings_.log_verbosity; }
+Level get_verbosity() noexcept { return settings_.log_verbosity; }
 
 void set_verbosity(Level level) { settings_.log_verbosity = level; }
 
