@@ -19,7 +19,7 @@
 #include <zen/node/database/access_layer.hpp>
 #include <zen/node/database/mdbx_tables.hpp>
 #include <zen/node/network/node_hub.hpp>
-#include <zen/node/zcash/params.hpp>
+#include <zen/node/zk/params.hpp>
 
 #include "common.hpp"
 
@@ -136,16 +136,15 @@ int main(int argc, char* argv[]) {
         // Let some time to allow threads to properly start
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        // Validate mandatory zcash params
+        // Validate mandatory zk params
         StopWatch sw(true);
-        auto zcash_params_path{(*node_settings.data_directory)[DataDirectory::kZkParamsName].path()};
-        log::Message("Validating Zcash params", {"directory", zcash_params_path.string()});
-        if (!zcash::validate_param_files(*node_settings.asio_context, zcash_params_path,
-                                         node_settings.no_zcash_checksums)) {
-            throw std::filesystem::filesystem_error("Invalid Zcash file params",
+        auto zk_params_path{(*node_settings.data_directory)[DataDirectory::kZkParamsName].path()};
+        log::Message("Validating ZK params", {"directory", zk_params_path.string()});
+        if (!zk::validate_param_files(*node_settings.asio_context, zk_params_path, node_settings.no_zk_checksums)) {
+            throw std::filesystem::filesystem_error("Invalid ZK file params",
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }
-        log::Message("Validated  Zcash params", {"elapsed", StopWatch::format(sw.since_start())});
+        log::Message("Validated  ZK params", {"elapsed", StopWatch::format(sw.since_start())});
 
         // 1) Start networking server
         zen::network::NodeHub node_hub(node_settings);

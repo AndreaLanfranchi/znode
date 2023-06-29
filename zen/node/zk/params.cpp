@@ -48,10 +48,10 @@
 #include <zen/node/common/terminal.hpp>
 #include <zen/node/concurrency/ossignals.hpp>
 
-namespace zen::zcash {
+namespace zen::zk {
 
 bool validate_param_files(boost::asio::io_context& asio_context, const std::filesystem::path& directory,
-                          bool no_zcash_checksums) {
+                          bool no_checksums) {
     std::vector<ParamFile> errored_param_files{};
 
     for (const auto& param_file : kParamFiles) {
@@ -82,7 +82,7 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
             continue;
         }
 
-        if (no_zcash_checksums) continue;  // Only first cycle. If we have to download the checksums are already checked
+        if (no_checksums) continue;  // Only first cycle. If we have to download the checksums are already checked
         const auto expected_checksum{hex::decode(param_file.expected_checksum)};
         if (!validate_file_checksum(file_path, *expected_checksum)) {
             if (!std::filesystem::remove(file_path)) {
@@ -239,7 +239,7 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     if (ec) {
         log::Error("Failed to connect to server", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
         return false;
-    };
+    }
 
     ssl_stream.set_verify_mode(ssl::verify_none);  // TODO ! Verify certificate
 

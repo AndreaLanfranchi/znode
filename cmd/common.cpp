@@ -69,7 +69,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
         ->check(CLI::Range(10u, 600u));
 
     cli.add_flag("--fakepow", node_settings.fake_pow, "Disables proof-of-work verification");
-    cli.add_flag("--zk.nochecksums", node_settings.no_zcash_checksums,
+    cli.add_flag("--zk.nochecksums", node_settings.no_zk_checksums,
                  "Disables initial verification of zk proofs files checksums");
 
     // Asio settings

@@ -51,7 +51,7 @@ serialization::Error NetMessageHeader::validate(std::optional<uint32_t> expected
     for (const auto& msg_def : kMessageDefinitions) {
         const auto cmp_len{strnlen_s(msg_def.command, 12)};
         if (memcmp(msg_def.command, command.data(), cmp_len) == 0) {
-            command_id = msg_def.command_id;  // Found the command
+            message_type = msg_def.message_type;  // Found the command
 
             // Check max size of payload if applicable
             if (msg_def.max_payload_length.has_value() && length > *msg_def.max_payload_length) {
@@ -62,7 +62,7 @@ serialization::Error NetMessageHeader::validate(std::optional<uint32_t> expected
         }
     }
 
-    if (command_id == MessageCommand::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
+    if (message_type == MessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
     if (length > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
     return kSuccess;

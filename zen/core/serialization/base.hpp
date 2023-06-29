@@ -38,6 +38,7 @@ enum class Error {
     kMessageHeaderOversizedPayload,  // Message header's declared payload size is too big
     kMessageHeaderInvalidChecksum,   // Message header's checksum is invalid
     KMessagesFlooding,               // Message flooding detected
+    kInvalidVersionHandShake,        // Wrong message sequence detected
 };
 
 inline bool operator!(Error e) { return e == static_cast<Error>(0); }

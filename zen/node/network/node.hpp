@@ -18,6 +18,7 @@
 #include <zen/core/common/base.hpp>
 
 #include <zen/node/concurrency/stoppable.hpp>
+#include <zen/node/network/common.hpp>
 
 namespace zen::network {
 
@@ -38,7 +39,7 @@ static constexpr size_t kMaxMessagesPerRead = 100;
 class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
     Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_context, SSL_CTX* ssl_context,
-         uint32_t idle_timeout_seconds, std::function<void(std::shared_ptr<Node>)> on_disconnect,
+         std::function<void(std::shared_ptr<Node>)> on_disconnect,
          std::function<void(DataDirectionMode, size_t)> on_data);
 
     Node(Node& other) = delete;
@@ -68,18 +69,20 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Returns whether the node is currently connected
     [[nodiscard]] bool is_connected() const noexcept { return !is_stopping() && is_connected_.load(); }
 
+    //! \brief Returns whether the node has been inactive for more than idle_timeout_seconds
+    [[nodiscard]] bool is_idle(uint32_t idle_timeout_seconds) const noexcept;
+
     //! \brief Returns the total number of bytes read from the socket
     [[nodiscard]] size_t bytes_received() const noexcept { return bytes_received_.load(); }
 
     //! \brief Returns the total number of bytes written to the socket
     [[nodiscard]] size_t bytes_sent() const noexcept { return bytes_sent_.load(); }
 
+    [[nodiscard]] std::string to_string() const noexcept;
+
   private:
     void start_ssl_handshake();
     void handle_ssl_handshake(const boost::system::error_code& ec);
-
-    //! \brief Start maintenance timer
-    void start_service_timer();
 
     //! \brief Begin reading from the socket asychronously
     void start_read();
@@ -93,23 +96,25 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     const NodeConnectionMode connection_mode_;
     boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
     boost::asio::ip::tcp::socket socket_;
+    boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> remote_endpoint_;
+    boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> local_endpoint_;
+
     SSL_CTX* ssl_context_;
     SSL* ssl_{nullptr};
-    boost::asio::steady_timer service_timer_;
-    std::atomic_bool service_timer_started_{false};
-    uint32_t idle_timeout_seconds_;
 
-    std::function<void(std::shared_ptr<Node>)> on_disconnect_;
-    std::function<void(DataDirectionMode, size_t)> on_data_;  // To gather receive data stats at higher level
-
-    std::atomic_bool is_started_{false}; // Guards against multiple calls to start()
+    std::atomic_int version_{0};          // Protocol version negotiated during handshake
+    std::atomic_bool is_started_{false};  // Guards against multiple calls to start()
     std::atomic_bool is_connected_{true};
+
+    std::function<void(std::shared_ptr<Node>)> on_disconnect_;  // Called after stop (notifies hub)
+    std::function<void(DataDirectionMode, size_t)> on_data_;    // To gather receive data stats at node hub
 
     boost::asio::streambuf receive_buffer_;  // Socket receive buffer
     boost::asio::streambuf send_buffer_;     // Socket send buffer
 
-    std::chrono::steady_clock::time_point last_receive_time_;
-    std::chrono::steady_clock::time_point last_send_time_;
+    std::atomic<std::chrono::steady_clock::time_point> connected_time_;
+    std::atomic<std::chrono::steady_clock::time_point> last_message_received_time_;
+    std::atomic<std::chrono::steady_clock::time_point> last_message_sent_time_;
 
     serialization::SDataStream send_stream_{serialization::Scope::kNetwork, 0};
 

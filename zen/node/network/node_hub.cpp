@@ -19,6 +19,12 @@ namespace zen::network {
 using boost::asio::ip::tcp;
 
 void NodeHub::start() {
+    if (bool expected{false}; !is_started_.compare_exchange_strong(expected, true)) {
+        return;
+    }
+    if (node_settings_.network.use_tls) {
+        // TODO initialize server context
+    }
     initialize_acceptor();
     info_stopwatch_.start(true);
     start_service_timer();
@@ -28,16 +34,29 @@ void NodeHub::start() {
 void NodeHub::start_service_timer() {
     service_timer_.expires_after(std::chrono::seconds(kServiceTimerIntervalSeconds_));
     service_timer_.async_wait([this](const boost::system::error_code& ec) {
-        if (ec == boost::asio::error::operation_aborted) {
-            return;  // No other operation allowed
-        } else if (ec) {
-            log::Error("Service", {"name", "Node Hub", "action", "info_timer_tick", "error", ec.message()});
-            // Fall through and resubmit
-        } else if (!ec) {
-            print_info();
+        if (handle_service_timer(ec)) {
+            start_service_timer();
         }
-        start_service_timer();
     });
+}
+
+bool NodeHub::handle_service_timer(const boost::system::error_code& ec) {
+    if (ec == boost::asio::error::operation_aborted) return false;
+    if (ec) {
+        log::Error("Service", {"name", "Node Hub", "action", "info_timer_tick", "error", ec.message()});
+        return false;
+    }
+    print_info();  // Print info every 5 seconds
+
+    std::scoped_lock lock{nodes_mutex_};
+    for (auto& node : nodes_) {
+        if (node->is_idle(node_settings_.network.idle_timeout_seconds)) {
+            log::Trace("Service", {"name", "Node Hub", "action", "service", "node", node->to_string()})
+                << "Idle for " << node_settings_.network.idle_timeout_seconds << " seconds, disconnecting ...";
+            node->stop(false);
+        }
+    }
+    return true;
 }
 
 void NodeHub::print_info() {
@@ -92,7 +111,6 @@ void NodeHub::start_accept() {
 
     std::shared_ptr<Node> new_node(new Node(
                                        NodeConnectionMode::kInbound, *node_settings_.asio_context, ssl_server_context_,
-                                       node_settings_.network.idle_timeout_seconds,
                                        [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
                                        [this](DataDirectionMode direction, size_t bytes_transferred) {
                                            on_node_data(direction, bytes_transferred);
@@ -141,16 +159,25 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
                                "total disconnections", std::to_string(total_disconnections_),
                                "total rejected connections", std::to_string(total_rejected_connections_)});
 
-        new_node->socket().set_option(tcp::no_delay(true));
-        new_node->socket().set_option(tcp::socket::keep_alive(true));
-        new_node->socket().set_option(boost::asio::socket_base::linger(true, 5));
-        new_node->socket().set_option(boost::asio::socket_base::receive_buffer_size(static_cast<int>(64_KiB)));
-        new_node->socket().set_option(boost::asio::socket_base::send_buffer_size(static_cast<int>(64_KiB)));
-        new_node->start();
+        // Set socket non-blocking
+        boost::system::error_code ec_socket;
+        new_node->socket().non_blocking(true, ec_socket);
+        if (ec_socket) {
+            log::Error("Service", {"name", "Node Hub", "peer", remote, "error", ec_socket.message()});
+            new_node->stop(false);
+            return;
+        } else {
+            new_node->socket().set_option(tcp::no_delay(true));
+            new_node->socket().set_option(tcp::socket::keep_alive(true));
+            new_node->socket().set_option(boost::asio::socket_base::linger(true, 5));
+            new_node->socket().set_option(boost::asio::socket_base::receive_buffer_size(static_cast<int>(64_KiB)));
+            new_node->socket().set_option(boost::asio::socket_base::send_buffer_size(static_cast<int>(64_KiB)));
+            new_node->start();
 
-        std::scoped_lock lock(nodes_mutex_);
-        nodes_.insert(new_node);
-        // Fall through and continue listening for new connections
+            std::scoped_lock lock(nodes_mutex_);
+            nodes_.insert(new_node);
+            // Fall through and continue listening for new connections
+        }
     }
 
     io_strand_.post([this]() { start_accept(); });  // Continue listening for new connections
@@ -212,4 +239,5 @@ void NodeHub::on_node_data(zen::network::DataDirectionMode direction, const size
             break;
     }
 }
+
 }  // namespace zen::network

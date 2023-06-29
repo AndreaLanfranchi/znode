@@ -22,7 +22,7 @@ static constexpr uint32_t kMaxProtocolMessageLength{
 
 static constexpr uint32_t kMessageHeaderLength{24};  // Length of a protocol message header
 
-enum class MessageCommand {
+enum class MessageType : uint32_t {
     kVersion,
     kVerack,
     kInv,
@@ -30,18 +30,23 @@ enum class MessageCommand {
 };
 
 struct MessageDefinition {
-    const char* command{nullptr};                                  // The command string
-    MessageCommand command_id{MessageCommand::kMissingOrUnknown};  // The command id
-    const std::optional<size_t> max_payload_length{};              // The max allowed payload length
+    const char* command{nullptr};                              // The command string
+    MessageType message_type{MessageType::kMissingOrUnknown};  // The command id
+    const std::optional<size_t> max_payload_length{};          // The max allowed payload length
 };
 
-inline constexpr MessageDefinition kMessageVersion{"version", MessageCommand::kVersion};
-inline constexpr MessageDefinition kMessageVerack{"verack", MessageCommand::kVerack, size_t{0}};
+inline constexpr MessageDefinition kMessageVersion{"version", MessageType::kVersion, 1_KiB};
+inline constexpr MessageDefinition kMessageVerack{"verack", MessageType::kVerack, size_t{0}};
 inline constexpr MessageDefinition kMessageInv{
-    "inv", MessageCommand::kInv, (serialization::kMaxSerializedCompactSize * h256::size()) + size_t{9 /* compact */}};
+    "inv", MessageType::kInv, (serialization::kMaxSerializedCompactSize * h256::size()) + size_t{9 /* compact */}};
 
 //! \brief List of all supported messages
-inline constexpr std::array<MessageDefinition, 3> kMessageDefinitions{kMessageVersion, kMessageVerack, kMessageInv};
+//! \attention This must be kept in same order as the MessageCommand enum
+inline constexpr std::array<MessageDefinition, 3> kMessageDefinitions{
+    kMessageVersion,  // 0
+    kMessageVerack,   // 1
+    kMessageInv       // 2
+};
 
 class NetMessageHeader : public serialization::Serializable {
   public:
@@ -53,14 +58,14 @@ class NetMessageHeader : public serialization::Serializable {
     uint32_t length{0};                  // Length of payload in bytes
     std::array<uint8_t, 4> checksum{0};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
 
-    [[nodiscard]] MessageCommand get_command() const noexcept { return command_id; }
+    [[nodiscard]] MessageType get_type() const noexcept { return message_type; }
     void reset() noexcept;
 
     [[nodiscard]] serialization::Error validate(
         std::optional<uint32_t> expected_magic) const noexcept;  // Performs message validation
 
   private:
-    mutable MessageCommand command_id{MessageCommand::kMissingOrUnknown};  // The command id
+    mutable MessageType message_type{MessageType::kMissingOrUnknown};  // The command id
 
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;

@@ -34,7 +34,7 @@ struct NodeSettings {
     size_t batch_size{512_MiB};                             // Batch size to use in stages
     size_t etl_buffer_size{256_MiB};                        // Buffer size for ETL operations
     bool fake_pow{false};                                   // Whether to verify Proof-of-Work (PoW)
-    bool no_zcash_checksums{false};                         // Whether to verify zcash files' checksums
+    bool no_zk_checksums{false};                            // Whether to verify zk files' checksums
     uint32_t sync_loop_throttle_seconds{0};                 // Minimum interval amongst sync cycle
     uint32_t sync_loop_log_interval_seconds{30};            // Interval for sync loop to emit logs
     NetworkSettings network{};                              // Network related settings

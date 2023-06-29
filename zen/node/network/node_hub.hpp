@@ -46,12 +46,14 @@ class NodeHub : public Stoppable {
     void on_node_data(DataDirectionMode direction, size_t bytes_transferred);
 
     void start_service_timer();
+    bool handle_service_timer(const boost::system::error_code& ec); // Services the node connections
     void print_info();
 
     NodeSettings& node_settings_;  // Reference to global config settings
 
-    boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
-    boost::asio::ip::tcp::acceptor socket_acceptor_;
+    std::atomic_bool is_started_{false};              // Guards against multiple starts
+    boost::asio::io_context::strand io_strand_;       // Serialized execution of handlers
+    boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
     boost::asio::steady_timer service_timer_;         // Service scheduler for this instance
     const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_
 

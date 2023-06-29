@@ -18,7 +18,7 @@
 
 #include <zen/core/common/base.hpp>
 
-namespace zen::zcash {
+namespace zen::zk {
 
 struct ParamFile {
     const std::string_view name{};               // Name of the file (e.g. sprout-proving.key)
@@ -50,7 +50,7 @@ static constexpr std::array<ParamFile, 5> kParamFiles{kSproutProvingKey, kSprout
 
 //! \brief Validate the existence and correctness of the params files in the given directory
 bool validate_param_files(boost::asio::io_context& asio_context, const std::filesystem::path& directory,
-                          bool no_zcash_checksums);
+                          bool no_checksums);
 
 //! \brief Download the params files from the trusted source and save them in the given directory
 bool download_param_file(boost::asio::io_context& asio_context, const std::filesystem::path& directory,
@@ -63,4 +63,4 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
 //! \brief Validates the checksum of the given file against the expected one
 bool validate_file_checksum(const std::filesystem::path& file_path, ByteView expected_checksum);
 
-}  // namespace zen::zcash
+}  // namespace zen::zk
