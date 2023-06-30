@@ -81,6 +81,8 @@ class NetMessage {
     [[nodiscard]] NetMessageHeader& header() { return *header_; }
     [[nodiscard]] serialization::SDataStream& data() { return *data_; }
 
+    [[nodiscard]] static serialization::Error validate_payload_checksum(ByteView payload, ByteView expected_checksum) noexcept;
+
   private:
     std::unique_ptr<NetMessageHeader> header_;
     std::unique_ptr<serialization::SDataStream> data_;

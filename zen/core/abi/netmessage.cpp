@@ -7,6 +7,7 @@
 */
 
 #include "netmessage.hpp"
+#include <zen/core/crypto/hash256.hpp>
 
 namespace zen {
 
@@ -65,6 +66,17 @@ serialization::Error NetMessageHeader::validate(std::optional<uint32_t> expected
     if (message_type == MessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
     if (length > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
+    return kSuccess;
+}
+
+serialization::Error NetMessage::validate_payload_checksum(ByteView payload, ByteView expected_checksum) noexcept {
+    using enum serialization::Error;
+    static crypto::Hash256 payload_digest{};
+    payload_digest.init(payload);
+    if (auto payload_hash{payload_digest.finalize()};
+        memcmp(payload_hash.data(), expected_checksum.data(), expected_checksum.size()) != 0) {
+        return kMessageHeaderInvalidChecksum;
+    }
     return kSuccess;
 }
 }  // namespace zen

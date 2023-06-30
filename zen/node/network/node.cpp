@@ -9,7 +9,6 @@
 #include <magic_enum.hpp>
 
 #include <zen/core/common/assert.hpp>
-#include <zen/core/crypto/hash256.hpp>
 
 #include <zen/node/common/log.hpp>
 #include <zen/node/serialization/exceptions.hpp>
@@ -225,8 +224,7 @@ serialization::Error Node::finalize_inbound_message() {
             }
             if (inbound_header_->max_payload_length().has_value() &&
                 inbound_header_->max_payload_length().value() == 0) {
-                serialization::success_or_throw(validate_payload_checksum(ByteView{}, inbound_header_->checksum));
-                // TODO process immediately messages not requiring a deferred processing
+                serialization::success_or_throw(NetMessage::validate_payload_checksum(ByteView{}, inbound_header_->checksum));
             } else {
                 ret = kMessageBodyIncomplete;  // Need body data
                 receive_mode_header_ = false;  // Switch to body mode
@@ -238,8 +236,12 @@ serialization::Error Node::finalize_inbound_message() {
             // Check if body is valid (checksum verification)
             const auto payload_view{inbound_stream_->read()};
             if (!payload_view) throw serialization::SerializationException(payload_view.error());
-            serialization::success_or_throw(validate_payload_checksum(payload_view.value(), inbound_header_->checksum));
+            serialization::success_or_throw(NetMessage::validate_payload_checksum(payload_view.value(), inbound_header_->checksum));
             inbound_stream_->rewind(payload_view->size());  // !!! Important - Return to start of body
+
+            // Body payload received completely and checked
+            // Switch back to header mode
+            receive_mode_header_ = true;
         }
 
     } catch (const serialization::SerializationException& ex) {
@@ -247,17 +249,6 @@ serialization::Error Node::finalize_inbound_message() {
     }
 
     return ret;
-}
-
-serialization::Error Node::validate_payload_checksum(ByteView payload, ByteView expected_checksum) noexcept {
-    using enum serialization::Error;
-    static crypto::Hash256 payload_digest{};
-    payload_digest.init(payload);
-    if (auto payload_hash{payload_digest.finalize()};
-        memcmp(payload_hash.data(), expected_checksum.data(), expected_checksum.size()) != 0) {
-        return kMessageHeaderInvalidChecksum;
-    }
-    return kSuccess;
 }
 
 void Node::clean_up(Node* ptr) noexcept {

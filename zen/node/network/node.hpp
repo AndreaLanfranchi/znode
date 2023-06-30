@@ -106,9 +106,6 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \remarks Switches from receiving mode from header to payload automatically
     [[nodiscard]] serialization::Error finalize_inbound_message();
 
-    //! \brief Compares the checksum of the payload with the initial bytes recorded in the header
-    [[nodiscard]] serialization::Error validate_payload_checksum(ByteView payload, ByteView expected_checksum) noexcept;
-
     //! \brief Begin writing to the socket asychronously
     void start_write();
 
