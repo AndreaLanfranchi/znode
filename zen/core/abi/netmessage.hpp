@@ -59,6 +59,7 @@ class NetMessageHeader : public serialization::Serializable {
     std::array<uint8_t, 4> checksum{0};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
 
     [[nodiscard]] MessageType get_type() const noexcept { return message_type; }
+    [[nodiscard]] std::optional<size_t> max_payload_length() const noexcept { return max_payload_length_; }
     void reset() noexcept;
 
     [[nodiscard]] serialization::Error validate(
@@ -66,7 +67,7 @@ class NetMessageHeader : public serialization::Serializable {
 
   private:
     mutable MessageType message_type{MessageType::kMissingOrUnknown};  // The command id
-
+    mutable std::optional<size_t> max_payload_length_;                 // The max length of payload
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };

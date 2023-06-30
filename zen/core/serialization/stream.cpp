@@ -57,12 +57,15 @@ void DataStream::erase(iterator where) { buffer_.erase(std::move(where)); }
 
 void DataStream::push_back(uint8_t byte) { buffer_.push_back(byte); }
 
-tl::expected<ByteView, Error> DataStream::read(size_t count) {
-    auto next_read_position{safe_add(read_position_, count)};
+tl::expected<ByteView, Error> DataStream::read(std::optional<size_t> count) noexcept {
+    if (!count.has_value()) {
+        count = avail();
+    }
+    auto next_read_position{safe_add(read_position_, *count)};
     if (!next_read_position || *next_read_position > buffer_.length()) {
         return tl::unexpected(Error::kReadBeyondData);
     }
-    ByteView ret(&buffer_[read_position_], count);
+    ByteView ret(&buffer_[read_position_], *count);
     std::swap(read_position_, *next_read_position);
     return ret;
 }

@@ -71,7 +71,8 @@ class DataStream {
 
     //! \brief Returns a view of requested bytes count from the actual read position
     //! \remarks After the view is returned the read position is advanced by count
-    [[nodiscard]] tl::expected<ByteView, Error> read(size_t count);
+    //! \remarks If count is omitted the whole unconsumed part of data is returned
+    [[nodiscard]] tl::expected<ByteView, Error> read(std::optional<size_t> count = std::nullopt) noexcept;
 
     //! \brief Advances the read position by count
     //! \remarks If the count of bytes to be skipped exceeds the boundary of the buffer the read position

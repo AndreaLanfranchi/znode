@@ -57,7 +57,7 @@ serialization::Error NetMessageHeader::validate(std::optional<uint32_t> expected
             if (msg_def.max_payload_length.has_value() && length > *msg_def.max_payload_length) {
                 return kMessageHeaderOversizedPayload;
             }
-
+            max_payload_length_ = msg_def.max_payload_length;
             break;
         }
     }

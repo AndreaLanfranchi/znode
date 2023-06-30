@@ -34,7 +34,7 @@ enum class DataDirectionMode {
 };
 
 //! \brief Maximum number of messages to parse in a single read operation
-static constexpr size_t kMaxMessagesPerRead = 100;
+static constexpr size_t kMaxMessagesPerRead = 32;
 
 class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
@@ -57,6 +57,13 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \attention Do not call directly, use in std::shared_ptr<Node> instead
     static void clean_up(Node* ptr) noexcept;
 
+    enum class ProtocolHandShakeStatus : uint32_t {
+        kNotInitiated = 0,
+        kVersionCompleted = 1,
+        kVerackCompleted = 2,
+        kCompleted = 3
+    };
+
     //! \brief Whether the node is inbound or outbound
     [[nodiscard]] NodeConnectionMode mode() const noexcept { return connection_mode_; }
 
@@ -68,6 +75,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the node is currently connected
     [[nodiscard]] bool is_connected() const noexcept { return !is_stopping() && is_connected_.load(); }
+
+    //! \brief The actual status of the protocol handshake
+    [[nodiscard]] ProtocolHandShakeStatus get_protocol_handshake_status() const noexcept {
+        return protocol_handshake_status_.load();
+    }
 
     //! \brief Returns whether the node has been inactive for more than idle_timeout_seconds
     [[nodiscard]] bool is_idle(uint32_t idle_timeout_seconds) const noexcept;
@@ -90,6 +102,13 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     serialization::Error parse_messages(
         size_t bytes_transferred);  // Reads messages from the receive buffer and consumes buffered data
 
+    //! \brief Finalizes the inbound message and queues it if applicable
+    //! \remarks Switches from receiving mode from header to payload automatically
+    [[nodiscard]] serialization::Error finalize_inbound_message();
+
+    //! \brief Compares the checksum of the payload with the initial bytes recorded in the header
+    [[nodiscard]] serialization::Error validate_payload_checksum(ByteView payload, ByteView expected_checksum) noexcept;
+
     //! \brief Begin writing to the socket asychronously
     void start_write();
 
@@ -102,8 +121,13 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     SSL_CTX* ssl_context_;
     SSL* ssl_{nullptr};
 
-    std::atomic_int version_{0};          // Protocol version negotiated during handshake
-    std::atomic_bool is_started_{false};  // Guards against multiple calls to start()
+    static constexpr int kVersionMessageExchanged{1};
+    static constexpr int kVerAckMessageExchanged{2};
+
+    std::atomic<ProtocolHandShakeStatus> protocol_handshake_status_{
+        ProtocolHandShakeStatus::kNotInitiated};  // Status of protocol handshake
+    std::atomic_int version_{0};                  // Protocol version negotiated during handshake
+    std::atomic_bool is_started_{false};          // Guards against multiple calls to start()
     std::atomic_bool is_connected_{true};
 
     std::function<void(std::shared_ptr<Node>)> on_disconnect_;  // Called after stop (notifies hub)

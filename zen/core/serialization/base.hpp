@@ -31,6 +31,8 @@ enum class Error {
     kReadBeyondData,
     kNonCanonicalCompactSize,
     kCompactSizeTooBig,
+    kMessageHeaderIncomplete,        // Message header too short and cannot be completed
+    kMessageBodyIncomplete,          // Message body too short
     kMessageHeaderMagicMismatch,     // Message header addressed to another network
     kMessageHeaderEmptyCommand,      // Message header command is empty
     kMessageHeaderUnknownCommand,    // Message header command is unknown
@@ -38,7 +40,8 @@ enum class Error {
     kMessageHeaderOversizedPayload,  // Message header's declared payload size is too big
     kMessageHeaderInvalidChecksum,   // Message header's checksum is invalid
     KMessagesFlooding,               // Message flooding detected
-    kInvalidVersionHandShake,        // Wrong message sequence detected
+    kInvalidProtocolHandShake,       // Wrong message sequence detected
+    kUndefinedError,                 // Not defined
 };
 
 inline bool operator!(Error e) { return e == static_cast<Error>(0); }
