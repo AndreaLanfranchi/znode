@@ -62,7 +62,7 @@ class NodeHub : public Stoppable {
     const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_
 
     SSL_CTX* ssl_server_context_{nullptr};  // For dial-in connections
-    SSL_CTX* ssl_client_context_{nullptr};  // For dial-out connections
+    [[maybe_unused]] SSL_CTX* ssl_client_context_{nullptr};  // For dial-out connections TODO
 
     std::atomic_uint32_t current_active_connections_{0};
     std::atomic_uint32_t current_active_inbound_connections_{0};

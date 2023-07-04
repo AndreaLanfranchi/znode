@@ -20,9 +20,9 @@ class SerializationException : public std::exception {
     explicit SerializationException(const char* message) : message_(message) {}
     explicit SerializationException(const char* message, const Error err) : message_(message), error_(err) {}
     explicit SerializationException(const Error err) : message_(std::string(magic_enum::enum_name(err))), error_(err) {}
-    const char* what() const noexcept override { return message_.c_str(); }
-    const Error error() const noexcept { return error_; }
-    const uint32_t error_code() const noexcept { return static_cast<uint32_t>(error_); }
+    [[nodiscard]] const char* what() const noexcept override { return message_.c_str(); }
+    [[nodiscard]] Error error() const noexcept { return error_; }
+    [[nodiscard]] uint32_t error_code() const noexcept { return static_cast<uint32_t>(error_); }
 
   private:
     std::string message_;
