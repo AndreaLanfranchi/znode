@@ -33,21 +33,25 @@ class NodeHub : public Stoppable {
     NodeHub& operator=(const NodeHub& other) = delete;
     ~NodeHub() = default;
 
-    void start();
-    bool stop(bool wait) noexcept override;
+    [[nodiscard]] bool contains(int id) const;                     // Returns whether a node id is actually connected
+    [[nodiscard]] size_t size() const;                             // Returns the number of nodes
+    [[nodiscard]] std::shared_ptr<Node> operator[](int id) const;  // Returns a shared_ptr<Node> by id
+    [[nodiscard]] std::vector<std::shared_ptr<Node>> get_nodes() const;  // Returns a vector of all nodes
+
+    void start();                            // Begins accepting connections
+    bool stop(bool wait) noexcept override;  // Stops accepting connections and stops all nodes
 
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
-
-    void start_accept();
+    void start_accept();         // Begin async accept operation
     void handle_accept(const std::shared_ptr<Node>& new_node, const boost::system::error_code& ec);
 
-    void on_node_disconnected(const std::shared_ptr<Node>& node);
-    void on_node_data(DataDirectionMode direction, size_t bytes_transferred);
+    void on_node_disconnected(const std::shared_ptr<Node>& node);              // Handles disconnects from nodes
+    void on_node_data(DataDirectionMode direction, size_t bytes_transferred);  // Handles data from nodes
 
-    void start_service_timer();
-    bool handle_service_timer(const boost::system::error_code& ec);  // Services the node connections
-    void print_info();
+    void start_service_timer();                                      // Starts the majordomo timer
+    bool handle_service_timer(const boost::system::error_code& ec);  // Majordomo to serve connections
+    void print_info();                                               // Prints some stats about network usage
 
     NodeSettings& node_settings_;  // Reference to global config settings
 
@@ -64,8 +68,8 @@ class NodeHub : public Stoppable {
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};
 
-    std::map<int, std::shared_ptr<Node>> nodes_;
-    std::mutex nodes_mutex_;
+    std::map<int, std::shared_ptr<Node>> nodes_;  // All the connected nodes
+    mutable std::mutex nodes_mutex_;              // Guards access to nodes_
 
     size_t total_connections_{0};
     size_t total_disconnections_{0};

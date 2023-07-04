@@ -242,4 +242,30 @@ void NodeHub::on_node_data(zen::network::DataDirectionMode direction, const size
     }
 }
 
+std::shared_ptr<Node> NodeHub::operator[](int id) const {
+    std::scoped_lock lock(nodes_mutex_);
+    if (nodes_.contains(id)) {
+        return nodes_.at(id);
+    }
+    return nullptr;
+}
+
+bool NodeHub::contains(int id) const {
+    std::scoped_lock lock(nodes_mutex_);
+    return nodes_.contains(id);
+}
+
+size_t NodeHub::size() const {
+    std::scoped_lock lock(nodes_mutex_);
+    return nodes_.size();
+}
+
+std::vector<std::shared_ptr<Node>> NodeHub::get_nodes() const {
+    std::scoped_lock lock(nodes_mutex_);
+    std::vector<std::shared_ptr<Node>> nodes;
+    for (const auto& [id, node] : nodes_) {
+        nodes.emplace_back(node);
+    }
+    return nodes;
+}
 }  // namespace zen::network
