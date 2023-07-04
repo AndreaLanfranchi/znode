@@ -17,6 +17,8 @@ void throw_exception(const std::exception&) {
 }  // namespace boost
 #endif
 
+namespace zen {
+
 //! \brief Portable strnlen_s
 #if !defined(_MSC_VER)
 unsigned long long strnlen_s(const char* str, size_t strsz) noexcept {
@@ -25,3 +27,5 @@ unsigned long long strnlen_s(const char* str, size_t strsz) noexcept {
     return end ? static_cast<unsigned long long>(end - str) : strsz;
 }
 #endif
+
+}  // namespace zen
