@@ -87,6 +87,7 @@ int main(int argc, char* argv[]) {
 
         cmd::Settings settings;
         auto& node_settings = settings.node_settings;
+        auto& network_settings = node_settings.network;
 
         // This parses and validates command line arguments
         // After return we're able to start services. Datadir has been deployed
@@ -135,6 +136,15 @@ int main(int argc, char* argv[]) {
 
         // Let some time to allow threads to properly start
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        // Check required certificate and key file are present to initialize SSL context
+        if (network_settings.use_tls) {
+            auto const ssl_data{(*node_settings.data_directory)[DataDirectory::kSSLCert].path()};
+            if (!network::validate_tls_requirement(ssl_data, network_settings.tls_password)) {
+                throw std::filesystem::filesystem_error("Invalid SSL certificate or key file",
+                                                        std::make_error_code(std::errc::no_such_file_or_directory));
+            }
+        }
 
         // Validate mandatory zk params
         StopWatch sw(true);

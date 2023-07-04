@@ -16,6 +16,7 @@
 #include <zen/node/common/stopwatch.hpp>
 #include <zen/node/concurrency/stoppable.hpp>
 #include <zen/node/network/node.hpp>
+#include <zen/node/network/secure.hpp>
 
 namespace zen::network {
 
@@ -61,7 +62,7 @@ class NodeHub : public Stoppable {
     boost::asio::steady_timer service_timer_;         // Service scheduler for this instance
     const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_
 
-    SSL_CTX* ssl_server_context_{nullptr};  // For dial-in connections
+    SSL_CTX* ssl_server_context_{nullptr};                   // For dial-in connections
     [[maybe_unused]] SSL_CTX* ssl_client_context_{nullptr};  // For dial-out connections TODO
 
     std::atomic_uint32_t current_active_connections_{0};

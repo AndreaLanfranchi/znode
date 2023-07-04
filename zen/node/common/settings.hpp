@@ -22,7 +22,8 @@ struct NetworkSettings {
     std::string local_endpoint{"0.0.0.0:13383"};  // Local node listen address
     uint32_t max_active_connections{100};         // Maximum allowed number of connected nodes
     uint32_t idle_timeout_seconds{300};           // Number of seconds after which an inactive node is disconnected
-    bool use_tls{false};                          // Whether to enforce SSL/TLS on network connections
+    bool use_tls{true};                           // Whether to enforce SSL/TLS on network connections
+    std::string tls_password{};                   // Password to use to load a private key file
 };
 
 struct NodeSettings {

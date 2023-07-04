@@ -20,6 +20,7 @@ namespace zen::cmd {
 
 void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& settings) {
     auto& node_settings = settings.node_settings;
+    auto& network_settings = node_settings.network;
 
     // Node settings
     std::filesystem::path data_dir_path;
@@ -82,22 +83,24 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
 
     // Network settings
     auto& network_opts = *cli.add_option_group("Network", "Networking options");
-    network_opts
-        .add_option("--network.localendpoint", node_settings.network.local_endpoint, "Local node listening address")
+    network_opts.add_option("--network.localendpoint", network_settings.local_endpoint, "Local node listening address")
         ->capture_default_str()
         ->check(IPEndPointValidator(/*allow_empty=*/true,
                                     /*default_port=*/13383));  // TODO the port will be on behalf of network
 
-    network_opts.add_flag("--network.tls", node_settings.network.use_tls, "Enable TLS secure communications");
+    auto notls_flag = network_opts.add_flag("--network.notls", "Disable TLS secure communications");
+
+    network_opts.add_option("--network.pkpwd", network_settings.tls_password, "Private key password")
+        ->capture_default_str()->excludes(notls_flag);
 
     network_opts
-        .add_option("--network.maxactiveconnections", node_settings.network.max_active_connections,
+        .add_option("--network.maxactiveconnections", network_settings.max_active_connections,
                     "Maximum number of actively connected nodes")
         ->capture_default_str()
         ->check(CLI::Range(size_t(20), size_t(200)));
 
     network_opts
-        .add_option("--network.idletimeout", node_settings.network.idle_timeout_seconds,
+        .add_option("--network.idletimeout", network_settings.idle_timeout_seconds,
                     "Number of seconds after which an idle node gets disconnected")
         ->capture_default_str()
         ->check(CLI::Range(size_t(30), size_t(3600)));
@@ -139,6 +142,8 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
 
     node_settings.asio_concurrency = user_asio_concurrency;
     node_settings.asio_context = std::make_unique<boost::asio::io_context>(static_cast<int>(user_asio_concurrency));
+
+    network_settings.use_tls = !notls_flag->count();
 }
 
 void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
