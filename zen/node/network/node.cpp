@@ -17,6 +17,8 @@
 
 namespace zen::network {
 
+std::atomic_int Node::next_node_id_{1};  // Start from 1 for user friendliness
+
 Node::Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_context, SSL_CTX* ssl_context,
            std::function<void(std::shared_ptr<Node>)> on_disconnect,
            std::function<void(DataDirectionMode, size_t)> on_data)
@@ -224,7 +226,8 @@ serialization::Error Node::finalize_inbound_message() {
             }
             if (inbound_header_->max_payload_length().has_value() &&
                 inbound_header_->max_payload_length().value() == 0) {
-                serialization::success_or_throw(NetMessage::validate_payload_checksum(ByteView{}, inbound_header_->checksum));
+                serialization::success_or_throw(
+                    NetMessage::validate_payload_checksum(ByteView{}, inbound_header_->checksum));
             } else {
                 ret = kMessageBodyIncomplete;  // Need body data
                 receive_mode_header_ = false;  // Switch to body mode
@@ -236,7 +239,8 @@ serialization::Error Node::finalize_inbound_message() {
             // Check if body is valid (checksum verification)
             const auto payload_view{inbound_stream_->read()};
             if (!payload_view) throw serialization::SerializationException(payload_view.error());
-            serialization::success_or_throw(NetMessage::validate_payload_checksum(payload_view.value(), inbound_header_->checksum));
+            serialization::success_or_throw(
+                NetMessage::validate_payload_checksum(payload_view.value(), inbound_header_->checksum));
             inbound_stream_->rewind(payload_view->size());  // !!! Important - Return to start of body
 
             // Body payload received completely and checked

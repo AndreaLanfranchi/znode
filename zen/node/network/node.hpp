@@ -64,6 +64,9 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
         kCompleted = 3
     };
 
+    //! \return The unique identifier of the node
+    [[nodiscard]] int id() const noexcept { return node_id_; }
+
     //! \brief Whether the node is inbound or outbound
     [[nodiscard]] NodeConnectionMode mode() const noexcept { return connection_mode_; }
 
@@ -90,7 +93,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Returns the total number of bytes written to the socket
     [[nodiscard]] size_t bytes_sent() const noexcept { return bytes_sent_.load(); }
 
+    //! \return The string representation of the remote endpoint
     [[nodiscard]] std::string to_string() const noexcept;
+
+    //! \return The next available node id
+    [[nodiscard]] static int next_node_id() noexcept { return next_node_id_.fetch_add(1); }
 
   private:
     void start_ssl_handshake();
@@ -109,43 +116,38 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Begin writing to the socket asychronously
     void start_write();
 
-    const NodeConnectionMode connection_mode_;
+    static std::atomic_int next_node_id_;        // Used to generate unique node ids
+    const int node_id_{next_node_id()};          // Unique node id
+    const NodeConnectionMode connection_mode_;   // Whether inbound or outbound
     boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
-    boost::asio::ip::tcp::socket socket_;
-    boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> remote_endpoint_;
-    boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> local_endpoint_;
+    boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
+    boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> remote_endpoint_;  // Remote endpoint
+    boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> local_endpoint_;   // Local endpoint
 
     SSL_CTX* ssl_context_;
     SSL* ssl_{nullptr};
 
-    static constexpr int kVersionMessageExchanged{1};
-    static constexpr int kVerAckMessageExchanged{2};
-
     std::atomic<ProtocolHandShakeStatus> protocol_handshake_status_{
-        ProtocolHandShakeStatus::kNotInitiated};  // Status of protocol handshake
-    std::atomic_int version_{0};                  // Protocol version negotiated during handshake
-    std::atomic_bool is_started_{false};          // Guards against multiple calls to start()
-    std::atomic_bool is_connected_{true};
-
-    std::function<void(std::shared_ptr<Node>)> on_disconnect_;  // Called after stop (notifies hub)
-    std::function<void(DataDirectionMode, size_t)> on_data_;    // To gather receive data stats at node hub
-
-    boost::asio::streambuf receive_buffer_;  // Socket receive buffer
-    boost::asio::streambuf send_buffer_;     // Socket send buffer
-
-    std::atomic<std::chrono::steady_clock::time_point> connected_time_;
-    std::atomic<std::chrono::steady_clock::time_point> last_message_received_time_;
-    std::atomic<std::chrono::steady_clock::time_point> last_message_sent_time_;
-
-    serialization::SDataStream send_stream_{serialization::Scope::kNetwork, 0};
-
-    std::atomic<size_t> bytes_received_{0};
-    std::atomic<size_t> bytes_sent_{0};
+        ProtocolHandShakeStatus::kNotInitiated};                         // Status of protocol handshake
+    std::atomic_int version_{0};                                         // Protocol version negotiated during handshake
+    std::atomic_bool is_started_{false};                                 // Guards against multiple calls to start()
+    std::atomic_bool is_connected_{true};                                // Status of socket connection
+    std::atomic<std::chrono::steady_clock::time_point> connected_time_;  // Time of connection
+    std::atomic<std::chrono::steady_clock::time_point> last_message_received_time_;  // Last fully "in" message tstamp
+    std::atomic<std::chrono::steady_clock::time_point> last_message_sent_time_;      // Last fully "out" message tstamp
+    std::function<void(std::shared_ptr<Node>)> on_disconnect_;                       // Called after stop (notifies hub)
+    std::function<void(DataDirectionMode, size_t)> on_data_;  // To gather receive data stats at node hub
+    boost::asio::streambuf receive_buffer_;                   // Socket receive buffer
+    boost::asio::streambuf send_buffer_;                      // Socket send buffer
+    std::atomic<size_t> bytes_received_{0};                   // Total bytes received from the socket during the session
+    std::atomic<size_t> bytes_sent_{0};                       // Total bytes sent to the socket during the session
 
     bool receive_mode_header_{true};  // Whether we have switched from parsing header to accepting payload
     std::unique_ptr<NetMessageHeader> inbound_header_{nullptr};            // The header of the message being received
     std::unique_ptr<serialization::SDataStream> inbound_stream_{nullptr};  // The message data
     std::vector<std::shared_ptr<NetMessage>> inbound_messages_{};          // Queue of received messages
     std::mutex inbound_messages_mutex_{};                                  // Lock guard for received messages
+
+    serialization::SDataStream send_stream_{serialization::Scope::kNetwork, 0};
 };
 }  // namespace zen::network
