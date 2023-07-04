@@ -49,11 +49,12 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& ec) {
     print_info();  // Print info every 5 seconds
 
     std::scoped_lock lock{nodes_mutex_};
-    for (auto& node : nodes_) {
-        if (node->is_idle(node_settings_.network.idle_timeout_seconds)) {
-            log::Trace("Service", {"name", "Node Hub", "action", "service", "node", node->to_string()})
+    for (auto [node_id, node_ptr] : nodes_) {
+        if (node_ptr->is_idle(node_settings_.network.idle_timeout_seconds)) {
+            log::Trace("Service", {"name", "Node Hub", "action", "service", "node", std::to_string(node_id), "remote",
+                                   node_ptr->to_string()})
                 << "Idle for " << node_settings_.network.idle_timeout_seconds << " seconds, disconnecting ...";
-            node->stop(false);
+            node_ptr->stop(false);
         }
     }
     return true;
@@ -99,8 +100,8 @@ bool NodeHub::stop(bool wait) noexcept {
         socket_acceptor_.close();
         std::scoped_lock lock(nodes_mutex_);
         // Stop all nodes
-        for (auto& node : nodes_) {
-            node->stop(false);
+        for (auto [node_id, node_ptr] : nodes_) {
+            node_ptr->stop(false);
         }
     }
     return ret;
@@ -136,7 +137,8 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
         local = to_string(local_endpoint.value());
     }
 
-    log::Trace("Service", {"name", "Node Hub", "status", "handle_accept", "local", local, "remote", remote});
+    log::Trace("Service", {"name", "Node Hub", "status", "handle_accept", "node", std::to_string(new_node->id()),
+                           "local", local, "remote", remote});
 
     if (ec) {
         log::Error("Service", {"name", "Node Hub", "error", ec.message()});
@@ -163,7 +165,8 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
         boost::system::error_code ec_socket;
         new_node->socket().non_blocking(true, ec_socket);
         if (ec_socket) {
-            log::Error("Service", {"name", "Node Hub", "peer", remote, "error", ec_socket.message()});
+            log::Error("Service", {"name", "Node Hub", "node", std::to_string(new_node->id()), "remote", remote,
+                                   "error", ec_socket.message()});
             new_node->stop(false);
             return;
         } else {
@@ -175,7 +178,7 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
             new_node->start();
 
             std::scoped_lock lock(nodes_mutex_);
-            nodes_.insert(new_node);
+            nodes_.emplace(new_node->id(), new_node);
             // Fall through and continue listening for new connections
         }
     }
@@ -207,26 +210,25 @@ void NodeHub::initialize_acceptor() {
 }
 
 void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
-    if (current_active_connections_) --current_active_connections_;
-
-    switch (node->mode()) {
-        using enum NodeConnectionMode;
-        case kInbound:
-            if (current_active_inbound_connections_) --current_active_inbound_connections_;
-            break;
-        case kOutbound:
-        case kManualOutbound:
-            if (current_active_outbound_connections_) --current_active_outbound_connections_;
-            break;
+    std::unique_lock lock(nodes_mutex_);
+    if (nodes_.contains(node->id())) {
+        nodes_.erase(node->id());
+        ++total_disconnections_;
+        current_active_connections_.store(static_cast<uint32_t>(nodes_.size()));
+        switch (node->mode()) {
+            using enum NodeConnectionMode;
+            case kInbound:
+                if (current_active_inbound_connections_) --current_active_inbound_connections_;
+                break;
+            case kOutbound:
+            case kManualOutbound:
+                if (current_active_outbound_connections_) --current_active_outbound_connections_;
+                break;
+        }
+        log::Trace("Service", {"name", "Node Hub", "total connections", std::to_string(total_connections_),
+                               "total disconnections", std::to_string(total_disconnections_),
+                               "total rejected connections", std::to_string(total_rejected_connections_)});
     }
-    ++total_disconnections_;
-
-    log::Trace("Service", {"name", "Node Hub", "total connections", std::to_string(total_connections_),
-                           "total disconnections", std::to_string(total_disconnections_), "total rejected connections",
-                           std::to_string(total_rejected_connections_)});
-
-    std::scoped_lock lock(nodes_mutex_);
-    nodes_.erase(node);
 }
 
 void NodeHub::on_node_data(zen::network::DataDirectionMode direction, const size_t bytes_transferred) {

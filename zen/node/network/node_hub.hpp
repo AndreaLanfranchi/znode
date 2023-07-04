@@ -6,8 +6,8 @@
 
 #pragma once
 #include <iostream>
+#include <map>
 #include <memory>
-#include <unordered_set>
 
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
@@ -46,7 +46,7 @@ class NodeHub : public Stoppable {
     void on_node_data(DataDirectionMode direction, size_t bytes_transferred);
 
     void start_service_timer();
-    bool handle_service_timer(const boost::system::error_code& ec); // Services the node connections
+    bool handle_service_timer(const boost::system::error_code& ec);  // Services the node connections
     void print_info();
 
     NodeSettings& node_settings_;  // Reference to global config settings
@@ -64,7 +64,7 @@ class NodeHub : public Stoppable {
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};
 
-    std::unordered_set<std::shared_ptr<Node>> nodes_;
+    std::map<int, std::shared_ptr<Node>> nodes_;
     std::mutex nodes_mutex_;
 
     size_t total_connections_{0};
