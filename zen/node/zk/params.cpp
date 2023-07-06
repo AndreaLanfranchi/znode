@@ -339,4 +339,4 @@ bool validate_file_checksum(const std::filesystem::path& file_path, ByteView exp
     }
     return is_match;
 }
-}  // namespace zen::zcash
+}  // namespace zen::zk

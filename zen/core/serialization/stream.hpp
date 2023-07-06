@@ -140,7 +140,7 @@ class SDataStream : public DataStream {
 
     // Serialization for arithmetic types
     template <class T>
-        requires std::is_arithmetic_v<T>
+    requires std::is_arithmetic_v<T>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
@@ -160,7 +160,7 @@ class SDataStream : public DataStream {
     }
 
     template <class T>
-        requires std::is_same_v<T, intx::uint256>
+    requires std::is_same_v<T, intx::uint256>
     [[nodiscard]] Error bind(T& object, Action action) {
         ZEN_ASSERT(sizeof(object) == 32);
         Error result{Error::kSuccess};
@@ -186,14 +186,12 @@ class SDataStream : public DataStream {
 
     // Serialization for Serializable classes
     template <class T>
-        requires std::derived_from<T, Serializable>
-    [[nodiscard]] Error bind(T& object, Action action) {
-        return object.serialization(*this, action);
-    }
+    requires std::derived_from<T, Serializable>
+    [[nodiscard]] Error bind(T& object, Action action) { return object.serialization(*this, action); }
 
     // Serialization for bytes array (fixed size)
     template <class T, std::size_t N>
-        requires std::is_fundamental_v<T>
+    requires std::is_fundamental_v<T>
     [[nodiscard]] Error bind(std::array<T, N>& object, Action action) {
         Error result{Error::kSuccess};
         const auto element_size{ser_sizeof(object[0])};
@@ -223,7 +221,7 @@ class SDataStream : public DataStream {
     // a special case as they're always the last element of a structure.
     // Due to this the size of the member is not recorded
     template <class T>
-        requires std::is_same_v<T, Bytes>
+    requires std::is_same_v<T, Bytes>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
