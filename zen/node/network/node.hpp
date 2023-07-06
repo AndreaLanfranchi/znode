@@ -117,7 +117,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     void initialize_inbound_message();
 
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
-    [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(MessageType message_type);
+    [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(NetMessageType message_type);
 
     //! \brief Begin writing to the socket asynchronously
     void start_write();

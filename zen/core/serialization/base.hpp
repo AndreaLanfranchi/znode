@@ -44,6 +44,7 @@ enum class Error {
     kMessagePayloadEmptyVector,           // Message payload vector is empty
     kMessagePayloadOversizedVector,       // Message payload vector is too large
     kMessagePayloadMismatchesVectorSize,  // Message payload vector size does not match the declared one
+    kMessagePayloadDuplicateVectorItems,  // Message payload vector contains duplicate items
     KMessagesFlooding,                    // Message flooding detected
     kInvalidProtocolHandShake,            // Wrong message sequence detected
     kDuplicateProtocolHandShake,          // Duplicate handshake message detected

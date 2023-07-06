@@ -8,6 +8,7 @@
 #include <array>
 #include <random>
 #include <regex>
+#include <set>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/format.hpp>
@@ -108,5 +109,21 @@ std::string get_random_alpha_string(size_t length) {
     }
 
     return ret;
+}
+
+size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size) noexcept {
+    if (!chunk_size || data.length() < chunk_size) {
+        return 0;
+    }
+    std::set<ByteView, std::less<>> unique_chunks;
+    size_t count{0};
+    size_t chunks{data.length() / chunk_size};
+    for (size_t i{0}; i < chunks; ++i) {
+        const auto chunk{data.substr(i * chunk_size, chunk_size)};
+        if (!unique_chunks.insert(chunk).second) {
+            ++count;
+        }
+    }
+    return count;
 }
 }  // namespace zen

@@ -251,7 +251,7 @@ serialization::Error Node::finalize_inbound_message() {
     return ret;
 }
 
-serialization::Error Node::validate_message_for_protocol_handshake(const MessageType message_type) {
+serialization::Error Node::validate_message_for_protocol_handshake(const NetMessageType message_type) {
     // Check this message is acceptable against current status of protocol handshake
     using enum serialization::Error;
     if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) {
@@ -259,21 +259,21 @@ serialization::Error Node::validate_message_for_protocol_handshake(const Message
             using enum NodeConnectionMode;
             using enum ProtocolHandShakeStatus;
             case kInbound:
-                if (message_type != MessageType::kVersion) return kInvalidProtocolHandShake;
+                if (message_type != NetMessageType::kVersion) return kInvalidProtocolHandShake;
                 protocol_handshake_status_.store(
                     static_cast<ProtocolHandShakeStatus>((static_cast<uint32_t>(protocol_handshake_status_.load()) |
                                                           static_cast<uint32_t>(kVersionCompleted))));
                 break;
             case kOutbound:
             case kManualOutbound:
-                if (message_type != MessageType::kVerack) return kInvalidProtocolHandShake;
+                if (message_type != NetMessageType::kVerack) return kInvalidProtocolHandShake;
                 protocol_handshake_status_.store(
                     static_cast<ProtocolHandShakeStatus>((static_cast<uint32_t>(protocol_handshake_status_.load()) |
                                                           static_cast<uint32_t>(kVerackCompleted))));
                 break;
         }
     } else {
-        if (message_type == MessageType::kVersion || message_type == MessageType::kVerack)
+        if (message_type == NetMessageType::kVersion || message_type == NetMessageType::kVerack)
             return kDuplicateProtocolHandShake;
     }
     return kSuccess;

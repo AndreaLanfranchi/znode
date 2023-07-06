@@ -29,4 +29,7 @@ namespace zen {
 //! \brief Builds a randomized string of alpha num chars (lowercase) of arbitrary length
 [[nodiscard]] std::string get_random_alpha_string(size_t length);
 
+//! \brief Provided a view of data returns the number of duplicate chunks of given size
+[[nodiscard]] size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size) noexcept;
+
 }  // namespace zen

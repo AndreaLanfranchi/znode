@@ -39,7 +39,7 @@ concept UnsignedIntegral = std::unsigned_integral<T>;
 
 template <class T>
 concept UnsignedIntegralEx = UnsignedIntegral<T> || std::same_as<T, intx::uint128> || std::same_as<T, intx::uint256> ||
-    std::same_as<T, intx::uint512>;
+                             std::same_as<T, intx::uint512>;
 
 //! \brief Used to allow passing string literals as template arguments
 template <size_t N>
@@ -57,7 +57,7 @@ using Bytes = std::basic_string<uint8_t>;
 
 class ByteView : public std::basic_string_view<uint8_t> {
   public:
-    constexpr ByteView() noexcept = default;
+    constexpr ByteView() noexcept : std::basic_string_view<uint8_t>{} {};
 
     constexpr ByteView(const std::basic_string_view<uint8_t>& other) noexcept
         : std::basic_string_view<uint8_t>{other.data(), other.length()} {}
