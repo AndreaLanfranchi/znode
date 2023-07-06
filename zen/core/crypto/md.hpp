@@ -82,6 +82,7 @@ class MessageDigest {
 
     //! \brief Accumulates more data into the digest
     void update(ByteView data) noexcept {
+        if (data.empty()) return;
         ingested_size_ += data.size();
         EVP_DigestUpdate(digest_context_.get(), data.data(), data.size());
     }

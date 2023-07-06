@@ -26,6 +26,15 @@ enum class TLSContextType {
     kClient
 };
 
+//! \brief Explicit deleter for SSL_CTXes
+struct SSLCTXDeleter {
+    constexpr SSLCTXDeleter() noexcept = default;
+    void operator()(SSL_CTX* ptr) const noexcept {
+        SSL_CTX_free(ptr);
+        ptr = nullptr;
+    }
+};
+
 //! \brief Generates a random RSA key pair
 //! \return A pointer to the generated key pair or nullptr if an error occurred
 //! \remarks The caller is responsible for freeing the returned pointer
@@ -57,17 +66,17 @@ EVP_PKEY* load_rsa_private_key(const std::filesystem::path& directory_path, cons
 X509* load_x509_certificate(const std::filesystem::path& directory_path);
 
 //! \brief Validates the provided certificate and private key do match
-bool validate_certificate(X509* cert, EVP_PKEY* pkey);
+bool validate_server_certificate(X509* cert, EVP_PKEY* pkey);
 
 //! \brief Creates a TLS context of the provided type (client or server)
 //! \remarks In case the type is server, the certificate and private key are loaded from the provided directory
 //! and the password (if not empty) is used to decrypt the private key
 //! \return A pointer to the created context or nullptr if an error occurred
-SSL_CTX* create_tls_context(TLSContextType type, const std::filesystem::path& directory_path,
-                            const std::string& key_password);
+SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& directory_path,
+                              const std::string& key_password);
 
 //! \brief Checks for the presence of a valid certificate and private key in the provided directory and, if user
 //! agrees, generates them
-bool validate_tls_requirement(const std::filesystem::path& directory_path, const std::string& key_password);
+bool validate_tls_requirements(const std::filesystem::path& directory_path, const std::string& key_password);
 
 }  // namespace zen::network

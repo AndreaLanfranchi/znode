@@ -31,17 +31,23 @@ enum class Error {
     kReadBeyondData,
     kNonCanonicalCompactSize,
     kCompactSizeTooBig,
-    kMessageHeaderIncomplete,        // Message header too short and cannot be completed
-    kMessageBodyIncomplete,          // Message body too short
-    kMessageHeaderMagicMismatch,     // Message header addressed to another network
-    kMessageHeaderEmptyCommand,      // Message header command is empty
-    kMessageHeaderUnknownCommand,    // Message header command is unknown
-    kMessageHeaderMalformedCommand,  // Message header's command is malformed (e.g. not null padded)
-    kMessageHeaderOversizedPayload,  // Message header's declared payload size is too big
-    kMessageHeaderInvalidChecksum,   // Message header's checksum is invalid
-    KMessagesFlooding,               // Message flooding detected
-    kInvalidProtocolHandShake,       // Wrong message sequence detected
-    kUndefinedError,                 // Not defined
+    kMessageHeaderIncomplete,             // Message header too short and cannot be completed
+    kMessageBodyIncomplete,               // Message body too short
+    kMessageHeaderMagicMismatch,          // Message header addressed to another network
+    kMessageHeaderEmptyCommand,           // Message header command is empty
+    kMessageHeaderUnknownCommand,         // Message header command is unknown
+    kMessageHeaderMalformedCommand,       // Message header's command is malformed (e.g. not null padded)
+    kMessageHeaderUndersizedPayload,      // Message header's declared payload size is too small
+    kMessageHeaderOversizedPayload,       // Message header's declared payload size is too wide
+    kMessageMismatchingPayloadLength,     // Message payload length does not match the declared one
+    kMessageHeaderInvalidChecksum,        // Message header's checksum is invalid
+    kMessagePayloadEmptyVector,           // Message payload vector is empty
+    kMessagePayloadOversizedVector,       // Message payload vector is too large
+    kMessagePayloadMismatchesVectorSize,  // Message payload vector size does not match the declared one
+    KMessagesFlooding,                    // Message flooding detected
+    kInvalidProtocolHandShake,            // Wrong message sequence detected
+    kDuplicateProtocolHandShake,          // Duplicate handshake message detected
+    kUndefinedError,                      // Not defined
 };
 
 inline bool operator!(Error e) { return e == static_cast<Error>(0); }

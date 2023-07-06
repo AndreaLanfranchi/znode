@@ -39,7 +39,7 @@ class NodeHub : public Stoppable {
     [[nodiscard]] std::shared_ptr<Node> operator[](int id) const;  // Returns a shared_ptr<Node> by id
     [[nodiscard]] std::vector<std::shared_ptr<Node>> get_nodes() const;  // Returns a vector of all nodes
 
-    void start();                            // Begins accepting connections
+    bool start();                            // Begins accepting connections
     bool stop(bool wait) noexcept override;  // Stops accepting connections and stops all nodes
 
   private:
@@ -62,8 +62,10 @@ class NodeHub : public Stoppable {
     boost::asio::steady_timer service_timer_;         // Service scheduler for this instance
     const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_
 
-    SSL_CTX* ssl_server_context_{nullptr};                   // For dial-in connections
-    [[maybe_unused]] SSL_CTX* ssl_client_context_{nullptr};  // For dial-out connections TODO
+    /* We use unique_ptr for SSL_CTX as connections / nodes are not meant to outlive NodeHub */
+
+    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_server_context_{nullptr};  // For dial-in connections
+    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_client_context_{nullptr};  // For dial-out connections
 
     std::atomic_uint32_t current_active_connections_{0};
     std::atomic_uint32_t current_active_inbound_connections_{0};

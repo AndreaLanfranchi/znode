@@ -7,6 +7,7 @@
 #include "node_hub.hpp"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/asio/ssl.hpp>
 #include <boost/lexical_cast.hpp>
 
 #include <zen/core/common/misc.hpp>
@@ -18,17 +19,31 @@ namespace zen::network {
 
 using boost::asio::ip::tcp;
 
-void NodeHub::start() {
+bool NodeHub::start() {
     if (bool expected{false}; !is_started_.compare_exchange_strong(expected, true)) {
-        return;
+        return false;
     }
     if (node_settings_.network.use_tls) {
-        // TODO initialize server context
+        const auto ssl_data{(*node_settings_.data_directory)[DataDirectory::kSSLCert].path()};
+        auto ctx{generate_tls_context(TLSContextType::kServer, ssl_data, node_settings_.network.tls_password)};
+        if (!ctx) {
+            log::Error("NodeHub", {"action", "start", "error", "failed to generate TLS server context"});
+            return false;
+        }
+        ssl_server_context_.reset(std::move(ctx));
+
+        ctx = generate_tls_context(TLSContextType::kClient, ssl_data, "");
+        if (!ctx) {
+            log::Error("NodeHub", {"action", "start", "error", "failed to generate TLS server context"});
+            return false;
+        }
+        ssl_client_context_.reset(std::move(ctx));
     }
     initialize_acceptor();
     info_stopwatch_.start(true);
     start_service_timer();
     start_accept();
+    return true;
 }
 
 void NodeHub::start_service_timer() {
@@ -110,13 +125,14 @@ bool NodeHub::stop(bool wait) noexcept {
 void NodeHub::start_accept() {
     log::Trace("Service", {"name", "Node Hub", "status", "Listening", "secure", ssl_server_context_ ? "yes" : "no"});
 
-    std::shared_ptr<Node> new_node(new Node(
-                                       NodeConnectionMode::kInbound, *node_settings_.asio_context, ssl_server_context_,
-                                       [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
-                                       [this](DataDirectionMode direction, size_t bytes_transferred) {
-                                           on_node_data(direction, bytes_transferred);
-                                       }),
-                                   Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
+    std::shared_ptr<Node> new_node(
+        new Node(
+            NodeConnectionMode::kInbound, *node_settings_.asio_context, ssl_server_context_.get(),
+            [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
+            [this](DataDirectionMode direction, size_t bytes_transferred) {
+                on_node_data(direction, bytes_transferred);
+            }),
+        Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
     socket_acceptor_.async_accept(
         new_node->socket(), [this, new_node](const boost::system::error_code& ec) { handle_accept(new_node, ec); });
@@ -190,7 +206,7 @@ void NodeHub::initialize_acceptor() {
     std::vector<std::string> address_parts;
     boost::split(address_parts, node_settings_.network.local_endpoint, boost::is_any_of(":"));
     if (address_parts.size() != 2) {
-        throw std::runtime_error("Invalid local endpoint: " + node_settings_.network.local_endpoint);
+        throw std::invalid_argument("Invalid local endpoint: " + node_settings_.network.local_endpoint);
     }
 
     auto port{boost::lexical_cast<uint16_t>(address_parts[1])};

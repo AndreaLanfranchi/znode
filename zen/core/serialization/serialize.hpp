@@ -31,9 +31,9 @@ inline uint32_t ser_sizeof(bool) {
 }
 
 //! \brief Returns the serialzed size of a compacted integral
-//! \remarks Mostly used in P2P messages to prepend a list of elements with the count of elements.
-//! Not to be confused with varint which is used in storage serialization
-inline uint32_t ser_compact_sizeof(uint64_t value) {
+//! \remarks Mostly used in P2P messages to prepend a list of elements with the count of items to be expected.
+//! \attention Not to be confused with varint
+inline constexpr uint32_t ser_compact_sizeof(uint64_t value) {
     if (value < 253)
         return 1;  // One byte only
     else if (value <= 0xffff)

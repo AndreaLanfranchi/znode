@@ -113,7 +113,13 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \remarks Switches from receiving mode from header to payload automatically
     [[nodiscard]] serialization::Error finalize_inbound_message();
 
-    //! \brief Begin writing to the socket asychronously
+    //! \brief Prepares for the processing of a new inbound message
+    void initialize_inbound_message();
+
+    //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
+    [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(MessageType message_type);
+
+    //! \brief Begin writing to the socket asynchronously
     void start_write();
 
     static std::atomic_int next_node_id_;        // Used to generate unique node ids

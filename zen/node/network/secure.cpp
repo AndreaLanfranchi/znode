@@ -285,7 +285,7 @@ X509* load_x509_certificate(const std::filesystem::path& directory_path) {
 
     return cert;
 }
-bool validate_certificate(X509* cert, EVP_PKEY* pkey) {
+bool validate_server_certificate(X509* cert, EVP_PKEY* pkey) {
     if (!cert) {
         ZEN_ERROR << "Invalid X509 certificate";
         return false;
@@ -303,8 +303,8 @@ bool validate_certificate(X509* cert, EVP_PKEY* pkey) {
 
     return true;
 }
-SSL_CTX* create_tls_context(TLSContextType type, const std::filesystem::path& directory_path,
-                            const std::string& key_password) {
+SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& directory_path,
+                              const std::string& key_password) {
     SSL_CTX* ctx{nullptr};
     switch (type) {
         case TLSContextType::kServer: {
@@ -334,36 +334,49 @@ SSL_CTX* create_tls_context(TLSContextType type, const std::filesystem::path& di
     SSL_CTX_set_ecdh_auto(ctx, 1);
 
     if (type == TLSContextType::kServer) {
-        auto cert_path = directory_path / kCertificateFileName;
-        auto key_path = directory_path / kPrivateKeyFileName;
-        if (!std::filesystem::exists(cert_path) || !std::filesystem::is_regular_file(cert_path) ||
-            !std::filesystem::exists(key_path) || !std::filesystem::is_regular_file(key_path)) {
-            ZEN_ERROR << "Invalid or not existing certificate or private key in directory " << directory_path.string();
-            SSL_CTX_free(ctx);
-            return nullptr;
-        }
+        auto x509_cert{load_x509_certificate(directory_path)};
+        auto rsa_pkey{load_rsa_private_key(directory_path, key_password)};
 
-        auto x509_cert{load_x509_certificate(cert_path)};
-        auto rsa_pkey{load_rsa_private_key(key_path, key_password)};
         if (!x509_cert || !rsa_pkey) {
-            ZEN_ERROR << "Failed to load certificate or private key";
+            ZEN_ERROR << "Failed to load certificate or private key from " << directory_path.string();
+            if (x509_cert) X509_free(x509_cert);
+            if (rsa_pkey) EVP_PKEY_free(rsa_pkey);
             SSL_CTX_free(ctx);
             return nullptr;
         }
 
-        if (!validate_certificate(x509_cert, rsa_pkey)) {
+        if (!validate_server_certificate(x509_cert, rsa_pkey)) {
             ZEN_ERROR << "Failed to validate certificate (mismatching private key)";
+            X509_free(x509_cert);
+            EVP_PKEY_free(rsa_pkey);
             SSL_CTX_free(ctx);
             return nullptr;
         }
 
-        SSL_CTX_use_certificate(ctx, x509_cert);
-        SSL_CTX_use_PrivateKey(ctx, rsa_pkey);
+        if (SSL_CTX_use_certificate(ctx, x509_cert) != 1) {
+            auto err{ERR_get_error()};
+            print_ssl_error(err);
+            ZEN_ERROR << "Failed to use certificate for SSL server context";
+            X509_free(x509_cert);
+            EVP_PKEY_free(rsa_pkey);
+            SSL_CTX_free(ctx);
+            return nullptr;
+        }
+
+        if (SSL_CTX_use_PrivateKey(ctx, rsa_pkey) != 1) {
+            auto err{ERR_get_error()};
+            print_ssl_error(err);
+            ZEN_ERROR << "Failed to use private key for SSL server context";
+            X509_free(x509_cert);
+            EVP_PKEY_free(rsa_pkey);
+            SSL_CTX_free(ctx);
+            return nullptr;
+        }
     }
 
     return ctx;
 }
-bool validate_tls_requirement(const std::filesystem::path& directory_path, const std::string& key_password) {
+bool validate_tls_requirements(const std::filesystem::path& directory_path, const std::string& key_password) {
     auto cert_path = directory_path / kCertificateFileName;
     auto key_path = directory_path / kPrivateKeyFileName;
 
@@ -371,9 +384,9 @@ bool validate_tls_requirement(const std::filesystem::path& directory_path, const
         std::filesystem::exists(key_path) && std::filesystem::is_regular_file(key_path)) {
         auto pkey{load_rsa_private_key(directory_path, key_password)};
         auto x509_cert{load_x509_certificate(directory_path)};
-        if (pkey && x509_cert && validate_certificate(x509_cert, pkey)) {
-            if (pkey) EVP_PKEY_free(pkey);
-            if (x509_cert) X509_free(x509_cert);
+        if (pkey && x509_cert && validate_server_certificate(x509_cert, pkey)) {
+            EVP_PKEY_free(pkey);
+            X509_free(x509_cert);
             return true;
         }
 
@@ -409,7 +422,7 @@ bool validate_tls_requirement(const std::filesystem::path& directory_path, const
     auto cert_free{gsl::finally([cert]() { X509_free(cert); })};
 
     ZEN_TRACE << "Validating certificate";
-    if (!validate_certificate(cert, pkey)) {
+    if (!validate_server_certificate(cert, pkey)) {
         ZEN_ERROR << "Failed to validate certificate (mismatching private key)";
         return false;
     }
