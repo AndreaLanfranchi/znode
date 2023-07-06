@@ -158,7 +158,7 @@ void Node::start_write() {
     // TODO implement
 }
 
-serialization::Error Node::parse_messages(size_t bytes_transferred) {
+serialization::Error Node::parse_messages(const size_t bytes_transferred) {
     using enum serialization::Error;
     serialization::Error err{kSuccess};
 
@@ -183,15 +183,14 @@ serialization::Error Node::parse_messages(size_t bytes_transferred) {
                 if (++messages_parsed > kMaxMessagesPerRead) {
                     err = KMessagesFlooding;
                 } else {
-
                     // Generate the new full message and notify higher levels
-                    auto new_message = std::make_shared<NetMessage>(inbound_header_.release(), inbound_stream_.release());
-                    if(err = new_message->validate(); err == kSuccess) {
+                    auto new_message =
+                        std::make_shared<NetMessage>(inbound_header_.release(), inbound_stream_.release());
+                    if (err = new_message->validate(); err == kSuccess) {
                         std::unique_lock lock{inbound_messages_mutex_};
                         inbound_messages_.push_back(std::move(new_message));
                         // TODO: notify higher levels
                     }
-
                 }
                 initialize_inbound_message();  // Prepare for next message
                 break;
@@ -203,11 +202,11 @@ serialization::Error Node::parse_messages(size_t bytes_transferred) {
                 initialize_inbound_message();  // Prepare for next message
         }
     }
+    receive_buffer_.consume(bytes_transferred);  // Discard data that has been processed
 
     if (err == kSuccess && messages_parsed != 0) {
         last_message_received_time_.store(std::chrono::steady_clock::now());
     }
-    receive_buffer_.consume(bytes_transferred);
     return err;
 }
 
@@ -243,13 +242,6 @@ serialization::Error Node::finalize_inbound_message() {
         } else {
             if (inbound_stream_->avail() != inbound_header_->length)
                 throw serialization::SerializationException(kMessageBodyIncomplete);
-
-            // Check if body is valid (checksum verification)
-            const auto payload_view{inbound_stream_->read()};
-            if (!payload_view) throw serialization::SerializationException(payload_view.error());
-            serialization::success_or_throw(
-                NetMessage::validate_payload_checksum(payload_view.value(), inbound_header_->checksum));
-            inbound_stream_->rewind(payload_view->size());  // !!! Important - Return to start of body
         }
 
     } catch (const serialization::SerializationException& ex) {
