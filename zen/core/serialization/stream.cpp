@@ -53,7 +53,30 @@ DataStream::iterator DataStream::end() { return buffer_.end(); }
 
 void DataStream::insert(iterator where, value_type item) { buffer_.insert(std::move(where), item); }
 
-void DataStream::erase(iterator where) { buffer_.erase(std::move(where)); }
+void DataStream::erase(iterator where) {
+    if (where == end()) {
+        return;
+    }
+    const auto pos(static_cast<size_type>(std::distance(buffer_.begin(), where)));
+    buffer_.erase(std::move(where));
+    if (read_position_ && read_position_ > pos) {
+        --read_position_;
+    }
+    read_position_ = std::min(read_position_, buffer_.size());
+}
+
+void DataStream::erase(const size_type pos, size_type count) {
+    if (!count || pos >= buffer_.size()) {
+        return;
+    }
+    const auto max_count{buffer_.size() - pos};
+    count = std::min(count, max_count);
+    buffer_.erase(pos, count);
+    if (read_position_ && read_position_ > pos) {
+        auto move_back_count{std::min(read_position_ - pos, count)};
+        read_position_ -= move_back_count;
+    }
+}
 
 void DataStream::push_back(uint8_t byte) { buffer_.push_back(byte); }
 
@@ -70,26 +93,26 @@ tl::expected<ByteView, Error> DataStream::read(std::optional<size_t> count) noex
     return ret;
 }
 
-Error DataStream::skip(DataStream::size_type count) noexcept {
-    auto requested_position(safe_add(read_position_, count));
-    if (!requested_position.has_value() || requested_position.value() > buffer_.size()) {
-        return Error::kReadBeyondData;
+void DataStream::ignore(size_type count) noexcept {
+    const auto pos(safe_add(read_position_, count));
+    if (!pos.has_value() || pos.value() > buffer_.size()) {
+        read_position_ = buffer_.size();
     }
-    read_position_ = requested_position.value();
-    return Error::kSuccess;
+    read_position_ = pos.value();
 }
 
 bool DataStream::eof() const noexcept { return read_position_ >= buffer_.size(); }
 
-DataStream::size_type DataStream::tellp() const noexcept { return read_position_; }
+DataStream::size_type DataStream::tellg() const noexcept { return read_position_; }
 
-void DataStream::seekp(size_type p) noexcept { read_position_ = std::min(p, buffer_.size()); }
+void DataStream::seekg(size_type p) noexcept { read_position_ = std::min(p, buffer_.size()); }
 
 std::string DataStream::to_string() const { return zen::hex::encode({buffer_.data(), buffer_.size()}, false); }
 
-void DataStream::shrink() {
-    buffer_.erase(0, read_position_);
-    read_position_ = 0;
+void DataStream::consume(std::optional<size_type> pos) noexcept {
+    const size_t count{std::min(read_position_, pos.value_or(std::numeric_limits<size_type>::max()))};
+    buffer_.erase(0, count);
+    read_position_ -= count;
 }
 
 DataStream::size_type DataStream::size() const noexcept { return buffer_.size(); }

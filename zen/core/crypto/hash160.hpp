@@ -28,8 +28,14 @@ class Hash160 : private boost::noncopyable {
     void update(std::string_view data) noexcept;
     [[nodiscard]] Bytes finalize() noexcept;
 
+    static constexpr Bytes kEmptyHash() noexcept {
+        // Known empty hash
+        return Bytes{0xb4, 0x72, 0xa2, 0x66, 0xd0, 0xbd, 0x89, 0xc1, 0x37, 0x06,
+                     0xa4, 0x13, 0x2c, 0xcf, 0xb1, 0x6f, 0x7c, 0x3b, 0x9f, 0xcb};
+    }
+
   private:
-    Sha256 inner_;
+    Sha256 hasher_;
 };
 
 }  // namespace zen::crypto

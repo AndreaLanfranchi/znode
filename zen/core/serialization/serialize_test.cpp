@@ -162,7 +162,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         // the string from the bottom
         CHECK(hexed_hash == hex::reverse_hex("43d0c82591953c4eafe114590d392676a01585d25b25d433557f0d7878b23f96"));
 
-        stream.seekp(0);
+        stream.seekg(0);
         for (int i{0}; i < 1000; ++i) {
             const auto returned_value{read_data<double>(stream)};
             REQUIRE(returned_value);
@@ -183,7 +183,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         hexed_hash.assign(hex::encode(hash));
         CHECK(hexed_hash == hex::reverse_hex("8e8b4cf3e4df8b332057e3e23af42ebc663b61e0495d5e7e32d85099d7f3fe0c"));
 
-        stream.seekp(0);
+        stream.seekg(0);
         for (int i{0}; i < 1000; ++i) {
             const auto returned_value{read_data<float>(stream)};
             REQUIRE(returned_value);
@@ -218,7 +218,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         read_bytes = stream.read(1);
         REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "fd");
-        CHECK(stream.tellp() == 1);
+        CHECK(stream.tellg() == 1);
         read_bytes = stream.read(stream.avail());
         REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "feff" /*swapped*/);
@@ -231,7 +231,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         read_bytes = stream.read(1);
         REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "fe");
-        CHECK(stream.tellp() == 1);
+        CHECK(stream.tellg() == 1);
         read_bytes = stream.read(stream.avail());
         REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "feffffff" /*swapped*/);
@@ -244,7 +244,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         read_bytes = stream.read(1);
         REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "ff");
-        CHECK(stream.tellp() == 1);
+        CHECK(stream.tellg() == 1);
         read_bytes = stream.read(stream.avail());
         REQUIRE(read_bytes);
         CHECK(hex::encode(*read_bytes) == "a0ffffffff000000" /*swapped*/);

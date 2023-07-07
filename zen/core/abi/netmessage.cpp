@@ -9,6 +9,7 @@
 #include "netmessage.hpp"
 
 #include <algorithm>
+#include <iostream>
 
 #include <gsl/gsl_util>
 
@@ -93,14 +94,25 @@ serialization::Error NetMessageHeader::validate(std::optional<ByteView> expected
         return kMessageHeaderOversizedPayload;
     }
 
+    if (length == 0) /* Hash of empty payload is already known */
+    {
+        auto empty_payload_hash{crypto::Hash256::kEmptyHash()};
+        if (memcmp(checksum.data(), empty_payload_hash.data(), checksum.size()) != 0)
+            return kMessageHeaderInvalidChecksum;
+    }
+
     return kSuccess;
 }
 
 serialization::Error NetMessage::validate() const noexcept {
     using enum serialization::Error;
-    const auto message_type(header_->get_type());
+
+    // Being a network message the payload size MUST NOT exceed the maximum allowed size for the protocol
+    // regardless any other check
+    if (raw_data_->size() > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
     // This also means the header has not been validated previously
+    const auto message_type(header_->get_type());
     if (message_type == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
 
     if (raw_data_->size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
@@ -108,10 +120,10 @@ serialization::Error NetMessage::validate() const noexcept {
     if (raw_data_->size() > kMessageHeaderLength + header_->length) return kMessageMismatchingPayloadLength;
 
     // From here on ensure we return to the beginning of the payload
-    const auto return_to_beginning{gsl::finally([this] { raw_data_->seekp(kMessageHeaderLength); })};
+    const auto return_to_beginning{gsl::finally([this] { raw_data_->seekg(kMessageHeaderLength); })};
 
     // Validate payload : length and checksum
-    raw_data_->seekp(kMessageHeaderLength);  // Important : skip the header !!!
+    raw_data_->seekg(kMessageHeaderLength);  // Important : skip the header !!!
     if (raw_data_->avail() != header_->length) return kMessageMismatchingPayloadLength;
     auto payload_view{raw_data_->read()};
     if (!payload_view) return payload_view.error();
@@ -122,6 +134,7 @@ serialization::Error NetMessage::validate() const noexcept {
     // read of the vector size the payload size can be checked against the expected size
     const auto& message_definition{kMessageDefinitions[static_cast<size_t>(message_type)]};
     if (message_definition.max_vector_items.has_value()) {
+        raw_data_->seekg(kMessageHeaderLength);
         const auto vector_size{serialization::read_compact(*raw_data_)};
         if (!vector_size) return vector_size.error();
         if (*vector_size == 0) return kMessagePayloadEmptyVector;  // MUST have some item

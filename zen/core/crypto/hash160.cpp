@@ -9,24 +9,25 @@
 
 namespace zen::crypto {
 
-Hash160::Hash160(ByteView data) : Hash160() { init(data); }
+Hash160::Hash160(ByteView data) : hasher_(data) {}
 
-Hash160::Hash160(std::string_view data) : Hash160() { init(data); }
+Hash160::Hash160(std::string_view data) : hasher_(data) {}
 
-void Hash160::init() noexcept { inner_.init(); }
+void Hash160::init() noexcept { hasher_.init(); }
 
-void Hash160::init(ByteView data) noexcept { inner_.init(data); }
+void Hash160::init(ByteView data) noexcept { hasher_.init(data); }
 
-void Hash160::init(std::string_view data) noexcept { inner_.init(data); }
+void Hash160::init(std::string_view data) noexcept { hasher_.init(data); }
 
-void Hash160::update(ByteView data) noexcept { inner_.update(data); }
+void Hash160::update(ByteView data) noexcept { hasher_.update(data); }
 
-void Hash160::update(std::string_view data) noexcept { inner_.update(data); }
+void Hash160::update(std::string_view data) noexcept { hasher_.update(data); }
 
 Bytes Hash160::finalize() noexcept {
-    Bytes tmp{inner_.finalize()};
-    if (tmp.empty()) return tmp;
-    Ripemd160 outer(tmp);
+    if (!hasher_.ingested_size()) return kEmptyHash();
+    const Bytes data{hasher_.finalize()};
+    if (data.empty()) return data;
+    Ripemd160 outer(data);
     return outer.finalize();
 }
 }  // namespace zen::crypto

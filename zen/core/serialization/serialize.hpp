@@ -108,7 +108,6 @@ inline Error read_data(Stream& stream, T& object) {
     const auto read_result{stream.read(count)};
     if (!read_result) return read_result.error();
     std::memcpy(&object, read_result->data(), count);
-    stream.shrink();  // Remove consumed data
     return Error::kSuccess;
 }
 

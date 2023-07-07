@@ -36,6 +36,8 @@ class DataStream {
     explicit DataStream() = default;
     explicit DataStream(ByteView data);
     explicit DataStream(std::span<value_type> data);
+    DataStream(DataStream& other) noexcept = default;
+    DataStream(DataStream&& other) noexcept = default;
     virtual ~DataStream() = default;
 
     //! \brief Reserves capacity
@@ -66,18 +68,23 @@ class DataStream {
     //! \brief Inserts new element at specified position
     void insert(iterator where, value_type item);
 
-    //! \brief Erase an element from specified position
+    //! \brief Erase a data element from specified position
+    //! \note Read position is adjusted accordingly
     void erase(iterator where);
+
+    //! \brief Erase a data range from specified position
+    //! \note Read position is adjusted accordingly
+    void erase(size_type pos, size_type count);
 
     //! \brief Returns a view of requested bytes count from the actual read position
     //! \remarks After the view is returned the read position is advanced by count
     //! \remarks If count is omitted the whole unconsumed part of data is returned
     [[nodiscard]] tl::expected<ByteView, Error> read(std::optional<size_t> count = std::nullopt) noexcept;
 
-    //! \brief Advances the read position by count
+    //! \brief Advances the read position by count without returning any data
     //! \remarks If the count of bytes to be skipped exceeds the boundary of the buffer the read position
     //! is moved at the end and eof() will return true
-    Error skip(size_type count) noexcept;
+    void ignore(size_type count = 1) noexcept;
 
     //! \brief Whether the end of stream's data has been reached
     [[nodiscard]] bool eof() const noexcept;
@@ -102,13 +109,17 @@ class DataStream {
     void get_clear(DataStream& dst);
 
     //! \brief Returns the current read position
-    [[nodiscard]] size_type tellp() const noexcept;
+    [[nodiscard]] size_type tellg() const noexcept;
 
-    //! \brief Moves to read position
-    void seekp(size_type p) noexcept;
+    //! \brief Moves to the desidered read position
+    //! \remarks If the provided position exceeds the boundary of the buffer the read position then
+    //! the read cursor is moved at the end and eof() will return true
+    void seekg(size_type p) noexcept;
 
-    //! \brief Removes the portion of already consumed data (up to read pos)
-    void shrink();
+    //! \brief Removes the portion of data from the beginning up to the provided position or the read position
+    //! (whichever is smaller) \remarks If no position is provided the whole buffer is cleared up to current read
+    //! position
+    void consume(std::optional<size_type> pos = std::nullopt) noexcept;
 
     //! \brief Returns the hexed representation of the data buffer
     [[nodiscard]] std::string to_string() const;
@@ -140,7 +151,7 @@ class SDataStream : public DataStream {
 
     // Serialization for arithmetic types
     template <class T>
-    requires std::is_arithmetic_v<T>
+        requires std::is_arithmetic_v<T>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
@@ -153,14 +164,13 @@ class SDataStream : public DataStream {
                 break;
             case kDeserialize:
                 result = read_data(*this, object);
-                shrink();
                 break;
         }
         return result;
     }
 
     template <class T>
-    requires std::is_same_v<T, intx::uint256>
+        requires std::is_same_v<T, intx::uint256>
     [[nodiscard]] Error bind(T& object, Action action) {
         ZEN_ASSERT(sizeof(object) == 32);
         Error result{Error::kSuccess};
@@ -186,12 +196,14 @@ class SDataStream : public DataStream {
 
     // Serialization for Serializable classes
     template <class T>
-    requires std::derived_from<T, Serializable>
-    [[nodiscard]] Error bind(T& object, Action action) { return object.serialization(*this, action); }
+        requires std::derived_from<T, Serializable>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        return object.serialization(*this, action);
+    }
 
     // Serialization for bytes array (fixed size)
     template <class T, std::size_t N>
-    requires std::is_fundamental_v<T>
+        requires std::is_fundamental_v<T>
     [[nodiscard]] Error bind(std::array<T, N>& object, Action action) {
         Error result{Error::kSuccess};
         const auto element_size{ser_sizeof(object[0])};
@@ -221,7 +233,7 @@ class SDataStream : public DataStream {
     // a special case as they're always the last element of a structure.
     // Due to this the size of the member is not recorded
     template <class T>
-    requires std::is_same_v<T, Bytes>
+        requires std::is_same_v<T, Bytes>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
@@ -237,7 +249,6 @@ class SDataStream : public DataStream {
                 auto data{read(data_length)};
                 ZEN_ASSERT(data);  // Should not return an error
                 object.assign(*data);
-                shrink();
                 break;
         }
         return result;

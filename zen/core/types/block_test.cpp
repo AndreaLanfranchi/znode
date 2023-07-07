@@ -22,7 +22,7 @@ TEST_CASE("Block Serialization", "[serialization]") {
     BlockHeader header2;
     REQUIRE(header2.deserialize(stream) == serialization::Error::kSuccess);
     CHECK(header == header2);
-    CHECK(stream.size() == 0);
+    CHECK(stream.eof());
 
     // Check the version equals to 15
     //    auto version_parsed{endian::load_little_u32(&archive[0])};

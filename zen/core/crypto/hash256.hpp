@@ -28,11 +28,16 @@ class Hash256 : private boost::noncopyable {
     void update(std::string_view data) noexcept;
     [[nodiscard]] Bytes finalize() noexcept;
 
-    [[nodiscard]] size_t digest_size() const noexcept { return hasher.digest_size(); }
-    [[nodiscard]] size_t ingested_size() const noexcept { return ingested_size_; }
+    [[nodiscard]] size_t digest_size() const noexcept { return hasher_.digest_size(); }
+    [[nodiscard]] size_t ingested_size() const noexcept { return hasher_.ingested_size(); }
+
+    static constexpr Bytes kEmptyHash() noexcept {
+        // Known empty hash
+        return Bytes{0x5d, 0xf6, 0xe0, 0xe2, 0x76, 0x13, 0x59, 0xd3, 0x0a, 0x82, 0x75, 0x05, 0x8e, 0x29, 0x9f, 0xcc,
+                     0x03, 0x81, 0x53, 0x45, 0x45, 0xf5, 0x5c, 0xf4, 0x3e, 0x41, 0x98, 0x3f, 0x5d, 0x4c, 0x94, 0x56};
+    }
 
   private:
-    Sha256 hasher;
-    size_t ingested_size_{0};  // Number of bytes ingested
+    Sha256 hasher_;
 };
 }  // namespace zen::crypto
