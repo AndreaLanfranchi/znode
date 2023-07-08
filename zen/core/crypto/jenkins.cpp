@@ -11,8 +11,8 @@
 namespace zen::crypto {
 
 uint64_t Jenkins::Hash(const uint32_t* source, size_t length, const uint32_t* salt) {
-    const auto width = static_cast<uint32_t>(length * sizeof(uint32_t));
-    uint32_t a{0xdeadbeef + width};
+    const auto width{static_cast<uint32_t>(length * sizeof(uint32_t))};
+    uint32_t a{uint32_t{0xdeadbeef} + width};
     uint32_t b{a};
     uint32_t c{b};
 
