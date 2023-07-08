@@ -25,8 +25,8 @@ void Hash160::update(std::string_view data) noexcept { hasher_.update(data); }
 
 Bytes Hash160::finalize() noexcept {
     if (!hasher_.ingested_size()) return kEmptyHash();
-    const Bytes data{hasher_.finalize()};
-    if (data.empty()) return data;
+    Bytes data{hasher_.finalize()};
+    if (data.empty()) return data;  // Some error occurred
     Ripemd160 outer(data);
     return outer.finalize();
 }

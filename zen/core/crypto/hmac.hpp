@@ -5,6 +5,8 @@
 */
 
 #pragma once
+#include <ranges>
+
 #include <boost/noncopyable.hpp>
 
 #include <zen/core/common/cast.hpp>
@@ -40,14 +42,10 @@ class Hmac : private boost::noncopyable {
         }
         rkey.resize(inner.block_size(), 0);
 
-        for (size_t i{0}; i < rkey.size(); ++i) {
-            rkey[i] ^= 0x5c;
-        }
+        std::ranges::for_each(rkey, [](auto& b) { b ^= 0x5c; });
         outer.update(rkey);
 
-        for (size_t i{0}; i < rkey.size(); ++i) {
-            rkey[i] ^= 0x5c ^ 0x36;
-        }
+        std::ranges::for_each(rkey, [](auto& b) { b ^= 0x5c ^ 0x36; });
         inner.update(rkey);
     };
 

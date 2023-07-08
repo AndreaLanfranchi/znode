@@ -73,8 +73,10 @@ class DataStream {
     void erase(iterator where);
 
     //! \brief Erase a data range from specified position
+    //! \param pos Position of the first byte to be erased
+    //! \param count Number of bytes to be erased (default: all bytes from pos to the end of the buffer)
     //! \note Read position is adjusted accordingly
-    void erase(size_type pos, size_type count);
+    void erase(size_type pos, std::optional<size_type> count = std::nullopt);
 
     //! \brief Returns a view of requested bytes count from the actual read position
     //! \remarks After the view is returned the read position is advanced by count

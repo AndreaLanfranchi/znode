@@ -9,7 +9,6 @@
 #include "netmessage.hpp"
 
 #include <algorithm>
-#include <iostream>
 
 #include <gsl/gsl_util>
 
@@ -145,8 +144,8 @@ serialization::Error NetMessage::validate() const noexcept {
             // Look for duplicates
             payload_view = raw_data_->read();
             ZEN_ASSERT(payload_view);
-            if (const auto duplicate_count{
-                    count_duplicate_data_chunks(*payload_view, *message_definition.vector_item_size)};
+            if (const auto duplicate_count{count_duplicate_data_chunks(
+                    *payload_view, *message_definition.vector_item_size, 1 /* one is enough */)};
                 duplicate_count > 0) {
                 return kMessagePayloadDuplicateVectorItems;
             }

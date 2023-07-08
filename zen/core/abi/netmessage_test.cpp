@@ -8,6 +8,7 @@
 #include <magic_enum.hpp>
 
 #include <zen/core/abi/netmessage.hpp>
+#include <zen/core/common/endian.hpp>
 #include <zen/core/crypto/hash256.hpp>
 #include <zen/core/encoding/hex.hpp>
 
@@ -215,9 +216,12 @@ TEST_CASE("NetMessage", "[abi]") {
 
         // Put in the size of the vector and a complete first element 36 bytes - message validation MUST pass
         // sizes checks but will still fail checksum validation
-        payload.erase(kMessageHeaderLength + ser_compact_sizeof(num_elements), data.size());
+        payload.erase(kMessageHeaderLength + ser_compact_sizeof(num_elements));
+        REQUIRE(payload.size() == kMessageHeaderLength + ser_compact_sizeof(num_elements));
+        REQUIRE(payload.avail() == ser_compact_sizeof(num_elements));
         data.resize(kInvItemSize, '0');
         payload.write(data);
+        REQUIRE(payload.avail() == ser_compact_sizeof(num_elements) + data.size());
         REQUIRE(magic_enum::enum_name(net_message.validate()) == "kMessageHeaderInvalidChecksum");
 
         // Lets move back to begin of body and compute checksum
@@ -231,6 +235,47 @@ TEST_CASE("NetMessage", "[abi]") {
         memcpy(header.checksum.data(), final_digest.data(), header.checksum.size());
         REQUIRE(magic_enum::enum_name(net_message.validate()) == "kSuccess");
 
+        // Test maximum number of vector elements with unique items
+        payload.erase(kMessageHeaderLength);
+        num_elements = kMaxInvItems;
+        write_compact(payload, num_elements);
+        for (uint64_t i = 0; i < kMaxInvItems; ++i) {
+            endian::store_big_u64(data.data(), i);  // This to prevent duplicates
+            payload.write(data);
+        }
+
+        // Lets move back to begin of body and compute checksum
+        payload.seekg(kMessageHeaderLength);
+        header.length = static_cast<uint32_t>(payload.avail());
+        digest_input = payload.read();
+        REQUIRE(digest_input);
+        REQUIRE(digest_input->size() == ser_compact_sizeof(num_elements) + (kInvItemSize * kMaxInvItems));
+        hasher.init(*digest_input);
+        final_digest = hasher.finalize();
+
+        memcpy(header.checksum.data(), final_digest.data(), header.checksum.size());
+        REQUIRE(magic_enum::enum_name(net_message.validate()) == "kSuccess");
+
+        // Test maximum number of vector elements with duplicate items
+        payload.erase(kMessageHeaderLength);
+        num_elements = kMaxInvItems;
+        write_compact(payload, num_elements);
+        for (uint64_t i = 0; i < kMaxInvItems; ++i) {
+            endian::store_big_u64(data.data(), i % 1'000);  // Duplicates every 1K
+            payload.write(data);
+        }
+
+        // Lets move back to begin of body and compute checksum
+        payload.seekg(kMessageHeaderLength);
+        header.length = static_cast<uint32_t>(payload.avail());
+        digest_input = payload.read();
+        REQUIRE(digest_input);
+        REQUIRE(digest_input->size() == ser_compact_sizeof(num_elements) + (kInvItemSize * kMaxInvItems));
+        hasher.init(*digest_input);
+        final_digest = hasher.finalize();
+
+        memcpy(header.checksum.data(), final_digest.data(), header.checksum.size());
+        REQUIRE(magic_enum::enum_name(net_message.validate()) == "kMessagePayloadDuplicateVectorItems");
     }
 }
 

@@ -6,7 +6,6 @@
 */
 
 #pragma once
-#include <thread>
 
 #include <tl/expected.hpp>
 
@@ -30,6 +29,8 @@ namespace zen {
 [[nodiscard]] std::string get_random_alpha_string(size_t length);
 
 //! \brief Provided a view of data returns the number of duplicate chunks of given size
-[[nodiscard]] size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size) noexcept;
+//! \remarks If max_count is set to zero then the function will return the total number of duplicate chunks found
+//! otherwise it will stop counting and return as soon as max_count is reached
+[[nodiscard]] size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size, size_t max_count = 0) noexcept;
 
 }  // namespace zen

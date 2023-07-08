@@ -111,7 +111,7 @@ std::string get_random_alpha_string(size_t length) {
     return ret;
 }
 
-size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size) noexcept {
+size_t count_duplicate_data_chunks(ByteView data, const size_t chunk_size, const size_t max_count) noexcept {
     if (!chunk_size || data.length() < chunk_size) {
         return 0;
     }
@@ -122,6 +122,9 @@ size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size) noexcept {
         const auto chunk{data.substr(i * chunk_size, chunk_size)};
         if (!unique_chunks.insert(chunk).second) {
             ++count;
+            if (max_count && count == max_count) {
+                break;
+            }
         }
     }
     return count;

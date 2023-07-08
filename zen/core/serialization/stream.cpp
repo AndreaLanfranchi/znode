@@ -65,15 +65,15 @@ void DataStream::erase(iterator where) {
     read_position_ = std::min(read_position_, buffer_.size());
 }
 
-void DataStream::erase(const size_type pos, size_type count) {
-    if (!count || pos >= buffer_.size()) {
+void DataStream::erase(const size_type pos, std::optional<size_type> count) {
+    if ((count.has_value() && *count == 0) || pos >= buffer_.size()) {
         return;
     }
     const auto max_count{buffer_.size() - pos};
-    count = std::min(count, max_count);
-    buffer_.erase(pos, count);
+    count = std::min(count.value_or(std::numeric_limits<size_type>::max()), max_count);
+    buffer_.erase(pos, *count);
     if (read_position_ && read_position_ > pos) {
-        auto move_back_count{std::min(read_position_ - pos, count)};
+        auto move_back_count{std::min(read_position_ - pos, *count)};
         read_position_ -= move_back_count;
     }
 }

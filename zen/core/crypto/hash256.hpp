@@ -29,7 +29,7 @@ class Hash256 : private boost::noncopyable {
     [[nodiscard]] Bytes finalize() noexcept;
 
     [[nodiscard]] size_t digest_size() const noexcept { return hasher_.digest_size(); }
-    [[nodiscard]] size_t ingested_size() const noexcept { return hasher_.ingested_size(); }
+    [[nodiscard]] size_t ingested_size() const noexcept { return ingested_size_; }
 
     static constexpr Bytes kEmptyHash() noexcept {
         // Known empty hash
@@ -39,5 +39,6 @@ class Hash256 : private boost::noncopyable {
 
   private:
     Sha256 hasher_;
+    size_t ingested_size_{0};
 };
 }  // namespace zen::crypto
