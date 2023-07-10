@@ -83,7 +83,7 @@ void Amount::operator--() noexcept { --amount_; }
 tl::expected<Amount, DecodingError> Amount::parse(const std::string& input) {
     static const std::string kMaxWhole(std::to_string(kCoinMaxSupply));
     const std::string dyn_pattern{
-        boost::str(boost::format("^(\\d{0,%i})(\\.\\d{0,%i})?$") % kMaxWhole.size() % kCoinMaxDecimals)};
+        boost::str(boost::format(R"(^(\d{0,%i})(\.\d{0,%i})?$)") % kMaxWhole.size() % kCoinMaxDecimals)};
     const std::regex pattern(dyn_pattern, std::regex_constants::icase);
 
     std::smatch matches;

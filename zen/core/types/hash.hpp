@@ -10,12 +10,15 @@
 
 #include <zen/core/common/assert.hpp>
 #include <zen/core/common/base.hpp>
+#include <zen/core/common/cast.hpp>
 #include <zen/core/common/endian.hpp>
 #include <zen/core/crypto/jenkins.hpp>
 #include <zen/core/encoding/hex.hpp>
 #include <zen/core/serialization/serializable.hpp>
 
 namespace zen {
+
+//! \brief A Hash is a fixed size sequence of bytes
 template <uint32_t BITS>
 class Hash : public serialization::Serializable {
   public:
@@ -74,7 +77,7 @@ class Hash : public serialization::Serializable {
     }
 
     //! \brief Returns the hash to its pristine state (i.e. all zeroes)
-    void reset() { memset(&bytes_, 0, kSize); }
+    void reset() { bytes_.fill(0); }
 
     [[nodiscard]] const uint8_t* data() const noexcept { return bytes_.data(); }
 
@@ -89,11 +92,7 @@ class Hash : public serialization::Serializable {
     constexpr auto operator<=>(const Hash&) const = default;
 
     inline explicit operator bool() const noexcept {
-        auto ptr{bytes_.data()};
-        for (uint32_t i{0}; i < kSize; ++i) {
-            if (*ptr > 0) return true;
-        }
-        return false;
+        return std::ranges::any_of(bytes_, [](const auto& byte) { return byte > 0; });
     }
 
   private:

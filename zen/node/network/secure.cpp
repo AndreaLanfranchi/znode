@@ -80,7 +80,7 @@ EVP_PKEY* generate_random_rsa_key_pair(int bits) {
     return pkey;
 }
 
-X509* network::generate_self_signed_certificate(EVP_PKEY* pkey) {
+X509* generate_self_signed_certificate(EVP_PKEY* pkey) {
     if (!pkey) {
         ZEN_ERROR << "Invalid EVP_PKEY";
         return nullptr;
@@ -104,7 +104,8 @@ X509* network::generate_self_signed_certificate(EVP_PKEY* pkey) {
     X509_gmtime_adj(X509_get_notAfter(x509_certificate), static_cast<long>(86400 * kCertificateValidityDays));
 
     X509_NAME* subject = X509_NAME_new();
-    X509_NAME_add_entry_by_txt(subject, "CN", MBSTRING_ASC, (unsigned char*)"zend++.node", -1, -1, 0);
+    X509_NAME_add_entry_by_txt(subject, "CN", MBSTRING_ASC, reinterpret_cast<const unsigned char*>("zend++.node"), -1,
+                               -1, 0);
     X509_set_subject_name(x509_certificate, subject);
     X509_set_issuer_name(x509_certificate, subject);
     X509_NAME_free(subject);
@@ -158,7 +159,8 @@ bool store_rsa_key_pair(EVP_PKEY* pkey, const std::string& password, const std::
 
     int result{0};
     if (!password.empty()) {
-        result = PEM_write_PKCS8PrivateKey(file, pkey, EVP_aes_256_cbc(), nullptr, 0, nullptr, (void*)password.c_str());
+        result = PEM_write_PKCS8PrivateKey(file, pkey, EVP_aes_256_cbc(), const_cast<char*>(password.data()),
+                                           static_cast<int>(password.size()), nullptr, nullptr);
     } else {
         result = PEM_write_PrivateKey(file, pkey, nullptr, nullptr, 0, nullptr, nullptr);
     }
@@ -236,7 +238,8 @@ EVP_PKEY* load_rsa_private_key(const std::filesystem::path& directory_path, cons
 
     EVP_PKEY* pkey{nullptr};
     if (!password.empty()) {
-        pkey = PEM_read_PrivateKey(file, nullptr, nullptr, (void*)password.c_str());
+        pkey = PEM_read_PrivateKey(file, nullptr, nullptr,
+                                   const_cast<void*>(reinterpret_cast<const void*>(password.data())));
     } else {
         pkey = PEM_read_PrivateKey(file, nullptr, nullptr, nullptr);
     }
