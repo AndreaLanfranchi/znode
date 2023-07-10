@@ -10,6 +10,7 @@
 #include <map>
 #include <regex>
 #include <string>
+#include <thread>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio/ip/address.hpp>
@@ -91,7 +92,8 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
     auto notls_flag = network_opts.add_flag("--network.notls", "Disable TLS secure communications");
 
     network_opts.add_option("--network.pkpwd", network_settings.tls_password, "Private key password")
-        ->capture_default_str()->excludes(notls_flag);
+        ->capture_default_str()
+        ->excludes(notls_flag);
 
     network_opts
         .add_option("--network.maxactiveconnections", network_settings.max_active_connections,
