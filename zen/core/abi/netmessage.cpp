@@ -52,7 +52,7 @@ serialization::Error NetMessageHeader::serialization(serialization::SDataStream&
 
 serialization::Error NetMessageHeader::validate(std::optional<ByteView> expected_network_magic) const noexcept {
     using enum serialization::Error;
-    if (expected_network_magic && ByteView{magic} != *expected_network_magic) return kMessageHeaderMagicMismatch;
+    if (expected_network_magic&& ByteView{magic} != *expected_network_magic) return kMessageHeaderMagicMismatch;
     if (command[0] == 0) return kMessageHeaderEmptyCommand;  // reject empty commands
     if (length > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
@@ -108,6 +108,7 @@ serialization::Error NetMessage::validate() const noexcept {
 
     // Being a network message the payload size MUST NOT exceed the maximum allowed size for the protocol
     // regardless any other check
+    if (raw_data_->size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
     if (raw_data_->size() > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
     // This also means the header has not been validated previously

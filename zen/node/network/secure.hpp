@@ -8,11 +8,13 @@
 
 #include <filesystem>
 
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 #include <openssl/ssl.h>
 
 #include <zen/node/common/directories.hpp>
+#include <zen/node/common/log.hpp>
 
 namespace zen::network {
 
@@ -34,6 +36,8 @@ struct SSLCTXDeleter {
         ptr = nullptr;
     }
 };
+
+void print_ssl_error(unsigned long error_code, log::Level severity = log::Level::kError);
 
 //! \brief Generates a random RSA key pair
 //! \return A pointer to the generated key pair or nullptr if an error occurred

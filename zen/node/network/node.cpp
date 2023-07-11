@@ -11,11 +11,11 @@
 #include <magic_enum.hpp>
 
 #include <zen/core/common/assert.hpp>
+#include <zen/core/common/misc.hpp>
 
 #include <zen/node/common/log.hpp>
+#include <zen/node/network/secure.hpp>
 #include <zen/node/serialization/exceptions.hpp>
-
-#include "zen/core/common/misc.hpp"
 
 namespace zen::network {
 
@@ -74,16 +74,33 @@ bool Node::stop(bool wait) noexcept {
 
 void Node::start_ssl_handshake() {
     ZEN_REQUIRE(ssl_context_ != nullptr);
+    ZEN_TRACE << "Starting SSL handshake";
     ssl_ = SSL_new(ssl_context_);
-    SSL_set_fd(ssl_, static_cast<int>(socket_.native_handle()));
+    SSL_set_fd(ssl_, static_cast<int>(socket_.lowest_layer().native_handle()));
 
     SSL_set_mode(ssl_, SSL_MODE_ENABLE_PARTIAL_WRITE);
     SSL_set_mode(ssl_, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_set_mode(ssl_, SSL_MODE_RELEASE_BUFFERS);
     SSL_set_mode(ssl_, SSL_MODE_AUTO_RETRY);
 
-    SSL_set_accept_state(ssl_);
-    SSL_do_handshake(ssl_);
+    switch (connection_mode_) {
+        case NodeConnectionMode::kInbound:
+            SSL_set_accept_state(ssl_);
+            break;
+        case NodeConnectionMode::kOutbound:
+        case NodeConnectionMode::kManualOutbound:
+            SSL_set_connect_state(ssl_);
+            break;
+        default:
+            ZEN_ASSERT(false);  // Should never happen;
+    }
+
+    if (SSL_do_handshake(ssl_) != 1) {
+        auto err{ERR_get_error()};
+        print_ssl_error(err, log::Level::kDebug);
+        stop(false);
+        return;
+    }
 
     boost::asio::async_write(socket_, boost::asio::null_buffers(),
                              [this](const boost::system::error_code& ec, std::size_t) { handle_ssl_handshake(ec); });
@@ -230,14 +247,15 @@ serialization::Error Node::finalize_inbound_message() {
             serialization::success_or_throw(inbound_header_->validate(std::nullopt /* TODO Put network magic here */));
             serialization::success_or_throw(validate_message_for_protocol_handshake(inbound_header_->get_type()));
 
-            // If this is a header only message (e.g. verack) validate checksum
+            // If this is a header only message (e.g. verack) validate empty checksum
             // otherwise switch to body mode and continue
             if (inbound_header_->length == 0) {
                 serialization::success_or_throw(
                     NetMessage::validate_payload_checksum(ByteView{}, inbound_header_->checksum));
+            } else {
+                ret = kMessageBodyIncomplete;  // Need body data
+                receive_mode_header_ = false;
             }
-            ret = kMessageBodyIncomplete;  // Need body data
-            receive_mode_header_ = false;  // Switch to body mode
 
         } else {
             if (inbound_stream_->avail() != inbound_header_->length)

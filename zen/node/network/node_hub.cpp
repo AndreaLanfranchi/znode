@@ -23,6 +23,7 @@ bool NodeHub::start() {
     if (bool expected{false}; !is_started_.compare_exchange_strong(expected, true)) {
         return false;
     }
+    ZEN_TRACE << "Is activated " << std::boolalpha << node_settings_.network.use_tls;
     if (node_settings_.network.use_tls) {
         const auto ssl_data{(*node_settings_.data_directory)[DataDirectory::kSSLCert].path()};
         auto ctx{generate_tls_context(TLSContextType::kServer, ssl_data, node_settings_.network.tls_password)};
@@ -30,14 +31,15 @@ bool NodeHub::start() {
             log::Error("NodeHub", {"action", "start", "error", "failed to generate TLS server context"});
             return false;
         }
-        ssl_server_context_.reset(std::move(ctx));
+        ssl_server_context_.reset(ctx);
+        ZEN_TRACE << "Is activated " << std::boolalpha << (ssl_server_context_.get() != nullptr);
 
         ctx = generate_tls_context(TLSContextType::kClient, ssl_data, "");
         if (!ctx) {
             log::Error("NodeHub", {"action", "start", "error", "failed to generate TLS server context"});
             return false;
         }
-        ssl_client_context_.reset(std::move(ctx));
+        ssl_client_context_.reset(ctx);
     }
     initialize_acceptor();
     info_stopwatch_.start(true);

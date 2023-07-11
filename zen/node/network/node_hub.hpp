@@ -63,9 +63,8 @@ class NodeHub : public Stoppable {
     const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_
 
     /* We use unique_ptr for SSL_CTX as connections / nodes are not meant to outlive NodeHub */
-
-    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_server_context_{nullptr};  // For dial-in connections
-    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_client_context_{nullptr};  // For dial-out connections
+    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_server_context_{nullptr, SSLCTXDeleter()};  // For dial-in connections
+    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_client_context_{nullptr, SSLCTXDeleter()};  // For dial-out connections
 
     std::atomic_uint32_t current_active_connections_{0};
     std::atomic_uint32_t current_active_inbound_connections_{0};

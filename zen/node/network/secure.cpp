@@ -10,21 +10,18 @@
 #include <random>
 
 #include <gsl/gsl_util>
-#include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
 
-#include <zen/node/common/log.hpp>
-
 namespace zen::network {
 
-static void print_ssl_error(unsigned long err) {
+void print_ssl_error(unsigned long err, const log::Level severity) {
     if (!err) {
         return;
     }
     char buf[256];
     ERR_error_string_n(err, buf, sizeof(buf));
-    log::Error("SSL error", {"code", std::to_string(err), "reason", std::string(buf)});
+    log::BufferBase(severity, "SSL error", {"code", std::to_string(err), "reason", std::string(buf)});
 }
 
 EVP_PKEY* generate_random_rsa_key_pair(int bits) {

@@ -145,7 +145,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
     node_settings.asio_concurrency = user_asio_concurrency;
     node_settings.asio_context = std::make_unique<boost::asio::io_context>(static_cast<int>(user_asio_concurrency));
 
-    network_settings.use_tls = !notls_flag->count();
+    network_settings.use_tls = !*notls_flag;
 }
 
 void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
