@@ -306,22 +306,11 @@ void Node::clean_up(Node* ptr) noexcept {
 
 bool Node::is_idle(const uint32_t idle_timeout_seconds) const noexcept {
     ZEN_REQUIRE(idle_timeout_seconds != 0);
-
     if (!is_connected()) return false;  // Not connected - not idle
-
-    std::chrono::seconds::rep idle_seconds{0};
-    const auto now{std::chrono::steady_clock::now()};
-    const auto last_message_received_time{last_message_received_time_.load()};
-    const auto last_message_sent_time{last_message_sent_time_.load()};
-
-    if (last_message_received_time == std::chrono::steady_clock::time_point::min() &&
-        last_message_sent_time == std::chrono::steady_clock::time_point::min()) {
-        idle_seconds = std::chrono::duration_cast<std::chrono::seconds>(now - connected_time_.load()).count();
-    } else {
-        idle_seconds = std::chrono::duration_cast<std::chrono::seconds>(
-                           now - std::max(last_message_received_time, last_message_sent_time))
-                           .count();
-    }
+    using namespace std::chrono;
+    const auto now{steady_clock::now()};
+    const auto most_recent_activity_time{std::max(last_message_received_time_.load(), last_message_sent_time_.load())};
+    const auto idle_seconds{duration_cast<seconds>(now - most_recent_activity_time).count()};
     return (static_cast<uint32_t>(idle_seconds) >= idle_timeout_seconds);
 }
 
