@@ -5,32 +5,36 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 ]]
 
-find_package(benchmark CONFIG REQUIRED)
+# Core Benchmarks
+message(CHECK_START "Looking for core benchmarks ...")
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "$CACHE{BUILD_MAIN_SRC_DIR}/core/*_benchmark.?pp")
+list(LENGTH SOURCES SOURCE_ITEMS)
+message(CHECK_PASS "found ${SOURCE_ITEMS} source files")
+if (NOT SOURCE_ITEMS EQUAL 0)
+    add_executable(core_benchmarks benchmark_test.cpp ${SOURCES})
+    target_link_libraries(core_benchmarks PRIVATE $CACHE{BUILD_CORE_COMPONENT} benchmark::benchmark)
 
-# Zen Core Benchmarks
-message(STATUS "Looking for benchmarks ... ${BUILD_MAIN_SRC_DIR}/core/*_benchmark.cpp")
-file(GLOB_RECURSE ZEN_CORE_BENCHMARKS CONFIGURE_DEPENDS "${BUILD_MAIN_SRC_DIR}/*_benchmark.cpp")
-list(LENGTH ZEN_CORE_BENCHMARKS ZEN_CORE_SOURCE_ITEMS)
-if (NOT ZEN_CORE_SOURCE_ITEMS EQUAL 0)
-    add_executable(core_benchmarks benchmark_test.cpp ${ZEN_CORE_BENCHMARKS})
-    target_link_libraries(core_benchmarks zen_core benchmark::benchmark)
-endif ()
+    # No exceptions here
+    target_compile_definitions(core_benchmarks PRIVATE BOOST_NO_EXCEPTIONS)
+    if (MSVC)
+        target_compile_options(core_benchmarks PRIVATE /EHa- /EHsc)
+    else ()
+        target_compile_options(core_benchmarks PRIVATE -fno-exceptions)
+    endif ()
 
-if (MSVC)
-    target_compile_options(core_benchmarks PRIVATE /EHa- /EHsc)
-else ()
-    target_compile_options(core_benchmarks PRIVATE -fno-exceptions)
 endif ()
 
 if (NOT BUILD_CORE_ONLY)
 
-    # Zen Node Benchmarks
-    message(STATUS "Looking for benchmarks ... ${BUILD_MAIN_SRC_DIR}/node/*_benchmark.cpp")
-    file(GLOB_RECURSE ZEN_NODE_BENCHMARKS CONFIGURE_DEPENDS "${BUILD_MAIN_SRC_DIR}/node/*_benchmark.cpp")
-    list(LENGTH ZEN_NODE_BENCHMARKS ZEN_NODE_SOURCE_ITEMS)
-    if (NOT ZEN_NODE_SOURCE_ITEMS EQUAL 0)
-        add_executable(node_benchmarks benchmark_test.cpp ${ZEN_NODE_BENCHMARKS})
-        target_link_libraries(node_benchmarks zen_node benchmark::benchmark)
+    # Main app Benchmarks
+    message(CHECK_START "Looking for main benchmarks ...")
+    set(SOURCES)
+    file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "$CACHE{BUILD_MAIN_SRC_DIR}/main/*_benchmark.?pp")
+    list(LENGTH SOURCES SOURCE_ITEMS)
+    message(CHECK_PASS "found ${SOURCE_ITEMS} source files")
+    if (NOT SOURCE_ITEMS EQUAL 0)
+        add_executable(main_benchmarks benchmark_test.cpp ${SOURCES})
+        target_link_libraries(main_benchmarks $CACHE{BUILD_MAIN_COMPONENT} benchmark::benchmark)
     endif ()
 
 endif ()

@@ -5,15 +5,15 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 ]]
 
-find_package(Catch2 CONFIG REQUIRED)
-
-# Zen Core Tests
-message(STATUS "Looking for tests ... ${BUILD_MAIN_SRC_DIR}/core/*_test.cpp")
-file(GLOB_RECURSE ZEN_CORE_TESTS CONFIGURE_DEPENDS "${BUILD_MAIN_SRC_DIR}/core/*_test.cpp")
-list(LENGTH ZEN_CORE_TESTS ZEN_CORE_SOURCE_ITEMS)
-if (NOT ZEN_CORE_SOURCE_ITEMS EQUAL 0)
-    add_executable(core_test unit_test.cpp ${ZEN_CORE_TESTS})
-    target_include_directories(core_test PRIVATE ${PROJECT_MAIN_DIR}/third-party/magic_enum/include)
+# Core Tests
+message(CHECK_START "Looking for core tests ...")
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "$CACHE{BUILD_MAIN_SRC_DIR}/core/*_test.?pp")
+list(LENGTH SOURCES SOURCE_ITEMS)
+message(CHECK_PASS "found ${SOURCE_ITEMS} source files")
+if (NOT SOURCE_ITEMS EQUAL 0)
+    add_executable(core_test unit_test.cpp ${SOURCES})
+    target_link_libraries(core_test PRIVATE $CACHE{BUILD_CORE_COMPONENT} Catch2::Catch2)
+    target_include_directories(core_test PUBLIC SYSTEM $CACHE{BUILD_3RDP_SRC_DIR}/magic_enum/include)
 
     # No exceptions here
     target_compile_definitions(core_test PRIVATE BOOST_NO_EXCEPTIONS)
@@ -23,21 +23,20 @@ if (NOT ZEN_CORE_SOURCE_ITEMS EQUAL 0)
         target_compile_options(core_test PRIVATE -fno-exceptions)
     endif ()
 
-    target_link_libraries(core_test zen_core Catch2::Catch2)
-
 endif ()
-
 
 if (NOT BUILD_CORE_ONLY)
 
-    # Zen Node Tests
-    message(STATUS "Looking for tests ... ${BUILD_MAIN_SRC_DIR}/node/*_test.cpp")
-    file(GLOB_RECURSE ZEN_NODE_TESTS CONFIGURE_DEPENDS "${BUILD_MAIN_SRC_DIR}/node/*_test.cpp")
-    list(LENGTH ZEN_NODE_TESTS ZEN_NODE_SOURCE_ITEMS)
-    if (NOT ZEN_NODE_SOURCE_ITEMS EQUAL 0)
-        add_executable(node_test unit_test.cpp ${ZEN_NODE_TESTS})
-        target_include_directories(node_test PRIVATE ${PROJECT_MAIN_DIR}/third-party/magic_enum/include)
-        target_link_libraries(node_test zen_node Catch2::Catch2)
+    # Main app Tests
+    message(CHECK_START "Looking for main tests ...")
+    set(SOURCES)
+    file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "$CACHE{BUILD_MAIN_SRC_DIR}/main/*_test.?pp")
+    list(LENGTH SOURCES SOURCE_ITEMS)
+    message(CHECK_PASS "found ${SOURCE_ITEMS} source files")
+    if (NOT SOURCE_ITEMS EQUAL 0)
+        add_executable(main_test unit_test.cpp ${SOURCES})
+        target_include_directories(main_test PUBLIC SYSTEM $CACHE{BUILD_3RDP_SRC_DIR}/magic_enum/include)
+        target_link_libraries(main_test PRIVATE $CACHE{BUILD_MAIN_COMPONENT} Catch2::Catch2)
     endif ()
 
 endif ()

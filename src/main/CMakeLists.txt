@@ -6,42 +6,23 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 ]]
 
-message(CHECK_START "Looking for required packages ...")
-find_package(Boost CONFIG REQUIRED COMPONENTS context coroutine)
-find_package(OpenSSL REQUIRED)
-find_package(absl CONFIG REQUIRED)
-find_package(CLI11 CONFIG REQUIRED)
-find_package(nlohmann_json CONFIG REQUIRED)
-
-if (NOT TARGET Boost::coroutine OR NOT TARGET Boost::context)
-    message(FATAL_ERROR "Boost components not found")
-elseif (NOT TARGET OpenSSL::SSL)
-    message(FATAL_ERROR "OpenSSL::SSL not found")
-elseif (NOT TARGET absl::time)
-    message(FATAL_ERROR "absl::time not found")
-elseif (NOT TARGET nlohmann_json::nlohmann_json)
-    message(FATAL_ERROR "nlohmann_json::nlohmann_json not found")
-elseif (NOT TARGET CLI11::CLI11)
-    message(FATAL_ERROR "CLI11::CLI11 not found")
-elseif (NOT TARGET mdbx-static)
-    message(FATAL_ERROR "mdbx-static not found")
-endif ()
-
-message(CHECK_PASS "All required packages found")
-
+message(CHECK_START "Looking for main source files ...")
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "*.cpp" "*.hpp" "*.c" "*.h")
 list(FILTER SOURCES EXCLUDE REGEX "\\.*\(_test|_benchmark)\\.(c|cpp|h|hpp)$")
-
 list(LENGTH SOURCES SOURCES_COUNT)
 if (SOURCES_COUNT EQUAL 0)
-    message(FATAL_ERROR "No source files found")
+    message(CHECK_FAIL "No source files found")
+    message(FATAL_ERROR "No inputs to build")
 endif ()
+message(CHECK_PASS "found ${SOURCES_COUNT} source files")
 
-message(STATUS "Found ${SOURCES_COUNT} source files")
 add_library($CACHE{BUILD_MAIN_COMPONENT} ${SOURCES})
-target_include_directories($CACHE{BUILD_MAIN_COMPONENT} PUBLIC
-        $CACHE{BUILD_3RDP_SRC_DIR}/magic_enum/include
-        $CACHE{BUILD_3RDP_SRC_DIR}/indicators/include)
+target_include_directories($CACHE{BUILD_MAIN_COMPONENT} SYSTEM PUBLIC
+        $CACHE{BUILD_MAIN_SRC_DIR}
+        $CACHE{BUILD_3RDP_SRC_DIR}
+        )
+
+set_target_properties($CACHE{BUILD_MAIN_COMPONENT} PROPERTIES LINKER_LANGUAGE CXX)
 
 set(PUBLIC_LIBS
         $CACHE{BUILD_CORE_COMPONENT}

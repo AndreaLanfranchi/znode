@@ -9,25 +9,25 @@
 cmake_minimum_required(VERSION 3.16.2)
 
 find_package(Git QUIET)
-if(NOT GIT_FOUND)
+if (NOT GIT_FOUND)
     message(FATAL_ERROR "Git not found, please install it")
-endif()
+endif ()
 
-if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cable/.git)
+if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cable/.git)
     message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init --recursive")
-endif()
+endif ()
 
 get_directory_property(PROJECT_HAS_PARENT PARENT_DIRECTORY)
 
-if(NOT PROJECT_HAS_PARENT)
+if (NOT PROJECT_HAS_PARENT)
 
     include(cmake/cable/bootstrap.cmake)
     include(CableBuildType)
     cable_set_build_type(DEFAULT Release CONFIGURATION_TYPES Release Debug)
 
-    if(NOT CMAKE_TOOLCHAIN_FILE)
+    if (NOT CMAKE_TOOLCHAIN_FILE)
         set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain/cxx20.cmake CACHE FILEPATH "" FORCE)
-    endif()
+    endif ()
 
     include(cmake/cable/HunterGate.cmake)
     HunterGate(
@@ -36,7 +36,7 @@ if(NOT PROJECT_HAS_PARENT)
             LOCAL
     )
 
-endif(NOT PROJECT_HAS_PARENT)
+endif (NOT PROJECT_HAS_PARENT)
 
 #[[
 If you want to include this project into your CMake project,
@@ -71,24 +71,24 @@ execute_process(
 )
 
 # Check if the git command was successful
-if(GIT_RESULT EQUAL 0)
+if (GIT_RESULT EQUAL 0)
     # Parse the git tag to extract version information
     string(REGEX REPLACE "^v(.*)" "\\1" PROJECT_VERSION "${GIT_TAG}")
 
     # Print the extracted version
     message("Project Version: ${PROJECT_VERSION}")
-else()
+else ()
     # No tags found or an error occurred
-    if(GIT_ERROR)
+    if (GIT_ERROR)
         message(STATUS "No tags found in the repository: ${GIT_ERROR}")
-    else()
+    else ()
         message(FATAL_ERROR "Error executing git command: ${GIT_RESULT}")
-    endif()
+    endif ()
 
     # Set a default version
     set(PROJECT_VERSION "0.1.0")
     message("Using default version: ${PROJECT_VERSION}")
-endif()
+endif ()
 
 include(CableBuildInfo)
 
@@ -124,18 +124,44 @@ message(
 include(${PROJECT_MAIN_DIR}/cmake/toolchain/compiler_settings.cmake)
 include(${PROJECT_MAIN_DIR}/cmake/Hunter/core_packages.cmake)
 
-find_package(Catch2 CONFIG REQUIRED)  # Tests
+message(CHECK_START "Looking for required packages ...")
+find_package(Microsoft.GSL CONFIG REQUIRED GLOBAL)
+find_package(nlohmann_json CONFIG REQUIRED GLOBAL)
+find_package(OpenSSL REQUIRED GLOBAL)
+find_package(intx CONFIG REQUIRED GLOBAL)
 
-if(NOT BUILD_CORE_ONLY)
-    include(${PROJECT_MAIN_DIR}/cmake/Hunter/node_packages.cmake)
+if (NOT TARGET intx::intx)
+    message(FATAL_ERROR "Mandatory package intx::intx not found")
+elseif (NOT TARGET Microsoft.GSL::GSL)
+    message(FATAL_ERROR "Mandatory package Microsoft.GSL::GSL not found")
+elseif (NOT TARGET nlohmann_json::nlohmann_json)
+    message(FATAL_ERROR "Mandatory package nlohmann_json::nlohmann_json not found")
+elseif (NOT TARGET OpenSSL::Crypto)
+    message(FATAL_ERROR "Mandatory package OpenSSL::Crypto not found")
+endif ()
 
-    find_package(Boost CONFIG REQUIRED)   # The Boost library
-    find_package(intx CONFIG REQUIRED)    # Big integers
+if (BUILD_TESTS)
+    find_package(Catch2 CONFIG REQUIRED GLOBAL)    # Tests
+    find_package(benchmark CONFIG REQUIRED GLOBAL) # Benchmarks
+    if (NOT TARGET Catch2::Catch2)
+        message(WARNING "Package Catch2::Catch target not found. Building tests will be disabled.")
+    endif ()
+    if (NOT TARGET benchmark::benchmark)
+        message(WARNING "Package benchmark::benchmark target not found. Building benchmarks will be disabled.")
+    endif ()
+endif ()
+
+if (NOT BUILD_CORE_ONLY)
+    include(${PROJECT_MAIN_DIR}/cmake/Hunter/main_packages.cmake)
 
     # Silence CMake policy warnings in submodules
     set(CMAKE_POLICY_DEFAULT_CMP0048 NEW) # project() command manages VERSION variables
     set(CMAKE_POLICY_DEFAULT_CMP0063 NEW) # Honor visibility properties for all target types
     set(CMAKE_POLICY_DEFAULT_CMP0074 NEW)
+
+    find_package(Boost CONFIG REQUIRED GLOBAL COMPONENTS context coroutine) # Boost
+    find_package(absl CONFIG REQUIRED GLOBAL)
+    find_package(CLI11 REQUIRED GLOBAL)
 
     # MDBX
     set(MDBX_ENABLE_TESTS OFF)
@@ -144,31 +170,45 @@ if(NOT BUILD_CORE_ONLY)
     add_subdirectory(third-party/libmdbx)
     target_include_directories(mdbx-static INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/third-party/libmdbx)
 
-endif(NOT BUILD_CORE_ONLY)
+    if (NOT TARGET Boost::coroutine OR NOT TARGET Boost::context)
+        message(FATAL_ERROR "Mandatory packages Boost::coroutine or Boost::context not found")
+    elseif (NOT TARGET OpenSSL::SSL)
+        message(FATAL_ERROR "Mandatory package OpenSSL::SSL not found")
+    elseif (NOT TARGET absl::time)
+        message(FATAL_ERROR "Mandatory package absl::time not found")
+    elseif (NOT TARGET mdbx-static)
+        message(FATAL_ERROR "Mandatory package mdbx-static not found")
+    elseif (NOT TARGET CLI11::CLI11)
+        message(FATAL_ERROR "Mandatory package CLI11::CLI11 not found")
+    endif ()
+
+endif (NOT BUILD_CORE_ONLY)
+message(CHECK_PASS "All required packages found")
+
 
 # Compiler enforcements on ${PROJECT_NAME}
-if(NOT MSVC)
+if (NOT MSVC)
 
     add_compile_options(-Werror -Wall -Wextra -pedantic)
     add_compile_options(-Wshadow -Wimplicit-fallthrough -Wsign-conversion)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wold-style-cast>)
     add_compile_options(-Wno-missing-field-initializers -Wnon-virtual-dtor)
 
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         add_compile_options(-Wno-attributes)
 
         # coroutines support
-        if((CMAKE_CXX_STANDARD GREATER_EQUAL 20))
+        if ((CMAKE_CXX_STANDARD GREATER_EQUAL 20))
             add_compile_options(-fcoroutines)
-        endif()
-    endif()
+        endif ()
+    endif ()
 
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_SYSTEM_NAME MATCHES "Darwin")
         add_compile_definitions(_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS)
         add_compile_options(-Wthread-safety)
-    endif()
+    endif ()
 
-else()
+else ()
 
     add_compile_options(/permissive-)
 
@@ -188,7 +228,7 @@ else()
 
     add_compile_options(/we26819) # Equivalent to -Wimplicit-fallthrough
 
-endif()
+endif ()
 
 add_subdirectory(src) # Main sources
 add_subdirectory(cmd) # Executables sources

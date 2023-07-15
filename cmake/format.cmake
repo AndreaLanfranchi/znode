@@ -28,7 +28,7 @@ cmake_policy(SET CMP0009 NEW)
 file(
         GLOB_RECURSE SRC
         LIST_DIRECTORIES false
-        "zen/*.?pp"
+        "src/*.?pp"
 )
 
 execute_process(COMMAND ${CLANG_FORMAT} -style=file -i ${SRC})
