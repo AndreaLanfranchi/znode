@@ -6,30 +6,28 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 ]]
 
-if (ZEN_TESTS)
+if (BUILD_TESTS)
     add_subdirectory(test)      # The testing suites
     add_subdirectory(benchmark) # The benchmarking suites
 endif ()
 
-if(NOT ZEN_CORE_ONLY)
+if(NOT BUILD_CORE_ONLY)
 
-    find_package(absl REQUIRED)
+    message(CHECK_START "Looking for required packages ...")
     find_package(CLI11 REQUIRED)
+    if(NOT TARGET CLI11::CLI11)
+        message(FATAL_ERROR "CLI11::CLI11 not found")
+    endif()
+    message(CHECK_PASS "All required packages found")
 
-    # The node itself
-    add_executable(zend++ "node.cpp;common.hpp;common.cpp")
-    target_link_libraries(zend++ PRIVATE zen_node zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
-    target_include_directories(zend++ PRIVATE ${ZEN_MAIN_DIR}/third-party/indicators/include)
+    # The node executable itself
+    add_executable(${PROJECT_NAME}d "node.cpp;common.hpp;common.cpp")
+    target_link_libraries(${PROJECT_NAME}d PRIVATE $CACHE{BUILD_MAIN_COMPONENT} zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
+    target_include_directories($CACHE{BUILD_MAIN_COMPONENT} PRIVATE $CACHE{BUILD_3RDP_SRC_DIR}/indicators/include)
 
-    # The toolbox executable
-    add_executable(zentool "toolbox.cpp;common.hpp;common.cpp")
-    target_link_libraries(zentool PRIVATE zen_node zen-buildinfo CLI11::CLI11)
-    target_include_directories(zentool PRIVATE ${ZEN_MAIN_DIR}/third-party/indicators/include)
-
-    # Flood executable
-    add_executable(flood "flood.cpp")
-    target_link_libraries(flood PRIVATE zen_node zen-buildinfo CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
-    target_include_directories(flood PRIVATE ${ZEN_MAIN_DIR}/third-party/indicators/include)
-
+    # The db-tool executable
+    add_executable(${PROJECT_NAME}-dbtool "toolbox.cpp;common.hpp;common.cpp")
+    target_link_libraries(${PROJECT_NAME}-dbtool PRIVATE $CACHE{BUILD_MAIN_COMPONENT} zen-buildinfo CLI11::CLI11)
+    target_include_directories(${PROJECT_NAME}-dbtool PRIVATE $CACHE{BUILD_3RDP_SRC_DIR}/indicators/include)
 
 endif()

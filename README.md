@@ -67,10 +67,10 @@ Additional CMAKE options (specify with `-D<OPTION_NAME[:type]>=<value>`):
 
 | OPTION_NAME          | Description                                        | Default |
 |:---------------------|:---------------------------------------------------|:-------:|
-| `ZEN_CORE_ONLY`      | Only build ZEN Core components                     |   OFF   |
-| `ZEN_CLANG_COVERAGE` | **Clang** (only) instrumentation for code coverage |   OFF   |
-| `ZEN_SANITIZE`       | Build instrumentation for sanitizers               |   OFF   |
-| `ZEN_TESTS`          | Build unit / consensus tests                       |   ON    |
+| `BUILD_CORE_ONLY`      | Only build ZEN Core components                     |   OFF   |
+| `BUILD_CLANG_COVERAGE` | **Clang** (only) instrumentation for code coverage |   OFF   |
+| `BUILD_SANITIZE`       | Build instrumentation for sanitizers               |   OFF   |
+| `BUILD_TESTS`          | Build unit / consensus tests                       |   ON    |
 
 Then run the build itself
 ```shell

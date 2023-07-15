@@ -19,7 +19,7 @@ Do not even try on AWS LightSail instances.
 ## Code Tree Map
 This projects contains the following directory components:
 * [`cmake`](../cmake) Where main cmake components are stored. Generally you don't need to edit anything there.
-* [`cmd`](../cmd) The basic source code of project's executable binaries (daemon and support tools). Nothing in this directory gets built when you choose the `ZEN_CORE_ONLY` build option
+* [`cmd`](../cmd) The basic source code of project's executable binaries (daemon and support tools). Nothing in this directory gets built when you choose the `BUILD_CORE_ONLY` build option
 * [`doc`](../doc) The documentation area. No source code is allowed here
 * [`third-party`](../third-party) Where most of the dependencies of the project are stored. Some directories may be bound to [submodules] while other may contain imported code.
 * [`zen/core`](../zen/core) This module contains the heart of the Zen protocol logic. Source code within `core` is suitable for export (as a library) to third-party applications and cannot make use of C++ exceptions (build flags explicitly voids them)
