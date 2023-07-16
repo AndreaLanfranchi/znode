@@ -132,7 +132,7 @@ message(CHECK_START "Looking for required packages ...")
 find_package(Microsoft.GSL CONFIG REQUIRED GLOBAL)
 find_package(nlohmann_json CONFIG REQUIRED GLOBAL)
 find_package(OpenSSL REQUIRED GLOBAL)
-find_package(intx CONFIG REQUIRED GLOBAL)
+find_package(intx)
 
 if (NOT TARGET intx::intx)
     message(FATAL_ERROR "Mandatory package intx::intx not found")

@@ -29,7 +29,7 @@ BOOST_NORETURN void throw_exception(const std::exception& ex);
 }
 #endif
 
-static_assert(intx::byte_order_is_little_endian == true, "Target architecture MUST be little endian");
+static_assert(std::endian::native == std::endian::little, "Target architecture MUST be little endian");
 
 namespace zenpp {
 
@@ -40,7 +40,7 @@ concept UnsignedIntegral = std::unsigned_integral<T>;
 
 template <class T>
 concept UnsignedIntegralEx = UnsignedIntegral<T> || std::same_as<T, intx::uint128> || std::same_as<T, intx::uint256> ||
-    std::same_as<T, intx::uint512>;
+                             std::same_as<T, intx::uint512>;
 
 //! \brief Used to allow passing string literals as template arguments
 template <size_t N>

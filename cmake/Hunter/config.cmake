@@ -26,6 +26,13 @@ hunter_config(
 )
 
 hunter_config(
+        intx
+        VERSION 0.10.0
+        URL https://github.com/chfast/intx/archive/refs/tags/v0.10.0.tar.gz
+        SHA1 3a6ebe0b1a36527b6ef291ee93a8e508371e5b77
+)
+
+hunter_config(
         Boost
         VERSION 1.81.0
         URL https://boostorg.jfrog.io/artifactory/main/release/1.81.0/source/boost_1_81_0.tar.bz2
