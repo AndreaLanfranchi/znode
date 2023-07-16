@@ -6,7 +6,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 ]]
 
-cmake_minimum_required(VERSION 3.16.2)
+cmake_minimum_required(VERSION 3.20)
 
 find_package(Git QUIET)
 if (NOT GIT_FOUND)
@@ -14,7 +14,7 @@ if (NOT GIT_FOUND)
 endif ()
 
 if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cable/.git)
-    message(FATAL_ERROR "Git submodules not initialized, execute:\n  git submodule update --init --recursive")
+    message(FATAL_ERROR "Git submodules not initialized, execute:\n$ git submodule update --init --recursive")
 endif ()
 
 get_directory_property(PROJECT_HAS_PARENT PARENT_DIRECTORY)
@@ -29,10 +29,10 @@ if (NOT PROJECT_HAS_PARENT)
         set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain/cxx20.cmake CACHE FILEPATH "" FORCE)
     endif ()
 
-    include(cmake/cable/HunterGate.cmake)
+    include(cmake/HunterGate.cmake)
     HunterGate(
-            URL "https://github.com/cpp-pm/hunter/archive/v0.24.3.tar.gz"
-            SHA1 "10738b59e539818a01090e64c2d09896247530c7"
+            URL "https://github.com/cpp-pm/hunter/archive/v0.24.18.tar.gz"
+            SHA1 "1292e4d661e1770d6d6ca08c12c07cf34a0bf718"
             LOCAL
     )
 
@@ -46,11 +46,11 @@ where you have cloned this project.
 
 -----------------------------------------------------------------------------------------------------
 include(<project-dir>/cmake/cable/bootstrap.cmake)
-include(<project-dir>/cmake/cable/HunterGate.cmake)
+include(<project-dir>/cmake/HunterGate.cmake)
 HunterGate(
-  URL "https://github.com/cpp-pm/hunter/archive/v0.24.3.tar.gz"
-  SHA1 "10738b59e539818a01090e64c2d09896247530c7"
-  FILEPATH "${CMAKE_SOURCE_DIR}/zen/cmake/Hunter/config.cmake"
+  URL "https://github.com/cpp-pm/hunter/archive/v0.24.18.tar.gz"
+  SHA1 "1292e4d661e1770d6d6ca08c12c07cf34a0bf718"
+  FILEPATH "${CMAKE_SOURCE_DIR}/<project-dir>/cmake/Hunter/config.cmake"
 )
 
 -----------------------------------------------------------------------------------------------------
@@ -129,10 +129,10 @@ include(${PROJECT_MAIN_DIR}/cmake/toolchain/compiler_settings.cmake)
 include(${PROJECT_MAIN_DIR}/cmake/Hunter/core_packages.cmake)
 
 message(CHECK_START "Looking for required packages ...")
-find_package(Microsoft.GSL CONFIG REQUIRED GLOBAL)
-find_package(nlohmann_json CONFIG REQUIRED GLOBAL)
-find_package(OpenSSL REQUIRED GLOBAL)
-find_package(intx)
+find_package(Microsoft.GSL CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED COMPONENTS Crypto SSL)
+find_package(intx CONFIG REQUIRED)
 
 if (NOT TARGET intx::intx)
     message(FATAL_ERROR "Mandatory package intx::intx not found")
@@ -141,12 +141,12 @@ elseif (NOT TARGET Microsoft.GSL::GSL)
 elseif (NOT TARGET nlohmann_json::nlohmann_json)
     message(FATAL_ERROR "Mandatory package nlohmann_json::nlohmann_json not found")
 elseif (NOT TARGET OpenSSL::Crypto)
-    message(FATAL_ERROR "Mandatory package OpenSSL::Crypto not found")
+    message(FATAL_ERROR "Mandatory package OpenSSL::Crypto not found but OPENSSL_FOUND==${OPENSSL_FOUND} and OPENSSL_CRYPTO_LIBRARY==${OPENSSL_CRYPTO_LIBRARY}")
 endif ()
 
 if (BUILD_TESTS)
-    find_package(Catch2 CONFIG REQUIRED GLOBAL)    # Tests
-    find_package(benchmark CONFIG REQUIRED GLOBAL) # Benchmarks
+    find_package(Catch2 CONFIG REQUIRED)    # Tests
+    find_package(benchmark CONFIG REQUIRED) # Benchmarks
     if (NOT TARGET Catch2::Catch2)
         message(WARNING "Package Catch2::Catch target not found. Building tests will be disabled.")
     endif ()
@@ -163,9 +163,9 @@ if (NOT BUILD_CORE_ONLY)
     set(CMAKE_POLICY_DEFAULT_CMP0063 NEW) # Honor visibility properties for all target types
     set(CMAKE_POLICY_DEFAULT_CMP0074 NEW)
 
-    find_package(Boost CONFIG REQUIRED GLOBAL COMPONENTS context coroutine) # Boost
-    find_package(absl CONFIG REQUIRED GLOBAL)
-    find_package(CLI11 REQUIRED GLOBAL)
+    find_package(Boost CONFIG REQUIRED COMPONENTS context coroutine) # Boost
+    find_package(absl CONFIG REQUIRED)
+    find_package(CLI11 REQUIRED)
 
     # MDBX
     set(MDBX_ENABLE_TESTS OFF)
@@ -243,4 +243,7 @@ else ()
 endif ()
 
 add_subdirectory(src) # Main sources
-add_subdirectory(cmd) # Executables sources
+
+if (NOT BUILD_CORE_ONLY)
+    add_subdirectory(cmd) # Executables sources
+endif (NOT BUILD_CORE_ONLY)
