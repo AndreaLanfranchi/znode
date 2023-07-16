@@ -8,7 +8,7 @@
 
 #include <boost/noncopyable.hpp>
 
-#include <zen/core/crypto/md.hpp>
+#include <core/crypto/md.hpp>
 
 namespace zen::crypto {
 //! \brief A hasher class for Bitcoin's 256 bit hash (double Sha256)

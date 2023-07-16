@@ -14,8 +14,8 @@
 
 #include <boost/noncopyable.hpp>
 
-#include <zen/core/common/assert.hpp>
-#include <zen/core/common/base.hpp>
+#include <core/common/assert.hpp>
+#include <core/common/base.hpp>
 
 namespace zen {
 

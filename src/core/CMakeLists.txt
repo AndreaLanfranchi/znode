@@ -16,25 +16,27 @@ if (SOURCES_COUNT EQUAL 0)
 endif ()
 message(CHECK_PASS "found ${SOURCES_COUNT} source files")
 
-add_library($CACHE{BUILD_CORE_COMPONENT} ${SOURCES})
-target_include_directories($CACHE{BUILD_CORE_COMPONENT} SYSTEM PUBLIC
-        $CACHE{BUILD_MAIN_SRC_DIR}
-        $CACHE{BUILD_3RDP_SRC_DIR}
-        )
-
-set_target_properties($CACHE{BUILD_CORE_COMPONENT} PROPERTIES LINKER_LANGUAGE CXX)
+add_library(${BUILD_CORE_COMPONENT} ${SOURCES})
+target_include_directories(${BUILD_CORE_COMPONENT} PRIVATE ${BUILD_MAIN_SRC_DIR})
+set_target_properties(${BUILD_CORE_COMPONENT} PROPERTIES LINKER_LANGUAGE CXX)
 
 # No exceptions here
-target_compile_definitions($CACHE{BUILD_CORE_COMPONENT} PRIVATE BOOST_NO_EXCEPTIONS)
+target_compile_definitions(${BUILD_CORE_COMPONENT} PRIVATE BOOST_NO_EXCEPTIONS)
 if (MSVC)
-    target_compile_options($CACHE{BUILD_CORE_COMPONENT} PRIVATE /EHa- /EHsc)
+    target_compile_options(${BUILD_CORE_COMPONENT} PRIVATE /EHa- /EHsc)
 else ()
-    target_compile_options($CACHE{BUILD_CORE_COMPONENT} PRIVATE -fno-exceptions)
+    target_compile_options(${BUILD_CORE_COMPONENT} PRIVATE -fno-exceptions)
 endif ()
 
-set(PUBLIC_LIBS intx::intx Microsoft.GSL::GSL nlohmann_json OpenSSL::Crypto)
+set(PUBLIC_LIBS
+        ${BUILDINFO_LIB}
+        third-party-includes
+        intx::intx
+        Microsoft.GSL::GSL
+        nlohmann_json
+        OpenSSL::Crypto)
 
 # See https://github.com/microsoft/vcpkg/issues/2621#issuecomment-359374703
 set(PRIVATE_LIBS $<$<BOOL:${MSVC}>:Ws2_32.lib>)
 
-target_link_libraries($CACHE{BUILD_CORE_COMPONENT} PUBLIC ${PUBLIC_LIBS} PRIVATE ${PRIVATE_LIBS})
+target_link_libraries(${BUILD_CORE_COMPONENT} PUBLIC ${PUBLIC_LIBS} PRIVATE ${PRIVATE_LIBS})

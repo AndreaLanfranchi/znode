@@ -12,14 +12,14 @@
 #include <openssl/opensslv.h>
 #include <openssl/ssl.h>
 
-#include <zen/core/common/memory.hpp>
+#include <core/common/memory.hpp>
 
-#include <zen/node/common/stopwatch.hpp>
-#include <zen/node/concurrency/ossignals.hpp>
-#include <zen/node/database/access_layer.hpp>
-#include <zen/node/database/mdbx_tables.hpp>
-#include <zen/node/network/node_hub.hpp>
-#include <zen/node/zk/params.hpp>
+#include <app/common/stopwatch.hpp>
+#include <app/concurrency/ossignals.hpp>
+#include <app/database/access_layer.hpp>
+#include <app/database/mdbx_tables.hpp>
+#include <app/network/node_hub.hpp>
+#include <app/zk/params.hpp>
 
 #include "common.hpp"
 
@@ -69,7 +69,7 @@ void prepare_chaindata_env(NodeSettings& node_settings, [[maybe_unused]] bool in
 }
 
 int main(int argc, char* argv[]) {
-    const auto build_info(zen_get_buildinfo());
+    const auto build_info(get_buildinfo());
 
     CLI::App cli(std::string(build_info->project_name).append(" node"));
     cli.get_formatter()->column_width(50);

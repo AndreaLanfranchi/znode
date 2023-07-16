@@ -6,9 +6,9 @@
 
 #include <vector>
 
-#include <zen/core/common/cast.hpp>
-#include <zen/core/crypto/hmac.hpp>
-#include <zen/core/crypto/md_test.hpp>
+#include <core/common/cast.hpp>
+#include <core/crypto/hmac.hpp>
+#include <core/crypto/md_test.hpp>
 
 namespace zen::crypto {
 

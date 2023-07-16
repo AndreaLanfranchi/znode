@@ -6,7 +6,7 @@
 
 #include <bit>
 
-#include <zen/core/crypto/jenkins.hpp>
+#include <core/crypto/jenkins.hpp>
 
 namespace zen::crypto {
 

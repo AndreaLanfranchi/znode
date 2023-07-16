@@ -4,7 +4,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "md_test.hpp"
+#include <core/crypto/md_test.hpp>
 
 namespace zen::crypto {
 

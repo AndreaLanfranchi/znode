@@ -10,12 +10,11 @@
 #include <optional>
 
 #include <CLI/CLI.hpp>
-#include <zen/buildinfo.h>
 
-#include <zen/core/common/misc.hpp>
+#include <core/common/misc.hpp>
 
-#include <zen/node/common/log.hpp>
-#include <zen/node/common/settings.hpp>
+#include <app/common/log.hpp>
+#include <app/common/settings.hpp>
 
 namespace zen::cmd {
 

@@ -12,7 +12,7 @@
 
 #include <boost/noncopyable.hpp>
 
-#include <zen/core/common/memory.hpp>
+#include <core/common/memory.hpp>
 
 namespace zen {
 

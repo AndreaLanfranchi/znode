@@ -8,9 +8,9 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/common/base.hpp>
-#include <zen/core/common/misc.hpp>
-#include <zen/core/common/object_pool.hpp>
+#include <core/common/base.hpp>
+#include <core/common/misc.hpp>
+#include <core/common/object_pool.hpp>
 
 namespace zen {
 

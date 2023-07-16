@@ -7,7 +7,7 @@
 #include <boost/format.hpp>
 #include <catch2/catch.hpp>
 
-#include <zen/core/types/amounts.hpp>
+#include <core/types/amounts.hpp>
 
 namespace zen {
 

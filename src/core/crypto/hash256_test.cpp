@@ -8,8 +8,8 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/crypto/hash256.hpp>
-#include <zen/core/crypto/md_test.hpp>
+#include <core/crypto/hash256.hpp>
+#include <core/crypto/md_test.hpp>
 
 namespace zen::crypto {
 

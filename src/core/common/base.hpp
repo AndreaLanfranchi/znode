@@ -8,7 +8,7 @@
 #pragma once
 
 // Clang-format off
-#include "preprocessor.hpp"  // Must be first
+#include <core/common/preprocessor.hpp>  // Must be first
 // clang-format on
 
 #include <compare>
@@ -20,6 +20,7 @@
 #include <string_view>
 
 #include <intx/intx.hpp>
+#include <zenpp/buildinfo.h>
 
 #if defined(BOOST_NO_EXCEPTIONS)
 #include <boost/throw_exception.hpp>
@@ -52,6 +53,12 @@ struct StringLiteral {
 #if !defined(_MSC_VER)
 unsigned long long strnlen_s(const char* str, size_t strsz) noexcept;
 #endif
+
+//! \brief Returns build information
+const buildinfo* get_buildinfo() noexcept;
+
+//! \brief Returns build information as string
+std::string get_buildinfo_string() noexcept;
 
 using Bytes = std::basic_string<uint8_t>;
 

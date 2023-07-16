@@ -7,12 +7,13 @@
 
 # Core Benchmarks
 message(CHECK_START "Looking for core benchmarks ...")
-file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "$CACHE{BUILD_MAIN_SRC_DIR}/core/*_benchmark.?pp")
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${BUILD_MAIN_SRC_DIR}/core/*_benchmark.?pp")
 list(LENGTH SOURCES SOURCE_ITEMS)
 message(CHECK_PASS "found ${SOURCE_ITEMS} source files")
 if (NOT SOURCE_ITEMS EQUAL 0)
     add_executable(core_benchmarks benchmark_test.cpp ${SOURCES})
-    target_link_libraries(core_benchmarks PRIVATE $CACHE{BUILD_CORE_COMPONENT} benchmark::benchmark)
+    target_link_libraries(core_benchmarks PUBLIC third-party-includes PRIVATE ${BUILD_CORE_COMPONENT} benchmark::benchmark)
+    target_include_directories(core_benchmarks PRIVATE ${BUILD_MAIN_SRC_DIR})
 
     # No exceptions here
     target_compile_definitions(core_benchmarks PRIVATE BOOST_NO_EXCEPTIONS)
@@ -29,12 +30,13 @@ if (NOT BUILD_CORE_ONLY)
     # Main app Benchmarks
     message(CHECK_START "Looking for main benchmarks ...")
     set(SOURCES)
-    file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "$CACHE{BUILD_MAIN_SRC_DIR}/main/*_benchmark.?pp")
+    file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${BUILD_MAIN_SRC_DIR}/main/*_benchmark.?pp")
     list(LENGTH SOURCES SOURCE_ITEMS)
     message(CHECK_PASS "found ${SOURCE_ITEMS} source files")
     if (NOT SOURCE_ITEMS EQUAL 0)
         add_executable(main_benchmarks benchmark_test.cpp ${SOURCES})
-        target_link_libraries(main_benchmarks $CACHE{BUILD_MAIN_COMPONENT} benchmark::benchmark)
+        target_link_libraries(main_benchmarks PUBLIC third-party-includes PRIVATE ${BUILD_MAIN_COMPONENT} benchmark::benchmark)
+        target_include_directories(main_benchmarks PRIVATE ${BUILD_MAIN_SRC_DIR})
     endif ()
 
 endif ()

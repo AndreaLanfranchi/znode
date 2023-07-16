@@ -8,13 +8,13 @@
 #include <array>
 #include <ranges>
 
-#include <zen/core/common/assert.hpp>
-#include <zen/core/common/base.hpp>
-#include <zen/core/common/cast.hpp>
-#include <zen/core/common/endian.hpp>
-#include <zen/core/crypto/jenkins.hpp>
-#include <zen/core/encoding/hex.hpp>
-#include <zen/core/serialization/serializable.hpp>
+#include <core/common/assert.hpp>
+#include <core/common/base.hpp>
+#include <core/common/cast.hpp>
+#include <core/common/endian.hpp>
+#include <core/crypto/jenkins.hpp>
+#include <core/encoding/hex.hpp>
+#include <core/serialization/serializable.hpp>
 
 namespace zen {
 

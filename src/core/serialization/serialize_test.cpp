@@ -6,10 +6,10 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/crypto/md.hpp>
-#include <zen/core/encoding/hex.hpp>
-#include <zen/core/serialization/serialize.hpp>
-#include <zen/core/serialization/stream.hpp>
+#include <core/crypto/md.hpp>
+#include <core/encoding/hex.hpp>
+#include <core/serialization/serialize.hpp>
+#include <core/serialization/stream.hpp>
 
 namespace zen::serialization {
 

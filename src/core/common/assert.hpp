@@ -8,7 +8,7 @@
 #pragma once
 #include <string_view>
 
-#include <zen/core/common/preprocessor.hpp>
+#include <core/common/preprocessor.hpp>
 
 namespace zen {
 [[noreturn]] void abort_due_to_assertion_failure(std::string_view message, const char* function, const char* file,

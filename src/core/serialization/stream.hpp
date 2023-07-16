@@ -13,10 +13,10 @@
 
 #include <tl/expected.hpp>
 
-#include <zen/core/common/base.hpp>
-#include <zen/core/common/secure_bytes.hpp>
-#include <zen/core/serialization/base.hpp>
-#include <zen/core/serialization/serialize.hpp>
+#include <core/common/base.hpp>
+#include <core/common/secure_bytes.hpp>
+#include <core/serialization/base.hpp>
+#include <core/serialization/serialize.hpp>
 
 namespace zen::serialization {
 

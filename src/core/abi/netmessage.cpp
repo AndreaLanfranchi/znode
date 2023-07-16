@@ -6,14 +6,13 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "netmessage.hpp"
-
 #include <algorithm>
 
 #include <gsl/gsl_util>
 
-#include <zen/core/common/misc.hpp>
-#include <zen/core/crypto/hash256.hpp>
+#include <core/abi/netmessage.hpp>
+#include <core/common/misc.hpp>
+#include <core/crypto/hash256.hpp>
 
 namespace zen {
 
@@ -52,7 +51,7 @@ serialization::Error NetMessageHeader::serialization(serialization::SDataStream&
 
 serialization::Error NetMessageHeader::validate(std::optional<ByteView> expected_network_magic) const noexcept {
     using enum serialization::Error;
-    if (expected_network_magic&& ByteView{magic} != *expected_network_magic) return kMessageHeaderMagicMismatch;
+    if (expected_network_magic && ByteView{magic} != *expected_network_magic) return kMessageHeaderMagicMismatch;
     if (command[0] == 0) return kMessageHeaderEmptyCommand;  // reject empty commands
     if (length > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 

@@ -7,8 +7,8 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/common/endian.hpp>
-#include <zen/core/encoding/hex.hpp>
+#include <core/common/endian.hpp>
+#include <core/encoding/hex.hpp>
 
 namespace zen::endian {
 

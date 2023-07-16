@@ -9,8 +9,8 @@
 #pragma once
 #include <tl/expected.hpp>
 
-#include <zen/core/common/base.hpp>
-#include <zen/core/encoding/errors.hpp>
+#include <core/common/base.hpp>
+#include <core/encoding/errors.hpp>
 
 namespace zen {
 

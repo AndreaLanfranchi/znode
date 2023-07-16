@@ -8,8 +8,8 @@
 
 #include <boost/noncopyable.hpp>
 
-#include <zen/core/crypto/md.hpp>
-#include <zen/core/types/hash.hpp>
+#include <core/crypto/md.hpp>
+#include <core/types/hash.hpp>
 
 namespace zen::crypto {
 //! \brief A hasher class for Bitcoin's 160-bit hash (SHA-256 + RIPEMD-160)

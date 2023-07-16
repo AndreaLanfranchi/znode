@@ -8,8 +8,8 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/common/base.hpp>
-#include <zen/core/common/capped_set.hpp>
+#include <core/common/base.hpp>
+#include <core/common/capped_set.hpp>
 
 namespace zen {
 TEST_CASE("Capped Set", "[memory]") {

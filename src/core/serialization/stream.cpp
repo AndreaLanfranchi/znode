@@ -8,9 +8,9 @@
 
 #include <utility>
 
-#include <zen/core/common/overflow.hpp>
-#include <zen/core/encoding/hex.hpp>
-#include <zen/core/serialization/stream.hpp>
+#include <core/common/overflow.hpp>
+#include <core/encoding/hex.hpp>
+#include <core/serialization/stream.hpp>
 
 namespace zen::serialization {
 

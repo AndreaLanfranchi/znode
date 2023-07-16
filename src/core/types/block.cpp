@@ -6,7 +6,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <zen/core/types/block.hpp>
+#include <core/types/block.hpp>
 
 namespace zen {
 

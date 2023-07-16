@@ -9,7 +9,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/encoding/hex.hpp>
+#include <core/encoding/hex.hpp>
 
 namespace zen::hex {
 

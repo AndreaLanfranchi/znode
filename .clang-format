@@ -10,10 +10,10 @@ PointerAlignment: Left
 
 IncludeCategories:
   # Zen headers
-  - Regex:           '<zen/core.*'
+  - Regex:           '<core.*'
     Priority:        50
 
-  - Regex:           '<zen/node.*'
+  - Regex:           '<app.*'
     Priority:        60
 
   # C standard library

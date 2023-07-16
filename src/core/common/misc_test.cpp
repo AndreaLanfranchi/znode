@@ -9,8 +9,8 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/common/cast.hpp>
-#include <zen/core/common/misc.hpp>
+#include <core/common/cast.hpp>
+#include <core/common/misc.hpp>
 
 namespace zen {
 

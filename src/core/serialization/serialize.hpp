@@ -10,8 +10,8 @@
 #include <bit>
 #include <type_traits>
 
-#include <zen/core/common/base.hpp>
-#include <zen/core/serialization/base.hpp>
+#include <core/common/base.hpp>
+#include <core/serialization/base.hpp>
 
 //! \brief All functions dedicated to objects and types serialization
 namespace zen::serialization {

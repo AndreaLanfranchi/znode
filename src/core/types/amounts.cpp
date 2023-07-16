@@ -12,7 +12,7 @@
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include <zen/core/types/amounts.hpp>
+#include <core/types/amounts.hpp>
 
 namespace zen {
 

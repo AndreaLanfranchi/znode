@@ -6,7 +6,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/types/hash.hpp>
+#include <core/types/hash.hpp>
 
 namespace zen {
 

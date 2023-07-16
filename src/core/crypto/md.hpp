@@ -10,11 +10,11 @@
 
 #include <openssl/evp.h>
 
-#include <zen/core/common/assert.hpp>
-#include <zen/core/common/base.hpp>
-#include <zen/core/common/cast.hpp>
-#include <zen/core/common/endian.hpp>
-#include <zen/core/common/object_pool.hpp>
+#include <core/common/assert.hpp>
+#include <core/common/base.hpp>
+#include <core/common/cast.hpp>
+#include <core/common/endian.hpp>
+#include <core/common/object_pool.hpp>
 
 namespace zen::crypto {
 

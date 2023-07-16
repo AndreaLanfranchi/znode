@@ -10,9 +10,9 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/common/cast.hpp>
-#include <zen/core/crypto/md.hpp>
-#include <zen/core/encoding/hex.hpp>
+#include <core/common/cast.hpp>
+#include <core/crypto/md.hpp>
+#include <core/encoding/hex.hpp>
 
 namespace zen::crypto {
 template <typename Hasher>

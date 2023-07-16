@@ -13,14 +13,13 @@
 #include <boost/format.hpp>
 #include <magic_enum.hpp>
 
-#include <zen/core/common/cast.hpp>
+#include <core/common/cast.hpp>
+#include <core/common/misc.hpp>
 
-#include <zen/node/common/directories.hpp>
-#include <zen/node/common/log.hpp>
-#include <zen/node/concurrency/ossignals.hpp>
-#include <zen/node/database/mdbx.hpp>
-
-#include "zen/core/common/misc.hpp"
+#include <app/common/directories.hpp>
+#include <app/common/log.hpp>
+#include <app/concurrency/ossignals.hpp>
+#include <app/database/mdbx.hpp>
 
 namespace fs = std::filesystem;
 using namespace zen;

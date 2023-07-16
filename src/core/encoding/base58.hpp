@@ -5,11 +5,12 @@
 */
 
 #pragma once
+
 #include <tl/expected.hpp>
 
-#include <zen/core/common/base.hpp>
-#include <zen/core/crypto/md.hpp>
-#include <zen/core/encoding/errors.hpp>
+#include <core/common/base.hpp>
+#include <core/crypto/md.hpp>
+#include <core/encoding/errors.hpp>
 
 namespace zen::base58 {
 

@@ -30,7 +30,7 @@
 // clang-format on
 #endif
 
-#include <zen/core/common/memory.hpp>
+#include <core/common/memory.hpp>
 
 namespace zen {
 // Inspired by:

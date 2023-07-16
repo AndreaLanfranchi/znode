@@ -10,7 +10,7 @@
 #include <concepts>
 #include <ranges>
 
-#include <zen/core/common/base.hpp>
+#include <core/common/base.hpp>
 
 namespace zen::endian {
 

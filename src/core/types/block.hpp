@@ -7,9 +7,9 @@
 */
 
 #pragma once
-#include <zen/core/common/base.hpp>
-#include <zen/core/serialization/serializable.hpp>
-#include <zen/core/types/hash.hpp>
+#include <core/common/base.hpp>
+#include <core/serialization/serializable.hpp>
+#include <core/types/hash.hpp>
 
 namespace zen {
 

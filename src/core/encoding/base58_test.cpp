@@ -8,9 +8,9 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/common/cast.hpp>
-#include <zen/core/encoding/base58.hpp>
-#include <zen/core/encoding/hex.hpp>
+#include <core/common/cast.hpp>
+#include <core/encoding/base58.hpp>
+#include <core/encoding/hex.hpp>
 
 namespace zen::base58 {
 

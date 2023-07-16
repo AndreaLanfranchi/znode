@@ -9,8 +9,8 @@
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 
-#include <zen/core/common/cast.hpp>
-#include <zen/core/encoding/base64.hpp>
+#include <core/common/cast.hpp>
+#include <core/encoding/base64.hpp>
 
 namespace zen::base64 {
 

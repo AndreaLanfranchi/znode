@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-#include <zen/core/common/base.hpp>
+#include <core/common/base.hpp>
 
 #if defined(BOOST_NO_EXCEPTIONS)
 namespace boost {
@@ -28,4 +28,22 @@ unsigned long long strnlen_s(const char* str, size_t strsz) noexcept {
 }
 #endif
 
+const buildinfo* get_buildinfo() noexcept { return zenpp_get_buildinfo(); }
+
+std::string get_buildinfo_string() noexcept {
+    std::string ret{};
+    const auto* build_info = get_buildinfo();
+    ret.append(build_info->project_name_with_version);
+    ret.append(" ");
+    ret.append(build_info->system_name);
+    ret.append("-");
+    ret.append(build_info->system_processor);
+    ret.append("_");
+    ret.append(build_info->build_type);
+    ret.append("/");
+    ret.append(build_info->compiler_id);
+    ret.append("-");
+    ret.append(build_info->compiler_version);
+    return ret;
+}
 }  // namespace zen

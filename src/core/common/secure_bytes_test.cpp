@@ -6,8 +6,8 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/common/base.hpp>
-#include <zen/core/common/secure_bytes.hpp>
+#include <core/common/base.hpp>
+#include <core/common/secure_bytes.hpp>
 
 namespace zen {
 TEST_CASE("Secure Bytes", "[memory]") {

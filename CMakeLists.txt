@@ -23,7 +23,7 @@ if (NOT PROJECT_HAS_PARENT)
 
     include(cmake/cable/bootstrap.cmake)
     include(CableBuildType)
-    cable_set_build_type(DEFAULT Release CONFIGURATION_TYPES Release Debug)
+    cable_set_build_type(DEFAULT Release CONFIGURATION_TYPES Debug Release RelWithDebInfo)
 
     if (NOT CMAKE_TOOLCHAIN_FILE)
         set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain/cxx20.cmake CACHE FILEPATH "" FORCE)
@@ -58,7 +58,7 @@ HunterGate(
 (You can update the Hunter version, but keep the FILEPATH option.)
 ]]
 
-project(zen)
+project(zenpp)
 
 # Execute git command to get the latest tag
 execute_process(
@@ -93,6 +93,11 @@ endif ()
 include(CableBuildInfo)
 
 cable_add_buildinfo_library(PROJECT_NAME ${PROJECT_NAME})
+if(NOT TARGET ${PROJECT_NAME}-buildinfo)
+    message(FATAL_ERROR "Build info library not found")
+else()
+    set(BUILDINFO_LIB ${PROJECT_NAME}-buildinfo)
+endif()
 
 option(BUILD_CORE_ONLY "Only build ${PROJECT_NAME} Core" OFF)
 option(BUILD_CLANG_COVERAGE "Clang instrumentation for code coverage reports" OFF)
@@ -100,15 +105,14 @@ option(BUILD_SANITIZE "Build instrumentation for sanitizers" OFF)
 option(BUILD_TESTS "Build tests" ON)
 
 get_filename_component(PROJECT_MAIN_DIR . ABSOLUTE)
-set(BUILD_MAIN_SRC_DIR "${PROJECT_MAIN_DIR}/src" CACHE PATH "Main source directory" FORCE)
-set(BUILD_3RDP_SRC_DIR "${PROJECT_MAIN_DIR}/third-party" CACHE PATH "Third party components sources directory" FORCE)
-set(BUILD_CORE_COMPONENT "${PROJECT_NAME}_core" CACHE PATH "Project's Core component target" FORCE)
-set(BUILD_MAIN_COMPONENT "${PROJECT_NAME}_main" CACHE PATH "Project's Main target" FORCE)
+set(BUILD_MAIN_SRC_DIR "${PROJECT_MAIN_DIR}/src")
+set(BUILD_CORE_COMPONENT "${PROJECT_NAME}-core")
+set(BUILD_MAIN_COMPONENT "${PROJECT_NAME}-app")
 
 message(
         "\n----------------------------------------------------------------------------\n"
         "-- Project  ${PROJECT_NAME} v${PROJECT_VERSION}\n"
-        "-- Source   $CACHE{BUILD_MAIN_SRC_DIR}\n"
+        "-- Source   ${BUILD_MAIN_SRC_DIR}\n"
         "-- Cmake    ${CMAKE_VERSION}\n"
         "-- Compiler ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}\n"
         "-- Build    ${CMAKE_BUILD_TYPE} ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_PROCESSOR}\n"
@@ -184,6 +188,14 @@ if (NOT BUILD_CORE_ONLY)
 
 endif (NOT BUILD_CORE_ONLY)
 message(CHECK_PASS "All required packages found")
+
+# Interface library for third parties
+add_library(third-party-includes INTERFACE)
+target_include_directories(third-party-includes INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/third-party/expected/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/third-party/indicators/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/third-party/magic_enum/include
+        )
 
 
 # Compiler enforcements on ${PROJECT_NAME}

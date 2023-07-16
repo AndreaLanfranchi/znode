@@ -8,10 +8,10 @@
 
 #include <benchmark/benchmark.h>
 
-#include <zen/core/common/base.hpp>
-#include <zen/core/common/cast.hpp>
-#include <zen/core/common/misc.hpp>
-#include <zen/core/encoding/hex.hpp>
+#include <core/common/base.hpp>
+#include <core/common/cast.hpp>
+#include <core/common/misc.hpp>
+#include <core/encoding/hex.hpp>
 
 namespace zen {
 

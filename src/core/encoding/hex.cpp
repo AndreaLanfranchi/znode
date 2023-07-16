@@ -8,7 +8,7 @@
 #include <array>
 #include <ranges>
 
-#include <zen/core/encoding/hex.hpp>
+#include <core/encoding/hex.hpp>
 
 namespace zen::hex {
 

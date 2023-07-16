@@ -15,7 +15,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio/ip/address.hpp>
 
-#include <zen/core/encoding/hex.hpp>
+#include <core/encoding/hex.hpp>
 
 namespace zen::cmd {
 
@@ -168,7 +168,7 @@ void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
 }
 
 std::string get_node_name_from_build_info(const buildinfo* build_info) {
-    std::string node_name{"zen/"};
+    std::string node_name{"zenpp/"};
     node_name.append(build_info->git_branch);
     node_name.append(" v");
     node_name.append(build_info->project_version);

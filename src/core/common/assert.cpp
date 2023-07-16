@@ -7,7 +7,7 @@
 
 #include <iostream>
 
-#include <zen/core/common/assert.hpp>
+#include <core/common/assert.hpp>
 
 namespace zen {
 void abort_due_to_assertion_failure(std::string_view message, const char* function, const char* file, long line) {

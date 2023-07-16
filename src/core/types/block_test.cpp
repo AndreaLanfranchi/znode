@@ -6,7 +6,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <zen/core/types/block.hpp>
+#include <core/types/block.hpp>
 
 namespace zen {
 

@@ -9,8 +9,8 @@
 
 #include <boost/noncopyable.hpp>
 
-#include <zen/core/common/cast.hpp>
-#include <zen/core/crypto/md.hpp>
+#include <core/common/cast.hpp>
+#include <core/crypto/md.hpp>
 
 namespace zen::crypto {
 

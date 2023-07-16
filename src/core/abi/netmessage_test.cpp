@@ -7,10 +7,10 @@
 #include <catch2/catch.hpp>
 #include <magic_enum.hpp>
 
-#include <zen/core/abi/netmessage.hpp>
-#include <zen/core/common/endian.hpp>
-#include <zen/core/crypto/hash256.hpp>
-#include <zen/core/encoding/hex.hpp>
+#include <core/abi/netmessage.hpp>
+#include <core/common/endian.hpp>
+#include <core/crypto/hash256.hpp>
+#include <core/encoding/hex.hpp>
 
 namespace zen {
 
