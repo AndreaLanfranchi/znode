@@ -22,8 +22,8 @@ This projects contains the following directory components:
 * [`cmd`](../cmd) The basic source code of project's executable binaries (daemon and support tools). Nothing in this directory gets built when you choose the `BUILD_CORE_ONLY` build option
 * [`doc`](../doc) The documentation area. No source code is allowed here
 * [`third-party`](../third-party) Where most of the dependencies of the project are stored. Some directories may be bound to [submodules] while other may contain imported code.
-* [`zen/core`](../zen/core) This module contains the heart of the Zen protocol logic. Source code within `core` is suitable for export (as a library) to third-party applications and cannot make use of C++ exceptions (build flags explicitly voids them)
-* [`zen/node`](../zen/node) This module contains the database, the staged sync loop and other logic necessary to function as a Zen node. This module depends on the `core` module.
+* [`src/core`](../src/core) This directory contains the heart of the protocol logic and all basic objects and functions. Source code within `core` is suitable for export (as a library) to third-party applications and cannot make use of C++ exceptions (build flags explicitly voids them)
+* [`src/app`](../src/app) This directory contains the application implementation : storage access layer, networking layer, and all other features needed for complete functionality of a block-chain node. Sources built from this directory depend on the `core` directory contents.
   
 To simplify the building process cmake is configured to make use of GLOB lists of files. As a result a strict naming convention of files (see [Style Guide](../README.md#style-guide)). In addition to that we establish two file names suffix (before extension) reservations:
 * `_test` explicitly mark a file to be included in the unit tests target

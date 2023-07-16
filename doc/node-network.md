@@ -2,10 +2,10 @@
 - [Documents Index](README.md)
 
 [Boost::Asio]: https://www.boost.org/doc/libs/1_81_0/doc/html/boost_asio.html
-[node-hub]: ../zen/node/network/node_hub.hpp
-[node]: ../zen/node/network/node.hpp
+[node-hub]: ../src/app/network/node_hub.hpp
+[node]: ../src/app/network/node.hpp
 
-The way Horizen nodes communicate with each other is based on the Bitcoin protocol. 
+The way `zenpp` nodes communicate with each other is based on the Bitcoin protocol. 
 The protocol is a set of rules that define how nodes communicate with each other. 
 The protocol is based on TCP/IP and uses a peer-to-peer network to broadcast transactions and blocks.
 The protocol is also used to synchronize the blockchain between nodes. Unlike the bitcoin major node implementations
@@ -17,4 +17,4 @@ The major components of the networking layer are:
 - [node] The node class is the representation of a remote node. It is responsible for managing the connection to a remote node and for dispatching messages to the appropriate handlers.
 
 ## Node-hub
-The node-hub is the main network component of the zend++ instance. It handles the connections with all nodes whether inbound or outbound.
+The node-hub is the main network component of the `zenpp` instance. It handles the connections with all nodes whether inbound or outbound.

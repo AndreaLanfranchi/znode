@@ -9,11 +9,12 @@ DerivePointerAlignment: false
 PointerAlignment: Left
 
 IncludeCategories:
-  # Zen headers
-  - Regex:           '<core.*'
+  # Core headers
+  - Regex:           '<core\/.*'
     Priority:        50
 
-  - Regex:           '<app.*'
+  # Main headers
+  - Regex:           '<app\/.*'
     Priority:        60
 
   # C standard library
@@ -27,4 +28,3 @@ IncludeCategories:
   # Third-party libraries
   - Regex:           '<.*'
     Priority:        30
-
