@@ -26,51 +26,22 @@ void print_ssl_error(unsigned long err, const log::Level severity) {
 
 EVP_PKEY* generate_random_rsa_key_pair(int bits) {
     EVP_PKEY* pkey{nullptr};
-    BIGNUM* bn{BN_new()};
-    if (bn == nullptr) {
-        LOG_ERROR << "Failed to create BIGNUM";
+
+    EVP_PKEY_CTX* ctx{EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, nullptr)};
+    if (ctx == nullptr) {
+        LOGF_ERROR << "Failed to create EVP_PKEY_CTX";
         return nullptr;
     }
-    auto bn_free{gsl::finally([bn]() { BN_free(bn); })};
+    auto ctx_free{gsl::finally([ctx]() { EVP_PKEY_CTX_free(ctx); })};
 
-    if (!BN_set_word(bn, static_cast<BN_ULONG>(RSA_F4))) {
-        LOG_ERROR << "Failed to set BIGNUM";
-        return nullptr;
-    }
-
-    RSA* rsa{RSA_new()};
-    if (rsa == nullptr) {
-        LOG_ERROR << "Failed to create RSA";
+    EVP_PKEY_keygen_init(ctx);
+    if (EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, bits) <= 0) {
+        LOGF_ERROR << "Failed to set RSA keygen bits";
         return nullptr;
     }
 
-    if (!RAND_poll()) {
-        auto err{ERR_get_error()};
-        print_ssl_error(err);
-        LOG_ERROR << "Failed to initialize random number generator";
-        RSA_free(rsa);
-        return nullptr;
-    }
-
-    if (!RSA_generate_key_ex(rsa, bits, bn, nullptr)) {
-        auto err{ERR_get_error()};
-        print_ssl_error(err);
-        LOG_ERROR << "Failed to initialize random number generator";
-        RSA_free(rsa);
-        return nullptr;
-    }
-
-    pkey = EVP_PKEY_new();
-    if (pkey == nullptr) {
-        LOG_ERROR << "Failed to create EVP_PKEY";
-        RSA_free(rsa);
-        return nullptr;
-    }
-    if (!EVP_PKEY_assign_RSA(pkey, rsa)) {
-        auto err{ERR_get_error()};
-        print_ssl_error(err);
-        LOG_ERROR << "Failed to assign RSA to EVP_PKEY";
-        EVP_PKEY_free(pkey);
+    if (EVP_PKEY_keygen(ctx, &pkey) <= 0) {
+        LOGF_ERROR << "Failed to generate RSA key pair";
         return nullptr;
     }
 
@@ -85,6 +56,8 @@ X509* generate_self_signed_certificate(EVP_PKEY* pkey) {
 
     X509* x509_certificate = X509_new();
     if (!x509_certificate) {
+        auto err{ERR_get_error()};
+        print_ssl_error(err);
         LOG_ERROR << "Failed to create X509 certificate";
         return nullptr;
     }
@@ -171,6 +144,7 @@ bool store_rsa_key_pair(EVP_PKEY* pkey, const std::string& password, const std::
 
     return true;
 }
+
 bool store_x509_certificate(X509* cert, const std::filesystem::path& directory_path) {
     if (!cert) {
         LOG_ERROR << "Invalid X509 certificate";
@@ -285,6 +259,7 @@ X509* load_x509_certificate(const std::filesystem::path& directory_path) {
 
     return cert;
 }
+
 bool validate_server_certificate(X509* cert, EVP_PKEY* pkey) {
     if (!cert) {
         LOG_ERROR << "Invalid X509 certificate";
@@ -303,6 +278,7 @@ bool validate_server_certificate(X509* cert, EVP_PKEY* pkey) {
 
     return true;
 }
+
 SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& directory_path,
                               const std::string& key_password) {
     SSL_CTX* ctx{nullptr};
@@ -376,6 +352,7 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
 
     return ctx;
 }
+
 bool validate_tls_requirements(const std::filesystem::path& directory_path, const std::string& key_password) {
     auto cert_path = directory_path / kCertificateFileName;
     auto key_path = directory_path / kPrivateKeyFileName;

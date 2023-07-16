@@ -121,7 +121,7 @@ using Message = LogBuffer<Level::kNone>;
 #define LOGF_BUFFER(level_)                    \
     if (!zenpp::log::test_verbosity(level_)) { \
     } else                                     \
-        zenpp::log::LogBuffer<level_>() << __func__ << " (" << __line__ << ") "
+        zenpp::log::LogBuffer<level_>() << __func__ << " (" << __LINE__ << ") "
 
 #define LOG_TRACE LOG_BUFFER(zenpp::log::Level::kTrace)
 #define LOG_DEBUG LOG_BUFFER(zenpp::log::Level::kDebug)
