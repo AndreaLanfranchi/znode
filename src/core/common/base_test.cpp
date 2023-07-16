@@ -9,7 +9,7 @@
 
 #include <core/common/base.hpp>
 
-namespace zen {
+namespace zenpp {
 
 TEST_CASE("Byteviews") {
     Bytes source{'0', '1', '2'};
@@ -23,4 +23,4 @@ TEST_CASE("Byteviews") {
     REQUIRE(bv2.is_null());
 }
 
-}  // namespace zen
+}  // namespace zenpp

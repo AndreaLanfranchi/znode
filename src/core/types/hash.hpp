@@ -16,7 +16,7 @@
 #include <core/encoding/hex.hpp>
 #include <core/serialization/serializable.hpp>
 
-namespace zen {
+namespace zenpp {
 
 //! \brief A Hash is a fixed size sequence of bytes
 template <uint32_t BITS>
@@ -108,4 +108,4 @@ class Hash : public serialization::Serializable {
 using h160 = Hash<160>;
 using h256 = Hash<256>;
 
-}  // namespace zen
+}  // namespace zenpp

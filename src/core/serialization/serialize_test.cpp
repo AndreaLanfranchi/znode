@@ -11,7 +11,7 @@
 #include <core/serialization/serialize.hpp>
 #include <core/serialization/stream.hpp>
 
-namespace zen::serialization {
+namespace zenpp::serialization {
 
 TEST_CASE("Serialization Sizes", "[serialization]") {
     CHECK(ser_sizeof('a') == 1);
@@ -335,4 +335,4 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         CHECK(value.error() == Error::kCompactSizeTooBig);
     }
 }
-}  // namespace zen::serialization
+}  // namespace zenpp::serialization

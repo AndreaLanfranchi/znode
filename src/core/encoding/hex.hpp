@@ -14,7 +14,7 @@
 #include <core/common/base.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zen::hex {
+namespace zenpp::hex {
 
 //! \brief Whether provided string begins with "0x" prefix (case insensitive)
 //! \param [in] source : string input
@@ -54,4 +54,4 @@ tl::expected<Bytes, DecodingError> decode(std::string_view source) noexcept;
 //! \brief Returns the integer value corresponding to the ascii hex digit provided
 tl::expected<unsigned, DecodingError> decode_digit(char input) noexcept;
 
-}  // namespace zen::hex
+}  // namespace zenpp::hex

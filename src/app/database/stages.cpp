@@ -9,7 +9,7 @@
 
 #include <app/database/stages.hpp>
 
-namespace zen::db::stages {
+namespace zenpp::db::stages {
 
 static BlockNum get_stage_data(mdbx::txn& txn, const char* stage_name, const db::MapConfig& domain,
                                const char* key_prefix = nullptr) {
@@ -85,4 +85,4 @@ bool is_known_stage(const char* name) {
     }
     return false;
 }
-}  // namespace zen::db::stages
+}  // namespace zenpp::db::stages

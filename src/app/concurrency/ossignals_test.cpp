@@ -10,7 +10,7 @@
 
 #include <app/concurrency/ossignals.hpp>
 
-namespace zen {
+namespace zenpp {
 
 TEST_CASE("Os Signals", "[concurrency]") {
     Ossignals::init();  // Enable the hooks
@@ -25,4 +25,4 @@ TEST_CASE("Os Signals", "[concurrency]") {
     REQUIRE(expected_trow);
     Ossignals::reset();  // Otherwise other tests get blocked
 }
-}  // namespace zen
+}  // namespace zenpp

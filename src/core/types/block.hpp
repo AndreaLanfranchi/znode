@@ -11,7 +11,7 @@
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
-namespace zen {
+namespace zenpp {
 
 static constexpr size_t kBlockHeaderSerializedSize{140};  // Excluding Equihash solution
 
@@ -34,4 +34,4 @@ class BlockHeader : public serialization::Serializable {
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
-}  // namespace zen
+}  // namespace zenpp

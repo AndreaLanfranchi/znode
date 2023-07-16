@@ -9,7 +9,7 @@
 
 #include <app/common/log.hpp>
 
-namespace zen::log {
+namespace zenpp::log {
 
 //! \brief Utility class using RAII to change the log verbosity level (necessary to make tests work in shuffled order)
 class SetLogVerbosityGuard {
@@ -31,4 +31,4 @@ inline std::ostream& null_stream() {
     } null_strm;
     return null_strm;
 }
-}  // namespace zen::log
+}  // namespace zenpp::log

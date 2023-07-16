@@ -14,7 +14,7 @@
 #include <app/network/common.hpp>
 #include <app/network/node_hub.hpp>
 
-namespace zen::network {
+namespace zenpp::network {
 
 using boost::asio::ip::tcp;
 
@@ -248,7 +248,7 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
     }
 }
 
-void NodeHub::on_node_data(zen::network::DataDirectionMode direction, const size_t bytes_transferred) {
+void NodeHub::on_node_data(network::DataDirectionMode direction, const size_t bytes_transferred) {
     switch (direction) {
         case DataDirectionMode::kInbound:
             total_bytes_received_ += bytes_transferred;
@@ -285,4 +285,4 @@ std::vector<std::shared_ptr<Node>> NodeHub::get_nodes() const {
     }
     return nodes;
 }
-}  // namespace zen::network
+}  // namespace zenpp::network

@@ -12,7 +12,7 @@
 
 #include <core/common/base.hpp>
 
-namespace zen::endian {
+namespace zenpp::endian {
 
 // TODO(C++23) replace with std::byteswap from <bits> header
 //! \brief Reverses the bytes for given integer value
@@ -62,4 +62,4 @@ const auto store_little_u32 = intx::le::unsafe::store<uint32_t>;
 // Similar to boost::endian::store_little_u64
 const auto store_little_u64 = intx::le::unsafe::store<uint64_t>;
 
-}  // namespace zen::endian
+}  // namespace zenpp::endian

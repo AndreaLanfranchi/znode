@@ -17,7 +17,7 @@ void throw_exception(const std::exception&) {
 }  // namespace boost
 #endif
 
-namespace zen {
+namespace zenpp {
 
 //! \brief Portable strnlen_s
 #if !defined(_MSC_VER)
@@ -46,4 +46,4 @@ std::string get_buildinfo_string() noexcept {
     ret.append(build_info->compiler_version);
     return ret;
 }
-}  // namespace zen
+}  // namespace zenpp

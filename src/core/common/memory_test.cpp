@@ -13,7 +13,7 @@
 #include <core/common/memory.hpp>
 #include <core/common/misc.hpp>
 
-namespace zen {
+namespace zenpp {
 
 TEST_CASE("Memory Usage", "[memory]") {
     size_t memory_usage_resident{get_memory_usage(true)};
@@ -26,7 +26,7 @@ TEST_CASE("System Memory", "[memory]") {
     size_t sys_page_size{get_system_page_size()};
     REQUIRE(sys_page_size > 0);
     REQUIRE((sys_page_size & (sys_page_size - 1)) == 0);  // Must be power of 2
-    std::cout << "Using " << zen::to_human_bytes(sys_page_size, /*binary=*/true) << " memory pages" << std::endl;
+    std::cout << "Using " << to_human_bytes(sys_page_size, /*binary=*/true) << " memory pages" << std::endl;
 }
 
 static const void* last_lock_addr{nullptr};
@@ -138,4 +138,4 @@ TEST_CASE("Lock object", "[memory]") {
     CHECK(LockedPagesManager::instance().empty());
 }
 
-}  // namespace zen
+}  // namespace zenpp

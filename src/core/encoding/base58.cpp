@@ -6,7 +6,7 @@
 
 #include <core/encoding/base58.hpp>
 
-namespace zen::base58 {
+namespace zenpp::base58 {
 
 /*
  * A note about the implementation
@@ -28,7 +28,7 @@ constexpr std::string_view kBase58Digits{"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcde
 // How many chars to append from Sha256 digest checksum
 constexpr size_t kCheckSumLength{4};
 
-tl::expected<std::string, EncodingError> encode(zen::ByteView input) noexcept {
+tl::expected<std::string, EncodingError> encode(ByteView input) noexcept {
     static ZEN_THREAD_LOCAL intx::uint<kBigintSizeInBits> value{0};  // Should be enough - at least for tests
 
     if (input.empty()) return std::string{};
@@ -77,7 +77,7 @@ tl::expected<std::string, EncodingError> encode(zen::ByteView input) noexcept {
     return encoded;
 }
 
-tl::expected<std::string, EncodingError> encode_check(zen::ByteView input) noexcept {
+tl::expected<std::string, EncodingError> encode_check(ByteView input) noexcept {
     Bytes buffer(input);
     crypto::Sha256 digest(buffer);
     const auto hash{digest.finalize()};
@@ -147,4 +147,4 @@ tl::expected<Bytes, DecodingError> decode_check(std::string_view input) noexcept
     return Bytes(original);
 }
 
-}  // namespace zen::base58
+}  // namespace zenpp::base58

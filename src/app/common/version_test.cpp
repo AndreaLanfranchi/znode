@@ -9,7 +9,7 @@
 
 #include <app/common/version.hpp>
 
-namespace zen {
+namespace zenpp {
 TEST_CASE("Versions", "[misc]") {
     Version ver0{};
     Version ver1{0, 0, 1};
@@ -18,4 +18,4 @@ TEST_CASE("Versions", "[misc]") {
     REQUIRE(ver0.to_string() == "0.0.0");
     REQUIRE(ver1.to_string() == "0.0.1");
 }
-}  // namespace zen
+}  // namespace zenpp

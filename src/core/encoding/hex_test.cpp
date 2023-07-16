@@ -11,7 +11,7 @@
 
 #include <core/encoding/hex.hpp>
 
-namespace zen::hex {
+namespace zenpp::hex {
 
 struct TestCaseDecodeHex {
     std::string hexstring;
@@ -94,4 +94,4 @@ TEST_CASE("Hex encoding integrals", "[encoding]") {
     CHECK(expected_hex == obtained_hex);
 }
 
-}  // namespace zen::hex
+}  // namespace zenpp::hex

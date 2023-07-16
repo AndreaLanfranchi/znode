@@ -12,7 +12,7 @@
 #include <core/crypto/hash256.hpp>
 #include <core/encoding/hex.hpp>
 
-namespace zen {
+namespace zenpp {
 
 namespace serialization::test {
 
@@ -279,4 +279,4 @@ TEST_CASE("NetMessage", "[abi]") {
     }
 }
 
-}  // namespace zen
+}  // namespace zenpp

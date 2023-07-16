@@ -17,7 +17,7 @@
 
 #include <app/common/terminal.hpp>
 
-namespace zen {
+namespace zenpp {
 
 void init_terminal() {
 #if defined(_WIN32)
@@ -50,4 +50,4 @@ bool ask_user_confirmation(const std::string message) {
 
     return matches[1].length() > 0;
 }
-}  // namespace zen
+}  // namespace zenpp

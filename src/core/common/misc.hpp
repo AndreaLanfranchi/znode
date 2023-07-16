@@ -12,7 +12,7 @@
 #include <core/common/base.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zen {
+namespace zenpp {
 
 //! \brief Abridges a string to given length and eventually adds an ellipsis if input length is gt required length
 //! \remarks Should length be equal to zero then no abridging occurs
@@ -33,4 +33,4 @@ namespace zen {
 //! otherwise it will stop counting and return as soon as max_count is reached
 [[nodiscard]] size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size, size_t max_count = 0) noexcept;
 
-}  // namespace zen
+}  // namespace zenpp

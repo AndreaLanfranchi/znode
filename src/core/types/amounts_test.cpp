@@ -9,7 +9,7 @@
 
 #include <core/types/amounts.hpp>
 
-namespace zen {
+namespace zenpp {
 
 std::string append_currency(const std::string_view& input) {
     return boost::str(boost::format("%s %s") % input % kCurrency);
@@ -93,4 +93,4 @@ TEST_CASE("FeeRates", "[types]") {
     fee = fr2.fee(100);
     CHECK(fee == 1520 * kCoin / 10);
 }
-}  // namespace zen
+}  // namespace zenpp

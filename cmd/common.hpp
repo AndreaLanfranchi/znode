@@ -16,7 +16,7 @@
 #include <app/common/log.hpp>
 #include <app/common/settings.hpp>
 
-namespace zen::cmd {
+namespace zenpp::cmd {
 
 struct Settings {
     NodeSettings node_settings;
@@ -26,9 +26,6 @@ struct Settings {
 
 //! \brief Parses command line arguments for node instance
 void parse_node_command_line(CLI::App& cli, int argc, char* argv[], Settings& settings);
-
-//! Assemble the full node name using the Cable build information
-std::string get_node_name_from_build_info(const buildinfo* build_info);
 
 struct HumanSizeParserValidator : public CLI::Validator {
     template <typename T>
@@ -59,4 +56,4 @@ struct IPEndPointValidator : public CLI::Validator {
 //! \brief Set up options to populate log settings after cli.parse()
 void add_logging_options(CLI::App& cli, log::Settings& log_settings);
 
-}  // namespace zen::cmd
+}  // namespace zenpp::cmd

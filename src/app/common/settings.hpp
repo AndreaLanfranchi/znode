@@ -16,7 +16,7 @@
 #include <app/common/directories.hpp>
 #include <app/database/mdbx.hpp>
 
-namespace zen {
+namespace zenpp {
 
 struct NetworkSettings {
     std::string local_endpoint{"0.0.0.0:13383"};  // Local node listen address
@@ -27,7 +27,6 @@ struct NetworkSettings {
 };
 
 struct NodeSettings {
-    std::string build_info{};                               // Human-readable build info
     std::unique_ptr<boost::asio::io_context> asio_context;  // Async context
     size_t asio_concurrency{2};                             // Async context concurrency level
     std::unique_ptr<DataDirectory> data_directory;          // Pointer to data folder
@@ -41,4 +40,4 @@ struct NodeSettings {
     NetworkSettings network{};                              // Network related settings
 };
 
-}  // namespace zen
+}  // namespace zenpp

@@ -23,7 +23,7 @@
 
 #include <core/common/assert.hpp>
 
-namespace zen {
+namespace zenpp {
 //! \brief Implementation of an asynchronous timer relying on boost:asio
 class Timer {
   public:
@@ -81,4 +81,4 @@ class Timer {
     boost::asio::deadline_timer timer_;
     std::function<bool()> call_back_;
 };
-}  // namespace zen
+}  // namespace zenpp

@@ -11,7 +11,7 @@
 #include <app/common/version.hpp>
 #include <app/database/mdbx.hpp>
 
-namespace zen::db::tables {
+namespace zenpp::db::tables {
 
 //! \brief Specifies the schema version we're compatible with
 //! \remarks This is also used in checking whether the database needs an ugrade migration
@@ -62,4 +62,4 @@ void deploy_tables(mdbx::txn& txn, const std::array<db::MapConfig, N> tables) {
     }
 }
 
-}  // namespace zen::db::tables
+}  // namespace zenpp::db::tables

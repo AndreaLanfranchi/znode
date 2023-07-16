@@ -8,7 +8,7 @@
 #include <app/common/log.hpp>
 #include <app/concurrency/worker.hpp>
 
-namespace zen {
+namespace zenpp {
 
 Worker::~Worker() { Worker::stop(/*wait=*/true); }
 
@@ -121,4 +121,4 @@ void Worker::rethrow() const {
     }
 }
 
-}  // namespace zen
+}  // namespace zenpp

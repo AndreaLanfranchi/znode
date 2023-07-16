@@ -6,7 +6,7 @@
 
 #include <core/crypto/md_test.hpp>
 
-namespace zen::crypto {
+namespace zenpp::crypto {
 
 TEST_CASE("Sha1 test vectors", "[crypto]") {
     static const std::vector<std::string> inputs{
@@ -166,4 +166,4 @@ TEST_CASE("Ripemd test vectors", "[crypto]") {
     run_hasher_tests(hasher, inputs, digests);
 }
 
-}  // namespace zen::crypto
+}  // namespace zenpp::crypto

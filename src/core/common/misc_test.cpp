@@ -12,7 +12,7 @@
 #include <core/common/cast.hpp>
 #include <core/common/misc.hpp>
 
-namespace zen {
+namespace zenpp {
 
 TEST_CASE("Parse Human Bytes", "[misc]") {
     auto parsed = parse_human_bytes("");
@@ -91,4 +91,4 @@ TEST_CASE("abridge", "[misc]") {
     CHECK(abridge("0123", 0) == "0123");
 }
 
-}  // namespace zen
+}  // namespace zenpp

@@ -17,7 +17,7 @@
 #include <app/common/directories.hpp>
 #include <app/database/mdbx.hpp>
 
-namespace zen::db {
+namespace zenpp::db {
 
 static const std::map<std::string, std::string, std::less<>> kGeneticCodes{
     {"AAA", "Lysine"},        {"AAC", "Asparagine"},    {"AAG", "Lysine"},        {"AAU", "Asparagine"},
@@ -418,4 +418,4 @@ TEST_CASE("Overflow pages") {
         REQUIRE(stats.ms_overflow_pages);
     }
 }
-}  // namespace zen::db
+}  // namespace zenpp::db

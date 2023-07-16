@@ -18,7 +18,7 @@
 #include <app/network/node.hpp>
 #include <app/network/secure.hpp>
 
-namespace zen::network {
+namespace zenpp::network {
 
 class NodeHub : public Stoppable {
   public:
@@ -83,4 +83,4 @@ class NodeHub : public Stoppable {
     StopWatch info_stopwatch_{/*auto_start=*/false};  // To measure the effective elapsed amongst two service_timer_
                                                       // events (for bandwidth calculation)
 };
-}  // namespace zen::network
+}  // namespace zenpp::network

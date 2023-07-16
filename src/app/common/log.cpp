@@ -17,7 +17,7 @@
 
 #include <app/common/log.hpp>
 
-namespace zen::log {
+namespace zenpp::log {
 static Settings settings_{};
 static std::mutex out_mtx{};
 static std::unique_ptr<std::fstream> file_{nullptr};
@@ -68,7 +68,7 @@ std::string get_thread_name() {
 
 static inline std::pair<const char*, const char*> get_level_settings(Level level) {
     switch (level) {
-        using enum zen::log::Level;
+        using enum zenpp::log::Level;
         case kTrace:
             return {"TRACE", kColorCoal};
         case kDebug:
@@ -153,4 +153,4 @@ void BufferBase::flush() const {
         }
     }
 }
-}  // namespace zen::log
+}  // namespace zenpp::log

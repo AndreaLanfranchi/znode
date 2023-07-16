@@ -10,7 +10,7 @@
 
 #include <core/encoding/hex.hpp>
 
-namespace zen::hex {
+namespace zenpp::hex {
 
 // ASCII -> hex value (0xff means bad [hex] char)
 static constexpr std::array<uint8_t, 256> kUnhexTable{
@@ -153,4 +153,4 @@ tl::expected<unsigned, DecodingError> decode_digit(const char input) noexcept {
     return value;
 }
 
-}  // namespace zen::hex
+}  // namespace zenpp::hex

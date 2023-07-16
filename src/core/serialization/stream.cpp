@@ -12,7 +12,7 @@
 #include <core/encoding/hex.hpp>
 #include <core/serialization/stream.hpp>
 
-namespace zen::serialization {
+namespace zenpp::serialization {
 
 DataStream::DataStream(const ByteView data) {
     buffer_.reserve(data.size());
@@ -107,7 +107,7 @@ DataStream::size_type DataStream::tellg() const noexcept { return read_position_
 
 void DataStream::seekg(size_type p) noexcept { read_position_ = std::min(p, buffer_.size()); }
 
-std::string DataStream::to_string() const { return zen::hex::encode({buffer_.data(), buffer_.size()}, false); }
+std::string DataStream::to_string() const { return zenpp::hex::encode({buffer_.data(), buffer_.size()}, false); }
 
 void DataStream::consume(std::optional<size_type> pos) noexcept {
     const size_t count{std::min(read_position_, pos.value_or(std::numeric_limits<size_type>::max()))};
@@ -146,4 +146,4 @@ void SDataStream::clear() noexcept {
     computed_size_ = 0;
 }
 
-}  // namespace zen::serialization
+}  // namespace zenpp::serialization

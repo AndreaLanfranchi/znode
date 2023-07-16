@@ -9,7 +9,7 @@
 
 #include <app/database/access_layer.hpp>
 
-namespace zen::db {
+namespace zenpp::db {
 
 std::optional<Version> read_schema_version(mdbx::txn& txn) {
     Cursor config(txn, db::tables::kConfig);
@@ -41,4 +41,4 @@ void write_schema_version(mdbx::txn& txn, const Version& version) {
     config.upsert(to_slice(tables::kDbSchemaVersionKey), to_slice(value));
 }
 
-}  // namespace zen::db
+}  // namespace zenpp::db

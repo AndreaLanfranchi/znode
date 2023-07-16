@@ -23,7 +23,7 @@
 
 #include "common.hpp"
 
-using namespace zen;
+using namespace zenpp;
 using namespace std::chrono;
 
 //! \brief Ensures database is ready and consistent with command line arguments
@@ -47,18 +47,18 @@ void prepare_chaindata_env(NodeSettings& node_settings, [[maybe_unused]] bool in
             throw db::Exception("Unable to detect schema version");
         }
         log::Message("Database schema", {"version", detected_schema_version->to_string()});
-        if (*detected_schema_version < zen::db::tables::kRequiredSchemaVersion) {
+        if (*detected_schema_version < db::tables::kRequiredSchemaVersion) {
             // TODO Run migrations and update schema version
             // for the moment an exception is thrown
             std::string what{"Incompatible schema version:"};
-            what.append(" expected " + zen::db::tables::kRequiredSchemaVersion.to_string());
+            what.append(" expected " + db::tables::kRequiredSchemaVersion.to_string());
             what.append(" got " + detected_schema_version->to_string());
             chaindata_env.close(/*dont_sync=*/true);
             throw std::filesystem::filesystem_error(what, std::make_error_code(std::errc::not_supported));
         }
     } else {
         db::tables::deploy_tables(*tx, db::tables::kChainDataTables);
-        db::write_schema_version(*tx, zen::db::tables::kRequiredSchemaVersion);
+        db::write_schema_version(*tx, db::tables::kRequiredSchemaVersion);
         tx.commit(/*renew=*/true);
     }
 
@@ -98,8 +98,7 @@ int main(int argc, char* argv[]) {
         log::set_thread_name("main");
 
         // Output BuildInfo
-        settings.node_settings.build_info = cmd::get_node_name_from_build_info(build_info);
-        log::Message("Using node", {"version", settings.node_settings.build_info});
+        log::Message("Using " + std::string(get_buildinfo()->project_name), {"version", get_buildinfo_string()});
 
         // Output mdbx build info
         auto const& mdbx_ver{mdbx::get_version()};
@@ -157,7 +156,7 @@ int main(int argc, char* argv[]) {
         log::Message("Validated  ZK params", {"elapsed", StopWatch::format(sw.since_start())});
 
         // 1) Start networking server
-        zen::network::NodeHub node_hub(node_settings);
+        network::NodeHub node_hub(node_settings);
         node_hub.start();
 
         // Start sync loop

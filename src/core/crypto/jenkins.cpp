@@ -8,7 +8,7 @@
 
 #include <core/crypto/jenkins.hpp>
 
-namespace zen::crypto {
+namespace zenpp::crypto {
 
 uint64_t Jenkins::Hash(const uint32_t* source, size_t length, const uint32_t* salt) {
     const auto width{static_cast<uint32_t>(length * sizeof(uint32_t))};
@@ -81,4 +81,4 @@ void Jenkins::HashFinal(uint32_t& a, uint32_t& b, uint32_t& c) {
     c ^= b;
     c -= std::rotl(b, 24);
 }
-}  // namespace zen::crypto
+}  // namespace zenpp::crypto

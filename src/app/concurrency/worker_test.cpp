@@ -11,7 +11,7 @@
 #include <app/common/log_test.hpp>
 #include <app/concurrency/worker.hpp>
 
-namespace zen {
+namespace zenpp {
 
 class TestWorker final : public Worker {
   public:
@@ -99,4 +99,4 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
         CHECK(worker.state() == kStopped);
     }
 }
-}  // namespace zen
+}  // namespace zenpp

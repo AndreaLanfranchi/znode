@@ -8,7 +8,7 @@
 #pragma once
 #include <cstdint>
 
-namespace zen {
+namespace zenpp {
 
 enum class DecodingError : uint32_t {
     kSuccess,
@@ -26,4 +26,4 @@ enum class EncodingError : uint32_t {
     kInputTooLong,
     kUnexpectedError,
 };
-}  // namespace zen
+}  // namespace zenpp

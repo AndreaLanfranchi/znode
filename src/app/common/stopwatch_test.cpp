@@ -11,7 +11,7 @@
 
 #include <app/common/stopwatch.hpp>
 
-namespace zen {
+namespace zenpp {
 TEST_CASE("Stop Watch", "[misc]") {
     using namespace std::chrono_literals;
 
@@ -67,4 +67,4 @@ TEST_CASE("Stop Watch", "[misc]") {
     CHECK(sw1.laps().empty());  // No more laps
     CHECK_FALSE(sw1);           // Not started
 }
-}  // namespace zen
+}  // namespace zenpp

@@ -8,7 +8,7 @@
 
 #include <core/types/block.hpp>
 
-namespace zen {
+namespace zenpp {
 
 TEST_CASE("Block Serialization", "[serialization]") {
     BlockHeader header;
@@ -28,4 +28,4 @@ TEST_CASE("Block Serialization", "[serialization]") {
     //    auto version_parsed{endian::load_little_u32(&archive[0])};
     //    CHECK(version_parsed == 15);
 }
-}  // namespace zen
+}  // namespace zenpp

@@ -16,7 +16,7 @@
 #include <app/network/secure.hpp>
 #include <app/serialization/exceptions.hpp>
 
-namespace zen::network {
+namespace zenpp::network {
 
 std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 
@@ -315,4 +315,4 @@ bool Node::is_idle(const uint32_t idle_timeout_seconds) const noexcept {
 
 std::string Node::to_string() const noexcept { return network::to_string(remote_endpoint_); }
 
-}  // namespace zen::network
+}  // namespace zenpp::network

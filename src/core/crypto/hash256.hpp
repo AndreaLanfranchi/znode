@@ -10,7 +10,7 @@
 
 #include <core/crypto/md.hpp>
 
-namespace zen::crypto {
+namespace zenpp::crypto {
 //! \brief A hasher class for Bitcoin's 256 bit hash (double Sha256)
 class Hash256 : private boost::noncopyable {
   public:
@@ -42,4 +42,4 @@ class Hash256 : private boost::noncopyable {
     Sha256 hasher_;
     size_t ingested_size_{0};
 };
-}  // namespace zen::crypto
+}  // namespace zenpp::crypto

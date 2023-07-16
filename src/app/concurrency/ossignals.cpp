@@ -15,7 +15,7 @@
 
 #include <app/concurrency/ossignals.hpp>
 
-namespace zen {
+namespace zenpp {
 
 static const char* sig_name(int sig_code) {
     switch (sig_code) {
@@ -140,4 +140,4 @@ void Ossignals::throw_if_signalled() {
 os_signal_exception::os_signal_exception(int code)
     : sig_code_{code}, message_{boost::str(boost::format("Caught OS signal %s") % sig_name(sig_code_))} {}
 const char* os_signal_exception::what() const noexcept { return message_.c_str(); }
-}  // namespace zen
+}  // namespace zenpp

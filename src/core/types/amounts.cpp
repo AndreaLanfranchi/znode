@@ -14,7 +14,7 @@
 
 #include <core/types/amounts.hpp>
 
-namespace zen {
+namespace zenpp {
 
 bool Amount::valid_money() const noexcept { return amount_ >= 0 && amount_ <= Amount::kMax; }
 
@@ -116,4 +116,4 @@ Amount FeeRate::fee(size_t bytes_size) const {
     if (!ret && satoshis_per_K_) ret = satoshis_per_K_;
     return ret;
 }
-}  // namespace zen
+}  // namespace zenpp

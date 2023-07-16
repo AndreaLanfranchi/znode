@@ -8,7 +8,7 @@
 
 #include <core/types/block.hpp>
 
-namespace zen {
+namespace zenpp {
 
 void BlockHeader::reset() {
     version = 0;
@@ -35,4 +35,4 @@ serialization::Error BlockHeader::serialization(serialization::SDataStream& stre
     if (!error) error = stream.bind(solution, action);
     return error;
 }
-}  // namespace zen
+}  // namespace zenpp

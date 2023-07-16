@@ -20,7 +20,7 @@
         lock = std::unique_lock{mutex_}; \
     }
 
-namespace zen {
+namespace zenpp {
 
 //! \brief A dynamic pool of objects usually expensive to create
 template <class T, class TDtor = std::default_delete<T>>
@@ -60,4 +60,4 @@ class ObjectPool : private boost::noncopyable {
     mutable std::mutex mutex_;
 };
 
-}  // namespace zen
+}  // namespace zenpp

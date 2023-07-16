@@ -11,7 +11,7 @@
 #include <core/common/base.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zen::base64 {
+namespace zenpp::base64 {
 
 //! \brief Returns a string of ascii chars with the base64 representation of input
 //! \remark If provided an empty input the return string is empty as well
@@ -25,4 +25,4 @@ namespace zen::base64 {
 //! \remark If provided an empty input the returned bytes are empty as well
 [[nodiscard]] tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept;
 
-}  // namespace zen::base64
+}  // namespace zenpp::base64

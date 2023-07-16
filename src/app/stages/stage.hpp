@@ -16,7 +16,7 @@
 #include <app/common/settings.hpp>
 #include <app/concurrency/stoppable.hpp>
 
-namespace zen::stages {
+namespace zenpp::stages {
 
 class StageError;
 
@@ -139,4 +139,4 @@ inline ZEN_ALWAYS_INLINE void success_or_throw(Stage::Result code) {
         throw StageError(code);
     }
 }
-}  // namespace zen::stages
+}  // namespace zenpp::stages

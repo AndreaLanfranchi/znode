@@ -7,7 +7,7 @@
 #pragma once
 #include <cstdint>
 
-namespace zen::serialization {
+namespace zenpp::serialization {
 
 static constexpr uint32_t kMaxSerializedCompactSize{0x02000000};
 
@@ -53,4 +53,4 @@ enum class Error {
 
 inline bool operator!(Error e) { return e == static_cast<Error>(0); }
 
-}  // namespace zen::serialization
+}  // namespace zenpp::serialization

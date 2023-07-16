@@ -17,7 +17,7 @@
 
 #include <core/encoding/hex.hpp>
 
-namespace zen::cmd {
+namespace zenpp::cmd {
 
 void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& settings) {
     auto& node_settings = settings.node_settings;
@@ -167,24 +167,6 @@ void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
     log_opts.add_option("--log.file", log_settings.log_file, "Tee all log lines to given file name");
 }
 
-std::string get_node_name_from_build_info(const buildinfo* build_info) {
-    std::string node_name{"zenpp/"};
-    node_name.append(build_info->git_branch);
-    node_name.append(" v");
-    node_name.append(build_info->project_version);
-    node_name.append("/");
-    node_name.append(build_info->system_name);
-    node_name.append("-");
-    node_name.append(build_info->system_processor);
-    node_name.append("_");
-    node_name.append(build_info->build_type);
-    node_name.append("/");
-    node_name.append(build_info->compiler_id);
-    node_name.append("-");
-    node_name.append(build_info->compiler_version);
-    return node_name;
-}
-
 IPEndPointValidator::IPEndPointValidator(bool allow_empty, int default_port) {
     func_ = [allow_empty, default_port](std::string& value) -> std::string {
         if (value.empty() && allow_empty) {
@@ -232,4 +214,4 @@ IPEndPointValidator::IPEndPointValidator(bool allow_empty, int default_port) {
         return {};
     };
 }
-}  // namespace zen::cmd
+}  // namespace zenpp::cmd

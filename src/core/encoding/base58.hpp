@@ -12,7 +12,7 @@
 #include <core/crypto/md.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zen::base58 {
+namespace zenpp::base58 {
 
 //! \brief Returns a string of ascii chars with the base58 representation of input
 //! \remark If provided an empty input the return string is empty as well
@@ -30,4 +30,4 @@ namespace zen::base58 {
 //! \remark If provided an empty input the return string is empty as well
 [[nodiscard]] tl::expected<Bytes, DecodingError> decode_check(std::string_view input) noexcept;
 
-}  // namespace zen::base58
+}  // namespace zenpp::base58

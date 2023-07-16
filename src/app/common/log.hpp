@@ -12,7 +12,7 @@
 
 #include <app/common/terminal.hpp>
 
-namespace zen::log {
+namespace zenpp::log {
 
 //! \brief Available severity levels
 enum class Level {
@@ -111,30 +111,30 @@ using Error = LogBuffer<Level::kError>;
 using Critical = LogBuffer<Level::kCritical>;
 using Message = LogBuffer<Level::kNone>;
 
-}  // namespace zen::log
+}  // namespace zenpp::log
 
-#define LOG_BUFFER(level_)                   \
-    if (!zen::log::test_verbosity(level_)) { \
-    } else                                   \
-        zen::log::LogBuffer<level_>()
+#define LOG_BUFFER(level_)                     \
+    if (!zenpp::log::test_verbosity(level_)) { \
+    } else                                     \
+        zenpp::log::LogBuffer<level_>()
 
-#define LOGF_BUFFER(level_)                  \
-    if (!zen::log::test_verbosity(level_)) { \
-    } else                                   \
-        zen::log::LogBuffer<level_>() << __func__ << " (" << __line__ << ") "
+#define LOGF_BUFFER(level_)                    \
+    if (!zenpp::log::test_verbosity(level_)) { \
+    } else                                     \
+        zenpp::log::LogBuffer<level_>() << __func__ << " (" << __line__ << ") "
 
-#define LOG_TRACE LOG_BUFFER(zen::log::Level::kTrace)
-#define LOG_DEBUG LOG_BUFFER(zen::log::Level::kDebug)
-#define LOG_INFO LOG_BUFFER(zen::log::Level::kInfo)
-#define LOG_WARNING LOG_BUFFER(zen::log::Level::kWarning)
-#define LOG_ERROR LOG_BUFFER(zen::log::Level::kError)
-#define LOG_CRITICAL LOG_BUFFER(zen::log::Level::kCritical)
-#define LOG_MESSAGE LOG_BUFFER(zen::log::Level::kNone)
+#define LOG_TRACE LOG_BUFFER(zenpp::log::Level::kTrace)
+#define LOG_DEBUG LOG_BUFFER(zenpp::log::Level::kDebug)
+#define LOG_INFO LOG_BUFFER(zenpp::log::Level::kInfo)
+#define LOG_WARNING LOG_BUFFER(zenpp::log::Level::kWarning)
+#define LOG_ERROR LOG_BUFFER(zenpp::log::Level::kError)
+#define LOG_CRITICAL LOG_BUFFER(zenpp::log::Level::kCritical)
+#define LOG_MESSAGE LOG_BUFFER(zenpp::log::Level::kNone)
 
-#define LOGF_TRACE LOGF_BUFFER(zen::log::Level::kTrace)
-#define LOGF_DEBUG LOGF_BUFFER(zen::log::Level::kDebug)
-#define LOGF_INFO LOGF_BUFFER(zen::log::Level::kInfo)
-#define LOGF_WARNING LOGF_BUFFER(zen::log::Level::kWarning)
-#define LOGF_ERROR LOGF_BUFFER(zen::log::Level::kError)
-#define LOGF_CRITICAL LOGF_BUFFER(zen::log::Level::kCritical)
-#define LOGF_MESSAGE LOGF_BUFFER(zen::log::Level::kNone)
+#define LOGF_TRACE LOGF_BUFFER(zenpp::log::Level::kTrace)
+#define LOGF_DEBUG LOGF_BUFFER(zenpp::log::Level::kDebug)
+#define LOGF_INFO LOGF_BUFFER(zenpp::log::Level::kInfo)
+#define LOGF_WARNING LOGF_BUFFER(zenpp::log::Level::kWarning)
+#define LOGF_ERROR LOGF_BUFFER(zenpp::log::Level::kError)
+#define LOGF_CRITICAL LOGF_BUFFER(zenpp::log::Level::kCritical)
+#define LOGF_MESSAGE LOGF_BUFFER(zenpp::log::Level::kNone)

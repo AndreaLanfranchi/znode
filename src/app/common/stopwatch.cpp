@@ -7,7 +7,7 @@
 
 #include <app/common/stopwatch.hpp>
 
-namespace zen {
+namespace zenpp {
 
 StopWatch::TimePoint StopWatch::start(bool with_reset) noexcept {
     using namespace std::chrono_literals;
@@ -124,4 +124,4 @@ std::string StopWatch::format(Duration duration) noexcept {
     return os.str();
 }
 
-}  // namespace zen
+}  // namespace zenpp

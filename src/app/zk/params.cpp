@@ -48,7 +48,7 @@
 #include <app/common/terminal.hpp>
 #include <app/concurrency/ossignals.hpp>
 
-namespace zen::zk {
+namespace zenpp::zk {
 
 bool validate_param_files(boost::asio::io_context& asio_context, const std::filesystem::path& directory,
                           bool no_checksums) {
@@ -339,4 +339,4 @@ bool validate_file_checksum(const std::filesystem::path& file_path, ByteView exp
     }
     return is_match;
 }
-}  // namespace zen::zk
+}  // namespace zenpp::zk

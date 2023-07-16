@@ -12,7 +12,7 @@
 #include <core/common/cast.hpp>
 #include <core/encoding/base64.hpp>
 
-namespace zen::base64 {
+namespace zenpp::base64 {
 
 // Inspired by https://stackoverflow.com/questions/5288076/base64-encoding-and-decoding-with-openssl
 
@@ -46,7 +46,7 @@ tl::expected<std::string, EncodingError> encode(ByteView bytes) noexcept {
 }
 
 tl::expected<std::string, EncodingError> encode(std::string_view data) noexcept {
-    return encode(zen::string_view_to_byte_view(data));
+    return encode(zenpp::string_view_to_byte_view(data));
 }
 
 tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
@@ -63,4 +63,4 @@ tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
     return ret;
 }
 
-}  // namespace zen::base64
+}  // namespace zenpp::base64

@@ -12,7 +12,7 @@
 #include <core/common/base.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zen {
+namespace zenpp {
 
 //! \brief Type-Safe wrapper class for token amounts
 class Amount {
@@ -79,4 +79,4 @@ class FeeRate {
     Amount satoshis_per_K_{0};
 };
 
-}  // namespace zen
+}  // namespace zenpp

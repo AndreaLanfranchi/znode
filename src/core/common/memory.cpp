@@ -32,7 +32,7 @@
 
 #include <core/common/memory.hpp>
 
-namespace zen {
+namespace zenpp {
 // Inspired by:
 // https://stackoverflow.com/questions/372484/how-do-i-programmatically-check-memory-use-in-a-fairly-portable-way-c-c
 size_t get_memory_usage(bool resident) {
@@ -117,4 +117,4 @@ bool MemoryPageLocker::unlock(const void* addr, size_t len) {
 LockedPagesManager* LockedPagesManager::instance_ = nullptr;
 std::once_flag LockedPagesManager::create_instance_once_{};
 
-}  // namespace zen
+}  // namespace zenpp

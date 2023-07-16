@@ -6,7 +6,7 @@
 
 #include <app/network/common.hpp>
 
-namespace zen::network {
+namespace zenpp::network {
 
 std::optional<boost::asio::ip::tcp::endpoint> get_remote_endpoint(const boost::asio::ip::tcp::socket& socket) noexcept {
     boost::system::error_code ec;
@@ -28,4 +28,4 @@ std::optional<boost::asio::ip::tcp::endpoint> get_local_endpoint(const boost::as
 std::string to_string(const boost::asio::ip::tcp::endpoint& endpoint) {
     return endpoint.address().to_string() + ":" + std::to_string(endpoint.port());
 }
-}  // namespace zen::network
+}  // namespace zenpp::network

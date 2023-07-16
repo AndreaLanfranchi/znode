@@ -20,7 +20,7 @@
 
 #include <core/common/misc.hpp>
 
-namespace zen {
+namespace zenpp {
 
 std::filesystem::path get_os_temporary_path() { return std::filesystem::temp_directory_path(); }
 
@@ -163,4 +163,4 @@ bool Directory::is_writable() const noexcept {
     std::filesystem::remove(test_file_path);
     return true;
 }
-}  // namespace zen
+}  // namespace zenpp

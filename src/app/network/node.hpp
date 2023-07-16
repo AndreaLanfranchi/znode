@@ -20,7 +20,7 @@
 #include <app/concurrency/stoppable.hpp>
 #include <app/network/common.hpp>
 
-namespace zen::network {
+namespace zenpp::network {
 
 enum class NodeConnectionMode {
     kInbound,        // Node is accepting connections
@@ -156,4 +156,4 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     serialization::SDataStream send_stream_{serialization::Scope::kNetwork, 0};
 };
-}  // namespace zen::network
+}  // namespace zenpp::network

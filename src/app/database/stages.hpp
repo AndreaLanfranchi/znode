@@ -9,7 +9,7 @@
 
 #include <app/database/mdbx_tables.hpp>
 
-namespace zen::db::stages {
+namespace zenpp::db::stages {
 
 //! \brief Headers are downloaded, their Proof-Of-Work validity and chaining is verified
 inline constexpr const char* kHeadersKey{"Headers"};
@@ -68,4 +68,4 @@ void write_stage_prune_progress(mdbx::txn& txn, const char* stage_name, BlockNum
 //! \return Whether it exists in kAllStages[]
 bool is_known_stage(const char* stage_name);
 
-}  // namespace zen::db::stages
+}  // namespace zenpp::db::stages

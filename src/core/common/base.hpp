@@ -31,7 +31,7 @@ BOOST_NORETURN void throw_exception(const std::exception& ex);
 
 static_assert(intx::byte_order_is_little_endian == true, "Target architecture MUST be little endian");
 
-namespace zen {
+namespace zenpp {
 
 using BlockNum = uint32_t;
 
@@ -114,4 +114,4 @@ static constexpr int64_t kCoinCent{kCoin / 100};      // One coin cent
 static constexpr int64_t kCoinMaxSupply{21'000'000};  // Max tokens supply
 static constexpr std::string_view kCurrency{"ZEN"};
 
-}  // namespace zen
+}  // namespace zenpp

@@ -15,7 +15,7 @@
 
 #include <app/database/mdbx_tables.hpp>
 
-namespace zen::db {
+namespace zenpp::db {
 
 class Exception : public std::exception {
   public:
@@ -34,4 +34,4 @@ std::optional<Version> read_schema_version(mdbx::txn& txn);
 //! \remarks Should new version be LT previous version an exception is thrown
 void write_schema_version(mdbx::txn& txn, const Version& version);
 
-}  // namespace zen::db
+}  // namespace zenpp::db

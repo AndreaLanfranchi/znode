@@ -8,7 +8,7 @@
 #include <app/database/stages.hpp>
 #include <app/stages/stage.hpp>
 
-namespace zen::stages {
+namespace zenpp::stages {
 
 Stage::Stage(SyncContext* sync_context, const char* stage_name, NodeSettings* node_settings)
     : sync_context_{sync_context}, stage_name_{stage_name}, node_settings_{node_settings} {}
@@ -32,4 +32,4 @@ void Stage::check_block_sequence(BlockNum actual, BlockNum expected) {
 void Stage::throw_if_stopping() {
     if (is_stopping()) throw StageError(Stage::Result::kAborted);
 }
-}  // namespace zen::stages
+}  // namespace zenpp::stages

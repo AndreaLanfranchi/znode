@@ -9,7 +9,7 @@
 #include <cstdint>
 
 #include <absl/strings/str_cat.h>
-namespace zen {
+namespace zenpp {
 
 //! \brief Used to compare versions of entities (e.g. Db schema version)
 struct Version {
@@ -20,4 +20,4 @@ struct Version {
     friend auto operator<=>(const Version&, const Version&) = default;
 };
 
-}  // namespace zen
+}  // namespace zenpp

@@ -10,7 +10,7 @@
 #include <app/common/directories.hpp>
 #include <app/database/access_layer.hpp>
 
-namespace zen::db {
+namespace zenpp::db {
 
 TEST_CASE("Schema version", "[database]") {
     const TempDirectory tmp_dir{};
@@ -48,4 +48,4 @@ TEST_CASE("Deploy Tables", "[database]") {
         CHECK(has_map(*txn, table.name));
     }
 }
-}  // namespace zen::db
+}  // namespace zenpp::db

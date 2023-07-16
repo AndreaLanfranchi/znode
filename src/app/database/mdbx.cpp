@@ -11,7 +11,7 @@
 
 #include <app/database/mdbx.hpp>
 
-namespace zen::db {
+namespace zenpp::db {
 
 //! \brief Returns data of current cursor position or moves it to the beginning or the end of the table based on
 //! provided direction if the cursor is not positioned.
@@ -346,4 +346,4 @@ size_t cursor_erase(mdbx::cursor& cursor, const ByteView set_key, const CursorMo
     return ret;
 }
 
-}  // namespace zen::db
+}  // namespace zenpp::db

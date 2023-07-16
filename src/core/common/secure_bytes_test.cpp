@@ -9,7 +9,7 @@
 #include <core/common/base.hpp>
 #include <core/common/secure_bytes.hpp>
 
-namespace zen {
+namespace zenpp {
 TEST_CASE("Secure Bytes", "[memory]") {
     intptr_t ptr{0};
     {
@@ -23,4 +23,4 @@ TEST_CASE("Secure Bytes", "[memory]") {
     CHECK(LockedPagesManager::instance().empty());
     CHECK_FALSE(LockedPagesManager::instance().contains(static_cast<size_t>(ptr)));
 }
-}  // namespace zen
+}  // namespace zenpp

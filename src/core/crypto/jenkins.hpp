@@ -8,7 +8,7 @@
 
 #include <core/common/base.hpp>
 
-namespace zen::crypto {
+namespace zenpp::crypto {
 
 class Jenkins {
   public:
@@ -19,4 +19,4 @@ class Jenkins {
     static void HashFinal(uint32_t& a, uint32_t& b, uint32_t& c);
 };
 
-}  // namespace zen::crypto
+}  // namespace zenpp::crypto

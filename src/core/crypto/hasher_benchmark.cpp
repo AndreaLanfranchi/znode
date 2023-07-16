@@ -11,13 +11,13 @@
 #include <core/common/misc.hpp>
 #include <core/crypto/md.hpp>
 
-namespace zen::crypto {
+namespace zenpp::crypto {
 
 static constexpr size_t kMinInputSize{64};
 static constexpr size_t kMaxInputSize{4_MiB};
 static constexpr size_t kInputSizeMultiplier{8};
 
-std::string random_alpha_string{zen::get_random_alpha_string(kMaxInputSize)};
+std::string random_alpha_string{get_random_alpha_string(kMaxInputSize)};
 
 void bench_sha1(benchmark::State& state) {
     static crypto::Sha1 hasher;
@@ -56,4 +56,4 @@ BENCHMARK(bench_sha1)->RangeMultiplier(kInputSizeMultiplier)->Range(kMinInputSiz
 BENCHMARK(bench_sha256)->RangeMultiplier(kInputSizeMultiplier)->Range(kMinInputSize, kMaxInputSize);
 BENCHMARK(bench_sha512)->RangeMultiplier(kInputSizeMultiplier)->Range(kMinInputSize, kMaxInputSize);
 
-}  // namespace zen::crypto
+}  // namespace zenpp::crypto

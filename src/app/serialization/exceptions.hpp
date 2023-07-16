@@ -13,7 +13,7 @@
 
 #include <core/serialization/base.hpp>
 
-namespace zen::serialization {
+namespace zenpp::serialization {
 
 class SerializationException : public std::exception {
   public:
@@ -33,4 +33,4 @@ inline void success_or_throw(Error err) {
     if (err == Error::kSuccess) return;
     throw SerializationException(err);
 }
-}  // namespace zen::serialization
+}  // namespace zenpp::serialization

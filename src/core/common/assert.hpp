@@ -10,17 +10,17 @@
 
 #include <core/common/preprocessor.hpp>
 
-namespace zen {
+namespace zenpp {
 [[noreturn]] void abort_due_to_assertion_failure(std::string_view message, const char* function, const char* file,
                                                  long line);
-}  // namespace zen
+}  // namespace zenpp
 
 //! \brief Always aborts program execution on assertion failure, even when NDEBUG is defined.
 #define ZEN_ASSERT(expr)      \
     if ((expr)) [[likely]]    \
         static_cast<void>(0); \
     else                      \
-        ::zen::abort_due_to_assertion_failure(#expr, __func__, __FILE__, __LINE__)
+        ::zenpp::abort_due_to_assertion_failure(#expr, __func__, __FILE__, __LINE__)
 
 //! \brief An alias for ZEN_ASSERT to make semantically clear that we're checking a precondition.
 #define ZEN_REQUIRE(expr) ZEN_ASSERT(expr)

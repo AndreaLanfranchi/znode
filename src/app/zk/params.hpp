@@ -18,7 +18,7 @@
 
 #include <core/common/base.hpp>
 
-namespace zen::zk {
+namespace zenpp::zk {
 
 struct ParamFile {
     const std::string_view name{};               // Name of the file (e.g. sprout-proving.key)
@@ -63,4 +63,4 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
 //! \brief Validates the checksum of the given file against the expected one
 bool validate_file_checksum(const std::filesystem::path& file_path, ByteView expected_checksum);
 
-}  // namespace zen::zk
+}  // namespace zenpp::zk

@@ -14,7 +14,7 @@
 #include <core/crypto/md.hpp>
 #include <core/encoding/hex.hpp>
 
-namespace zen::crypto {
+namespace zenpp::crypto {
 template <typename Hasher>
 void run_hasher_tests(Hasher& hasher, const std::vector<std::string>& inputs, const std::vector<std::string>& digests) {
     REQUIRE(inputs.size() == digests.size());
@@ -39,7 +39,7 @@ void run_hasher_tests(Hasher& hasher, const std::vector<std::string>& inputs, co
         const auto hash{hasher.finalize()};
         CHECK(hasher.ingested_size() == input_size);
         CHECK(hash.size() == hasher.digest_size());
-        CHECK(zen::hex::encode(hash) == digests[i]);
+        CHECK(hex::encode(hash) == digests[i]);
     }
 }
 
@@ -52,8 +52,8 @@ void run_hasher_tests(Hasher& hasher, const std::vector<std::pair<std::string, s
     static std::mt19937_64 rng(rd());
 
     for (size_t i{0}; i < inputs.size(); ++i) {
-        const auto initial_key{*zen::hex::decode(inputs[i].first)};
-        const auto input{*zen::hex::decode(inputs[i].second)};
+        const auto initial_key{*hex::decode(inputs[i].first)};
+        const auto input{*hex::decode(inputs[i].second)};
         ByteView input_view{input};
 
         hasher.init(initial_key);
@@ -69,7 +69,7 @@ void run_hasher_tests(Hasher& hasher, const std::vector<std::pair<std::string, s
 
         const auto hash{hasher.finalize()};
         CHECK(hash.size() == hasher.digest_size());
-        const auto hexed_hash{zen::hex::encode(hash)};
+        const auto hexed_hash{zenpp::hex::encode(hash)};
         if (digests[i].length() < hexed_hash.length()) {
             CHECK(hexed_hash.substr(0, digests[i].size()) == digests[i]);
         } else {
@@ -77,5 +77,4 @@ void run_hasher_tests(Hasher& hasher, const std::vector<std::pair<std::string, s
         }
     }
 }
-
-}  // namespace zen::crypto
+}  // namespace zenpp::crypto

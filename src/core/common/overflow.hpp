@@ -10,7 +10,7 @@
 #include <optional>
 #include <type_traits>
 
-namespace zen {
+namespace zenpp {
 
 template <typename T>
 constexpr bool is_overflow_safe(T a, T b) noexcept {
@@ -43,4 +43,4 @@ template <typename T>
     }
     return std::numeric_limits<T>::max();
 }
-}  // namespace zen
+}  // namespace zenpp

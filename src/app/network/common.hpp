@@ -10,7 +10,7 @@
 
 #include <boost/asio/ip/tcp.hpp>
 
-namespace zen::network {
+namespace zenpp::network {
 
 //! \brief Tries to get the remote endpoint of a socket
 std::optional<boost::asio::ip::tcp::endpoint> get_remote_endpoint(const boost::asio::ip::tcp::socket& socket) noexcept;
@@ -21,4 +21,4 @@ std::optional<boost::asio::ip::tcp::endpoint> get_local_endpoint(const boost::as
 //! \brief Returns a string representation of a socket endpoint (i.e. IP:PORT)
 std::string to_string(const boost::asio::ip::tcp::endpoint& endpoint);
 
-}  // namespace zen::network
+}  // namespace zenpp::network

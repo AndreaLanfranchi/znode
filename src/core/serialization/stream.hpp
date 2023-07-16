@@ -18,7 +18,7 @@
 #include <core/serialization/base.hpp>
 #include <core/serialization/serialize.hpp>
 
-namespace zen::serialization {
+namespace zenpp::serialization {
 
 class Serializable;
 
@@ -260,4 +260,4 @@ class SDataStream : public DataStream {
     size_type computed_size_{0};  // Total accrued size (for size computing)
 };
 
-}  // namespace zen::serialization
+}  // namespace zenpp::serialization

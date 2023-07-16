@@ -8,7 +8,7 @@
 
 #include <core/types/hash.hpp>
 
-namespace zen {
+namespace zenpp {
 
 const std::array<uint8_t, h256::size()> R1Array{0x9c, 0x52, 0x4a, 0xdb, 0xcf, 0x56, 0x11, 0x12, 0x2b, 0x29, 0x12,
                                                 0x5e, 0x5d, 0x35, 0xd2, 0xd2, 0x22, 0x81, 0xaa, 0xb5, 0x33, 0xf0,
@@ -64,15 +64,15 @@ TEST_CASE("Hash", "[types]") {
 TEST_CASE("Hash to jenkins hash", "[types]") {
     auto salt{h256::from_hex("00112233445566778899aabbccddeeff00")};
     CHECK(salt);
-    const size_t buffer_size{zen::h256::size() / sizeof(uint32_t)};
+    const size_t buffer_size{zenpp::h256::size() / sizeof(uint32_t)};
     std::array<uint32_t, buffer_size> saltbuf{0};
-    std::memcpy(&saltbuf, salt->data(), zen::Hash<256>::size());
+    std::memcpy(&saltbuf, salt->data(), Hash<256>::size());
 
     std::array<uint32_t, buffer_size> r1lbuf{0};
-    std::memcpy(&r1lbuf, R1L.data(), zen::h256::size());
+    std::memcpy(&r1lbuf, R1L.data(), h256::size());
 
     uint64_t hash1{R1L.hash(*salt)};
     uint64_t hash2{crypto::Jenkins::Hash(&r1lbuf[0], buffer_size, &saltbuf[0])};
     CHECK(hash1 == hash2);
 }
-}  // namespace zen
+}  // namespace zenpp

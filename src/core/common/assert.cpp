@@ -9,7 +9,7 @@
 
 #include <core/common/assert.hpp>
 
-namespace zen {
+namespace zenpp {
 void abort_due_to_assertion_failure(std::string_view message, const char* function, const char* file, long line) {
     std::cerr << "\n!! Assertion failed !!\n"
               << "   Expression: " << message << "\n"
@@ -19,4 +19,4 @@ void abort_due_to_assertion_failure(std::string_view message, const char* functi
               << std::endl;
     std::abort();
 }
-}  // namespace zen
+}  // namespace zenpp

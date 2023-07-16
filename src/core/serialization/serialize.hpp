@@ -14,7 +14,7 @@
 #include <core/serialization/base.hpp>
 
 //! \brief All functions dedicated to objects and types serialization
-namespace zen::serialization {
+namespace zenpp::serialization {
 
 //! \brief Returns the serialized size of arithmetic types
 //! \remarks Do not define serializable classes members as size_t as it might lead to wrong results on
@@ -154,4 +154,4 @@ inline tl::expected<uint64_t, Error> read_compact(Stream& stream, bool range_che
     if (range_check && ret > kMaxSerializedCompactSize) return tl::unexpected(Error::kCompactSizeTooBig);
     return ret;
 }
-}  // namespace zen::serialization
+}  // namespace zenpp::serialization

@@ -12,7 +12,7 @@
 
 #include <app/common/log_test.hpp>
 
-namespace zen::log {
+namespace zenpp::log {
 // Custom LogBuffer just for testing to access buffered content
 template <Level level>
 class TestLogBuffer : public LogBuffer<level> {
@@ -48,7 +48,7 @@ TEST_CASE("LogBuffer", "[common][log]") {
     StreamSwap cout_swap{std::cout, null_stream()};
     StreamSwap cerr_swap{std::cerr, null_stream()};
 
-    using enum zen::log::Level;
+    using enum zenpp::log::Level;
     SECTION("LogBuffer stores nothing for verbosity higher than default") {
         check_log_empty<kDebug>(true);
         check_log_empty<kTrace>(true);
@@ -101,4 +101,4 @@ TEST_CASE("LogBuffer", "[common][log]") {
         CHECK(log_buffer3.content().find(thread_id_stream.str()) == std::string::npos);
     }
 }
-}  // namespace zen::log
+}  // namespace zenpp::log

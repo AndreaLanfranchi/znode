@@ -8,7 +8,7 @@
 #pragma once
 #include <atomic>
 
-namespace zen {
+namespace zenpp {
 
 //! \brief An interface providing stoppability for active components
 class Stoppable {
@@ -27,4 +27,4 @@ class Stoppable {
     std::atomic_bool stop_requested_{false};  // Whether a stop request has been issued
 };
 
-}  // namespace zen
+}  // namespace zenpp

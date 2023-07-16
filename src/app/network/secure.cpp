@@ -13,7 +13,7 @@
 
 #include <app/network/secure.hpp>
 
-namespace zen::network {
+namespace zenpp::network {
 
 void print_ssl_error(unsigned long err, const log::Level severity) {
     if (!err) {
@@ -440,4 +440,4 @@ bool validate_tls_requirements(const std::filesystem::path& directory_path, cons
 
     return true;
 }
-}  // namespace zen::network
+}  // namespace zenpp::network

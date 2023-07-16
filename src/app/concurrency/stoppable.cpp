@@ -8,7 +8,7 @@
 #include <app/concurrency/ossignals.hpp>
 #include <app/concurrency/stoppable.hpp>
 
-namespace zen {
+namespace zenpp {
 
 bool Stoppable::stop([[maybe_unused]] /*in non-threaded components we don't need this*/ bool wait) noexcept {
     bool expected{false};
@@ -17,4 +17,4 @@ bool Stoppable::stop([[maybe_unused]] /*in non-threaded components we don't need
 
 bool Stoppable::is_stopping() const noexcept { return stop_requested_ || Ossignals::signalled(); }
 
-}  // namespace zen
+}  // namespace zenpp

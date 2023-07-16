@@ -14,7 +14,7 @@
 #include <core/common/misc.hpp>
 #include <core/crypto/hash256.hpp>
 
-namespace zen {
+namespace zenpp {
 
 void NetMessageHeader::reset() noexcept {
     magic.fill(0);
@@ -165,4 +165,4 @@ serialization::Error NetMessage::validate_payload_checksum(ByteView payload, Byt
     }
     return kSuccess;
 }
-}  // namespace zen
+}  // namespace zenpp

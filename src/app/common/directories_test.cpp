@@ -15,7 +15,7 @@
 #include <app/common/directories.hpp>
 #include <app/common/log_test.hpp>
 
-namespace zen {
+namespace zenpp {
 
 TEST_CASE("Process Path", "[misc]") {
     const auto process_path{get_process_absolute_full_path()};
@@ -138,4 +138,4 @@ TEST_CASE("Data Directory", "[misc]") {
         CHECK(std::filesystem::exists(zen_data_dir / subdir));
     }
 }
-}  // namespace zen
+}  // namespace zenpp

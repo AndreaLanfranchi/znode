@@ -10,7 +10,7 @@
 #include <app/common/directories.hpp>
 #include <app/database/stages.hpp>
 
-namespace zen::db {
+namespace zenpp::db {
 
 TEST_CASE("Stages Progresses", "[database]") {
     const TempDirectory tmp_dir{};
@@ -35,4 +35,4 @@ TEST_CASE("Stages Progresses", "[database]") {
 
     CHECK_THROWS((void)stages::read_stage_progress(*txn, "UnknownStageName"));
 }
-}  // namespace zen::db
+}  // namespace zenpp::db

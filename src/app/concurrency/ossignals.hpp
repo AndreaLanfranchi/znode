@@ -10,7 +10,7 @@
 #include <functional>
 #include <string>
 
-namespace zen {
+namespace zenpp {
 
 //! \brief Specific exception for
 class os_signal_exception : public std::exception {
@@ -40,4 +40,4 @@ class Ossignals {
     static std::function<void(int)> custom_handler_;  // Custom handling
 };
 
-}  // namespace zen
+}  // namespace zenpp

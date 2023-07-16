@@ -21,8 +21,9 @@
 #include <app/concurrency/ossignals.hpp>
 #include <app/database/mdbx.hpp>
 
+
 namespace fs = std::filesystem;
-using namespace zen;
+using namespace zenpp;
 using namespace boost::placeholders;
 
 struct dbTableEntry {
@@ -215,7 +216,7 @@ int main(int argc, char* argv[]) {
     /*
      * Parse arguments and validate
      */
-    CLI11_PARSE(app_main, argc, argv);
+    CLI11_PARSE(app_main, argc, argv)
 
     try {
         Directory db_dir(fs::path(db_path->as<std::string>()));

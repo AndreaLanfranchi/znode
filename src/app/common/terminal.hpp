@@ -9,7 +9,7 @@
 
 #include <string>
 
-namespace zen {
+namespace zenpp {
 
 // Reset sequence
 inline constexpr const char* kColorReset = "\x1b[0m";  // Resets fore color to terminal default
@@ -85,4 +85,4 @@ void init_terminal();
 //! \brief Prompt user for a confirmation
 bool ask_user_confirmation(const std::string message = "Confirm action ?");
 
-}  // namespace zen
+}  // namespace zenpp

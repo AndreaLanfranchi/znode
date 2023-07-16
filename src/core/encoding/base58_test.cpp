@@ -12,7 +12,7 @@
 #include <core/encoding/base58.hpp>
 #include <core/encoding/hex.hpp>
 
-namespace zen::base58 {
+namespace zenpp::base58 {
 
 // See https://github.com/status-im/nim-stew/blob/master/tests/test_base58.nim
 // Checked they're the same as Zen old code base
@@ -76,4 +76,4 @@ TEST_CASE("Base58 encode/decode with checksum", "[encoding]") {
     }
 }
 
-}  // namespace zen::base58
+}  // namespace zenpp::base58

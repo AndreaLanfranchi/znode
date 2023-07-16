@@ -28,7 +28,7 @@ cmake_policy(SET CMP0009 NEW)
 file(
         GLOB_RECURSE SRC
         LIST_DIRECTORIES false
-        "src/*.?pp"
+        "src/*.?pp" "cmd/*.?hpp"
 )
 
 execute_process(COMMAND ${CLANG_FORMAT} -style=file -i ${SRC})

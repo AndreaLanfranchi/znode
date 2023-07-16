@@ -9,7 +9,7 @@
 #include <core/common/base.hpp>
 #include <core/serialization/stream.hpp>
 
-namespace zen::serialization {
+namespace zenpp::serialization {
 
 //! \brief Public interface all serializable objects must implement
 class Serializable {
@@ -35,4 +35,4 @@ class Serializable {
   private:
     virtual Error serialization(SDataStream& stream, Action action) = 0;
 };
-}  // namespace zen::serialization
+}  // namespace zenpp::serialization
