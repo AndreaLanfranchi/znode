@@ -28,26 +28,26 @@ EVP_PKEY* generate_random_rsa_key_pair(int bits) {
     EVP_PKEY* pkey{nullptr};
     BIGNUM* bn{BN_new()};
     if (bn == nullptr) {
-        ZEN_ERROR << "Failed to create BIGNUM";
+        LOG_ERROR << "Failed to create BIGNUM";
         return nullptr;
     }
     auto bn_free{gsl::finally([bn]() { BN_free(bn); })};
 
     if (!BN_set_word(bn, static_cast<BN_ULONG>(RSA_F4))) {
-        ZEN_ERROR << "Failed to set BIGNUM";
+        LOG_ERROR << "Failed to set BIGNUM";
         return nullptr;
     }
 
     RSA* rsa{RSA_new()};
     if (rsa == nullptr) {
-        ZEN_ERROR << "Failed to create RSA";
+        LOG_ERROR << "Failed to create RSA";
         return nullptr;
     }
 
     if (!RAND_poll()) {
         auto err{ERR_get_error()};
         print_ssl_error(err);
-        ZEN_ERROR << "Failed to initialize random number generator";
+        LOG_ERROR << "Failed to initialize random number generator";
         RSA_free(rsa);
         return nullptr;
     }
@@ -55,21 +55,21 @@ EVP_PKEY* generate_random_rsa_key_pair(int bits) {
     if (!RSA_generate_key_ex(rsa, bits, bn, nullptr)) {
         auto err{ERR_get_error()};
         print_ssl_error(err);
-        ZEN_ERROR << "Failed to initialize random number generator";
+        LOG_ERROR << "Failed to initialize random number generator";
         RSA_free(rsa);
         return nullptr;
     }
 
     pkey = EVP_PKEY_new();
     if (pkey == nullptr) {
-        ZEN_ERROR << "Failed to create EVP_PKEY";
+        LOG_ERROR << "Failed to create EVP_PKEY";
         RSA_free(rsa);
         return nullptr;
     }
     if (!EVP_PKEY_assign_RSA(pkey, rsa)) {
         auto err{ERR_get_error()};
         print_ssl_error(err);
-        ZEN_ERROR << "Failed to assign RSA to EVP_PKEY";
+        LOG_ERROR << "Failed to assign RSA to EVP_PKEY";
         EVP_PKEY_free(pkey);
         return nullptr;
     }
@@ -79,13 +79,13 @@ EVP_PKEY* generate_random_rsa_key_pair(int bits) {
 
 X509* generate_self_signed_certificate(EVP_PKEY* pkey) {
     if (!pkey) {
-        ZEN_ERROR << "Invalid EVP_PKEY";
+        LOG_ERROR << "Invalid EVP_PKEY";
         return nullptr;
     }
 
     X509* x509_certificate = X509_new();
     if (!x509_certificate) {
-        ZEN_ERROR << "Failed to create X509 certificate";
+        LOG_ERROR << "Failed to create X509 certificate";
         return nullptr;
     }
 
@@ -111,7 +111,7 @@ X509* generate_self_signed_certificate(EVP_PKEY* pkey) {
     if (!X509_set_pubkey(x509_certificate, pkey)) {
         auto err{ERR_get_error()};
         print_ssl_error(err);
-        ZEN_ERROR << "Failed to set public key";
+        LOG_ERROR << "Failed to set public key";
         X509_free(x509_certificate);
         return nullptr;
     }
@@ -120,7 +120,7 @@ X509* generate_self_signed_certificate(EVP_PKEY* pkey) {
     if (!X509_sign(x509_certificate, pkey, EVP_sha256())) {
         auto err{ERR_get_error()};
         print_ssl_error(err);
-        ZEN_ERROR << "Failed to sign certificate";
+        LOG_ERROR << "Failed to sign certificate";
         X509_free(x509_certificate);
         return nullptr;
     }
@@ -130,12 +130,12 @@ X509* generate_self_signed_certificate(EVP_PKEY* pkey) {
 
 bool store_rsa_key_pair(EVP_PKEY* pkey, const std::string& password, const std::filesystem::path& directory_path) {
     if (!pkey) {
-        ZEN_ERROR << "Invalid EVP_PKEY";
+        LOG_ERROR << "Invalid EVP_PKEY";
         return false;
     }
 
     if (directory_path.empty() || directory_path.is_relative() || !std::filesystem::is_directory(directory_path)) {
-        ZEN_ERROR << "Invalid path " << directory_path.string();
+        LOG_ERROR << "Invalid path " << directory_path.string();
         return false;
     }
 
@@ -149,7 +149,7 @@ bool store_rsa_key_pair(EVP_PKEY* pkey, const std::string& password, const std::
 #endif
 
     if (!file) {
-        ZEN_ERROR << "Failed to open file " << file_path.string();
+        LOG_ERROR << "Failed to open file " << file_path.string();
         return false;
     }
     auto file_close{gsl::finally([file]() { fclose(file); })};
@@ -165,7 +165,7 @@ bool store_rsa_key_pair(EVP_PKEY* pkey, const std::string& password, const std::
     if (!result) {
         auto err{ERR_get_error()};
         print_ssl_error(err);
-        ZEN_ERROR << "Failed to write private key to file " << file_path.string();
+        LOG_ERROR << "Failed to write private key to file " << file_path.string();
         return false;
     }
 
@@ -173,12 +173,12 @@ bool store_rsa_key_pair(EVP_PKEY* pkey, const std::string& password, const std::
 }
 bool store_x509_certificate(X509* cert, const std::filesystem::path& directory_path) {
     if (!cert) {
-        ZEN_ERROR << "Invalid X509 certificate";
+        LOG_ERROR << "Invalid X509 certificate";
         return false;
     }
 
     if (directory_path.empty() || directory_path.is_relative() || !std::filesystem::is_directory(directory_path)) {
-        ZEN_ERROR << "Invalid path " << directory_path.string();
+        LOG_ERROR << "Invalid path " << directory_path.string();
         return false;
     }
 
@@ -192,7 +192,7 @@ bool store_x509_certificate(X509* cert, const std::filesystem::path& directory_p
 #endif
 
     if (!file) {
-        ZEN_ERROR << "Failed to open file " << file_path.string();
+        LOG_ERROR << "Failed to open file " << file_path.string();
         return false;
     }
     auto file_close{gsl::finally([file]() { fclose(file); })};
@@ -200,7 +200,7 @@ bool store_x509_certificate(X509* cert, const std::filesystem::path& directory_p
     if (!PEM_write_X509(file, cert)) {
         auto err{ERR_get_error()};
         print_ssl_error(err);
-        ZEN_ERROR << "Failed to write certificate to file " << file_path.string();
+        LOG_ERROR << "Failed to write certificate to file " << file_path.string();
         return false;
     }
 
@@ -209,13 +209,13 @@ bool store_x509_certificate(X509* cert, const std::filesystem::path& directory_p
 
 EVP_PKEY* load_rsa_private_key(const std::filesystem::path& directory_path, const std::string& password) {
     if (!std::filesystem::exists(directory_path) || !std::filesystem::is_directory(directory_path)) {
-        ZEN_ERROR << "Invalid or not existing container directory " << directory_path.string();
+        LOG_ERROR << "Invalid or not existing container directory " << directory_path.string();
         return nullptr;
     }
 
     auto file_path = directory_path / kPrivateKeyFileName;
     if (!std::filesystem::exists(file_path) || !std::filesystem::is_regular_file(file_path)) {
-        ZEN_ERROR << "Invalid or not existing file " << file_path.string();
+        LOG_ERROR << "Invalid or not existing file " << file_path.string();
         return nullptr;
     }
 
@@ -228,7 +228,7 @@ EVP_PKEY* load_rsa_private_key(const std::filesystem::path& directory_path, cons
 #endif
 
     if (!file) {
-        ZEN_ERROR << "Failed to open file " << file_path.string();
+        LOG_ERROR << "Failed to open file " << file_path.string();
         return nullptr;
     }
     auto file_close{gsl::finally([file]() { fclose(file); })};
@@ -242,7 +242,7 @@ EVP_PKEY* load_rsa_private_key(const std::filesystem::path& directory_path, cons
     }
 
     if (!pkey) {
-        ZEN_ERROR << "Failed to read private key from file " << file_path.string();
+        LOG_ERROR << "Failed to read private key from file " << file_path.string();
         EVP_PKEY_free(pkey);
         return nullptr;
     }
@@ -252,13 +252,13 @@ EVP_PKEY* load_rsa_private_key(const std::filesystem::path& directory_path, cons
 
 X509* load_x509_certificate(const std::filesystem::path& directory_path) {
     if (!std::filesystem::exists(directory_path) || !std::filesystem::is_directory(directory_path)) {
-        ZEN_ERROR << "Invalid or not existing container directory " << directory_path.string();
+        LOG_ERROR << "Invalid or not existing container directory " << directory_path.string();
         return nullptr;
     }
 
     auto file_path = directory_path / kCertificateFileName;
     if (!std::filesystem::exists(file_path) || !std::filesystem::is_regular_file(file_path)) {
-        ZEN_ERROR << "Invalid or not existing file " << file_path.string();
+        LOG_ERROR << "Invalid or not existing file " << file_path.string();
         return nullptr;
     }
 
@@ -271,14 +271,14 @@ X509* load_x509_certificate(const std::filesystem::path& directory_path) {
 #endif
 
     if (!file) {
-        ZEN_ERROR << "Failed to open file " << file_path.string();
+        LOG_ERROR << "Failed to open file " << file_path.string();
         return nullptr;
     }
     auto file_close{gsl::finally([file]() { fclose(file); })};
 
     X509* cert{PEM_read_X509(file, nullptr, nullptr, nullptr)};
     if (!cert) {
-        ZEN_ERROR << "Failed to read certificate from file " << file_path.string();
+        LOG_ERROR << "Failed to read certificate from file " << file_path.string();
         X509_free(cert);
         return nullptr;
     }
@@ -287,17 +287,17 @@ X509* load_x509_certificate(const std::filesystem::path& directory_path) {
 }
 bool validate_server_certificate(X509* cert, EVP_PKEY* pkey) {
     if (!cert) {
-        ZEN_ERROR << "Invalid X509 certificate";
+        LOG_ERROR << "Invalid X509 certificate";
         return false;
     }
 
     if (!pkey) {
-        ZEN_ERROR << "Invalid EVP_PKEY";
+        LOG_ERROR << "Invalid EVP_PKEY";
         return false;
     }
 
     if (X509_verify(cert, pkey) != 1) {
-        ZEN_ERROR << "Failed to verify certificate";
+        LOG_ERROR << "Failed to verify certificate";
         return false;
     }
 
@@ -316,13 +316,13 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
             break;
         }
         default: {
-            ZEN_ERROR << "Invalid TLS context type";
+            LOG_ERROR << "Invalid TLS context type";
             return nullptr;
         }
     }
 
     if (!ctx) {
-        ZEN_ERROR << "Failed to create SSL context";
+        LOG_ERROR << "Failed to create SSL context";
         return nullptr;
     }
 
@@ -338,7 +338,7 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
         auto rsa_pkey{load_rsa_private_key(directory_path, key_password)};
 
         if (!x509_cert || !rsa_pkey) {
-            ZEN_ERROR << "Failed to load certificate or private key from " << directory_path.string();
+            LOG_ERROR << "Failed to load certificate or private key from " << directory_path.string();
             if (x509_cert) X509_free(x509_cert);
             if (rsa_pkey) EVP_PKEY_free(rsa_pkey);
             SSL_CTX_free(ctx);
@@ -346,7 +346,7 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
         }
 
         if (!validate_server_certificate(x509_cert, rsa_pkey)) {
-            ZEN_ERROR << "Failed to validate certificate (mismatching private key)";
+            LOG_ERROR << "Failed to validate certificate (mismatching private key)";
             X509_free(x509_cert);
             EVP_PKEY_free(rsa_pkey);
             SSL_CTX_free(ctx);
@@ -356,7 +356,7 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
         if (SSL_CTX_use_certificate(ctx, x509_cert) != 1) {
             auto err{ERR_get_error()};
             print_ssl_error(err);
-            ZEN_ERROR << "Failed to use certificate for SSL server context";
+            LOG_ERROR << "Failed to use certificate for SSL server context";
             X509_free(x509_cert);
             EVP_PKEY_free(rsa_pkey);
             SSL_CTX_free(ctx);
@@ -366,7 +366,7 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
         if (SSL_CTX_use_PrivateKey(ctx, rsa_pkey) != 1) {
             auto err{ERR_get_error()};
             print_ssl_error(err);
-            ZEN_ERROR << "Failed to use private key for SSL server context";
+            LOG_ERROR << "Failed to use private key for SSL server context";
             X509_free(x509_cert);
             EVP_PKEY_free(rsa_pkey);
             SSL_CTX_free(ctx);
@@ -390,7 +390,7 @@ bool validate_tls_requirements(const std::filesystem::path& directory_path, cons
             return true;
         }
 
-        ZEN_ERROR << "Failed to load certificate or private key from " << directory_path.string();
+        LOG_ERROR << "Failed to load certificate or private key from " << directory_path.string();
         if (pkey) EVP_PKEY_free(pkey);
         if (x509_cert) X509_free(x509_cert);
     }
@@ -405,36 +405,36 @@ bool validate_tls_requirements(const std::filesystem::path& directory_path, cons
     std::filesystem::remove(cert_path);  // Ensure removed
     std::filesystem::remove(key_path);
 
-    ZEN_TRACE << "Generating new certificate and key";
+    LOG_TRACE << "Generating new certificate and key";
     auto pkey{generate_random_rsa_key_pair(static_cast<int>(kCertificateKeyLength))};
     if (!pkey) {
-        ZEN_ERROR << "Failed to generate RSA key pair";
+        LOG_ERROR << "Failed to generate RSA key pair";
         return false;
     }
     auto pkey_free{gsl::finally([pkey]() { EVP_PKEY_free(pkey); })};
 
-    ZEN_TRACE << "Generating self signed certificate";
+    LOG_TRACE << "Generating self signed certificate";
     auto cert{generate_self_signed_certificate(pkey)};
     if (!cert) {
-        ZEN_ERROR << "Failed to generate self signed certificate";
+        LOG_ERROR << "Failed to generate self signed certificate";
         return false;
     }
     auto cert_free{gsl::finally([cert]() { X509_free(cert); })};
 
-    ZEN_TRACE << "Validating certificate";
+    LOG_TRACE << "Validating certificate";
     if (!validate_server_certificate(cert, pkey)) {
-        ZEN_ERROR << "Failed to validate certificate (mismatching private key)";
+        LOG_ERROR << "Failed to validate certificate (mismatching private key)";
         return false;
     }
 
-    ZEN_TRACE << "Saving certificate and private key to files";
+    LOG_TRACE << "Saving certificate and private key to files";
     if (!store_x509_certificate(cert, directory_path)) {
-        ZEN_ERROR << "Failed to save certificate to file " << cert_path.string();
+        LOG_ERROR << "Failed to save certificate to file " << cert_path.string();
         return false;
     }
-    ZEN_TRACE << "Saving private key to file";
+    LOG_TRACE << "Saving private key to file";
     if (!store_rsa_key_pair(pkey, key_password, directory_path)) {
-        ZEN_ERROR << "Failed to save private key to file " << key_path.string();
+        LOG_ERROR << "Failed to save private key to file " << key_path.string();
         return false;
     }
 

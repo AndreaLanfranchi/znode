@@ -65,7 +65,7 @@ std::filesystem::path get_os_default_storage_path() {
         base_path_str.assign(env_value.to_string());
     } else {
 #ifdef _WIN32
-        std::string env_name{"APPDATA"};
+        std::string env_name{"LOCALAPPDATA"};
 #else
         std::string env_name{"HOME"};
 #endif
@@ -80,16 +80,18 @@ std::filesystem::path get_os_default_storage_path() {
     }
 
     std::filesystem::path base_dir_path{base_path_str};
+    std::string project_name{get_buildinfo()->project_name};
+    project_name.insert(0, 1, '.');
 #ifdef _WIN32
-    base_dir_path /= ".zen";
+    base_dir_path /= project_name;
 #elif __APPLE__
     base_dir_path /= "Library";
     base_dir_path /= "Application Support";
-    base_dir_path /= "zen";
+    base_dir_path /= project_name;
 #else
     base_dir_path /= ".local";
     base_dir_path /= "share";
-    base_dir_path /= "zen";
+    base_dir_path /= project_name;
 #endif
 
     return base_dir_path;

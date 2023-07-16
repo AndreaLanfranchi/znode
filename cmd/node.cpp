@@ -222,25 +222,25 @@ int main(int argc, char* argv[]) {
     } catch (const CLI::ParseError& ex) {
         return cli.exit(ex);
     } catch (const boost::system::error_code& ec) {
-        ZEN_ERROR << "Boost error code :" << ec.message();
+        LOG_ERROR << "Boost error code :" << ec.message();
         return -1;
     } catch (const std::filesystem::filesystem_error& ex) {
-        ZEN_ERROR << "Filesystem error :" << ex.what();
+        LOG_ERROR << "Filesystem error :" << ex.what();
         return -2;
     } catch (const std::invalid_argument& ex) {
-        ZEN_ERROR << "Invalid argument :" << ex.what();
+        LOG_ERROR << "Invalid argument :" << ex.what();
         return -3;
     } catch (const db::Exception& ex) {
-        ZEN_ERROR << "Unexpected db error : " << ex.what();
+        LOG_ERROR << "Unexpected db error : " << ex.what();
         return -4;
     } catch (const std::runtime_error& ex) {
-        ZEN_ERROR << "Unexpected runtime error : " << ex.what();
+        LOG_ERROR << "Unexpected runtime error : " << ex.what();
         return -1;
     } catch (const std::exception& ex) {
-        ZEN_ERROR << "Unexpected error : " << ex.what();
+        LOG_ERROR << "Unexpected error : " << ex.what();
         return -5;
     } catch (...) {
-        ZEN_ERROR << "Unexpected undefined error";
+        LOG_ERROR << "Unexpected undefined error";
         return -99;
     }
 }

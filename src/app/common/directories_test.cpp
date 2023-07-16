@@ -23,14 +23,14 @@ TEST_CASE("Process Path", "[misc]") {
 #if defined(_MSC_VER)
     CHECK(process_path.has_extension());
 #endif
-    ZEN_LOG << "Running tests from " << process_path.string() << " in " << process_path.parent_path().string();
+    LOG_MESSAGE << "Running tests from " << process_path.string() << " in " << process_path.parent_path().string();
 }
 
 TEST_CASE("Directory", "[misc]") {
     SECTION("Directory in current dir") {
         const auto process_path{get_process_absolute_full_path()};
         Directory current_dir(process_path.parent_path());
-        ZEN_LOG << "Accessed directory " << current_dir.path().string();
+        LOG_MESSAGE << "Accessed directory " << current_dir.path().string();
         CHECK(current_dir.exists());
         CHECK_FALSE(current_dir.is_pristine());
         const auto current_dir_size{current_dir.size(/*recurse=*/true)};
@@ -38,7 +38,7 @@ TEST_CASE("Directory", "[misc]") {
 
         std::string random_name{get_random_alpha_string(15)};
         auto sub_dir{current_dir[std::filesystem::path(random_name)]};
-        ZEN_LOG << "Accessed sub directory " << sub_dir.path().string();
+        LOG_MESSAGE << "Accessed sub directory " << sub_dir.path().string();
         CHECK(sub_dir.exists());
         CHECK(sub_dir.is_pristine());
 
@@ -69,10 +69,10 @@ TEST_CASE("Directory", "[misc]") {
             Directory current_dir(process_path.parent_path());
             std::string random_name{get_random_alpha_string(15)};
             std::filesystem::path sub_path{current_dir.path() / random_name};
-            ZEN_LOG << "Using sub dir path " << sub_path.string() << " "
-                    << (sub_path.is_absolute() ? "absolute" : "relative");
+            LOG_MESSAGE << "Using sub dir path " << sub_path.string() << " "
+                        << (sub_path.is_absolute() ? "absolute" : "relative");
             auto sub_dir{current_dir[sub_path]};
-            ZEN_LOG << "Used sub dir path " << sub_dir.path().string();
+            LOG_MESSAGE << "Used sub dir path " << sub_dir.path().string();
             CHECK(sub_dir.exists());
         } catch (const std::invalid_argument&) {
             has_thrown = true;
@@ -88,7 +88,7 @@ TEST_CASE("Temp Directory", "[misc]") {
         {
             TempDirectory tmp_dir(process_path.parent_path());
             tmp_generated_path = tmp_dir.path();
-            ZEN_LOG << "Generated tmp directory " << tmp_generated_path.string();
+            LOG_MESSAGE << "Generated tmp directory " << tmp_generated_path.string();
             CHECK(tmp_dir.is_pristine());
         }
         CHECK_FALSE(std::filesystem::exists(tmp_generated_path));
@@ -99,7 +99,7 @@ TEST_CASE("Temp Directory", "[misc]") {
         {
             TempDirectory tmp_dir{};
             tmp_generated_path = tmp_dir.path();
-            ZEN_LOG << "Generated tmp directory " << tmp_generated_path.string();
+            LOG_MESSAGE << "Generated tmp directory " << tmp_generated_path.string();
             CHECK(tmp_dir.is_pristine());
         }
         CHECK(tmp_generated_path.string().starts_with(os_tmp_path.string()));

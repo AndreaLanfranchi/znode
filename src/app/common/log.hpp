@@ -113,15 +113,28 @@ using Message = LogBuffer<Level::kNone>;
 
 }  // namespace zen::log
 
-#define ZEN_LOGBUFFER(level_)                \
+#define LOG_BUFFER(level_)                   \
     if (!zen::log::test_verbosity(level_)) { \
     } else                                   \
-        zen::log::LogBuffer<level_>() << __func__ << ": "
+        zen::log::LogBuffer<level_>()
 
-#define ZEN_TRACE ZEN_LOGBUFFER(zen::log::Level::kTrace)
-#define ZEN_DEBUG ZEN_LOGBUFFER(zen::log::Level::kDebug)
-#define ZEN_INFO ZEN_LOGBUFFER(zen::log::Level::kInfo)
-#define ZEN_WARNING ZEN_LOGBUFFER(zen::log::Level::kWarning)
-#define ZEN_ERROR ZEN_LOGBUFFER(zen::log::Level::kError)
-#define ZEN_CRITICAL ZEN_LOGBUFFER(zen::log::Level::kCritical)
-#define ZEN_LOG ZEN_LOGBUFFER(zen::log::Level::kNone)
+#define LOGF_BUFFER(level_)                  \
+    if (!zen::log::test_verbosity(level_)) { \
+    } else                                   \
+        zen::log::LogBuffer<level_>() << __func__ << " (" << __line__ << ") "
+
+#define LOG_TRACE LOG_BUFFER(zen::log::Level::kTrace)
+#define LOG_DEBUG LOG_BUFFER(zen::log::Level::kDebug)
+#define LOG_INFO LOG_BUFFER(zen::log::Level::kInfo)
+#define LOG_WARNING LOG_BUFFER(zen::log::Level::kWarning)
+#define LOG_ERROR LOG_BUFFER(zen::log::Level::kError)
+#define LOG_CRITICAL LOG_BUFFER(zen::log::Level::kCritical)
+#define LOG_MESSAGE LOG_BUFFER(zen::log::Level::kNone)
+
+#define LOGF_TRACE LOGF_BUFFER(zen::log::Level::kTrace)
+#define LOGF_DEBUG LOGF_BUFFER(zen::log::Level::kDebug)
+#define LOGF_INFO LOGF_BUFFER(zen::log::Level::kInfo)
+#define LOGF_WARNING LOGF_BUFFER(zen::log::Level::kWarning)
+#define LOGF_ERROR LOGF_BUFFER(zen::log::Level::kError)
+#define LOGF_CRITICAL LOGF_BUFFER(zen::log::Level::kCritical)
+#define LOGF_MESSAGE LOGF_BUFFER(zen::log::Level::kNone)

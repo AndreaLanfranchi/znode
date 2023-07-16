@@ -73,7 +73,7 @@ bool Node::stop(bool wait) noexcept {
 
 void Node::start_ssl_handshake() {
     ZEN_REQUIRE(ssl_context_ != nullptr);
-    ZEN_TRACE << "Starting SSL handshake";
+    LOG_TRACE << "Starting SSL handshake";
     ssl_ = SSL_new(ssl_context_);
     SSL_set_fd(ssl_, static_cast<int>(socket_.lowest_layer().native_handle()));
 
