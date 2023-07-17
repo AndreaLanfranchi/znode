@@ -35,11 +35,11 @@ TEST_CASE("NetMessage", "[abi]") {
     std::string hexed_header_data;
 
     SECTION("Header only validation") {
-        REQUIRE(net_message.validate() == kMessageHeaderUnknownCommand);
+        REQUIRE(magic_enum::enum_name(net_message.validate()) == "kMessageHeaderIncomplete");
 
         REQUIRE(header.pristine());
-        REQUIRE(header.get_type() == NetMessageType::kMissingOrUnknown);
-        REQUIRE(header.validate() == kMessageHeaderEmptyCommand);
+        REQUIRE(magic_enum::enum_name(header.get_type()) == "kMissingOrUnknown");
+        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderEmptyCommand");
 
         hexed_header_data =
             "00000000"                  // ....               fake network magic

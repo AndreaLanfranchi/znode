@@ -6,6 +6,7 @@
 */
 
 #pragma once
+#include <array>
 #include <bit>
 #include <concepts>
 #include <ranges>
@@ -19,11 +20,9 @@ namespace zenpp::endian {
 template <std::integral T>
 constexpr T byte_swap(T value) {
     static_assert(std::has_unique_object_representations_v<T>, "T may not have padding bits");
-    Bytes buffer(sizeof(T), 0);
-    std::memcpy(buffer.data(), &value, sizeof(T));
-    std::ranges::reverse(buffer);
-    std::memcpy(&value, buffer.data(), sizeof(T));
-    return value;
+    std::array<std::byte, sizeof(T)> value_bytes{std::bit_cast<std::array<std::byte, sizeof(T)>>(value)};
+    std::ranges::reverse(value_bytes);
+    return std::bit_cast<T>(value_bytes);
 }
 
 // Similar to boost::endian::load_big_u16
