@@ -38,7 +38,7 @@ void Node::start() {
     remote_endpoint_ = socket_.remote_endpoint();
     last_message_received_time_ = std::chrono::steady_clock::now();  // We don't want to disconnect immediately
     connected_time_.store(std::chrono::steady_clock::now());
-    initialize_inbound_message();
+    inbound_message_ = std::make_unique<NetMessage>(version_);
 
     auto self{shared_from_this()};
     if (ssl_context_ != nullptr) {
@@ -59,10 +59,10 @@ bool Node::stop(bool wait) noexcept {
             ssl_ = nullptr;
         }
 
+        is_connected_.store(false);
         boost::system::error_code ec;
         socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);  // Shutdown both send and receive
         socket_.close(ec);
-        is_connected_.store(false);
         if (bool expected{true}; is_started_.compare_exchange_strong(expected, false)) {
             auto self{shared_from_this()};
             io_strand_.post([self]() { self->on_disconnect_(self); });
@@ -72,7 +72,7 @@ bool Node::stop(bool wait) noexcept {
 }
 
 void Node::start_ssl_handshake() {
-    ZEN_REQUIRE(ssl_context_ != nullptr);
+    REQUIRES(ssl_context_ != nullptr);
     LOG_TRACE << "Starting SSL handshake";
     ssl_ = SSL_new(ssl_context_);
     SSL_set_fd(ssl_, static_cast<int>(socket_.lowest_layer().native_handle()));
@@ -91,7 +91,7 @@ void Node::start_ssl_handshake() {
             SSL_set_connect_state(ssl_);
             break;
         default:
-            ZEN_ASSERT(false);  // Should never happen;
+            ASSERT(false);  // Should never happen;
     }
 
     if (SSL_do_handshake(ssl_) != 1) {
@@ -157,16 +157,17 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
         if (on_data_) on_data_(DataDirectionMode::kInbound, bytes_transferred);
 
         const auto parse_result{parse_messages(bytes_transferred)};
-        if (parse_result != serialization::Error::kSuccess) {
-            log::Warning("P2P message error",
-                         {"peer", "unknown", "error", std::string(magic_enum::enum_name(parse_result))})
+        if (serialization::is_fatal_error(parse_result)) {
+            log::Warning("Network message error",
+                         {"id", std::to_string(node_id_), "remote", network::to_string(local_endpoint_), "error",
+                          std::string(magic_enum::enum_name(parse_result))})
                 << "Disconnecting peer ...";
-            io_strand_.post([self]() { self->stop(false); });
+            stop(false);
             return;
         }
     }
 
-    // Continue reading
+    // Continue reading from socket
     io_strand_.post([self]() { self->start_read(); });
 }
 
@@ -175,120 +176,76 @@ void Node::start_write() {
 }
 
 serialization::Error Node::parse_messages(const size_t bytes_transferred) {
-    using enum serialization::Error;
-    serialization::Error err{kSuccess};
+    using namespace serialization;
+    using enum Error;
+    Error err{kSuccess};
 
-    static const std::list<serialization::Error> kNonFatalErrors{kSuccess, kMessageHeaderIncomplete,
-                                                                 kMessageBodyIncomplete};
-    const auto should_continue_parsing{
-        [&err]() { return std::find(kNonFatalErrors.begin(), kNonFatalErrors.end(), err) != kNonFatalErrors.end(); }};
+    static const bool should_trace_log{log::test_verbosity(log::Level::kTrace)};
 
     size_t messages_parsed{0};
-
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
-    while (should_continue_parsing() && !data.empty()) {
-        auto bytes_to_section_completion{(receive_mode_header_ ? kMessageHeaderLength : inbound_header_->length) -
-                                         inbound_stream_->avail()};
-        bytes_to_section_completion = std::min(bytes_to_section_completion, data.size());
-        inbound_stream_->write(data.substr(0, bytes_to_section_completion));
-        data.remove_prefix(bytes_to_section_completion);
-
-        const auto finalization_err{finalize_inbound_message()};
-        switch (finalization_err) {
-            case kSuccess:  // Message fully received and processed - queue it for processing and continue reading
-                if (++messages_parsed > kMaxMessagesPerRead) {
-                    err = KMessagesFlooding;
-                } else {
-                    // Generate the new full message and notify higher levels
-                    auto new_message =
-                        std::make_shared<NetMessage>(inbound_header_.release(), inbound_stream_.release());
-                    if (err = new_message->validate(); err == kSuccess) {
-                        std::unique_lock lock{inbound_messages_mutex_};
-                        inbound_messages_.push_back(std::move(new_message));
-                        // TODO: notify higher levels
-                    }
-                }
-                initialize_inbound_message();  // Prepare for next message
+    while (!data.empty()) {
+        if (err = inbound_message_->parse(data); is_fatal_error(err)) break;
+        if (err == kMessageHeaderIncomplete) break;  // Can't do anything but read other data
+        if (!inbound_message_->header().pristine() /*has been deserialized*/) {
+            if (const auto err_handshake = validate_message_for_protocol_handshake(inbound_message_->get_type());
+                err_handshake != kSuccess) {
+                err = err_handshake;
                 break;
-            case kMessageHeaderIncomplete:  // Need more data on this header - continue reading
-            case kMessageBodyIncomplete:    // Need more data on this body - continue reading
-                break;
-            default:
-                err = finalization_err;        // Something went wrong - Report to caller and discard data
-                initialize_inbound_message();  // Prepare for next message
+            }
         }
+        if (err == kMessageBodyIncomplete) break;  // Can't do anything but read other data
+
+        // If we get here the message has been successfully parsed and can be queued for processing
+        // unless we exceed the maximum number of messages per read
+        // Eventually we initialize a new message and continue parsing
+        if (++messages_parsed > kMaxMessagesPerRead) {
+            err = KMessagesFloodingDetected;
+            break;
+        }
+
+        // TODO verify this message is actually intended for the active network
+        // TODO by matching network config magic bytes
+
+        if (should_trace_log) {
+            log::Trace("Network message received",
+                       {"id", std::to_string(node_id_), "remote", network::to_string(local_endpoint_), "message",
+                        std::string(magic_enum::enum_name(inbound_message_->get_type())), "size",
+                        to_human_bytes(inbound_message_->size())});
+        }
+
+        std::unique_lock lock{inbound_messages_mutex_};
+        inbound_messages_.push_back(std::move(inbound_message_));
+        inbound_message_ = std::make_unique<NetMessage>(version_);  // Start with a brand new message
+        // TODO notify higher levels that a new message has been received
+        lock.unlock();
     }
     receive_buffer_.consume(bytes_transferred);  // Discard data that has been processed
-
-    if (err == kSuccess && messages_parsed != 0) {
+    if (!is_fatal_error(err) && messages_parsed != 0) {
         last_message_received_time_.store(std::chrono::steady_clock::now());
     }
     return err;
-}
-
-void Node::initialize_inbound_message() {
-    receive_mode_header_ = true;
-    inbound_stream_ = std::make_unique<serialization::SDataStream>(serialization::Scope::kNetwork, version_);
-    inbound_header_ = std::make_unique<NetMessageHeader>();
-}
-
-serialization::Error Node::finalize_inbound_message() {
-    using enum serialization::Error;
-    serialization::Error ret{kSuccess};
-
-    try {
-        if (receive_mode_header_) {
-            // Is the header complete?
-            if (inbound_stream_->avail() != kMessageHeaderLength)
-                throw serialization::SerializationException(kMessageHeaderIncomplete);
-
-            serialization::success_or_throw(inbound_header_->deserialize(*inbound_stream_));
-            serialization::success_or_throw(inbound_header_->validate(std::nullopt /* TODO Put network magic here */));
-            serialization::success_or_throw(validate_message_for_protocol_handshake(inbound_header_->get_type()));
-
-            // If this is a header only message (e.g. verack) validate empty checksum
-            // otherwise switch to body mode and continue
-            if (inbound_header_->length == 0) {
-                serialization::success_or_throw(
-                    NetMessage::validate_payload_checksum(ByteView{}, inbound_header_->checksum));
-            } else {
-                ret = kMessageBodyIncomplete;  // Need body data
-                receive_mode_header_ = false;
-            }
-
-        } else {
-            if (inbound_stream_->avail() != inbound_header_->length)
-                throw serialization::SerializationException(kMessageBodyIncomplete);
-        }
-
-    } catch (const serialization::SerializationException& ex) {
-        ret = ex.error();
-    }
-
-    return ret;
 }
 
 serialization::Error Node::validate_message_for_protocol_handshake(const NetMessageType message_type) {
     // Check this message is acceptable against current status of protocol handshake
     using enum serialization::Error;
     if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) {
+        auto status {static_cast<uint32_t>(protocol_handshake_status_.load())};
         switch (connection_mode_) {
             using enum NodeConnectionMode;
             using enum ProtocolHandShakeStatus;
             case kInbound:
                 if (message_type != NetMessageType::kVersion) return kInvalidProtocolHandShake;
-                protocol_handshake_status_.store(
-                    static_cast<ProtocolHandShakeStatus>((static_cast<uint32_t>(protocol_handshake_status_.load()) |
-                                                          static_cast<uint32_t>(kVersionCompleted))));
+                status |= static_cast<uint32_t>(kVersionCompleted);
                 break;
             case kOutbound:
             case kManualOutbound:
                 if (message_type != NetMessageType::kVerack) return kInvalidProtocolHandShake;
-                protocol_handshake_status_.store(
-                    static_cast<ProtocolHandShakeStatus>((static_cast<uint32_t>(protocol_handshake_status_.load()) |
-                                                          static_cast<uint32_t>(kVerackCompleted))));
+                status |= static_cast<uint32_t>(kVerackCompleted);
                 break;
         }
+        protocol_handshake_status_.store(static_cast<ProtocolHandShakeStatus>(status));
     } else {
         if (message_type == NetMessageType::kVersion || message_type == NetMessageType::kVerack)
             return kDuplicateProtocolHandShake;
@@ -304,7 +261,7 @@ void Node::clean_up(Node* ptr) noexcept {
 }
 
 bool Node::is_idle(const uint32_t idle_timeout_seconds) const noexcept {
-    ZEN_REQUIRE(idle_timeout_seconds != 0);
+    REQUIRES(idle_timeout_seconds != 0);
     if (!is_connected()) return false;  // Not connected - not idle
     using namespace std::chrono;
     const auto now{steady_clock::now()};

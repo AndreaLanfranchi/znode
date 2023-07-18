@@ -40,9 +40,9 @@ class MessageDigest {
     MessageDigest()
         : digest_{EVP_get_digestbyname(T.value)},
           digest_context_{MDContexts.empty() ? EVP_MD_CTX_new() : MDContexts.acquire()} {
-        ZEN_ASSERT(digest_ != nullptr);
-        ZEN_ASSERT(digest_context_ != nullptr);
-        ZEN_ASSERT(EVP_DigestInit_ex(digest_context_.get(), digest_, nullptr) == 1);
+        ASSERT(digest_ != nullptr);
+        ASSERT(digest_context_ != nullptr);
+        ASSERT(EVP_DigestInit_ex(digest_context_.get(), digest_, nullptr) == 1);
         digest_size_ = static_cast<size_t>(EVP_MD_size(digest_));
         block_size_ = static_cast<size_t>(EVP_MD_block_size(digest_));
     }
@@ -101,14 +101,16 @@ class MessageDigest {
             }
         } else {
             // Only for Sha256 in Merkle tree composition
-            if (!(digest_name() == "SHA256" && ingested_size_ == block_size_)) {
-                ret.clear();
-            } else {
+            if (digest_name() == "SHA256" && ingested_size_ == block_size_) {
                 // See the structure of SHA256 which access is deprecated in OpenSSL 3.0.1
                 // We need only first 8 integers
-                const auto ctx_data{static_cast<unsigned int*>(EVP_MD_CTX_md_data(digest_context_.get()))};
-                for (size_t i{0}; i < 8; ++i) {
-                    endian::store_big_u32(&ret[i << 2], ctx_data[i]);
+                // TODO: Seems OpenSSL 3.1.0 always returns nullptr
+                const auto ctx{EVP_MD_CTX_get0_md_data(digest_context_.get())};
+                if (ctx != nullptr) {
+                    const auto* ctx_data{reinterpret_cast<const uint32_t*>(ctx)};
+                    for (size_t i{0}; i < 8; ++i) {
+                        endian::store_big_u32(&ret[i << 2], ctx_data[i]);
+                    }
                 }
             }
         }

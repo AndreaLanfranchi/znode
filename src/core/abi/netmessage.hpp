@@ -35,33 +35,39 @@ enum class NetMessageType : uint32_t {
 struct MessageDefinition {
     const char* command{nullptr};                                    // The command string
     NetMessageType message_type{NetMessageType::kMissingOrUnknown};  // The command id
+    const bool is_vectorized{false};                                 // Whether the payload is a vector of items
     const std::optional<size_t> max_vector_items{};    // The maximum number of vector items in the payload
     const std::optional<size_t> vector_item_size{};    // The size of a vector item
     const std::optional<size_t> min_payload_length{};  // The min allowed payload length
     const std::optional<size_t> max_payload_length{};  // The max allowed payload length
+    const std::optional<int> min_protocol_version{};   // The min protocol version that supports this message
+    const std::optional<int> max_protocol_version{};   // The max protocol version that supports this message
 };
 
 inline constexpr MessageDefinition kMessageVersion{
     "version",                 //
     NetMessageType::kVersion,  //
-    std::nullopt,              //
-    std::nullopt,              //
-    size_t{46},                //
-    size_t(1_KiB)              //
+    false,
+    std::nullopt,  //
+    std::nullopt,  //
+    size_t{46},    //
+    size_t(1_KiB)  //
 };
 
 inline constexpr MessageDefinition kMessageVerack{
     "verack",                 //
     NetMessageType::kVerack,  //
-    std::nullopt,             //
-    std::nullopt,             //
-    std::nullopt,             //
-    size_t{0}                 //
+    false,
+    std::nullopt,  //
+    std::nullopt,  //
+    std::nullopt,  //
+    size_t{0}      //
 };
 
 inline constexpr MessageDefinition kMessageInv{
     "inv",                 //
     NetMessageType::kInv,  //
+    true,
     size_t{kMaxInvItems},
     size_t{kInvItemSize},
     size_t{1 + kInvItemSize},                                                                 //
@@ -71,6 +77,7 @@ inline constexpr MessageDefinition kMessageInv{
 inline constexpr MessageDefinition kMessageAddr{
     "addr",                 //
     NetMessageType::kAddr,  //
+    true,
     size_t{kMaxAddrItems},
     size_t{kAddrItemSize},
     size_t{1 + kAddrItemSize},                                                                   //
@@ -80,6 +87,7 @@ inline constexpr MessageDefinition kMessageAddr{
 inline constexpr MessageDefinition kMessageMissingOrUnknown{
     nullptr,                            //
     NetMessageType::kMissingOrUnknown,  //
+    false,
     size_t{0},
     size_t{0},
     size_t{0},  //
@@ -104,29 +112,21 @@ class NetMessageHeader : public serialization::Serializable {
     NetMessageHeader() : Serializable(){};
 
     std::array<uint8_t, 4> magic{0};     // Message magic (origin network)
-    std::array<uint8_t, 12> command{0};  // ASCII string identifying the packet content, NULL padded (non-NULL padding
-                                         // results in message rejected)
+    std::array<uint8_t, 12> command{0};  // ASCII string identifying the packet content, NULL padded
     uint32_t length{0};                  // Length of payload in bytes
     std::array<uint8_t, 4> checksum{0};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
 
-    //! \brief Returns the decoded message type
-    [[nodiscard]] NetMessageType get_type() const noexcept {
-        return kMessageDefinitions[message_definition_id_].message_type;
+    //! \brief Returns the message definition
+    [[nodiscard]] const MessageDefinition& get_definition() const noexcept {
+        return kMessageDefinitions[message_definition_id_];
     }
+
+    //! \brief Returns the decoded message type
+    [[nodiscard]] NetMessageType get_type() const noexcept { return get_definition().message_type; }
 
     //! \brief Sets the message type and fills the command field
     //! \remarks On non pristine headers, this function has no effect
     void set_type(NetMessageType type) noexcept;
-
-    [[nodiscard]] std::optional<size_t> max_vector_items() const noexcept {
-        return kMessageDefinitions[message_definition_id_].max_vector_items;
-    }
-    [[nodiscard]] std::optional<size_t> min_payload_length() const noexcept {
-        return kMessageDefinitions[message_definition_id_].min_payload_length;
-    }
-    [[nodiscard]] std::optional<size_t> max_payload_length() const noexcept {
-        return kMessageDefinitions[message_definition_id_].max_payload_length;
-    }
 
     //! \brief Reset the header to its factory state
     void reset() noexcept;
@@ -135,8 +135,7 @@ class NetMessageHeader : public serialization::Serializable {
     [[nodiscard]] bool pristine() const noexcept;
 
     //! \brief Performs a sanity check on the header
-    [[nodiscard]] serialization::Error validate(
-        std::optional<ByteView> expected_network_magic = std::nullopt) const noexcept;
+    [[nodiscard]] serialization::Error validate() const noexcept;
 
   private:
     mutable size_t message_definition_id_{static_cast<size_t>(NetMessageType::kMissingOrUnknown)};
@@ -147,42 +146,30 @@ class NetMessageHeader : public serialization::Serializable {
 class NetMessage {
   public:
     //! \brief Construct a blank NetMessage
-    NetMessage()
-        : header_(std::make_unique<NetMessageHeader>()),
-          raw_data_(std::make_unique<serialization::SDataStream>(serialization::Scope::kNetwork, 0)){};
+    NetMessage() : header_(), data_(serialization::Scope::kNetwork, 0){};
 
     //! \brief Construct a blank NetMessage with a specific version
-    explicit NetMessage(int version)
-        : header_(std::make_unique<NetMessageHeader>()),
-          raw_data_(std::make_unique<serialization::SDataStream>(serialization::Scope::kNetwork, version)){};
-
-    //! \brief Construct a NetMessage from a header and data
-    //! \remarks This takes ownership of the header and data
-    explicit NetMessage(std::unique_ptr<NetMessageHeader>& header, std::unique_ptr<serialization::SDataStream>& data)
-        : header_(std::move(header)), raw_data_(std::move(data)) {}
-
-    //! \brief Construct a NetMessage from a header and data
-    //! \remarks This takes ownership of the header and data
-    explicit NetMessage(NetMessageHeader* header_ptr, serialization::SDataStream* data_ptr)
-        : header_(header_ptr), raw_data_(data_ptr) {}
+    explicit NetMessage(int version) : header_(), data_(serialization::Scope::kNetwork, version){};
 
     NetMessage(const NetMessage&) = delete;
     NetMessage(const NetMessage&&) = delete;
     NetMessage& operator=(const NetMessage&) = delete;
     ~NetMessage() = default;
 
-    [[nodiscard]] NetMessageHeader& header() const noexcept { return *header_; }
-    [[nodiscard]] serialization::SDataStream& data() const noexcept { return *raw_data_; }
+    [[nodiscard]] size_t size() const noexcept { return data_.size(); }
+    [[nodiscard]] NetMessageType get_type() const noexcept { return header_.get_type(); }
+    [[nodiscard]] NetMessageHeader& header() noexcept { return header_; }
+    [[nodiscard]] serialization::SDataStream& data() noexcept { return data_; }
+    [[nodiscard]] serialization::Error parse(ByteView& input_data) noexcept;
 
-    //! \brief Validates the message header and payload
+    //! \brief Validates the message header, payload and checksum
     [[nodiscard]] serialization::Error validate() const noexcept;
 
-    [[nodiscard]] static serialization::Error validate_payload_checksum(ByteView payload,
-                                                                        ByteView expected_checksum) noexcept;
-
   private:
-    std::unique_ptr<NetMessageHeader> header_{nullptr};
-    std::unique_ptr<serialization::SDataStream> raw_data_{nullptr};
+    NetMessageHeader header_;                  // Where the message header is deserialized
+    mutable serialization::SDataStream data_;  // Contains all the message raw data
+
+    [[nodiscard]] serialization::Error validate_checksum() const noexcept;
 };
 
 }  // namespace zenpp

@@ -30,12 +30,5 @@ hunter_config(
 
 hunter_config(
         OpenSSL
-
-#        VERSION 1.1.1t
-#        URL https://github.com/openssl/openssl/archive/OpenSSL_1_1_1t.tar.gz
-#        SHA1 34ea65451f7fc4625f31ba50f89b3fbea12f13f3
-
         VERSION 3.1.0
-        #URL https://github.com/openssl/openssl/archive/openssl-3.1.0.tar.gz
-        #SHA1 1adb0f773af645b9f54738301920e5c74360b76d
 )

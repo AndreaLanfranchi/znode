@@ -5,6 +5,7 @@
 */
 
 #pragma once
+#include <array>
 #include <cstdint>
 
 namespace zenpp::serialization {
@@ -31,26 +32,34 @@ enum class Error {
     kReadBeyondData,
     kNonCanonicalCompactSize,
     kCompactSizeTooBig,
-    kMessageHeaderIncomplete,             // Message header too short and cannot be completed
-    kMessageBodyIncomplete,               // Message body too short
-    kMessageHeaderMagicMismatch,          // Message header addressed to another network
-    kMessageHeaderEmptyCommand,           // Message header command is empty
-    kMessageHeaderUnknownCommand,         // Message header command is unknown
-    kMessageHeaderMalformedCommand,       // Message header's command is malformed (e.g. not null padded)
-    kMessageHeaderUndersizedPayload,      // Message header's declared payload size is too small
-    kMessageHeaderOversizedPayload,       // Message header's declared payload size is too wide
-    kMessageMismatchingPayloadLength,     // Message payload length does not match the declared one
-    kMessageHeaderInvalidChecksum,        // Message header's checksum is invalid
-    kMessagePayloadEmptyVector,           // Message payload vector is empty
-    kMessagePayloadOversizedVector,       // Message payload vector is too large
-    kMessagePayloadMismatchesVectorSize,  // Message payload vector size does not match the declared one
-    kMessagePayloadDuplicateVectorItems,  // Message payload vector contains duplicate items
-    KMessagesFlooding,                    // Message flooding detected
-    kInvalidProtocolHandShake,            // Wrong message sequence detected
-    kDuplicateProtocolHandShake,          // Duplicate handshake message detected
-    kUndefinedError,                      // Not defined
+    kMessageHeaderIncomplete,                   // Message header too short and cannot be completed
+    kMessageBodyIncomplete,                     // Message body too short
+    kMessageHeaderMagicMismatch,                // Message header addressed to another network
+    kMessageHeaderEmptyCommand,                 // Message header command is empty
+    kMessageHeaderUnknownCommand,               // Message header command is unknown
+    kMessageHeaderMalformedCommand,             // Message header's command is malformed (e.g. not null padded)
+    kMessageHeaderUndersizedPayload,            // Message header's declared payload size is too small
+    kMessageHeaderOversizedPayload,             // Message header's declared payload size is too wide
+    kMessageMismatchingPayloadLength,           // Message payload length does not match the declared one
+    kMessageHeaderInvalidChecksum,              // Message header's checksum is invalid
+    kMessagePayloadEmptyVector,                 // Message payload vector is empty
+    kMessagePayloadOversizedVector,             // Message payload vector is too large
+    kMessagePayloadMismatchesVectorSize,        // Message payload vector size does not match the declared one
+    kMessagePayloadDuplicateVectorItems,        // Message payload vector contains duplicate items
+    KMessagesFloodingDetected,                  // Message flooding detected
+    kInvalidProtocolHandShake,                  // Wrong message sequence detected
+    kDuplicateProtocolHandShake,                // Duplicate handshake message detected
+    kUnsupportedMessageTypeForProtocolVersion,  // Message type is not supported in current protocol version
+    kDeprecatedMessageTypeForProtocolVersion,   // Message type is deprecated in current protocol version
+    kUndefinedError,                            // Not defined
 };
 
 inline bool operator!(Error e) { return e == static_cast<Error>(0); }
+
+inline constexpr std::array<Error, 3> kNonFatalErrors{Error::kSuccess, Error::kMessageHeaderIncomplete,
+                                                      Error::kMessageBodyIncomplete};
+inline bool is_fatal_error(Error e) {
+    return std::find(kNonFatalErrors.begin(), kNonFatalErrors.end(), e) == kNonFatalErrors.end();
+}
 
 }  // namespace zenpp::serialization

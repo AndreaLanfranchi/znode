@@ -35,11 +35,11 @@ TEST_CASE("NetMessage", "[abi]") {
     std::string hexed_header_data;
 
     SECTION("Header only validation") {
-        REQUIRE(magic_enum::enum_name(net_message.validate()) == "kMessageHeaderIncomplete");
+        CHECK(magic_enum::enum_name(net_message.validate()) == "kMessageHeaderIncomplete");
 
-        REQUIRE(header.pristine());
-        REQUIRE(magic_enum::enum_name(header.get_type()) == "kMissingOrUnknown");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderEmptyCommand");
+        CHECK(header.pristine());
+        CHECK(magic_enum::enum_name(header.get_type()) == "kMissingOrUnknown");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderEmptyCommand");
 
         hexed_header_data =
             "00000000"                  // ....               fake network magic
@@ -47,10 +47,9 @@ TEST_CASE("NetMessage", "[abi]") {
             "00000000"                  // ....               payload length
             "00000000";                 // ....               payload checksum
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderMalformedCommand");
-        REQUIRE(magic_enum::enum_name(header.validate(network_magic_bytes)) == "kMessageHeaderMagicMismatch");
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderMalformedCommand");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderMalformedCommand");
 
         payload.clear();
         header.reset();
@@ -61,9 +60,9 @@ TEST_CASE("NetMessage", "[abi]") {
             "00000000"                  // ....               payload length
             "00000000";                 // ....               payload checksum
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderEmptyCommand");
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderEmptyCommand");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderEmptyCommand");
         payload.clear();
         header.reset();
 
@@ -73,9 +72,9 @@ TEST_CASE("NetMessage", "[abi]") {
             "00000000"                  // ....               payload length
             "00000000";                 // ....               payload checksum
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderMalformedCommand");
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderMalformedCommand");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderMalformedCommand");
         payload.clear();
         header.reset();
 
@@ -85,9 +84,9 @@ TEST_CASE("NetMessage", "[abi]") {
             "00000000"                  // ....               payload length
             "00000000";                 // ....               payload checksum
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderUnknownCommand");
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderUnknownCommand");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderUnknownCommand");
         payload.clear();
         header.reset();
 
@@ -97,16 +96,12 @@ TEST_CASE("NetMessage", "[abi]") {
             "00000000"                  // ....               payload length
             "00000000";                 // ....               payload checksum
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderUndersizedPayload");
-        REQUIRE(magic_enum::enum_name(header.get_type()) == "kVersion");
-        payload.clear();
-
-        auto deserialize_result{header.serialize(payload)};
-        REQUIRE(magic_enum::enum_name(deserialize_result) == "kSuccess");
-        REQUIRE(payload.to_string() == hexed_header_data);
-
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderUndersizedPayload");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderUndersizedPayload");
+        CHECK(magic_enum::enum_name(header.get_type()) == "kVersion");
+        std::ignore = payload.seekg(0);
+        CHECK(payload.to_string() == hexed_header_data);
         payload.clear();
         header.reset();
 
@@ -116,11 +111,11 @@ TEST_CASE("NetMessage", "[abi]") {
             "80000000"                  // ....               payload length
             "00000000";                 // ....               payload checksum
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.get_type()) == "kVersion");
-        REQUIRE(header.length == 128);
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
+        CHECK(magic_enum::enum_name(header.validate()) == "kSuccess");
+        CHECK(magic_enum::enum_name(header.get_type()) == "kVersion");
+        CHECK(header.length == 128);
         payload.clear();
         header.reset();
 
@@ -130,9 +125,9 @@ TEST_CASE("NetMessage", "[abi]") {
             "00000000"                  // ....               payload length (0)
             "00000000";                 // ....               payload checksum
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate(network_magic_bytes)) == "kMessageHeaderInvalidChecksum");
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderInvalidChecksum");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderInvalidChecksum");
         payload.clear();
         header.reset();
 
@@ -142,11 +137,11 @@ TEST_CASE("NetMessage", "[abi]") {
             "00000000"                  // ....               payload length (0)
             "5df6e0e2";                 // ....               payload checksum (empty)
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate(network_magic_bytes)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.get_type()) == "kVerack");
-        REQUIRE(header.length == 0);
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
+        CHECK(magic_enum::enum_name(header.validate()) == "kSuccess");
+        CHECK(magic_enum::enum_name(header.get_type()) == "kVerack");
+        CHECK(header.length == 0);
         payload.clear();
         header.reset();
 
@@ -156,11 +151,11 @@ TEST_CASE("NetMessage", "[abi]") {
             "01040000"                  // ....               payload length (1025)
             "00000000";                 // ....               payload checksum
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderOversizedPayload");
-        REQUIRE(header.length == 1_KiB + 1);
-        REQUIRE(magic_enum::enum_name(header.get_type()) == "kVersion");
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderOversizedPayload");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderOversizedPayload");
+        CHECK(header.length == 1_KiB + 1);
+        CHECK(magic_enum::enum_name(header.get_type()) == "kVersion");
         payload.clear();
         header.reset();
     }
@@ -172,10 +167,10 @@ TEST_CASE("NetMessage", "[abi]") {
             "00000000"                  // ....               payload length (0)
             "00000000";                 // ....               payload checksum (empty)
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderUndersizedPayload");
-        REQUIRE(magic_enum::enum_name(header.get_type()) == "kInv");
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderUndersizedPayload");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderUndersizedPayload");
+        CHECK(magic_enum::enum_name(header.get_type()) == "kInv");
         payload.clear();
         header.reset();
 
@@ -185,10 +180,10 @@ TEST_CASE("NetMessage", "[abi]") {
             "01000000"                  // ....               payload length (1) not enough
             "00000000";                 // ....               payload checksum (empty)
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kMessageHeaderUndersizedPayload");
-        REQUIRE(magic_enum::enum_name(header.get_type()) == "kInv");
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderUndersizedPayload");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderUndersizedPayload");
+        CHECK(magic_enum::enum_name(header.get_type()) == "kInv");
         payload.clear();
         header.reset();
 
@@ -198,16 +193,16 @@ TEST_CASE("NetMessage", "[abi]") {
             "25000000"                  // ....               payload length (37) 1 item
             "00000000";                 // ....               payload checksum (empty)
 
-        REQUIRE(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        REQUIRE(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.validate()) == "kSuccess");
-        REQUIRE(magic_enum::enum_name(header.get_type()) == "kInv");
-        REQUIRE(header.length == 37);
+        CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
+        CHECK(magic_enum::enum_name(header.validate()) == "kSuccess");
+        CHECK(magic_enum::enum_name(header.get_type()) == "kInv");
+        CHECK(header.length == 37);
 
         // Put in only the size of the vector but nothing else - message validation MUST fail
         uint64_t num_elements{1};
         write_compact(payload, num_elements);
-        REQUIRE(magic_enum::enum_name(net_message.validate()) == "kMessageBodyIncomplete");
+        CHECK(magic_enum::enum_name(net_message.validate()) == "kMessageBodyIncomplete");
 
         // Put in the size of the vector and an incomplete first element - message validation MUST fail
         Bytes data{0x01, 0x02, 0x03, 0x04};

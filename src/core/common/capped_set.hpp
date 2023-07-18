@@ -21,7 +21,7 @@ class CappedSet {
 
   public:
     explicit CappedSet(const size_t capacity) : capacity_{capacity} {
-        ZEN_REQUIRE(capacity != 0);  // Can't create zero capped container
+        REQUIRES(capacity != 0);  // Can't create zero capped container
     }
     ~CappedSet() = default;
 

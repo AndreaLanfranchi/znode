@@ -45,7 +45,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     Node(Node& other) = delete;
     Node(Node&& other) = delete;
     Node& operator=(const Node& other) = delete;
-    ~Node() = default;
+    ~Node() override = default;
 
     //! \brief Start the asynchronous read/write operations
     void start();
@@ -109,12 +109,6 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     serialization::Error parse_messages(
         size_t bytes_transferred);  // Reads messages from the receive buffer and consumes buffered data
 
-    //! \brief Finalizes the inbound message and queues it if applicable
-    //! \remarks Switches from receiving mode from header to payload automatically
-    [[nodiscard]] serialization::Error finalize_inbound_message();
-
-    //! \brief Prepares for the processing of a new inbound message
-    void initialize_inbound_message();
 
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
     [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(NetMessageType message_type);
@@ -148,11 +142,9 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<size_t> bytes_received_{0};                   // Total bytes received from the socket during the session
     std::atomic<size_t> bytes_sent_{0};                       // Total bytes sent to the socket during the session
 
-    bool receive_mode_header_{true};  // Whether we have switched from parsing header to accepting payload
-    std::unique_ptr<NetMessageHeader> inbound_header_{nullptr};            // The header of the message being received
-    std::unique_ptr<serialization::SDataStream> inbound_stream_{nullptr};  // The message data
-    std::vector<std::shared_ptr<NetMessage>> inbound_messages_{};          // Queue of received messages
-    std::mutex inbound_messages_mutex_{};                                  // Lock guard for received messages
+    std::unique_ptr<NetMessage> inbound_message_{nullptr};         // The "next" message being received
+    std::vector<std::shared_ptr<NetMessage>> inbound_messages_{};  // Queue of received messages awaiting processing
+    std::mutex inbound_messages_mutex_{};                          // Lock guard for received messages
 
     serialization::SDataStream send_stream_{serialization::Scope::kNetwork, 0};
 };

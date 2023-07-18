@@ -42,22 +42,26 @@ void NetMessageHeader::set_type(const NetMessageType type) noexcept {
 serialization::Error NetMessageHeader::serialization(serialization::SDataStream& stream, serialization::Action action) {
     using namespace serialization;
     using enum Error;
-    Error error{stream.bind(magic, action)};
-    if (!error) error = stream.bind(command, action);
-    if (!error) error = stream.bind(length, action);
-    if (!error) error = stream.bind(checksum, action);
-    return error;
+    Error err{Error::kSuccess};
+    if (action == Action::kSerialize) err = validate();
+    if (!err) err = stream.bind(magic, action);
+    if (!err) err = stream.bind(command, action);
+    if (!err) err = stream.bind(length, action);
+    if (!err) err = stream.bind(checksum, action);
+    if (!err && action == Action::kDeserialize) err = validate();
+    return err;
 }
 
-serialization::Error NetMessageHeader::validate(std::optional<ByteView> expected_network_magic) const noexcept {
-    using enum serialization::Error;
-    if (expected_network_magic && ByteView{magic} != *expected_network_magic) return kMessageHeaderMagicMismatch;
+serialization::Error NetMessageHeader::validate() const noexcept {
+    using namespace serialization;
+    using enum Error;
     if (command[0] == 0) return kMessageHeaderEmptyCommand;  // reject empty commands
     if (length > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
     // Check the command string is made of printable characters
     // eventually right padded to 12 bytes with NUL (0x00) characters.
     bool null_matched{false};
+    size_t got_command_len{0};
     for (const auto c : command) {
         if (!null_matched) {
             if (c == 0) {
@@ -65,16 +69,17 @@ serialization::Error NetMessageHeader::validate(std::optional<ByteView> expected
                 continue;
             }
             if (c < 32 || c > 126) return kMessageHeaderMalformedCommand;
+            ++got_command_len;
         } else if (c) {
             return kMessageHeaderMalformedCommand;
         }
     }
 
     // Identify the command amongst the known ones
-    size_t id{0};
+    decltype(message_definition_id_) id{0};
     for (const auto& msg_def : kMessageDefinitions) {
-        const auto cmp_len{strnlen_s(msg_def.command, command.size())};
-        if (memcmp(msg_def.command, command.data(), cmp_len) == 0) {
+        const auto def_command_len{strnlen_s(msg_def.command, command.size())};
+        if (got_command_len == def_command_len && memcmp(msg_def.command, command.data(), def_command_len) == 0) {
             message_definition_id_ = id;
             break;
         }
@@ -84,7 +89,7 @@ serialization::Error NetMessageHeader::validate(std::optional<ByteView> expected
     if (message_definition_id_ == static_cast<size_t>(NetMessageType::kMissingOrUnknown))
         return kMessageHeaderUnknownCommand;
 
-    const auto& message_definition{kMessageDefinitions[message_definition_id_]};
+    const auto& message_definition{get_definition()};
     if (message_definition.min_payload_length.has_value() && length < *message_definition.min_payload_length) {
         return kMessageHeaderUndersizedPayload;
     }
@@ -105,45 +110,46 @@ serialization::Error NetMessageHeader::validate(std::optional<ByteView> expected
 serialization::Error NetMessage::validate() const noexcept {
     using enum serialization::Error;
 
-    // Being a network message the payload size MUST NOT exceed the maximum allowed size for the protocol
-    // regardless any other check
-    if (raw_data_->size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
-    if (raw_data_->size() > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
+    // Being a network message the payload :
+    // - must be at least kMessageHeaderLength byte long
+    // - must be at most kMaxProtocolMessageLength byte long
+    if (data_.size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
+    if (data_.size() > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
     // This also means the header has not been validated previously
-    const auto message_type(header_->get_type());
-    if (message_type == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
+    const auto& message_definition(header_.get_definition());
+    if (message_definition.message_type == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
 
-    if (raw_data_->size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
-    if (raw_data_->size() < kMessageHeaderLength + header_->length) return kMessageBodyIncomplete;
-    if (raw_data_->size() > kMessageHeaderLength + header_->length) return kMessageMismatchingPayloadLength;
+    if (data_.size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
+    if (data_.size() < kMessageHeaderLength + header_.length) return kMessageBodyIncomplete;
+    if (data_.size() > kMessageHeaderLength + header_.length) return kMessageMismatchingPayloadLength;
 
     // From here on ensure we return to the beginning of the payload
-    const auto return_to_beginning{gsl::finally([this] { raw_data_->seekg(kMessageHeaderLength); })};
+    const auto data_to_payload{gsl::finally([this] { data_.seekg(kMessageHeaderLength); })};
 
     // Validate payload : length and checksum
-    raw_data_->seekg(kMessageHeaderLength);  // Important : skip the header !!!
-    if (raw_data_->avail() != header_->length) return kMessageMismatchingPayloadLength;
-    auto payload_view{raw_data_->read()};
+    data_.seekg(kMessageHeaderLength);  // Important : skip the header !!!
+    if (data_.avail() != header_.length) return kMessageMismatchingPayloadLength;
+    auto payload_view{data_.read()};
     if (!payload_view) return payload_view.error();
-    if (auto error{validate_payload_checksum(*payload_view, header_->checksum)}; error != kSuccess) return error;
+    if (auto error{validate_checksum()}; error != kSuccess) return error;
 
     // For specific messages the vectorized data size can be known in advance
     // e.g. inventory messages are made of 36 bytes elements hence, after the initial
     // read of the vector size the payload size can be checked against the expected size
-    const auto& message_definition{kMessageDefinitions[static_cast<size_t>(message_type)]};
-    if (message_definition.max_vector_items.has_value()) {
-        raw_data_->seekg(kMessageHeaderLength);
-        const auto vector_size{serialization::read_compact(*raw_data_)};
+    if (message_definition.is_vectorized) {
+        data_.seekg(kMessageHeaderLength);
+        const auto vector_size{serialization::read_compact(data_)};
         if (!vector_size) return vector_size.error();
-        if (*vector_size == 0) return kMessagePayloadEmptyVector;  // MUST have some item
-        if (*vector_size > *message_definition.max_vector_items) return kMessagePayloadOversizedVector;
+        if (*vector_size == 0) return kMessagePayloadEmptyVector;  // MUST have at least 1 element
+        if (*vector_size > message_definition.max_vector_items.value_or(UINT32_MAX))
+            return kMessagePayloadOversizedVector;
         if (message_definition.vector_item_size.has_value()) {
             const auto expected_vector_size{*vector_size * *message_definition.vector_item_size};
-            if (raw_data_->avail() != expected_vector_size) return kMessagePayloadMismatchesVectorSize;
+            if (data_.avail() != expected_vector_size) return kMessagePayloadMismatchesVectorSize;
             // Look for duplicates
-            payload_view = raw_data_->read();
-            ZEN_ASSERT(payload_view);
+            payload_view = data_.read();
+            ASSERT(payload_view);
             if (const auto duplicate_count{count_duplicate_data_chunks(
                     *payload_view, *message_definition.vector_item_size, 1 /* one is enough */)};
                 duplicate_count > 0) {
@@ -155,14 +161,71 @@ serialization::Error NetMessage::validate() const noexcept {
     return kSuccess;
 }
 
-serialization::Error NetMessage::validate_payload_checksum(ByteView payload, ByteView expected_checksum) noexcept {
-    using enum serialization::Error;
-    static crypto::Hash256 payload_digest{};
-    payload_digest.init(payload);
-    if (auto payload_hash{payload_digest.finalize()};
-        memcmp(payload_hash.data(), expected_checksum.data(), expected_checksum.size()) != 0) {
-        return kMessageHeaderInvalidChecksum;
+serialization::Error NetMessage::parse(ByteView& input_data) noexcept {
+    using namespace serialization;
+    using enum Error;
+
+    Error ret{kSuccess};
+    while (!input_data.empty()) {
+        const bool header_mode(data_.tellg() < kMessageHeaderLength);
+        auto bytes_to_read(header_mode ? kMessageHeaderLength - data_.avail() : header_.length - data_.avail());
+        if (bytes_to_read > input_data.size()) bytes_to_read = input_data.size();
+        data_.write(input_data.substr(0, bytes_to_read));
+        input_data.remove_prefix(bytes_to_read);
+
+        if (header_mode) {
+            if (data_.avail() < kMessageHeaderLength) {
+                ret = kMessageHeaderIncomplete;  // Not enough data for a full header
+                break;                           // All data consumed nevertheless
+            }
+
+            ret = header_.deserialize(data_);
+            if (ret == kSuccess) {
+                const auto& message_definition{header_.get_definition()};
+                if (message_definition.min_protocol_version.has_value() &&
+                    data_.get_version() < *message_definition.min_protocol_version) {
+                    ret = kUnsupportedMessageTypeForProtocolVersion;
+                }
+                if (message_definition.max_protocol_version.has_value() &&
+                    data_.get_version() > *message_definition.max_protocol_version) {
+                    ret = kDeprecatedMessageTypeForProtocolVersion;
+                }
+            }
+            if (ret == kSuccess) ret = header_.validate(/* TODO Network magic here */);
+            if (ret == kSuccess) {
+                if (header_.length == 0) return validate_checksum();  // No payload to read
+                continue;                                             // Keep reading the body payload - if any
+            }
+            break;  // Exit on any error - here are all fatal
+
+        } else {
+            if (data_.avail() < header_.length) {
+                ret = kMessageBodyIncomplete;  // Not enough data for a full body
+                break;                         // All data consumed nevertheless
+            }
+            ret = validate();  // Validate the whole payload of the message
+            break;             // Exit anyway as either there is an or we have consumed all input data
+        }
     }
-    return kSuccess;
+
+    return ret;
+}
+
+serialization::Error NetMessage::validate_checksum() const noexcept {
+    using enum serialization::Error;
+    const auto current_pos{data_.tellg()};
+    if (data_.seekg(kMessageHeaderLength) != kMessageHeaderLength) return kMessageHeaderIncomplete;
+    const auto data_to_payload{gsl::finally([this, current_pos] { std::ignore = data_.seekg(current_pos); })};
+
+    const auto payload_view{data_.read()};
+    if (!payload_view) return payload_view.error();
+
+    serialization::Error ret{kSuccess};
+    crypto::Hash256 payload_digest(*payload_view);
+    if (auto payload_hash{payload_digest.finalize()};
+        memcmp(payload_hash.data(), header_.checksum.data(), header_.checksum.size()) != 0) {
+        ret = kMessageHeaderInvalidChecksum;
+    }
+    return ret;
 }
 }  // namespace zenpp

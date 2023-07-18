@@ -93,7 +93,7 @@ inline void write_compact(Stream& stream, uint64_t obj) {
             prefix = 255;
             break;
         default:
-            ZEN_ASSERT(false);  // Should not happen - Houston we have a problem
+            ASSERT(false);  // Should not happen - Houston we have a problem
     }
 
     stream.push_back(prefix);

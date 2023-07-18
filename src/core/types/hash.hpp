@@ -45,7 +45,7 @@ class Hash : public serialization::Serializable {
     //! \brief Converting constructor from unsigned integer value.
     //! \details This constructor assigns the value to the last 8 bytes [24:31] in big endian order
     explicit Hash(uint64_t value) {
-        ZEN_ASSERT(sizeof(value) <= kSize);
+        ASSERT(sizeof(value) <= kSize);
         const auto offset{size() - sizeof(value)};
         endian::store_big_u64(&bytes_[offset], value);
     }

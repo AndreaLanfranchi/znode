@@ -116,7 +116,7 @@ class DataStream {
     //! \brief Moves to the desidered read position
     //! \remarks If the provided position exceeds the boundary of the buffer the read position then
     //! the read cursor is moved at the end and eof() will return true
-    void seekg(size_type p) noexcept;
+    size_type seekg(size_type p) noexcept;
 
     //! \brief Removes the portion of data from the beginning up to the provided position or the read position
     //! (whichever is smaller) \remarks If no position is provided the whole buffer is cleared up to current read
@@ -174,7 +174,7 @@ class SDataStream : public DataStream {
     template <class T>
     requires std::is_same_v<T, intx::uint256>
     [[nodiscard]] Error bind(T& object, Action action) {
-        ZEN_ASSERT(sizeof(object) == 32);
+        ASSERT(sizeof(object) == 32);
         Error result{Error::kSuccess};
         switch (action) {
             using enum Action;
@@ -247,7 +247,7 @@ class SDataStream : public DataStream {
             case kDeserialize:
                 auto data_length{this->avail()};
                 auto data{read(data_length)};
-                ZEN_ASSERT(data);  // Should not return an error
+                ASSERT(data);  // Should not return an error
                 object.assign(*data);
                 break;
         }

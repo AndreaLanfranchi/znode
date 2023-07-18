@@ -105,7 +105,10 @@ bool DataStream::eof() const noexcept { return read_position_ >= buffer_.size();
 
 DataStream::size_type DataStream::tellg() const noexcept { return read_position_; }
 
-void DataStream::seekg(size_type p) noexcept { read_position_ = std::min(p, buffer_.size()); }
+DataStream::size_type DataStream::seekg(size_type p) noexcept {
+    read_position_ = std::min(p, buffer_.size());
+    return read_position_;
+}
 
 std::string DataStream::to_string() const { return zenpp::hex::encode({buffer_.data(), buffer_.size()}, false); }
 

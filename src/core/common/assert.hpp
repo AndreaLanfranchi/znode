@@ -16,14 +16,14 @@ namespace zenpp {
 }  // namespace zenpp
 
 //! \brief Always aborts program execution on assertion failure, even when NDEBUG is defined.
-#define ZEN_ASSERT(expr)      \
+#define ASSERT(expr)      \
     if ((expr)) [[likely]]    \
         static_cast<void>(0); \
     else                      \
         ::zenpp::abort_due_to_assertion_failure(#expr, __func__, __FILE__, __LINE__)
 
-//! \brief An alias for ZEN_ASSERT to make semantically clear that we're checking a precondition.
-#define ZEN_REQUIRE(expr) ZEN_ASSERT(expr)
+//! \brief An alias for ASSERT to make semantically clear that we're checking a precondition.
+#define REQUIRES(expr) ASSERT(expr)
 
-//! \brief An alias for ZEN_ASSERT to make semantically clear that we're checking a postcondition.
-#define ZEN_ENSURE(expr) ZEN_ASSERT(expr)
+//! \brief An alias for ASSERT to make semantically clear that we're checking a postcondition.
+#define ENSURE(expr) ASSERT(expr)

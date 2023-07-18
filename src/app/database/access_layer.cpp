@@ -17,7 +17,7 @@ std::optional<Version> read_schema_version(mdbx::txn& txn) {
         return std::nullopt;
     }
     auto data{config.current()};
-    ZEN_ASSERT(data.value.length() == sizeof(Version));
+    ASSERT(data.value.length() == sizeof(Version));
     const auto data_ptr = static_cast<uint8_t*>(data.value.data());
     Version ret{};
     ret.Major = endian::load_big_u32(&data_ptr[0]);
