@@ -83,9 +83,8 @@ int main(int argc, char* argv[]) {
         OpenSSL_add_all_ciphers();
         ERR_load_crypto_strings();
 
-        Ossignals::init();         // Intercept OS signals
-        AppContext app_context{};  // Global application context
-        auto& settings = app_context.settings;
+        Ossignals::init();       // Intercept OS signals
+        AppSettings settings{};  // Global app settings
         auto& network_settings = settings.network;
         auto& log_settings = settings.log;
 
@@ -113,23 +112,21 @@ int main(int argc, char* argv[]) {
         auto chaindata_env{db::open_env(settings.chaindata_env_config)};
 
         // Start boost asio with the number of threads specified by the concurrency hint
-        app_context.asio_context =
-            std::make_unique<boost::asio::io_context>(static_cast<int>(settings.asio_concurrency));
-        REQUIRES(app_context.asio_context != nullptr);  // Safety check
+        boost::asio::io_context asio_context(static_cast<int>(settings.asio_concurrency));
         using asio_guard_type = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
-        auto asio_guard = std::make_unique<asio_guard_type>(app_context.asio_context->get_executor());
+        auto asio_guard = std::make_unique<asio_guard_type>(asio_context.get_executor());
         std::vector<std::thread> asio_threads;
         for (size_t i{0}; i < settings.asio_concurrency; ++i) {
-            asio_threads.emplace_back([&app_context, i]() {
+            asio_threads.emplace_back([&asio_context, i]() {
                 std::string thread_name{"asio-" + std::to_string(i)};
                 log::set_thread_name(thread_name);
                 log::Trace("Service", {"name", thread_name, "status", "starting"});
-                app_context.asio_context->run();
+                asio_context.run();
                 log::Trace("Service", {"name", thread_name, "status", "stopped"});
             });
         }
-        auto stop_asio{gsl::finally([&app_context, &asio_guard, &asio_threads]() {
-            app_context.asio_context->stop();
+        auto stop_asio{gsl::finally([&asio_context, &asio_guard, &asio_threads]() {
+            asio_context.stop();
             asio_guard.reset();
             for (auto& t : asio_threads) {
                 if (t.joinable()) t.join();
@@ -152,15 +149,15 @@ int main(int argc, char* argv[]) {
         StopWatch sw(true);
         auto zk_params_path{(*settings.data_directory)[DataDirectory::kZkParamsName].path()};
         log::Message("Validating ZK params", {"directory", zk_params_path.string()});
-        if (!zk::validate_param_files(*app_context.asio_context, zk_params_path, settings.no_zk_checksums)) {
+        if (!zk::validate_param_files(asio_context, zk_params_path, settings.no_zk_checksums)) {
             throw std::filesystem::filesystem_error("Invalid ZK file params",
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }
         log::Message("Validated  ZK params", {"elapsed", StopWatch::format(sw.since_start())});
 
         // 1) Instantiate and start a new NodeHub
-        app_context.node_hub = std::make_unique<network::NodeHub>(app_context);
-        app_context.node_hub->start();
+        network::NodeHub node_hub{settings, asio_context};
+        node_hub.start();
 
         // Start sync loop
         const auto start_time{std::chrono::steady_clock::now()};
@@ -207,7 +204,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        app_context.node_hub->stop(true);  // 1) Stop networking server
+        node_hub.stop(true);  // 1) Stop networking server
 
         if (settings.data_directory) {
             log::Message("Closing database", {"path", (*settings.data_directory)["chaindata"].path().string()});

@@ -16,7 +16,8 @@
 
 namespace zenpp::network {
 
-using boost::asio::ip::tcp;
+using namespace boost;
+using asio::ip::tcp;
 
 bool NodeHub::start() {
     if (bool expected{false}; !is_started_.compare_exchange_strong(expected, true)) {
@@ -126,14 +127,13 @@ bool NodeHub::stop(bool wait) noexcept {
 void NodeHub::start_accept() {
     log::Trace("Service", {"name", "Node Hub", "status", "Listening", "secure", ssl_server_context_ ? "yes" : "no"});
 
-    std::shared_ptr<Node> new_node(
-        new Node(
-            NodeConnectionMode::kInbound, *app_context_.asio_context, ssl_server_context_.get(),
-            [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
-            [this](DataDirectionMode direction, size_t bytes_transferred) {
-                on_node_data(direction, bytes_transferred);
-            }),
-        Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
+    std::shared_ptr<Node> new_node(new Node(
+                                       NodeConnectionMode::kInbound, asio_context_, ssl_server_context_.get(),
+                                       [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
+                                       [this](DataDirectionMode direction, size_t bytes_transferred) {
+                                           on_node_data(direction, bytes_transferred);
+                                       }),
+                                   Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
     socket_acceptor_.async_accept(
         new_node->socket(), [this, new_node](const boost::system::error_code& ec) { handle_accept(new_node, ec); });
@@ -200,7 +200,7 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
         }
     }
 
-    io_strand_.post([this]() { start_accept(); });  // Continue listening for new connections
+    asio::post(asio_strand_, [this]() { start_accept(); });  // Continue listening for new connections
 }
 
 void NodeHub::initialize_acceptor() {

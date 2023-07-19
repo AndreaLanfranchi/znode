@@ -18,6 +18,9 @@
 
 namespace zenpp::network {
 
+using namespace boost;
+using asio::ip::tcp;
+
 std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 
 Node::Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_context, SSL_CTX* ssl_context,
@@ -43,9 +46,9 @@ void Node::start() {
 
     auto self{shared_from_this()};
     if (ssl_context_ != nullptr) {
-        i_strand_.post([self]() { self->start_ssl_handshake(); });
+        asio::post(i_strand_, [self]() { self->start_ssl_handshake(); });
     } else {
-        i_strand_.post([self]() { self->start_read(); });
+        asio::post(i_strand_, [self]() { self->start_read(); });
     }
 }
 
@@ -66,7 +69,7 @@ bool Node::stop(bool wait) noexcept {
         socket_.close(ec);
         if (bool expected{true}; is_started_.compare_exchange_strong(expected, false)) {
             auto self{shared_from_this()};
-            i_strand_.post([self]() { self->on_disconnect_(self); });
+            asio::post(i_strand_, [self]() { self->on_disconnect_(self); });
         }
     }
     return ret;
@@ -109,7 +112,7 @@ void Node::start_ssl_handshake() {
 void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
     auto self{shared_from_this()};
     if (!ec) {
-        i_strand_.post([self]() {
+        asio::post(i_strand_, [self]() {
             self->connected_time_.store(std::chrono::steady_clock::now());
             self->start_read();
         });
@@ -138,7 +141,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
     if (ec) {
         log::Error("P2P node", {"peer", "unknown", "action", "handle_read", "error", ec.message()})
             << "Disconnecting ...";
-        i_strand_.post([self]() { self->stop(false); });
+        stop(false);
         return;
     }
 
@@ -169,7 +172,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
     }
 
     // Continue reading from socket
-    i_strand_.post([self]() { self->start_read(); });
+    asio::post(i_strand_, [self]() { self->start_read(); });
 }
 
 void Node::start_write() {
@@ -229,7 +232,6 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
 }
 
 serialization::Error Node::validate_message_for_protocol_handshake(const NetMessageType message_type) {
-
     using enum serialization::Error;
     if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) [[unlikely]] {
         // Only these two guys during handshake

@@ -22,12 +22,12 @@ namespace zenpp::network {
 
 class NodeHub : public Stoppable {
   public:
-    explicit NodeHub(AppContext& app_context)
-        : app_context_{app_context},
-          app_settings_{app_context.settings},
-          io_strand_{*app_context.asio_context},
-          socket_acceptor_{*app_context.asio_context},
-          service_timer_{*app_context.asio_context} {};
+    explicit NodeHub(AppSettings& settings, boost::asio::io_context& io_context)
+        : app_settings_{settings},
+          asio_context_{io_context},
+          asio_strand_{io_context},
+          socket_acceptor_{io_context},
+          service_timer_{io_context} {};
 
     // Not copyable or movable
     NodeHub(NodeHub& other) = delete;
@@ -55,11 +55,11 @@ class NodeHub : public Stoppable {
     bool handle_service_timer(const boost::system::error_code& ec);  // Majordomo to serve connections
     void print_info();                                               // Prints some stats about network usage
 
-    AppContext& app_context_;    // Reference to global application context
-    AppSettings& app_settings_;  // Reference to global application settings
+    AppSettings& app_settings_;              // Reference to global application settings
+    boost::asio::io_context& asio_context_;  // Reference to global asio context
 
     std::atomic_bool is_started_{false};              // Guards against multiple starts
-    boost::asio::io_context::strand io_strand_;       // Serialized execution of handlers
+    boost::asio::io_context::strand asio_strand_;     // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
     boost::asio::steady_timer service_timer_;         // Service scheduler for this instance
     const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_

@@ -15,8 +15,7 @@
 
 #include <app/common/directories.hpp>
 #include <app/common/log.hpp>
-#include <app/database/mdbx.hpp>
-#include <app/network/node_hub.hpp>
+#include <app/database/mdbx.hpp>  // TODO define dbsettings here and remove this include (mdbx.hpp must include this)
 
 namespace zenpp {
 
@@ -40,11 +39,5 @@ struct AppSettings {
     uint32_t sync_loop_log_interval_seconds{30};    // Interval for sync loop to emit logs
     NetworkSettings network{};                      // Network related settings
     log::Settings log{};                            // Log related settings
-};
-
-struct AppContext {
-    AppSettings settings{};                                 // Node settings
-    std::unique_ptr<boost::asio::io_context> asio_context;  // Async context
-    std::unique_ptr<network::NodeHub> node_hub;             // Node hub instance
 };
 }  // namespace zenpp
