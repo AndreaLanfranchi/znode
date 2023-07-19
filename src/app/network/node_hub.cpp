@@ -115,10 +115,15 @@ bool NodeHub::stop(bool wait) noexcept {
     if (ret) /* not already stopping */ {
         service_timer_.cancel();
         socket_acceptor_.close();
-        std::scoped_lock lock(nodes_mutex_);
+        std::unique_lock lock(nodes_mutex_);
         // Stop all nodes
         for (auto [node_id, node_ptr] : nodes_) {
             node_ptr->stop(false);
+        }
+        lock.unlock();
+        // Wait for all nodes to stop - active_connections get to zero
+        while (wait && current_active_connections_.load() > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
     return ret;
