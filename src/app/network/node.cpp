@@ -24,7 +24,8 @@ Node::Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_conte
            std::function<void(std::shared_ptr<Node>)> on_disconnect,
            std::function<void(DataDirectionMode, size_t)> on_data)
     : connection_mode_(connection_mode),
-      io_strand_(io_context),
+      i_strand_(io_context),
+      o_strand_(io_context),
       socket_(io_context),
       ssl_context_(ssl_context),
       on_disconnect_(std::move(on_disconnect)),
@@ -42,9 +43,9 @@ void Node::start() {
 
     auto self{shared_from_this()};
     if (ssl_context_ != nullptr) {
-        io_strand_.post([self]() { self->start_ssl_handshake(); });
+        i_strand_.post([self]() { self->start_ssl_handshake(); });
     } else {
-        io_strand_.post([self]() { self->start_read(); });
+        i_strand_.post([self]() { self->start_read(); });
     }
 }
 
@@ -65,7 +66,7 @@ bool Node::stop(bool wait) noexcept {
         socket_.close(ec);
         if (bool expected{true}; is_started_.compare_exchange_strong(expected, false)) {
             auto self{shared_from_this()};
-            io_strand_.post([self]() { self->on_disconnect_(self); });
+            i_strand_.post([self]() { self->on_disconnect_(self); });
         }
     }
     return ret;
@@ -108,13 +109,13 @@ void Node::start_ssl_handshake() {
 void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
     auto self{shared_from_this()};
     if (!ec) {
-        io_strand_.post([self]() {
+        i_strand_.post([self]() {
             self->connected_time_.store(std::chrono::steady_clock::now());
             self->start_read();
         });
     } else {
         log::Error("Node::handle_ssl_handshake()", {"error", ec.message()});
-        io_strand_.post([self]() { self->stop(false); });
+        i_strand_.post([self]() { self->stop(false); });
     }
 }
 
@@ -137,7 +138,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
     if (ec) {
         log::Error("P2P node", {"peer", "unknown", "action", "handle_read", "error", ec.message()})
             << "Disconnecting ...";
-        io_strand_.post([self]() { self->stop(false); });
+        i_strand_.post([self]() { self->stop(false); });
         return;
     }
 
@@ -147,7 +148,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
         if (ssl_shutdown_status & SSL_RECEIVED_SHUTDOWN) {
             SSL_shutdown(ssl_);
             log::Info("P2P node", {"peer", "unknown", "action", "handle_read", "message", "SSL_RECEIVED_SHUTDOWN"});
-            io_strand_.post([self]() { self->stop(false); });
+            i_strand_.post([self]() { self->stop(false); });
             return;
         }
     }
@@ -168,7 +169,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
     }
 
     // Continue reading from socket
-    io_strand_.post([self]() { self->start_read(); });
+    i_strand_.post([self]() { self->start_read(); });
 }
 
 void Node::start_write() {
@@ -231,7 +232,7 @@ serialization::Error Node::validate_message_for_protocol_handshake(const NetMess
     // Check this message is acceptable against current status of protocol handshake
     using enum serialization::Error;
     if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) {
-        auto status {static_cast<uint32_t>(protocol_handshake_status_.load())};
+        auto status{static_cast<uint32_t>(protocol_handshake_status_.load())};
         switch (connection_mode_) {
             using enum NodeConnectionMode;
             using enum ProtocolHandShakeStatus;

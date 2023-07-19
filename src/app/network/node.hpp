@@ -109,18 +109,18 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     serialization::Error parse_messages(
         size_t bytes_transferred);  // Reads messages from the receive buffer and consumes buffered data
 
-
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
     [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(NetMessageType message_type);
 
     //! \brief Begin writing to the socket asynchronously
     void start_write();
 
-    static std::atomic_int next_node_id_;        // Used to generate unique node ids
-    const int node_id_{next_node_id()};          // Unique node id
-    const NodeConnectionMode connection_mode_;   // Whether inbound or outbound
-    boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
-    boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
+    static std::atomic_int next_node_id_;       // Used to generate unique node ids
+    const int node_id_{next_node_id()};         // Unique node id
+    const NodeConnectionMode connection_mode_;  // Whether inbound or outbound
+    boost::asio::io_context::strand i_strand_;  // Serialized execution of handlers for input operations
+    boost::asio::io_context::strand o_strand_;  // Serialized execution of handlers for output operations
+    boost::asio::ip::tcp::socket socket_;       // The underlying socket (either plain or SSL)
     boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> remote_endpoint_;  // Remote endpoint
     boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> local_endpoint_;   // Local endpoint
 

@@ -239,7 +239,7 @@ TEST_CASE("NetMessage", "[abi]") {
             payload.write(data);
         }
 
-        // Lets move back to begin of body and compute checksum
+        // Let's move back to begin of body and compute checksum
         payload.seekg(kMessageHeaderLength);
         header.length = static_cast<uint32_t>(payload.avail());
         digest_input = payload.read();
