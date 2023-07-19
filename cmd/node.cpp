@@ -27,7 +27,7 @@ using namespace zenpp;
 using namespace std::chrono;
 
 //! \brief Ensures database is ready and consistent with command line arguments
-void prepare_chaindata_env(NodeSettings& node_settings, [[maybe_unused]] bool init_if_not_configured = true) {
+void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool init_if_not_configured = true) {
     bool chaindata_exclusive{node_settings.chaindata_env_config.exclusive};  // save setting
     {
         auto& config = node_settings.chaindata_env_config;
@@ -83,18 +83,18 @@ int main(int argc, char* argv[]) {
         OpenSSL_add_all_ciphers();
         ERR_load_crypto_strings();
 
-        Ossignals::init();  // Intercept OS signals
-
-        cmd::Settings settings;
-        auto& node_settings = settings.node_settings;
-        auto& network_settings = node_settings.network;
+        Ossignals::init();         // Intercept OS signals
+        AppContext app_context{};  // Global application context
+        auto& settings = app_context.settings;
+        auto& network_settings = settings.network;
+        auto& log_settings = settings.log;
 
         // This parses and validates command line arguments
         // After return we're able to start services. Datadir has been deployed
         cmd::parse_node_command_line(cli, argc, argv, settings);
 
         // Start logging
-        log::init(settings.log_settings);
+        log::init(log_settings);
         log::set_thread_name("main");
 
         // Output BuildInfo
@@ -109,24 +109,27 @@ int main(int argc, char* argv[]) {
         log::Message("Using OpenSSL", {"version", OPENSSL_VERSION_TEXT});
 
         // Check and open db
-        prepare_chaindata_env(node_settings, true);
-        auto chaindata_env{db::open_env(node_settings.chaindata_env_config)};
+        prepare_chaindata_env(settings, true);
+        auto chaindata_env{db::open_env(settings.chaindata_env_config)};
 
         // Start boost asio with the number of threads specified by the concurrency hint
+        app_context.asio_context =
+            std::make_unique<boost::asio::io_context>(static_cast<int>(settings.asio_concurrency));
+        REQUIRES(app_context.asio_context != nullptr);  // Safety check
         using asio_guard_type = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
-        auto asio_guard = std::make_unique<asio_guard_type>(node_settings.asio_context->get_executor());
+        auto asio_guard = std::make_unique<asio_guard_type>(app_context.asio_context->get_executor());
         std::vector<std::thread> asio_threads;
-        for (size_t i{0}; i < node_settings.asio_concurrency; ++i) {
-            asio_threads.emplace_back([&node_settings, i]() {
+        for (size_t i{0}; i < settings.asio_concurrency; ++i) {
+            asio_threads.emplace_back([&app_context, i]() {
                 std::string thread_name{"asio-" + std::to_string(i)};
                 log::set_thread_name(thread_name);
                 log::Trace("Service", {"name", thread_name, "status", "starting"});
-                node_settings.asio_context->run();
+                app_context.asio_context->run();
                 log::Trace("Service", {"name", thread_name, "status", "stopped"});
             });
         }
-        auto stop_asio{gsl::finally([&node_settings, &asio_guard, &asio_threads]() {
-            node_settings.asio_context->stop();
+        auto stop_asio{gsl::finally([&app_context, &asio_guard, &asio_threads]() {
+            app_context.asio_context->stop();
             asio_guard.reset();
             for (auto& t : asio_threads) {
                 if (t.joinable()) t.join();
@@ -138,7 +141,7 @@ int main(int argc, char* argv[]) {
 
         // Check required certificate and key file are present to initialize SSL context
         if (network_settings.use_tls) {
-            auto const ssl_data{(*node_settings.data_directory)[DataDirectory::kSSLCert].path()};
+            auto const ssl_data{(*settings.data_directory)[DataDirectory::kSSLCert].path()};
             if (!network::validate_tls_requirements(ssl_data, network_settings.tls_password)) {
                 throw std::filesystem::filesystem_error("Invalid SSL certificate or key file",
                                                         std::make_error_code(std::errc::no_such_file_or_directory));
@@ -147,17 +150,17 @@ int main(int argc, char* argv[]) {
 
         // Validate mandatory zk params
         StopWatch sw(true);
-        auto zk_params_path{(*node_settings.data_directory)[DataDirectory::kZkParamsName].path()};
+        auto zk_params_path{(*settings.data_directory)[DataDirectory::kZkParamsName].path()};
         log::Message("Validating ZK params", {"directory", zk_params_path.string()});
-        if (!zk::validate_param_files(*node_settings.asio_context, zk_params_path, node_settings.no_zk_checksums)) {
+        if (!zk::validate_param_files(*app_context.asio_context, zk_params_path, settings.no_zk_checksums)) {
             throw std::filesystem::filesystem_error("Invalid ZK file params",
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }
         log::Message("Validated  ZK params", {"elapsed", StopWatch::format(sw.since_start())});
 
-        // 1) Start networking server
-        network::NodeHub node_hub(node_settings);
-        node_hub.start();
+        // 1) Instantiate and start a new NodeHub
+        app_context.node_hub = std::make_unique<network::NodeHub>(app_context);
+        app_context.node_hub->start();
 
         // Start sync loop
         const auto start_time{std::chrono::steady_clock::now()};
@@ -165,8 +168,8 @@ int main(int argc, char* argv[]) {
         // Keep waiting till sync_loop stops
         // Signals are handled in sync_loop and below
         auto t1{std::chrono::steady_clock::now()};
-        const auto chaindata_dir{(*node_settings.data_directory)[DataDirectory::kChainDataName]};
-        const auto etltmp_dir{(*node_settings.data_directory)[DataDirectory::kEtlTmpName]};
+        const auto chaindata_dir{(*settings.data_directory)[DataDirectory::kChainDataName]};
+        const auto etltmp_dir{(*settings.data_directory)[DataDirectory::kEtlTmpName]};
 
         // TODO while (sync_loop.get_state() != Worker::State::kStopped) {
         while (true) {
@@ -204,10 +207,10 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        node_hub.stop(true);  // 1) Stop networking server
+        app_context.node_hub->stop(true);  // 1) Stop networking server
 
-        if (node_settings.data_directory) {
-            log::Message("Closing database", {"path", (*node_settings.data_directory)["chaindata"].path().string()});
+        if (settings.data_directory) {
+            log::Message("Closing database", {"path", (*settings.data_directory)["chaindata"].path().string()});
             chaindata_env.close();
             // sync_loop.rethrow();  // Eventually throws the exception which caused the stop
         }

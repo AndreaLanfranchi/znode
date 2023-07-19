@@ -22,17 +22,18 @@ namespace zenpp::network {
 
 class NodeHub : public Stoppable {
   public:
-    explicit NodeHub(NodeSettings& node_settings)
-        : node_settings_{node_settings},
-          io_strand_{*node_settings.asio_context},
-          socket_acceptor_{*node_settings.asio_context},
-          service_timer_{*node_settings.asio_context} {};
+    explicit NodeHub(AppContext& app_context)
+        : app_context_{app_context},
+          app_settings_{app_context.settings},
+          io_strand_{*app_context.asio_context},
+          socket_acceptor_{*app_context.asio_context},
+          service_timer_{*app_context.asio_context} {};
 
     // Not copyable or movable
     NodeHub(NodeHub& other) = delete;
     NodeHub(NodeHub&& other) = delete;
     NodeHub& operator=(const NodeHub& other) = delete;
-    ~NodeHub() = default;
+    ~NodeHub() override = default;
 
     [[nodiscard]] bool contains(int id) const;                     // Returns whether a node id is actually connected
     [[nodiscard]] size_t size() const;                             // Returns the number of nodes
@@ -54,7 +55,8 @@ class NodeHub : public Stoppable {
     bool handle_service_timer(const boost::system::error_code& ec);  // Majordomo to serve connections
     void print_info();                                               // Prints some stats about network usage
 
-    NodeSettings& node_settings_;  // Reference to global config settings
+    AppContext& app_context_;    // Reference to global application context
+    AppSettings& app_settings_;  // Reference to global application settings
 
     std::atomic_bool is_started_{false};              // Guards against multiple starts
     boost::asio::io_context::strand io_strand_;       // Serialized execution of handlers

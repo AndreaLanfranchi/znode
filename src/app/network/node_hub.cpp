@@ -22,16 +22,16 @@ bool NodeHub::start() {
     if (bool expected{false}; !is_started_.compare_exchange_strong(expected, true)) {
         return false;
     }
-    LOG_TRACE << "Is activated " << std::boolalpha << node_settings_.network.use_tls;
-    if (node_settings_.network.use_tls) {
-        const auto ssl_data{(*node_settings_.data_directory)[DataDirectory::kSSLCert].path()};
-        auto ctx{generate_tls_context(TLSContextType::kServer, ssl_data, node_settings_.network.tls_password)};
+    LOG_TRACE << "Is activated " << std::boolalpha << app_settings_.network.use_tls;
+    if (app_settings_.network.use_tls) {
+        const auto ssl_data{(*app_settings_.data_directory)[DataDirectory::kSSLCert].path()};
+        auto ctx{generate_tls_context(TLSContextType::kServer, ssl_data, app_settings_.network.tls_password)};
         if (!ctx) {
             log::Error("NodeHub", {"action", "start", "error", "failed to generate TLS server context"});
             return false;
         }
         ssl_server_context_.reset(ctx);
-        LOG_TRACE << "Is activated " << std::boolalpha << (ssl_server_context_.get() != nullptr);
+        LOG_TRACE << "Is activated " << std::boolalpha << (ssl_server_context_ != nullptr);
 
         ctx = generate_tls_context(TLSContextType::kClient, ssl_data, "");
         if (!ctx) {
@@ -66,10 +66,10 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& ec) {
 
     std::scoped_lock lock{nodes_mutex_};
     for (auto [node_id, node_ptr] : nodes_) {
-        if (node_ptr->is_idle(node_settings_.network.idle_timeout_seconds)) {
+        if (node_ptr->is_idle(app_settings_.network.idle_timeout_seconds)) {
             log::Trace("Service", {"name", "Node Hub", "action", "service", "node", std::to_string(node_id), "remote",
                                    node_ptr->to_string()})
-                << "Idle for " << node_settings_.network.idle_timeout_seconds << " seconds, disconnecting ...";
+                << "Idle for " << app_settings_.network.idle_timeout_seconds << " seconds, disconnecting ...";
             node_ptr->stop(false);
         }
     }
@@ -128,7 +128,7 @@ void NodeHub::start_accept() {
 
     std::shared_ptr<Node> new_node(
         new Node(
-            NodeConnectionMode::kInbound, *node_settings_.asio_context, ssl_server_context_.get(),
+            NodeConnectionMode::kInbound, *app_context_.asio_context, ssl_server_context_.get(),
             [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
@@ -163,9 +163,9 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
     } else if (!ec) {
         ++total_connections_;
         // Check we do not exceed the maximum number of connections
-        if (current_active_connections_ >= node_settings_.network.max_active_connections) {
+        if (current_active_connections_ >= app_settings_.network.max_active_connections) {
             log::Trace("Service", {"name", "Node Hub", "peers",
-                                   std::to_string(node_settings_.network.max_active_connections), "action", "reject"});
+                                   std::to_string(app_settings_.network.max_active_connections), "action", "reject"});
             new_node->stop(false);
             ++total_rejected_connections_;
             return;
@@ -205,9 +205,9 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
 
 void NodeHub::initialize_acceptor() {
     std::vector<std::string> address_parts;
-    boost::split(address_parts, node_settings_.network.local_endpoint, boost::is_any_of(":"));
+    boost::split(address_parts, app_settings_.network.local_endpoint, boost::is_any_of(":"));
     if (address_parts.size() != 2) {
-        throw std::invalid_argument("Invalid local endpoint: " + node_settings_.network.local_endpoint);
+        throw std::invalid_argument("Invalid local endpoint: " + app_settings_.network.local_endpoint);
     }
 
     auto port{boost::lexical_cast<uint16_t>(address_parts[1])};
@@ -222,7 +222,7 @@ void NodeHub::initialize_acceptor() {
     socket_acceptor_.bind(local_endpoint);
     socket_acceptor_.listen();
 
-    log::Info("Service", {"name", "Node Hub", "secure", (node_settings_.network.use_tls ? "yes" : "no"), "listening on",
+    log::Info("Service", {"name", "Node Hub", "secure", (app_settings_.network.use_tls ? "yes" : "no"), "listening on",
                           to_string(local_endpoint)});
 }
 

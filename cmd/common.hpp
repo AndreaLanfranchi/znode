@@ -18,14 +18,9 @@
 
 namespace zenpp::cmd {
 
-struct Settings {
-    NodeSettings node_settings;
-    log::Settings log_settings;
-};
-
 
 //! \brief Parses command line arguments for node instance
-void parse_node_command_line(CLI::App& cli, int argc, char* argv[], Settings& settings);
+void parse_node_command_line(CLI::App& cli, int argc, char* argv[], AppSettings& settings);
 
 struct HumanSizeParserValidator : public CLI::Validator {
     template <typename T>

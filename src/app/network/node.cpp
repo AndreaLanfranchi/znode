@@ -115,7 +115,7 @@ void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
         });
     } else {
         log::Error("Node::handle_ssl_handshake()", {"error", ec.message()});
-        i_strand_.post([self]() { self->stop(false); });
+        stop(false);
     }
 }
 
@@ -148,7 +148,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
         if (ssl_shutdown_status & SSL_RECEIVED_SHUTDOWN) {
             SSL_shutdown(ssl_);
             log::Info("P2P node", {"peer", "unknown", "action", "handle_read", "message", "SSL_RECEIVED_SHUTDOWN"});
-            i_strand_.post([self]() { self->stop(false); });
+            stop(true);
             return;
         }
     }
@@ -188,7 +188,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
     while (!data.empty()) {
         if (err = inbound_message_->parse(data); is_fatal_error(err)) break;
         if (err == kMessageHeaderIncomplete) break;  // Can't do anything but read other data
-        if (!inbound_message_->header().pristine() /*has been deserialized*/) {
+        if (!inbound_message_->header().pristine() /* has been deserialized */) {
             if (const auto err_handshake = validate_message_for_protocol_handshake(inbound_message_->get_type());
                 err_handshake != kSuccess) {
                 err = err_handshake;
@@ -229,27 +229,53 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
 }
 
 serialization::Error Node::validate_message_for_protocol_handshake(const NetMessageType message_type) {
-    // Check this message is acceptable against current status of protocol handshake
+
     using enum serialization::Error;
-    if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) {
+    if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) [[unlikely]] {
+        // Only these two guys during handshake
+        // See the switch below for details about the order
+        if (message_type != NetMessageType::kVersion && message_type != NetMessageType::kVerack)
+            return kInvalidProtocolHandShake;
+
         auto status{static_cast<uint32_t>(protocol_handshake_status_.load())};
         switch (connection_mode_) {
             using enum NodeConnectionMode;
             using enum ProtocolHandShakeStatus;
             case kInbound:
-                if (message_type != NetMessageType::kVersion) return kInvalidProtocolHandShake;
-                status |= static_cast<uint32_t>(kVersionCompleted);
+                if (message_type == NetMessageType::kVersion &&
+                    (status & static_cast<uint32_t>(kRemoteVersionReceived))) {
+                    return kDuplicateProtocolHandShake;
+                }
+                if (message_type == NetMessageType::kVerack &&
+                    (status & static_cast<uint32_t>(kLocalVersionAckReceived))) {
+                    return kDuplicateProtocolHandShake;
+                }
+                status |= static_cast<uint32_t>(message_type == NetMessageType::kVersion ? kRemoteVersionReceived
+                                                                                         : kLocalVersionAckReceived);
                 break;
             case kOutbound:
             case kManualOutbound:
-                if (message_type != NetMessageType::kVerack) return kInvalidProtocolHandShake;
-                status |= static_cast<uint32_t>(kVerackCompleted);
+                if (message_type == NetMessageType::kVersion && (status & static_cast<uint32_t>(kLocalVersionSent))) {
+                    return kDuplicateProtocolHandShake;
+                }
+                if (message_type == NetMessageType::kVerack &&
+                    (status & static_cast<uint32_t>(kRemoteVersionAckSent))) {
+                    return kDuplicateProtocolHandShake;
+                }
+                status |= static_cast<uint32_t>(message_type == NetMessageType::kVersion ? kLocalVersionSent
+                                                                                         : kRemoteVersionAckSent);
                 break;
         }
         protocol_handshake_status_.store(static_cast<ProtocolHandShakeStatus>(status));
     } else {
-        if (message_type == NetMessageType::kVersion || message_type == NetMessageType::kVerack)
-            return kDuplicateProtocolHandShake;
+        switch (message_type) {
+            using enum NetMessageType;
+            case kVersion:  // None of these two is allowed
+            case kVerack:   // after completed handshake
+                return kDuplicateProtocolHandShake;
+            default:
+                break;
+        }
     }
     return kSuccess;
 }

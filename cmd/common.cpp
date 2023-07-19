@@ -19,27 +19,27 @@
 
 namespace zenpp::cmd {
 
-void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& settings) {
-    auto& node_settings = settings.node_settings;
-    auto& network_settings = node_settings.network;
+void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& settings) {
+
+    auto& network_settings = settings.network;
 
     // Node settings
     std::filesystem::path data_dir_path;
-    std::string chaindata_max_size_str{to_human_bytes(node_settings.chaindata_env_config.max_size, /*binary=*/true)};
+    std::string chaindata_max_size_str{to_human_bytes(settings.chaindata_env_config.max_size, /*binary=*/true)};
     std::string chaindata_growth_size_str{
-        to_human_bytes(node_settings.chaindata_env_config.growth_size, /*binary=*/true)};
-    std::string chaindata_page_size_str{to_human_bytes(node_settings.chaindata_env_config.page_size, /*binary=*/true)};
-    std::string batch_size_str{to_human_bytes(node_settings.batch_size, /*binary=*/true)};
-    std::string etl_buffer_size_str{to_human_bytes(node_settings.etl_buffer_size, /*binary=*/true)};
+        to_human_bytes(settings.chaindata_env_config.growth_size, /*binary=*/true)};
+    std::string chaindata_page_size_str{to_human_bytes(settings.chaindata_env_config.page_size, /*binary=*/true)};
+    std::string batch_size_str{to_human_bytes(settings.batch_size, /*binary=*/true)};
+    std::string etl_buffer_size_str{to_human_bytes(settings.etl_buffer_size, /*binary=*/true)};
 
     cli.add_option("--datadir", data_dir_path, "Path to data directory")
         ->default_val(get_os_default_storage_path().string());
 
-    cli.add_flag("--chaindata.exclusive", node_settings.chaindata_env_config.exclusive,
+    cli.add_flag("--chaindata.exclusive", settings.chaindata_env_config.exclusive,
                  "Chaindata database opened in exclusive mode");
-    cli.add_flag("--chaindata.readahead", node_settings.chaindata_env_config.read_ahead,
+    cli.add_flag("--chaindata.readahead", settings.chaindata_env_config.read_ahead,
                  "Chaindata database enable readahead");
-    cli.add_flag("--chaindata.writemap", node_settings.chaindata_env_config.write_map,
+    cli.add_flag("--chaindata.writemap", settings.chaindata_env_config.write_map,
                  "Chaindata database enable writemap");
 
     cli.add_option("--chaindata.growthsize", chaindata_growth_size_str, "Chaindata database growth size.")
@@ -60,18 +60,18 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
         ->capture_default_str()
         ->check(HumanSizeParserValidator("64MiB", {"16GiB"}));
 
-    cli.add_option("--syncloop.throttle", node_settings.sync_loop_throttle_seconds,
+    cli.add_option("--syncloop.throttle", settings.sync_loop_throttle_seconds,
                    "Sets the minimum delay between sync loop starts (in seconds)")
         ->capture_default_str()
         ->check(CLI::Range(1u, 7200u));
 
-    cli.add_option("--syncloop.loginterval", node_settings.sync_loop_log_interval_seconds,
+    cli.add_option("--syncloop.loginterval", settings.sync_loop_log_interval_seconds,
                    "Sets the interval between sync loop INFO logs (in seconds)")
         ->capture_default_str()
         ->check(CLI::Range(10u, 600u));
 
-    cli.add_flag("--fakepow", node_settings.fake_pow, "Disables proof-of-work verification");
-    cli.add_flag("--zk.nochecksums", node_settings.no_zk_checksums,
+    cli.add_flag("--fakepow", settings.fake_pow, "Disables proof-of-work verification");
+    cli.add_flag("--zk.nochecksums", settings.no_zk_checksums,
                  "Disables initial verification of zk proofs files checksums");
 
     // Asio settings
@@ -108,7 +108,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
         ->check(CLI::Range(size_t(30), size_t(3600)));
 
     // Logging options
-    auto& log_settings = settings.log_settings;
+    auto& log_settings = settings.log;
     add_logging_options(cli, log_settings);
 
     // Parse and validate
@@ -118,33 +118,29 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, Settings& set
     if ((*parsed_size_value & (*parsed_size_value - 1)) != 0) {
         throw std::invalid_argument("--chaindata.pagesize value is not a power of 2");
     }
-    node_settings.chaindata_env_config.page_size = *parsed_size_value;
+    settings.chaindata_env_config.page_size = *parsed_size_value;
 
-    const auto mdbx_max_size_hard_limit{node_settings.chaindata_env_config.page_size * db::kMdbxMaxPages};
+    const auto mdbx_max_size_hard_limit{settings.chaindata_env_config.page_size * db::kMdbxMaxPages};
     parsed_size_value = parse_human_bytes(chaindata_max_size_str);
     if (*parsed_size_value > mdbx_max_size_hard_limit) {
         throw std::invalid_argument("--chaindata.maxsize is invalid or > " +
                                     to_human_bytes(mdbx_max_size_hard_limit, /*binary=*/
                                                    true));
     }
-    node_settings.chaindata_env_config.max_size = *parsed_size_value;
+    settings.chaindata_env_config.max_size = *parsed_size_value;
 
     parsed_size_value = parse_human_bytes(chaindata_growth_size_str);
     if (*parsed_size_value > (mdbx_max_size_hard_limit / /* two increments ?*/ 2u)) {
         throw std::invalid_argument("--chaindata.growthsize max value > " +
                                     to_human_bytes(mdbx_max_size_hard_limit / 2, /*binary=*/true));
     }
-    node_settings.chaindata_env_config.growth_size = *parsed_size_value;
 
-    node_settings.data_directory = std::make_unique<DataDirectory>(data_dir_path);
-    node_settings.data_directory->deploy();  // Ensure subdirs are created
-
-    node_settings.batch_size = *parse_human_bytes(batch_size_str);
-    node_settings.etl_buffer_size = *parse_human_bytes(etl_buffer_size_str);
-
-    node_settings.asio_concurrency = user_asio_concurrency;
-    node_settings.asio_context = std::make_unique<boost::asio::io_context>(static_cast<int>(user_asio_concurrency));
-
+    settings.chaindata_env_config.growth_size = *parsed_size_value;
+    settings.data_directory = std::make_unique<DataDirectory>(data_dir_path);
+    settings.data_directory->deploy();  // Ensure subdirs are created
+    settings.batch_size = *parse_human_bytes(batch_size_str);
+    settings.etl_buffer_size = *parse_human_bytes(etl_buffer_size_str);
+    settings.asio_concurrency = user_asio_concurrency;
     network_settings.use_tls = !*notls_flag;
 }
 

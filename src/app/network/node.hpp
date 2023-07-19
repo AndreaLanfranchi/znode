@@ -58,10 +58,12 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     static void clean_up(Node* ptr) noexcept;
 
     enum class ProtocolHandShakeStatus : uint32_t {
-        kNotInitiated = 0,
-        kVersionCompleted = 1,
-        kVerackCompleted = 2,
-        kCompleted = 3
+        kNotInitiated = 0,                  // 0
+        kLocalVersionSent = 1 << 0,         // 1
+        kLocalVersionAckReceived = 1 << 1,  // 2
+        kRemoteVersionReceived = 1 << 2,    // 4
+        kRemoteVersionAckSent = 1 << 3,     // 8
+        kCompleted = kLocalVersionSent | kLocalVersionAckReceived | kRemoteVersionReceived | kRemoteVersionAckSent
     };
 
     //! \return The unique identifier of the node
@@ -107,9 +109,10 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     void start_read();
     void handle_read(const boost::system::error_code& ec, size_t bytes_transferred);
     serialization::Error parse_messages(
-        size_t bytes_transferred);  // Reads messages from the receive buffer and consumes buffered data
+        size_t bytes_transferred);  // Reads messages from the receiving buffer and consumes buffered data
 
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
+    //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
     [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(NetMessageType message_type);
 
     //! \brief Begin writing to the socket asynchronously
