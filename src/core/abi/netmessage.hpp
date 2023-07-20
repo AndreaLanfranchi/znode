@@ -15,7 +15,7 @@
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
-namespace zenpp {
+namespace zenpp::abi {
 
 static constexpr size_t kMaxProtocolMessageLength{static_cast<size_t>(4_MiB)};  // Maximum length of a protocol message
 static constexpr size_t kMessageHeaderLength{24};                               // Length of a protocol message header
@@ -172,4 +172,4 @@ class NetMessage {
     [[nodiscard]] serialization::Error validate_checksum() const noexcept;
 };
 
-}  // namespace zenpp
+}  // namespace zenpp::abi

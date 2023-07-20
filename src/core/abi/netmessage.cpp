@@ -14,7 +14,7 @@
 #include <core/common/misc.hpp>
 #include <core/crypto/hash256.hpp>
 
-namespace zenpp {
+namespace zenpp::abi {
 
 void NetMessageHeader::reset() noexcept {
     magic.fill(0);
@@ -228,4 +228,4 @@ serialization::Error NetMessage::validate_checksum() const noexcept {
     }
     return ret;
 }
-}  // namespace zenpp
+}  // namespace zenpp::abi

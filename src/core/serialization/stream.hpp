@@ -7,13 +7,16 @@
 */
 
 #pragma once
+#include <array>
 #include <functional>
 #include <optional>
 #include <span>
 
+#include <boost/asio/ip/address.hpp>
 #include <tl/expected.hpp>
 
 #include <core/common/base.hpp>
+#include <core/common/cast.hpp>
 #include <core/common/secure_bytes.hpp>
 #include <core/serialization/base.hpp>
 #include <core/serialization/serialize.hpp>
@@ -153,7 +156,7 @@ class SDataStream : public DataStream {
 
     // Serialization for arithmetic types
     template <class T>
-    requires std::is_arithmetic_v<T>
+        requires std::is_arithmetic_v<T>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
@@ -172,7 +175,7 @@ class SDataStream : public DataStream {
     }
 
     template <class T>
-    requires std::is_same_v<T, intx::uint256>
+        requires std::is_same_v<T, intx::uint256>
     [[nodiscard]] Error bind(T& object, Action action) {
         ASSERT(sizeof(object) == 32);
         Error result{Error::kSuccess};
@@ -198,12 +201,14 @@ class SDataStream : public DataStream {
 
     // Serialization for Serializable classes
     template <class T>
-    requires std::derived_from<T, Serializable>
-    [[nodiscard]] Error bind(T& object, Action action) { return object.serialization(*this, action); }
+        requires std::derived_from<T, Serializable>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        return object.serialization(*this, action);
+    }
 
     // Serialization for bytes array (fixed size)
     template <class T, std::size_t N>
-    requires std::is_fundamental_v<T>
+        requires std::is_fundamental_v<T>
     [[nodiscard]] Error bind(std::array<T, N>& object, Action action) {
         Error result{Error::kSuccess};
         const auto element_size{ser_sizeof(object[0])};
@@ -233,7 +238,7 @@ class SDataStream : public DataStream {
     // a special case as they're always the last element of a structure.
     // Due to this the size of the member is not recorded
     template <class T>
-    requires std::is_same_v<T, Bytes>
+        requires std::is_same_v<T, Bytes>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
@@ -249,6 +254,74 @@ class SDataStream : public DataStream {
                 auto data{read(data_length)};
                 ASSERT(data);  // Should not return an error
                 object.assign(*data);
+                break;
+        }
+        return result;
+    }
+
+    // Serialization for std::string
+    template <class T>
+        requires std::is_same_v<T, std::string>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        Error result{Error::kSuccess};
+        switch (action) {
+            using enum Action;
+            case kComputeSize:
+                computed_size_ += ser_compact_sizeof(object.size()) + object.size();
+                break;
+            case kSerialize:
+                write_compact(*this, static_cast<uint64_t>(object.size()));
+                write(string_view_to_byte_view(object));
+                break;
+            case kDeserialize:
+                auto data_length{read_compact(*this)};
+                if (!data_length) {
+                    result = data_length.error();
+                    break;
+                }
+                auto data{read(*data_length)};
+                if (!data) {
+                    result = data.error();
+                    break;
+                }
+                object.assign(data->begin(), data->end());
+                break;
+        }
+        return result;
+    }
+
+    // Serialization for ip::address
+    // see https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
+    template <class T>
+        requires std::is_same_v<T, boost::asio::ip::address>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        Error result{Error::kSuccess};
+        std::array<uint8_t, 16> bytes{0x0};
+        switch (action) {
+            using enum Action;
+            case kComputeSize:
+                computed_size_ += 16;
+                break;
+            case kSerialize:
+                // Always transform in corresponding v6 representation
+                if (object.is_v4()) {
+                    auto object_v6{boost::asio::ip::address_v6::v4_mapped(object.to_v4())};
+                    bytes = object_v6.to_bytes();
+                } else {
+                    bytes = object.to_v6().to_bytes();
+                }
+                result = bind(bytes, action);
+                break;
+            case kDeserialize:
+                result = bind(bytes, action);
+                if (result == Error::kSuccess) {
+                    if (reinterpret_cast<uint64_t*>(bytes.data())[0] == 0U) {
+                        object = boost::asio::ip::make_address_v4(
+                            std::array<uint8_t, 4>{bytes[12], bytes[13], bytes[14], bytes[15]});
+                    } else {
+                        object = boost::asio::ip::make_address_v6(bytes);
+                    }
+                }
                 break;
         }
         return result;

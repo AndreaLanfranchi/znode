@@ -42,7 +42,7 @@ void Node::start() {
     remote_endpoint_ = socket_.remote_endpoint();
     last_message_received_time_ = std::chrono::steady_clock::now();  // We don't want to disconnect immediately
     connected_time_.store(std::chrono::steady_clock::now());
-    inbound_message_ = std::make_unique<NetMessage>(version_);
+    inbound_message_ = std::make_unique<abi::NetMessage>(version_);
 
     auto self{shared_from_this()};
     if (ssl_context_ != nullptr) {
@@ -220,7 +220,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
 
         std::unique_lock lock{inbound_messages_mutex_};
         inbound_messages_.push_back(std::move(inbound_message_));
-        inbound_message_ = std::make_unique<NetMessage>(version_);  // Start with a brand new message
+        inbound_message_ = std::make_unique<abi::NetMessage>(version_);  // Start with a brand new message
         // TODO notify higher levels that a new message has been received
         lock.unlock();
     }
@@ -231,7 +231,8 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
     return err;
 }
 
-serialization::Error Node::validate_message_for_protocol_handshake(const NetMessageType message_type) {
+serialization::Error Node::validate_message_for_protocol_handshake(const abi::NetMessageType message_type) {
+    using namespace zenpp::abi;
     using enum serialization::Error;
     if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) [[unlikely]] {
         // Only these two guys during handshake

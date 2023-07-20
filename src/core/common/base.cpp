@@ -14,6 +14,10 @@ void throw_exception(const std::exception&) {
     std::cerr << "Aborted due to unallowed exception" << std::endl;
     std::abort();
 }
+void throw_exception(const std::exception&, const boost::source_location&) {
+    std::cerr << "Aborted due to unallowed exception" << std::endl;
+    std::abort();
+}
 }  // namespace boost
 #endif
 
