@@ -12,7 +12,6 @@
 
 #include <core/abi/netmessage.hpp>
 #include <core/common/misc.hpp>
-#include <core/crypto/hash256.hpp>
 
 namespace zenpp::abi {
 
@@ -110,13 +109,10 @@ serialization::Error NetMessageHeader::validate() const noexcept {
 serialization::Error NetMessage::validate() const noexcept {
     using enum serialization::Error;
 
-    // Being a network message the payload :
-    // - must be at least kMessageHeaderLength byte long
-    // - must be at most kMaxProtocolMessageLength byte long
     if (data_.size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
     if (data_.size() > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
-    // This also means the header has not been validated previously
+
     const auto& message_definition(header_.get_definition());
     if (message_definition.message_type == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
 
@@ -228,4 +224,9 @@ serialization::Error NetMessage::validate_checksum() const noexcept {
     }
     return ret;
 }
+
+void NetMessage::set_version(int version) noexcept { data_.set_version(version); }
+
+int NetMessage::get_version() const noexcept { return data_.get_version(); }
+
 }  // namespace zenpp::abi

@@ -11,7 +11,9 @@
 #include <memory>
 #include <optional>
 
+#include <core/abi/messages.hpp>
 #include <core/common/base.hpp>
+#include <core/crypto/hash256.hpp>
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
@@ -151,6 +153,7 @@ class NetMessage {
     //! \brief Construct a blank NetMessage with a specific version
     explicit NetMessage(int version) : header_(), data_(serialization::Scope::kNetwork, version){};
 
+    // Not movable nor copyable
     NetMessage(const NetMessage&) = delete;
     NetMessage(const NetMessage&&) = delete;
     NetMessage& operator=(const NetMessage&) = delete;
@@ -162,8 +165,49 @@ class NetMessage {
     [[nodiscard]] serialization::SDataStream& data() noexcept { return data_; }
     [[nodiscard]] serialization::Error parse(ByteView& input_data) noexcept;
 
+    //! \brief Sets the message version (generally inherited from the protocol version)
+    void set_version(int version) noexcept;
+
+    //! \brief Returns the message version
+    [[nodiscard]] int get_version() const noexcept;
+
     //! \brief Validates the message header, payload and checksum
     [[nodiscard]] serialization::Error validate() const noexcept;
+
+    //! \brief Populates the message header and payload
+    //! \remarks The payload is serialized and the header is filled accordingly
+    template <class T>
+        requires std::derived_from<T, MessagePayload>
+    serialization::Error push(NetMessageType type, T& payload, ByteView& magic) {
+        using namespace serialization;
+        using enum Error;
+
+        if (!header_.pristine()) return kInvalidMessageState;
+        if (magic.size() != header_.magic.size()) return kMessageHeaderMagicMismatch;
+        data_.clear();
+        header_.set_type(type);
+
+        // Serialize the payload into own data stream
+        // Needed to compute the length and checksum
+        SDataStream payload_stream(Scope::kNetwork, get_version());
+        auto err{payload.serialize(payload_stream, Action::kSerialize)};
+        if (!!err) return err;
+        header_.length = payload_stream.size();
+
+        // Compute the checksum
+        const auto payload_view{payload_stream.read()};
+        if (!payload_view) return payload_view.error();
+        crypto::Hash256 payload_digest(*payload_view);
+        auto payload_hash{payload_digest.finalize()};
+        std::memcpy(header_.checksum.data(), payload_hash.data(), header_.checksum.size());
+
+        // Serialize the header
+        err = header_.serialize(data_);
+        if (!!err) return err;
+        payload_stream.seekg(0);          // Move at the beginning of the payload stream
+        payload_stream.get_clear(data_);  // Copy the contents of the payload stream into the message data stream
+        return validate();                // Ensure the message is valid also when we push it
+    }
 
   private:
     NetMessageHeader header_;                  // Where the message header is deserialized

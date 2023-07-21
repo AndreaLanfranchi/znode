@@ -154,9 +154,26 @@ class SDataStream : public DataStream {
     //! \remarks After this operation eof() == true
     void clear() noexcept override;
 
+    // Serialization for bool
+    [[nodiscard]] Error bind(bool& object, Action action) {
+        Error result{Error::kSuccess};
+        switch (action) {
+            using enum Action;
+            case kComputeSize:
+                computed_size_ += 1;
+                break;
+            case kSerialize:
+                write_data(*this, object);
+                break;
+            case kDeserialize:
+                result = read_data(*this, object);
+                break;
+        }
+        return result;
+    }
+
     // Serialization for arithmetic types
-    template <class T>
-        requires std::is_arithmetic_v<T>
+    template <Integral T>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {

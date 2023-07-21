@@ -10,7 +10,7 @@ namespace zenpp::abi {
 
 using namespace serialization;
 
-Error MessageVersion::serialization(SDataStream& stream, Action action) {
+Error Version::serialization(SDataStream& stream, Action action) {
     using enum Error;
     Error ret{kSuccess};
     if (!ret) ret = stream.bind(version, action);

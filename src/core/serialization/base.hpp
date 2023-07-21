@@ -32,6 +32,7 @@ enum class Error {
     kReadBeyondData,
     kNonCanonicalCompactSize,
     kCompactSizeTooBig,
+    kInvalidMessageState,                       // Trying to push a payload in an already initialized network message
     kMessageHeaderIncomplete,                   // Message header too short and cannot be completed
     kMessageBodyIncomplete,                     // Message body too short
     kMessageHeaderMagicMismatch,                // Message header addressed to another network

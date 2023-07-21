@@ -42,6 +42,12 @@ template <class T>
 concept UnsignedIntegral = std::unsigned_integral<T>;
 
 template <class T>
+concept SignedIntegral = std::signed_integral<T>;
+
+template <class T>
+concept Integral = UnsignedIntegral<T> || SignedIntegral<T>;
+
+template <class T>
 concept UnsignedIntegralEx = UnsignedIntegral<T> || std::same_as<T, intx::uint128> || std::same_as<T, intx::uint256> ||
                              std::same_as<T, intx::uint512>;
 
