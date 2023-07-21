@@ -6,6 +6,7 @@
 */
 
 #pragma once
+#include <vector>
 #include <memory>
 #include <optional>
 
@@ -25,6 +26,7 @@ struct NetworkSettings {
     uint32_t idle_timeout_seconds{300};           // Number of seconds after which an inactive node is disconnected
     bool use_tls{true};                           // Whether to enforce SSL/TLS on network connections
     std::string tls_password{};                   // Password to use to load a private key file
+    std::vector<std::string> connect_nodes{};     // List of nodes to connect to at startup
 };
 
 struct AppSettings {

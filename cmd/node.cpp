@@ -13,6 +13,7 @@
 #include <openssl/ssl.h>
 
 #include <core/common/memory.hpp>
+#include <core/types/address.hpp>
 
 #include <app/common/stopwatch.hpp>
 #include <app/concurrency/ossignals.hpp>
@@ -158,6 +159,15 @@ int main(int argc, char* argv[]) {
         // 1) Instantiate and start a new NodeHub
         network::NodeHub node_hub{settings, asio_context};
         node_hub.start();
+
+        // Connect nodes if required
+        if(!settings.network.connect_nodes.empty()) {
+            for(auto const& node_address: settings.network.connect_nodes) {
+                log::Info("Connecting to peer", {"address", node_address}) << " ...";
+                const NetworkAddress address{node_address};
+                if(!node_hub.connect(address)) break;
+            }
+        }
 
         // Start sync loop
         const auto start_time{std::chrono::steady_clock::now()};

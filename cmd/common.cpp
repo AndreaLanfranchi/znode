@@ -20,14 +20,12 @@
 namespace zenpp::cmd {
 
 void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& settings) {
-
     auto& network_settings = settings.network;
 
     // Node settings
     std::filesystem::path data_dir_path;
     std::string chaindata_max_size_str{to_human_bytes(settings.chaindata_env_config.max_size, /*binary=*/true)};
-    std::string chaindata_growth_size_str{
-        to_human_bytes(settings.chaindata_env_config.growth_size, /*binary=*/true)};
+    std::string chaindata_growth_size_str{to_human_bytes(settings.chaindata_env_config.growth_size, /*binary=*/true)};
     std::string chaindata_page_size_str{to_human_bytes(settings.chaindata_env_config.page_size, /*binary=*/true)};
     std::string batch_size_str{to_human_bytes(settings.batch_size, /*binary=*/true)};
     std::string etl_buffer_size_str{to_human_bytes(settings.etl_buffer_size, /*binary=*/true)};
@@ -39,8 +37,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
                  "Chaindata database opened in exclusive mode");
     cli.add_flag("--chaindata.readahead", settings.chaindata_env_config.read_ahead,
                  "Chaindata database enable readahead");
-    cli.add_flag("--chaindata.writemap", settings.chaindata_env_config.write_map,
-                 "Chaindata database enable writemap");
+    cli.add_flag("--chaindata.writemap", settings.chaindata_env_config.write_map, "Chaindata database enable writemap");
 
     cli.add_option("--chaindata.growthsize", chaindata_growth_size_str, "Chaindata database growth size.")
         ->capture_default_str()
@@ -106,6 +103,12 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
                     "Number of seconds after which an idle node gets disconnected")
         ->capture_default_str()
         ->check(CLI::Range(size_t(30), size_t(3600)));
+
+    network_opts
+        .add_option("--connect", network_settings.connect_nodes, "Immediately connect to this remote nodes list")
+        ->capture_default_str()
+        ->check(IPEndPointValidator(/*allow_empty=*/true,
+                                    /*default_port=*/13383));  // TODO the port will be on behalf of network
 
     // Logging options
     auto& log_settings = settings.log;

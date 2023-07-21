@@ -12,6 +12,8 @@
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
 
+#include <core/types/address.hpp>
+
 #include <app/common/settings.hpp>
 #include <app/common/stopwatch.hpp>
 #include <app/concurrency/stoppable.hpp>
@@ -40,8 +42,12 @@ class NodeHub : public Stoppable {
     [[nodiscard]] std::shared_ptr<Node> operator[](int id) const;  // Returns a shared_ptr<Node> by id
     [[nodiscard]] std::vector<std::shared_ptr<Node>> get_nodes() const;  // Returns a vector of all nodes
 
-    bool start();                            // Begins accepting connections
-    bool stop(bool wait) noexcept override;  // Stops accepting connections and stops all nodes
+    [[nodiscard]] size_t bytes_sent() const noexcept { return total_bytes_sent_.load(); }
+    [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
+
+    bool start();                                               // Begins accepting connections
+    bool stop(bool wait) noexcept override;                     // Stops accepting connections and stops all nodes
+    [[nodiscard]] bool connect(const NetworkAddress& address);  // Connects to a remote endpoint
 
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
@@ -50,6 +56,7 @@ class NodeHub : public Stoppable {
 
     void on_node_disconnected(const std::shared_ptr<Node>& node);              // Handles disconnects from nodes
     void on_node_data(DataDirectionMode direction, size_t bytes_transferred);  // Handles data from nodes
+    void set_common_socket_options(boost::asio::ip::tcp::socket& socket);      // Sets common socket options
 
     void start_service_timer();                                      // Starts the majordomo timer
     bool handle_service_timer(const boost::system::error_code& ec);  // Majordomo to serve connections

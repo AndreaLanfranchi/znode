@@ -40,8 +40,10 @@ void Node::start() {
     }
     local_endpoint_ = socket_.local_endpoint();
     remote_endpoint_ = socket_.remote_endpoint();
-    last_message_received_time_ = std::chrono::steady_clock::now();  // We don't want to disconnect immediately
-    connected_time_.store(std::chrono::steady_clock::now());
+    const auto now{std::chrono::steady_clock::now()};
+    last_message_received_time_ = now;  // We don't want to disconnect immediately
+    last_message_sent_time_ = now;      // We don't want to disconnect immediately
+    connected_time_.store(now);
     inbound_message_ = std::make_unique<abi::NetMessage>(version_);
 
     auto self{shared_from_this()};
@@ -77,58 +79,140 @@ bool Node::stop(bool wait) noexcept {
 
 void Node::start_ssl_handshake() {
     REQUIRES(ssl_context_ != nullptr);
-    LOG_TRACE << "Starting SSL handshake";
     ssl_ = SSL_new(ssl_context_);
-    SSL_set_fd(ssl_, static_cast<int>(socket_.lowest_layer().native_handle()));
 
-    SSL_set_mode(ssl_, SSL_MODE_ENABLE_PARTIAL_WRITE);
-    SSL_set_mode(ssl_, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
-    SSL_set_mode(ssl_, SSL_MODE_RELEASE_BUFFERS);
-    SSL_set_mode(ssl_, SSL_MODE_AUTO_RETRY);
-
-    switch (connection_mode_) {
-        case NodeConnectionMode::kInbound:
-            SSL_set_accept_state(ssl_);
-            break;
-        case NodeConnectionMode::kOutbound:
-        case NodeConnectionMode::kManualOutbound:
-            SSL_set_connect_state(ssl_);
-            break;
-        default:
-            ASSERT(false);  // Should never happen;
-    }
-
-    if (SSL_do_handshake(ssl_) != 1) {
-        auto err{ERR_get_error()};
-        print_ssl_error(err, log::Level::kDebug);
-        stop(false);
+    if (!SSL_set_fd(ssl_, static_cast<int>(socket_.lowest_layer().native_handle()))) {
+        auto error_code(ERR_get_error());
+        print_ssl_error(error_code, log::Level::kWarning);
+        stop(true);
+        LOGF_TRACE << "end";
         return;
     }
 
-    boost::asio::async_write(socket_, boost::asio::null_buffers(),
-                             [this](const boost::system::error_code& ec, std::size_t) { handle_ssl_handshake(ec); });
-}
+    // SSL_set_mode(ssl_, SSL_MODE_ENABLE_PARTIAL_WRITE);
+    SSL_set_mode(ssl_, SSL_MODE_RELEASE_BUFFERS);
+    SSL_set_mode(ssl_, SSL_MODE_AUTO_RETRY);
 
-void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
-    auto self{shared_from_this()};
-    if (!ec) {
-        asio::post(i_strand_, [self]() {
-            self->connected_time_.store(std::chrono::steady_clock::now());
-            self->start_read();
-        });
-    } else {
-        log::Error("Node::handle_ssl_handshake()", {"error", ec.message()});
-        stop(false);
+    // Tries the operation for at most 5 seconds
+
+    int result{0};
+
+    // Buffer to store data
+    std::array<char, 1_KiB> buffer{0};
+    size_t total_bytes_read(0);
+    size_t total_bytes_written(0);
+    size_t bytes_read(0);
+    size_t bytes_written(0);
+
+    // Do not stay here more than 5 seconds
+    auto start_handhsake_time{std::chrono::steady_clock::now()};
+    while (std::chrono::steady_clock::now() - start_handhsake_time < std::chrono::seconds(5)) {
+        switch (connection_mode_) {
+            using enum NodeConnectionMode;
+            case kInbound:
+                result = SSL_accept(ssl_);
+                break;
+            case kOutbound:
+            case kManualOutbound:
+                result = SSL_connect(ssl_);
+                break;
+            default:
+                ASSERT(false);  // Should never happen;
+        }
+
+        int ssl_error = SSL_get_error(ssl_, result);
+        if (result == 1) {
+            log::Info("P2P node", {"peer", network::to_string(remote_endpoint_), "action", "SSL handshake", "status",
+                                   "Successful"});
+            if (on_data_) {
+                if (total_bytes_read) on_data_(DataDirectionMode::kInbound, total_bytes_read);
+                if (total_bytes_written) on_data_(DataDirectionMode::kOutbound, total_bytes_written);
+            }
+            auto self{shared_from_this()};
+            asio::post(i_strand_, [self]() { self->start_read(); });
+            // TODO post message advertising local version
+            return;
+        } else if (ssl_error == SSL_ERROR_WANT_READ || ssl_error == SSL_ERROR_WANT_WRITE) {
+            switch (ssl_error) {
+                case SSL_ERROR_WANT_READ:
+                    LOG_TRACE << "SSL_ERROR_WANT_READ";
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    SSL_read_ex(ssl_, buffer.data(), buffer.size(), &bytes_read);
+                    total_bytes_read += bytes_read;
+                    break;
+                case SSL_ERROR_WANT_WRITE:
+                    LOG_TRACE << "SSL_ERROR_WANT_WRITE";
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                    SSL_write_ex(ssl_, nullptr, 10, &bytes_written);
+                    total_bytes_written += bytes_written;
+                    [[fallthrough]];
+                default:
+                    break;
+            }
+        } else {
+            auto error_code(ERR_get_error());
+            ERR_error_string_n(error_code, buffer.data(), sizeof(buffer));
+            log::Warning("P2P node", {"peer", network::to_string(remote_endpoint_), "action", "SSL handshake", "error",
+                                      std::string(buffer.data())})
+                << "Disconnecting ...";
+            stop(true);
+            return;
+        }
     }
+
+    log::Warning("P2P node",
+                 {"peer", network::to_string(remote_endpoint_), "action", "SSL handshake", "error", "Timeout reached"})
+        << "Disconnecting ...";
+    stop(true);
 }
 
 void Node::start_read() {
-    if (!is_connected_.load()) return;
+    if (!is_connected_.load() || !socket_.is_open()) return;
+
     auto self{shared_from_this()};
-    socket_.async_read_some(receive_buffer_.prepare(65_KiB),
-                            [this, self](const boost::system::error_code& ec, const size_t bytes_transferred) {
-                                handle_read(ec, bytes_transferred);
-                            });
+    if (!ssl_) {
+        // Plain unencrypted connection
+        socket_.async_read_some(receive_buffer_.prepare(64_KiB),
+                                [self](const boost::system::error_code& ec, const size_t bytes_transferred) {
+                                    self->handle_read(ec, bytes_transferred);
+                                });
+    } else {
+        std::array<char, 16_KiB> buffer{0};
+        size_t bytes_read{0};
+        int result{SSL_read_ex(ssl_, buffer.data(), 16_KiB, &bytes_read)};
+
+        int ssl_shutdown_status = SSL_get_shutdown(ssl_);
+        if (ssl_shutdown_status & SSL_RECEIVED_SHUTDOWN) {
+            log::Warning("P2P node", {"peer", network::to_string(remote_endpoint_), "action", "SSL read", "error",
+                                      "Remote sent SHUTDOWN"})
+                << "Disconnecting ...";
+            stop(true);
+            return;
+        }
+
+        if (result < 1) {
+            int ssl_error = SSL_get_error(ssl_, result);
+            if (ssl_error != SSL_ERROR_WANT_READ) {
+                // something went wrong
+                auto error_code(ERR_get_error());
+                ERR_error_string_n(error_code, buffer.data(), sizeof(buffer));
+                log::Warning("P2P node", {"peer", network::to_string(remote_endpoint_), "action", "SSL read", "error",
+                                          std::string(buffer.data())})
+                    << "Disconnecting ...";
+                stop(true);
+                return;
+            }
+        }
+
+        if (bytes_read > 0) {
+            LOG_TRACE << "SSL_read_ex bytes read " << bytes_read;
+            if (on_data_) on_data_(DataDirectionMode::kInbound, bytes_read);
+            receive_buffer_.sputn(buffer.data(), static_cast<std::streamsize>(bytes_read));
+        }
+
+        // Consume the data
+        asio::post(i_strand_, [self]() { self->start_read(); });
+    }
 }
 
 void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_transferred) {
@@ -137,38 +221,31 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
     // is not relevant anymore.
     if (!is_connected()) return;
 
-    auto self{shared_from_this()};
     if (ec) {
-        log::Error("P2P node", {"peer", "unknown", "action", "handle_read", "error", ec.message()})
+        log::Warning("P2P node",
+                     {"peer", network::to_string(remote_endpoint_), "action", "handle_read", "error", ec.message()})
             << "Disconnecting ...";
         stop(false);
         return;
     }
 
-    // Check SSL shutdown status
-    if (ssl_ != nullptr) {
-        int ssl_shutdown_status = SSL_get_shutdown(ssl_);
-        if (ssl_shutdown_status & SSL_RECEIVED_SHUTDOWN) {
-            SSL_shutdown(ssl_);
-            log::Info("P2P node", {"peer", "unknown", "action", "handle_read", "message", "SSL_RECEIVED_SHUTDOWN"});
-            stop(true);
-            return;
-        }
+    auto self{shared_from_this()};
+    if (!bytes_transferred) {
+        asio::post(i_strand_, [self]() { self->start_read(); });
+        return;
     }
 
-    if (bytes_transferred > 0) {
-        bytes_received_ += bytes_transferred;
-        if (on_data_) on_data_(DataDirectionMode::kInbound, bytes_transferred);
+    bytes_received_ += bytes_transferred;  // This is the real traffic (including SSL overhead)
+    if (on_data_ && bytes_transferred) on_data_(DataDirectionMode::kInbound, bytes_transferred);
 
-        const auto parse_result{parse_messages(bytes_transferred)};
-        if (serialization::is_fatal_error(parse_result)) {
-            log::Warning("Network message error",
-                         {"id", std::to_string(node_id_), "remote", network::to_string(local_endpoint_), "error",
-                          std::string(magic_enum::enum_name(parse_result))})
-                << "Disconnecting peer ...";
-            stop(false);
-            return;
-        }
+    const auto parse_result{parse_messages(bytes_transferred)};
+    if (serialization::is_fatal_error(parse_result)) {
+        log::Warning("Network message error",
+                     {"id", std::to_string(node_id_), "remote", network::to_string(remote_endpoint_), "error",
+                      std::string(magic_enum::enum_name(parse_result))})
+            << "Disconnecting peer ...";
+        stop(false);
+        return;
     }
 
     // Continue reading from socket
@@ -189,7 +266,13 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
     size_t messages_parsed{0};
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
     while (!data.empty()) {
-        if (err = inbound_message_->parse(data); is_fatal_error(err)) break;
+        if (err = inbound_message_->parse(data); is_fatal_error(err)) {
+            if (should_trace_log) {
+                LOG_TRACE << "Data: " << inbound_message_->data().to_string();
+                LOG_TRACE << "P Length: " << inbound_message_->header().length;
+            }
+            break;
+        }
         if (err == kMessageHeaderIncomplete) break;  // Can't do anything but read other data
         if (!inbound_message_->header().pristine() /* has been deserialized */) {
             if (const auto err_handshake = validate_message_for_protocol_handshake(inbound_message_->get_type());

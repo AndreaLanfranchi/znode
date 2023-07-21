@@ -103,7 +103,6 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
   private:
     void start_ssl_handshake();
-    void handle_ssl_handshake(const boost::system::error_code& ec);
 
     //! \brief Begin reading from the socket asychronously
     void start_read();
@@ -145,9 +144,10 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<size_t> bytes_received_{0};                   // Total bytes received from the socket during the session
     std::atomic<size_t> bytes_sent_{0};                       // Total bytes sent to the socket during the session
 
-    std::unique_ptr<abi::NetMessage> inbound_message_{nullptr};         // The "next" message being received
-    std::vector<std::shared_ptr<abi::NetMessage>> inbound_messages_{};  // Queue of received messages awaiting processing
-    std::mutex inbound_messages_mutex_{};                          // Lock guard for received messages
+    std::unique_ptr<abi::NetMessage> inbound_message_{nullptr};  // The "next" message being received
+    std::vector<std::shared_ptr<abi::NetMessage>>
+        inbound_messages_{};               // Queue of received messages awaiting processing
+    std::mutex inbound_messages_mutex_{};  // Lock guard for received messages
 
     serialization::SDataStream send_stream_{serialization::Scope::kNetwork, 0};
 };

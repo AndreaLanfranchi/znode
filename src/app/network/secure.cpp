@@ -16,9 +16,7 @@
 namespace zenpp::network {
 
 void print_ssl_error(unsigned long err, const log::Level severity) {
-    if (!err) {
-        return;
-    }
+    if (!err) return;
     char buf[256];
     ERR_error_string_n(err, buf, sizeof(buf));
     log::BufferBase(severity, "SSL error", {"code", std::to_string(err), "reason", std::string(buf)});
@@ -74,7 +72,7 @@ X509* generate_self_signed_certificate(EVP_PKEY* pkey) {
     X509_gmtime_adj(X509_get_notAfter(x509_certificate), static_cast<long>(86400 * kCertificateValidityDays));
 
     X509_NAME* subject = X509_NAME_new();
-    X509_NAME_add_entry_by_txt(subject, "CN", MBSTRING_ASC, reinterpret_cast<const unsigned char*>("zend++.node"), -1,
+    X509_NAME_add_entry_by_txt(subject, "CN", MBSTRING_ASC, reinterpret_cast<const unsigned char*>("zenpp.node"), -1,
                                -1, 0);
     X509_set_subject_name(x509_certificate, subject);
     X509_set_issuer_name(x509_certificate, subject);
@@ -268,6 +266,15 @@ bool validate_server_certificate(X509* cert, EVP_PKEY* pkey) {
 
     if (!pkey) {
         LOG_ERROR << "Invalid EVP_PKEY";
+        return false;
+    }
+    // Get the certificate's validity period
+    ASN1_TIME* not_before = X509_getm_notBefore(cert);
+    ASN1_TIME* not_after = X509_getm_notAfter(cert);
+
+    const auto current_time = time(nullptr);
+    if (ASN1_TIME_cmp_time_t(not_before, current_time) == 1 || ASN1_TIME_cmp_time_t(not_after, current_time) == -1) {
+        LOG_ERROR << "Certificate is not valid or expired";
         return false;
     }
 

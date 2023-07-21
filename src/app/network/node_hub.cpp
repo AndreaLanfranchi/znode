@@ -23,7 +23,6 @@ bool NodeHub::start() {
     if (bool expected{false}; !is_started_.compare_exchange_strong(expected, true)) {
         return false;
     }
-    LOG_TRACE << "Is activated " << std::boolalpha << app_settings_.network.use_tls;
     if (app_settings_.network.use_tls) {
         const auto ssl_data{(*app_settings_.data_directory)[DataDirectory::kSSLCert].path()};
         auto ctx{generate_tls_context(TLSContextType::kServer, ssl_data, app_settings_.network.tls_password)};
@@ -32,8 +31,6 @@ bool NodeHub::start() {
             return false;
         }
         ssl_server_context_.reset(ctx);
-        LOG_TRACE << "Is activated " << std::boolalpha << (ssl_server_context_ != nullptr);
-
         ctx = generate_tls_context(TLSContextType::kClient, ssl_data, "");
         if (!ctx) {
             log::Error("NodeHub", {"action", "start", "error", "failed to generate TLS server context"});
@@ -129,9 +126,45 @@ bool NodeHub::stop(bool wait) noexcept {
     return ret;
 }
 
-void NodeHub::start_accept() {
-    log::Trace("Service", {"name", "Node Hub", "status", "Listening", "secure", ssl_server_context_ ? "yes" : "no"});
+bool NodeHub::connect(const NetworkAddress& address) {
+    if (is_stopping()) return false;
+    if (current_active_connections_.fetch_add(1) > app_settings_.network.max_active_connections) {
+        --current_active_connections_;
+        log::Error("Service", {"name", "Node Hub", "action", "connect", "error", "max active connections reached"});
+        return false;
+    }
+    std::shared_ptr<Node> new_node(new Node(
+                                       NodeConnectionMode::kOutbound, asio_context_, ssl_client_context_.get(),
+                                       [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
+                                       [this](DataDirectionMode direction, size_t bytes_transferred) {
+                                           on_node_data(direction, bytes_transferred);
+                                       }),
+                                   Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
+    auto& socket{new_node->socket()};
+    auto peer_endpoint = address.to_endpoint();
+    try {
+        socket.connect(peer_endpoint);
+        set_common_socket_options(socket);
+    } catch (const boost::system::system_error& ex) {
+        log::Error("Service", {"name", "Node Hub", "action", "connect", "remote", network::to_string(peer_endpoint),
+                               "error", ex.what()});
+        --current_active_connections_;
+        return false;
+    }
+
+    ++total_connections_;
+    ++current_active_outbound_connections_;
+    new_node->start();
+    std::scoped_lock lock(nodes_mutex_);
+    nodes_.emplace(new_node->id(), new_node);
+    return true;
+}
+
+void NodeHub::start_accept() {
+    if (is_stopping()) return;
+
+    log::Trace("Service", {"name", "Node Hub", "status", "Listening", "secure", ssl_server_context_ ? "yes" : "no"});
     std::shared_ptr<Node> new_node(new Node(
                                        NodeConnectionMode::kInbound, asio_context_, ssl_server_context_.get(),
                                        [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
@@ -145,10 +178,7 @@ void NodeHub::start_accept() {
 }
 
 void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::system::error_code& ec) {
-    if (ec == boost::asio::error::operation_aborted) {
-        log::Trace("Service", {"name", "Node Hub", "status", "stop"});
-        return;  // No other operation allowed
-    }
+    if (is_stopping() || ec == boost::asio::error::operation_aborted) return;
 
     std::string remote{"unknown"};
     std::string local{"unknown"};
@@ -163,45 +193,39 @@ void NodeHub::handle_accept(const std::shared_ptr<Node>& new_node, const boost::
                            "local", local, "remote", remote});
 
     if (ec) {
-        log::Error("Service", {"name", "Node Hub", "error", ec.message()});
+        log::Error("Service", {"name", "Node Hub", "action", "handle_accept", "error", ec.message()});
+        new_node->stop(false);
         // Fall through and continue listening for new connections
-    } else if (!ec) {
+    } else {
         ++total_connections_;
         // Check we do not exceed the maximum number of connections
         if (current_active_connections_ >= app_settings_.network.max_active_connections) {
-            log::Trace("Service", {"name", "Node Hub", "peers",
-                                   std::to_string(app_settings_.network.max_active_connections), "action", "reject"});
+            log::Trace("Service", {"name", "Node Hub", "action", "handle_accept"})
+                << "Too many connections. Rejecting ...";
             new_node->stop(false);
             ++total_rejected_connections_;
-            return;
-        }
-
-        ++current_active_connections_;
-        ++current_active_inbound_connections_;
-
-        log::Trace("Service", {"name", "Node Hub", "total connections", std::to_string(total_connections_),
-                               "total disconnections", std::to_string(total_disconnections_),
-                               "total rejected connections", std::to_string(total_rejected_connections_)});
-
-        // Set socket non-blocking
-        boost::system::error_code ec_socket;
-        new_node->socket().non_blocking(true, ec_socket);
-        if (ec_socket) {
-            log::Error("Service", {"name", "Node Hub", "node", std::to_string(new_node->id()), "remote", remote,
-                                   "error", ec_socket.message()});
-            new_node->stop(false);
-            return;
         } else {
-            new_node->socket().set_option(tcp::no_delay(true));
-            new_node->socket().set_option(tcp::socket::keep_alive(true));
-            new_node->socket().set_option(boost::asio::socket_base::linger(true, 5));
-            new_node->socket().set_option(boost::asio::socket_base::receive_buffer_size(static_cast<int>(64_KiB)));
-            new_node->socket().set_option(boost::asio::socket_base::send_buffer_size(static_cast<int>(64_KiB)));
-            new_node->start();
+            ++current_active_connections_;
+            ++current_active_inbound_connections_;
+            log::Trace("Service", {"name", "Node Hub", "total connections", std::to_string(total_connections_),
+                                   "total disconnections", std::to_string(total_disconnections_),
+                                   "total rejected connections", std::to_string(total_rejected_connections_)});
 
-            std::scoped_lock lock(nodes_mutex_);
-            nodes_.emplace(new_node->id(), new_node);
-            // Fall through and continue listening for new connections
+            // Set socket non-blocking
+            boost::system::error_code ec_socket;
+            new_node->socket().non_blocking(true, ec_socket);
+            if (ec_socket) {
+                log::Error("Service", {"name", "Node Hub", "node", std::to_string(new_node->id()), "remote", remote,
+                                       "error", ec_socket.message()});
+                new_node->stop(false);
+                return;
+            } else {
+                set_common_socket_options(new_node->socket());
+                new_node->start();
+
+                std::scoped_lock lock(nodes_mutex_);
+                nodes_.emplace(new_node->id(), new_node);
+            }
         }
     }
 
@@ -289,5 +313,13 @@ std::vector<std::shared_ptr<Node>> NodeHub::get_nodes() const {
         nodes.emplace_back(node);
     }
     return nodes;
+}
+
+void NodeHub::set_common_socket_options(tcp::socket& socket) {
+    socket.set_option(tcp::no_delay(true));
+    socket.set_option(tcp::socket::keep_alive(true));
+    socket.set_option(boost::asio::socket_base::linger(true, 5));
+    socket.set_option(boost::asio::socket_base::receive_buffer_size(static_cast<int>(64_KiB)));
+    socket.set_option(boost::asio::socket_base::send_buffer_size(static_cast<int>(64_KiB)));
 }
 }  // namespace zenpp::network

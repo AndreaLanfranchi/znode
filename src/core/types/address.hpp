@@ -7,6 +7,7 @@
 #pragma once
 
 #include <boost/asio/ip/address.hpp>
+#include <boost/asio/ip/tcp.hpp>
 
 #include <core/serialization/serializable.hpp>
 
@@ -28,12 +29,15 @@ enum class NetworkServicesType : uint32_t {
 class NetworkAddress : public serialization::Serializable {
   public:
     NetworkAddress();
-    NetworkAddress(std::string address_string, uint16_t port_num);
+    NetworkAddress(const std::string& address_string, uint16_t port_num);
+    explicit NetworkAddress(std::string endpoint_string);
 
     uint32_t time{0};                  // unix timestamp : not serialized if protocol version < 31402
     uint64_t services{0};              // services mask
     boost::asio::ip::address address;  // the actual network address
     uint16_t port{0};                  // Tcp port number
+
+    [[nodiscard]] boost::asio::ip::tcp::endpoint to_endpoint() const;
 
   private:
     friend class serialization::SDataStream;
