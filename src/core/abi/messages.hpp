@@ -12,17 +12,7 @@
 
 namespace zenpp::abi {
 
-//! \brief Message payload only an abstract interface class to allow template specialization
-class MessagePayload : public serialization::Serializable {
-  public:
-    MessagePayload() = default;
-    ~MessagePayload() override = default;
-
-  private:
-    serialization::Error serialization(serialization::SDataStream&, serialization::Action) override = 0;
-};
-
-class NullData : public MessagePayload {
+class NullData : public serialization::Serializable {
   public:
     NullData() = default;
     ~NullData() override = default;
@@ -35,8 +25,11 @@ class NullData : public MessagePayload {
     };
 };
 
-class Version : public MessagePayload {
+class Version : public serialization::Serializable {
   public:
+    Version() = default;
+    ~Version() override = default;
+
     int32_t version{0};
     uint64_t services{static_cast<uint64_t>(NetworkServicesType::kNone)};
     int64_t timestamp{0};

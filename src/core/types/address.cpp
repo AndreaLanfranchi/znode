@@ -55,6 +55,9 @@ NetworkAddress::NetworkAddress(const std::string& address_string, uint16_t port_
     port = port_num;
 }
 
+NetworkAddress::NetworkAddress(boost::asio::ip::tcp::endpoint& endpoint)
+    : address(endpoint.address()), port(endpoint.port()) {}
+
 Error NetworkAddress::serialization(SDataStream& stream, Action action) {
     using enum Error;
     Error ret{kSuccess};

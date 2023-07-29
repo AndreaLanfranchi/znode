@@ -113,14 +113,14 @@ class NetMessageHeader : public serialization::Serializable {
   public:
     NetMessageHeader() : Serializable(){};
 
-    std::array<uint8_t, 4> magic{0};     // Message magic (origin network)
-    std::array<uint8_t, 12> command{0};  // ASCII string identifying the packet content, NULL padded
-    uint32_t length{0};                  // Length of payload in bytes
-    std::array<uint8_t, 4> checksum{0};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
+    std::array<uint8_t, 4> magic{};     // Message magic (origin network)
+    std::array<uint8_t, 12> command{};  // ASCII string identifying the packet content, NULL padded
+    uint32_t length{0};                 // Length of payload in bytes
+    std::array<uint8_t, 4> checksum{};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
 
     //! \brief Returns the message definition
     [[nodiscard]] const MessageDefinition& get_definition() const noexcept {
-        return kMessageDefinitions[message_definition_id_];
+        return kMessageDefinitions[static_cast<int>(message_type_)];
     }
 
     //! \brief Returns the decoded message type
@@ -137,10 +137,10 @@ class NetMessageHeader : public serialization::Serializable {
     [[nodiscard]] bool pristine() const noexcept;
 
     //! \brief Performs a sanity check on the header
-    [[nodiscard]] serialization::Error validate() const noexcept;
+    [[nodiscard]] serialization::Error validate() noexcept;
 
   private:
-    mutable size_t message_definition_id_{static_cast<size_t>(NetMessageType::kMissingOrUnknown)};
+    NetMessageType message_type_{NetMessageType::kMissingOrUnknown};
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
@@ -148,10 +148,15 @@ class NetMessageHeader : public serialization::Serializable {
 class NetMessage {
   public:
     //! \brief Construct a blank NetMessage
-    NetMessage() : header_(), data_(serialization::Scope::kNetwork, 0){};
+    NetMessage() : data_{serialization::Scope::kNetwork, 0} {};
 
     //! \brief Construct a blank NetMessage with a specific version
-    explicit NetMessage(int version) : header_(), data_(serialization::Scope::kNetwork, version){};
+    explicit NetMessage(int version) : data_{serialization::Scope::kNetwork, version} {};
+
+    //! \brief Construct a NetMessage with network magic provided
+    explicit NetMessage(int version, std::array<uint8_t, 4>& magic) : data_{serialization::Scope::kNetwork, version} {
+        header_.magic = magic;
+    };
 
     // Not movable nor copyable
     NetMessage(const NetMessage&) = delete;
@@ -172,48 +177,22 @@ class NetMessage {
     [[nodiscard]] int get_version() const noexcept;
 
     //! \brief Validates the message header, payload and checksum
-    [[nodiscard]] serialization::Error validate() const noexcept;
+    [[nodiscard]] serialization::Error validate() noexcept;
 
     //! \brief Populates the message header and payload
-    //! \remarks The payload is serialized and the header is filled accordingly
-    template <class T>
-        requires std::derived_from<T, MessagePayload>
-    serialization::Error push(NetMessageType type, T& payload, ByteView& magic) {
-        using namespace serialization;
-        using enum Error;
+    serialization::Error push(NetMessageType message_type, serialization::Serializable& payload,
+                              ByteView magic) noexcept;
 
-        if (!header_.pristine()) return kInvalidMessageState;
-        if (magic.size() != header_.magic.size()) return kMessageHeaderMagicMismatch;
-        data_.clear();
-        header_.set_type(type);
+    //! \brief Populates the message header and payload (alias)
+    serialization::Error push(NetMessageType message_type, serialization::Serializable& payload,
+                              std::array<uint8_t, 4>& magic) noexcept;
 
-        // Serialize the payload into own data stream
-        // Needed to compute the length and checksum
-        SDataStream payload_stream(Scope::kNetwork, get_version());
-        auto err{payload.serialize(payload_stream, Action::kSerialize)};
-        if (!!err) return err;
-        header_.length = payload_stream.size();
-
-        // Compute the checksum
-        const auto payload_view{payload_stream.read()};
-        if (!payload_view) return payload_view.error();
-        crypto::Hash256 payload_digest(*payload_view);
-        auto payload_hash{payload_digest.finalize()};
-        std::memcpy(header_.checksum.data(), payload_hash.data(), header_.checksum.size());
-
-        // Serialize the header
-        err = header_.serialize(data_);
-        if (!!err) return err;
-        payload_stream.seekg(0);          // Move at the beginning of the payload stream
-        payload_stream.get_clear(data_);  // Copy the contents of the payload stream into the message data stream
-        return validate();                // Ensure the message is valid also when we push it
-    }
 
   private:
-    NetMessageHeader header_;                  // Where the message header is deserialized
-    mutable serialization::SDataStream data_;  // Contains all the message raw data
+    NetMessageHeader header_{};        // Where the message header is deserialized
+    serialization::SDataStream data_;  // Contains all the message raw data
 
-    [[nodiscard]] serialization::Error validate_checksum() const noexcept;
+    [[nodiscard]] serialization::Error validate_checksum() noexcept;
 };
 
 }  // namespace zenpp::abi

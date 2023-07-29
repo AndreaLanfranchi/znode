@@ -16,18 +16,18 @@
 namespace zenpp::abi {
 
 void NetMessageHeader::reset() noexcept {
-    magic.fill(0);
-    command.fill(0);
+    magic.fill('0');
+    command.fill('0');
     length = 0;
-    checksum.fill(0);
-    message_definition_id_ = static_cast<size_t>(NetMessageType::kMissingOrUnknown);
+    checksum.fill('0');
+    message_type_ = NetMessageType::kMissingOrUnknown;
 }
 
 bool NetMessageHeader::pristine() const noexcept {
-    return std::all_of(magic.begin(), magic.end(), [](const auto& byte) { return byte == 0; }) &&
-           std::all_of(command.begin(), command.end(), [](const auto& byte) { return byte == 0; }) &&
-           std::all_of(checksum.begin(), checksum.end(), [](const auto& byte) { return byte == 0; }) &&
-           message_definition_id_ == static_cast<size_t>(NetMessageType::kMissingOrUnknown) && length == 0;
+    return std::all_of(magic.begin(), magic.end(), [](const auto b) { return b == 0; }) &&
+           std::all_of(command.begin(), command.end(), [](const auto b) { return b == 0; }) &&
+           std::all_of(checksum.begin(), checksum.end(), [](const auto b) { return b == 0; }) &&
+           message_type_ == NetMessageType::kMissingOrUnknown && length == 0;
 }
 
 void NetMessageHeader::set_type(const NetMessageType type) noexcept {
@@ -35,14 +35,13 @@ void NetMessageHeader::set_type(const NetMessageType type) noexcept {
     const auto& message_definition{kMessageDefinitions[static_cast<size_t>(type)]};
     const auto command_bytes{strnlen_s(message_definition.command, command.size())};
     memcpy(command.data(), message_definition.command, command_bytes);
-    message_definition_id_ = static_cast<size_t>(type);
+    message_type_ = type;
 }
 
 serialization::Error NetMessageHeader::serialization(serialization::SDataStream& stream, serialization::Action action) {
     using namespace serialization;
     using enum Error;
     Error err{Error::kSuccess};
-    if (action == Action::kSerialize) err = validate();
     if (!err) err = stream.bind(magic, action);
     if (!err) err = stream.bind(command, action);
     if (!err) err = stream.bind(length, action);
@@ -51,7 +50,7 @@ serialization::Error NetMessageHeader::serialization(serialization::SDataStream&
     return err;
 }
 
-serialization::Error NetMessageHeader::validate() const noexcept {
+serialization::Error NetMessageHeader::validate() noexcept {
     using namespace serialization;
     using enum Error;
     if (command[0] == 0) return kMessageHeaderEmptyCommand;  // reject empty commands
@@ -75,18 +74,17 @@ serialization::Error NetMessageHeader::validate() const noexcept {
     }
 
     // Identify the command amongst the known ones
-    decltype(message_definition_id_) id{0};
+    int id{0};
     for (const auto& msg_def : kMessageDefinitions) {
         const auto def_command_len{strnlen_s(msg_def.command, command.size())};
         if (got_command_len == def_command_len && memcmp(msg_def.command, command.data(), def_command_len) == 0) {
-            message_definition_id_ = id;
+            message_type_ = static_cast<NetMessageType>(id);
             break;
         }
         ++id;
     }
 
-    if (message_definition_id_ == static_cast<size_t>(NetMessageType::kMissingOrUnknown))
-        return kMessageHeaderUnknownCommand;
+    if (message_type_ == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
 
     const auto& message_definition{get_definition()};
     if (message_definition.min_payload_length.has_value() && length < *message_definition.min_payload_length) {
@@ -106,12 +104,11 @@ serialization::Error NetMessageHeader::validate() const noexcept {
     return kSuccess;
 }
 
-serialization::Error NetMessage::validate() const noexcept {
+serialization::Error NetMessage::validate() noexcept {
     using enum serialization::Error;
 
     if (data_.size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
     if (data_.size() > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
-
 
     const auto& message_definition(header_.get_definition());
     if (message_definition.message_type == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
@@ -207,7 +204,7 @@ serialization::Error NetMessage::parse(ByteView& input_data) noexcept {
     return ret;
 }
 
-serialization::Error NetMessage::validate_checksum() const noexcept {
+serialization::Error NetMessage::validate_checksum() noexcept {
     using enum serialization::Error;
     const auto current_pos{data_.tellg()};
     if (data_.seekg(kMessageHeaderLength) != kMessageHeaderLength) return kMessageHeaderIncomplete;
@@ -229,4 +226,46 @@ void NetMessage::set_version(int version) noexcept { data_.set_version(version);
 
 int NetMessage::get_version() const noexcept { return data_.get_version(); }
 
+serialization::Error NetMessage::push(const NetMessageType message_type, serialization::Serializable& payload,
+                                      ByteView magic) noexcept {
+    using namespace serialization;
+    using enum Error;
+
+    if (message_type == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
+    if (magic.size() != header_.magic.size()) return kMessageHeaderMagicMismatch;
+    if (!header_.pristine()) return kInvalidMessageState;
+    header_.set_type(message_type);
+    std::memcpy(header_.magic.data(), magic.data(), header_.magic.size());
+
+    data_.clear();                       // Clear the data stream
+    auto err{header_.serialize(data_)};  // Serialize the header into the data stream
+    if (!!err) return err;
+    ASSERT(data_.size() == kMessageHeaderLength);
+
+    err = payload.serialize(data_);  // Serialize the payload into the data stream
+    if (!!err) return err;
+    ASSERT(data_.size() > kMessageHeaderLength);
+
+    header_.length = static_cast<uint32_t>(data_.size() - kMessageHeaderLength);  // Set the payload length
+
+    // Compute the checksum
+    data_.seekg(kMessageHeaderLength);  // Move at the beginning of the payload
+    const auto payload_view{data_.read()};
+    if (!payload_view) return payload_view.error();
+    crypto::Hash256 payload_digest(*payload_view);
+    auto payload_hash{payload_digest.finalize()};
+    std::memcpy(header_.checksum.data(), payload_hash.data(), header_.checksum.size());
+
+    // Now copy the lazily computed size and checksum into the datastream
+    memcpy(&data_[16], &header_.length, sizeof(header_.length));
+    memcpy(&data_[20], &header_.checksum, sizeof(header_.checksum));
+
+    return validate();  // Ensure the message is valid also when we push it
+}
+
+serialization::Error NetMessage::push(NetMessageType message_type, serialization::Serializable& payload,
+                                      std::array<uint8_t, 4>& magic) noexcept {
+    ByteView magic_view{magic.data(), magic.size()};
+    return push(message_type, payload, magic_view);
+}
 }  // namespace zenpp::abi

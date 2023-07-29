@@ -31,6 +31,7 @@ class NetworkAddress : public serialization::Serializable {
     NetworkAddress();
     NetworkAddress(const std::string& address_string, uint16_t port_num);
     explicit NetworkAddress(std::string endpoint_string);
+    explicit NetworkAddress(boost::asio::ip::tcp::endpoint& endpoint);
 
     uint32_t time{0};                  // unix timestamp : not serialized if protocol version < 31402
     uint64_t services{0};              // services mask

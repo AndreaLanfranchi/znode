@@ -8,7 +8,7 @@
 
 namespace zenpp::time {
 
-int64_t now() noexcept {
+int64_t unix_now() noexcept {
     const auto tnow{std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())};
     return static_cast<int64_t>(tnow);
 }

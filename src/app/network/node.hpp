@@ -12,13 +12,16 @@
 #include <vector>
 
 #include <boost/asio.hpp>
+#include <magic_enum.hpp>
 #include <openssl/ssl.h>
 
 #include <core/abi/netmessage.hpp>
 #include <core/common/base.hpp>
 
+#include <app/common/settings.hpp>
 #include <app/concurrency/stoppable.hpp>
 #include <app/network/common.hpp>
+#include <app/network/protocol.hpp>
 
 namespace zenpp::network {
 
@@ -26,6 +29,14 @@ enum class NodeConnectionMode {
     kInbound,        // Node is accepting connections
     kOutbound,       // Node is connecting to other nodes
     kManualOutbound  // Forced connection to a specific node
+};
+
+enum class NodeIdleResult {
+    kNotIdle,                   // Node is not idle
+    kProtocolHandshakeTimeout,  // Too much time for protocol handshake
+    kInboundTimeout,            // Too much time since the beginning of an inbound message
+    kOutboundTimeout,           // Too much time since the beginning of an outbound message
+    kGlobalTimeout              // Too much time since the last completed activity
 };
 
 enum class DataDirectionMode {
@@ -38,8 +49,8 @@ static constexpr size_t kMaxMessagesPerRead = 32;
 
 class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
-    Node(NodeConnectionMode connection_mode, boost::asio::io_context& io_context, SSL_CTX* ssl_context,
-         std::function<void(std::shared_ptr<Node>)> on_disconnect,
+    Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost::asio::io_context& io_context,
+         SSL_CTX* ssl_context, std::function<void(std::shared_ptr<Node>)> on_disconnect,
          std::function<void(DataDirectionMode, size_t)> on_data);
 
     Node(Node& other) = delete;
@@ -86,8 +97,9 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
         return protocol_handshake_status_.load();
     }
 
-    //! \brief Returns whether the node has been inactive for more than idle_timeout_seconds
-    [[nodiscard]] bool is_idle(uint32_t idle_timeout_seconds) const noexcept;
+    //! \brief Returns whether the node (i.e. the remote) has been inactive/unresponsive beyond the amounts
+    //! of time specified in network settings
+    [[nodiscard]] NodeIdleResult is_idle() const noexcept;
 
     //! \brief Returns the total number of bytes read from the socket
     [[nodiscard]] size_t bytes_received() const noexcept { return bytes_received_.load(); }
@@ -100,6 +112,13 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \return The next available node id
     [[nodiscard]] static int next_node_id() noexcept { return next_node_id_.fetch_add(1); }
+
+    //! \brief Creates a new network message to be queued for delivery to the remote node
+    serialization::Error push_message(abi::NetMessageType message_type, serialization::Serializable& payload);
+
+    //! \brief Creates a new network message to be queued for delivery to the remote node
+    //! \remarks This a handy overload used to send messages with a null payload
+    serialization::Error push_message(abi::NetMessageType message_type);
 
   private:
     void start_ssl_handshake();
@@ -114,14 +133,16 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
     [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(abi::NetMessageType message_type);
 
-    //! \brief Begin writing to the socket asynchronously
-    void start_write();
+    void start_write();        // Begin writing to the socket asynchronously
+    void start_write_ssl();    // Begins async writes to the SSL context by openssl
+    void start_write_plain();  // Begins async writes to the socket by boost asio
+    void handle_write_plain(const boost::system::error_code& ec, size_t bytes_transferred);  // Async write handler
 
+    AppSettings& app_settings_;                 // Reference to global application settings
     static std::atomic_int next_node_id_;       // Used to generate unique node ids
     const int node_id_{next_node_id()};         // Unique node id
     const NodeConnectionMode connection_mode_;  // Whether inbound or outbound
-    boost::asio::io_context::strand i_strand_;  // Serialized execution of handlers for input operations
-    boost::asio::io_context::strand o_strand_;  // Serialized execution of handlers for output operations
+    boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
     boost::asio::ip::tcp::socket socket_;       // The underlying socket (either plain or SSL)
     boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> remote_endpoint_;  // Remote endpoint
     boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> local_endpoint_;   // Local endpoint
@@ -144,11 +165,21 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<size_t> bytes_received_{0};                   // Total bytes received from the socket during the session
     std::atomic<size_t> bytes_sent_{0};                       // Total bytes sent to the socket during the session
 
+    std::atomic<std::chrono::steady_clock::time_point> inbound_message_start_time_{
+        std::chrono::steady_clock::time_point::min()};           // Start time of inbound msg
     std::unique_ptr<abi::NetMessage> inbound_message_{nullptr};  // The "next" message being received
     std::vector<std::shared_ptr<abi::NetMessage>>
         inbound_messages_{};               // Queue of received messages awaiting processing
     std::mutex inbound_messages_mutex_{};  // Lock guard for received messages
 
-    serialization::SDataStream send_stream_{serialization::Scope::kNetwork, 0};
+    std::atomic_bool is_writing_{false};  // Whether a write operation is in progress
+    std::atomic<std::chrono::steady_clock::time_point> outbound_message_start_time_{
+        std::chrono::steady_clock::time_point::min()};              // Start time of outbound msg
+    std::shared_ptr<abi::NetMessage> outbound_message_{nullptr};    // The "next" message being sent
+    std::vector<decltype(outbound_message_)> outbound_messages_{};  // Queue of messages awaiting to be sent
+    std::mutex outbound_messages_mutex_{};                          // Lock guard for messages to be sent
+
+    abi::Version local_version_{};   // Local protocol version
+    abi::Version remote_version_{};  // Remote protocol version
 };
 }  // namespace zenpp::network

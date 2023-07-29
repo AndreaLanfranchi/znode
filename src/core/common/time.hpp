@@ -11,6 +11,6 @@
 
 namespace zenpp::time {
 
-int64_t now() noexcept;
+int64_t unix_now() noexcept;
 
 }  // namespace zenpp::time

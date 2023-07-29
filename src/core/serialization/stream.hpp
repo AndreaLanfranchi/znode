@@ -95,7 +95,7 @@ class DataStream {
     [[nodiscard]] bool eof() const noexcept;
 
     //! \brief Accesses one element of the buffer
-    constexpr reference operator[](size_type pos) { return buffer_[pos + read_position_]; }
+    constexpr reference operator[](size_type pos) { return buffer_[pos]; }
 
     //! \brief Returns the size of the contained data
     [[nodiscard]] size_type size() const noexcept;
@@ -160,7 +160,7 @@ class SDataStream : public DataStream {
         switch (action) {
             using enum Action;
             case kComputeSize:
-                computed_size_ += 1;
+                ++computed_size_;
                 break;
             case kSerialize:
                 write_data(*this, object);
@@ -236,7 +236,7 @@ class SDataStream : public DataStream {
                 computed_size_ += array_bytes_size;
                 break;
             case kSerialize:
-                write(static_cast<uint8_t*>(object.data()), array_bytes_size);
+                result = write(static_cast<uint8_t*>(object.data()), array_bytes_size);
                 break;
             case kDeserialize:
                 auto read_result{read(array_bytes_size)};
@@ -264,7 +264,7 @@ class SDataStream : public DataStream {
                 computed_size_ += object.size();
                 break;
             case kSerialize:
-                write(object);
+                result = write(object);
                 break;
             case kDeserialize:
                 auto data_length{this->avail()};

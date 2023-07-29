@@ -61,17 +61,18 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& ec) {
         return false;
     }
     print_info();  // Print info every 5 seconds
-
     std::scoped_lock lock{nodes_mutex_};
     for (auto [node_id, node_ptr] : nodes_) {
-        if (node_ptr->is_idle(app_settings_.network.idle_timeout_seconds)) {
-            log::Trace("Service", {"name", "Node Hub", "action", "service", "node", std::to_string(node_id), "remote",
-                                   node_ptr->to_string()})
-                << "Idle for " << app_settings_.network.idle_timeout_seconds << " seconds, disconnecting ...";
+        const auto result{node_ptr->is_idle()};
+        if (result != NodeIdleResult::kNotIdle) {
+            std::string reason{magic_enum::enum_name(result)};
+            log::Info("Service", {"name", "Node Hub", "action", "service", "node", std::to_string(node_id), "remote",
+                                  node_ptr->to_string(), "reason", reason})
+                << "Disconnecting ...";
             node_ptr->stop(false);
         }
     }
-    return true;
+    return !is_stopping();  // Required to resubmit the timer
 }
 
 void NodeHub::print_info() {
@@ -133,13 +134,14 @@ bool NodeHub::connect(const NetworkAddress& address) {
         log::Error("Service", {"name", "Node Hub", "action", "connect", "error", "max active connections reached"});
         return false;
     }
-    std::shared_ptr<Node> new_node(new Node(
-                                       NodeConnectionMode::kOutbound, asio_context_, ssl_client_context_.get(),
-                                       [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
-                                       [this](DataDirectionMode direction, size_t bytes_transferred) {
-                                           on_node_data(direction, bytes_transferred);
-                                       }),
-                                   Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
+    std::shared_ptr<Node> new_node(
+        new Node(
+            app_settings_, NodeConnectionMode::kOutbound, asio_context_, ssl_client_context_.get(),
+            [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
+            [this](DataDirectionMode direction, size_t bytes_transferred) {
+                on_node_data(direction, bytes_transferred);
+            }),
+        Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
     auto& socket{new_node->socket()};
     auto peer_endpoint = address.to_endpoint();
@@ -165,13 +167,14 @@ void NodeHub::start_accept() {
     if (is_stopping()) return;
 
     log::Trace("Service", {"name", "Node Hub", "status", "Listening", "secure", ssl_server_context_ ? "yes" : "no"});
-    std::shared_ptr<Node> new_node(new Node(
-                                       NodeConnectionMode::kInbound, asio_context_, ssl_server_context_.get(),
-                                       [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
-                                       [this](DataDirectionMode direction, size_t bytes_transferred) {
-                                           on_node_data(direction, bytes_transferred);
-                                       }),
-                                   Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
+    std::shared_ptr<Node> new_node(
+        new Node(
+            app_settings_, NodeConnectionMode::kInbound, asio_context_, ssl_server_context_.get(),
+            [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
+            [this](DataDirectionMode direction, size_t bytes_transferred) {
+                on_node_data(direction, bytes_transferred);
+            }),
+        Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
     socket_acceptor_.async_accept(
         new_node->socket(), [this, new_node](const boost::system::error_code& ec) { handle_accept(new_node, ec); });

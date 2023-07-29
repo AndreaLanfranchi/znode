@@ -23,7 +23,7 @@ set_target_properties(${BUILD_CORE_COMPONENT} PROPERTIES LINKER_LANGUAGE CXX)
 # No exceptions here
 target_compile_definitions(${BUILD_CORE_COMPONENT} PRIVATE BOOST_NO_EXCEPTIONS)
 if (MSVC)
-    target_compile_options(${BUILD_CORE_COMPONENT} PRIVATE /EHa- /EHsc)
+    #target_compile_options(${BUILD_CORE_COMPONENT} PRIVATE /EHa- /EHsc)
 else ()
     target_compile_options(${BUILD_CORE_COMPONENT} PRIVATE -fno-exceptions)
 endif ()

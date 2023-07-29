@@ -17,15 +17,11 @@ Error Version::serialization(SDataStream& stream, Action action) {
     if (!ret) ret = stream.bind(services, action);
     if (!ret) ret = stream.bind(timestamp, action);
     if (!ret) ret = stream.bind(addr_recv, action);
-
-    if (!ret && stream.get_version() >= 106) {
-        if (!ret) ret = stream.bind(addr_from, action);
-        if (!ret) ret = stream.bind(nonce, action);
-        if (!ret) ret = stream.bind(user_agent, action);
-        if (!ret) ret = stream.bind(start_height, action);
-        if (!ret && stream.get_version() >= 7001) ret = stream.bind(relay, action);
-    }
-
+    if (!ret) ret = stream.bind(addr_from, action);
+    if (!ret) ret = stream.bind(nonce, action);
+    if (!ret) ret = stream.bind(user_agent, action);
+    if (!ret) ret = stream.bind(start_height, action);
+    if (!ret) ret = stream.bind(relay, action);
     return ret;
 }
 }  // namespace zenpp::abi
