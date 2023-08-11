@@ -52,7 +52,8 @@ class NodeHub : public Stoppable {
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
     void start_accept();         // Begin async accept operation
-    void handle_accept(const std::shared_ptr<Node>& new_node, const boost::system::error_code& ec);
+    void handle_accept(const boost::system::error_code& ec,
+                       boost::asio::ip::tcp::socket socket);  // Async accept handler
 
     void on_node_disconnected(const std::shared_ptr<Node>& node);              // Handles disconnects from nodes
     void on_node_data(DataDirectionMode direction, size_t bytes_transferred);  // Handles data from nodes
@@ -71,9 +72,13 @@ class NodeHub : public Stoppable {
     boost::asio::steady_timer service_timer_;         // Service scheduler for this instance
     const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_
 
-    /* We use unique_ptr for SSL_CTX as connections / nodes are not meant to outlive NodeHub */
-    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_server_context_{nullptr, SSLCTXDeleter()};  // For dial-in connections
-    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_client_context_{nullptr, SSLCTXDeleter()};  // For dial-out connections
+    std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure connections
+    std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure connections
+
+    //    /* We use unique_ptr for SSL_CTX as connections / nodes are not meant to outlive NodeHub */
+    //    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_server_context_{nullptr, SSLCTXDeleter()};  // For dial-in
+    //    connections std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_client_context_{nullptr, SSLCTXDeleter()};  // For
+    //    dial-out connections
 
     std::atomic_uint32_t current_active_connections_{0};
     std::atomic_uint32_t current_active_inbound_connections_{0};

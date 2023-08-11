@@ -311,12 +311,11 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
 
     SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
     SSL_CTX_set_min_proto_version(ctx, TLS1_3_VERSION);
-    SSL_CTX_set_max_proto_version(ctx, TLS1_3_VERSION);
-    SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
     SSL_CTX_set_options(ctx, SSL_OP_NO_RENEGOTIATION);
-    SSL_CTX_set_ecdh_auto(ctx, 1);
 
     if (type == TLSContextType::kServer) {
+
+        SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
         auto x509_cert{load_x509_certificate(directory_path)};
         auto rsa_pkey{load_rsa_private_key(directory_path, key_password)};
 

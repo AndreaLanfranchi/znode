@@ -62,11 +62,9 @@ Error NetworkAddress::serialization(SDataStream& stream, Action action) {
     using enum Error;
     Error ret{kSuccess};
 
-    if (!ret && stream.get_version() >= 31402) ret = stream.bind(time, action);
+    if (!ret) ret = stream.bind(time, action);
     if (!ret) ret = stream.bind(services, action);
-    // These two guys are big endian
-    // address is already BE by boost
-    // for port we need to swap bytes
+    // These two guys are big endian address is already BE by boost for port we need to swap bytes
     if (!ret) ret = stream.bind(address, action);
     port = _byteswap_ushort(port);
     if (!ret) ret = stream.bind(port, action);
@@ -77,4 +75,17 @@ Error NetworkAddress::serialization(SDataStream& stream, Action action) {
 
 boost::asio::ip::tcp::endpoint NetworkAddress::to_endpoint() const { return {address, port}; }
 
+Error VersionNetworkAddress::serialization(SDataStream& stream, Action action) {
+    using enum Error;
+    Error ret{kSuccess};
+
+    if (!ret) ret = stream.bind(services, action);
+    // These two guys are big endian address is already BE by boost for port we need to swap bytes
+    if (!ret) ret = stream.bind(address, action);
+    port = _byteswap_ushort(port);
+    if (!ret) ret = stream.bind(port, action);
+    port = _byteswap_ushort(port);
+
+    return ret;
+}
 }  // namespace zenpp

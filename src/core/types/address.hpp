@@ -45,4 +45,13 @@ class NetworkAddress : public serialization::Serializable {
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 
+//! \brief VersionNetworkAddress is a NetworkAddress which is used in the Version message
+//! and it is (de)serialized without the time field.
+class VersionNetworkAddress : public NetworkAddress {
+  public:
+    using NetworkAddress::NetworkAddress;
+  private:
+    friend class serialization::SDataStream;
+    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+};
 }  // namespace zenpp

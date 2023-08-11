@@ -116,7 +116,7 @@ TEST_CASE("NetMessage", "[abi]") {
         CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
         CHECK(magic_enum::enum_name(header.validate()) == "kSuccess");
         CHECK(magic_enum::enum_name(header.get_type()) == "kVersion");
-        CHECK(header.length == 128);
+        CHECK(header.payload_length == 128);
         payload.clear();
         header.reset();
 
@@ -142,7 +142,7 @@ TEST_CASE("NetMessage", "[abi]") {
         CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
         CHECK(magic_enum::enum_name(header.validate()) == "kSuccess");
         CHECK(magic_enum::enum_name(header.get_type()) == "kVerack");
-        CHECK(header.length == 0);
+        CHECK(header.payload_length == 0);
         payload.clear();
         header.reset();
 
@@ -155,7 +155,7 @@ TEST_CASE("NetMessage", "[abi]") {
         CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
         CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderOversizedPayload");
         CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderOversizedPayload");
-        CHECK(header.length == 1_KiB + 1);
+        CHECK(header.payload_length == 1_KiB + 1);
         CHECK(magic_enum::enum_name(header.get_type()) == "kVersion");
         payload.clear();
         header.reset();
@@ -198,7 +198,7 @@ TEST_CASE("NetMessage", "[abi]") {
         CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
         CHECK(magic_enum::enum_name(header.validate()) == "kSuccess");
         CHECK(magic_enum::enum_name(header.get_type()) == "kInv");
-        CHECK(header.length == 37);
+        CHECK(header.payload_length == 37);
 
         // Put in only the size of the vector but nothing else - message validation MUST fail
         uint64_t num_elements{1};
@@ -228,7 +228,7 @@ TEST_CASE("NetMessage", "[abi]") {
         crypto::Hash256 hasher(*digest_input);
         auto final_digest{hasher.finalize()};
 
-        memcpy(header.checksum.data(), final_digest.data(), header.checksum.size());
+        memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
         REQUIRE(magic_enum::enum_name(net_message.validate()) == "kSuccess");
 
         // Test maximum number of vector elements with unique items
@@ -242,14 +242,14 @@ TEST_CASE("NetMessage", "[abi]") {
 
         // Let's move back to begin of body and compute checksum
         payload.seekg(kMessageHeaderLength);
-        header.length = static_cast<uint32_t>(payload.avail());
+        header.payload_length = static_cast<uint32_t>(payload.avail());
         digest_input = payload.read();
         REQUIRE(digest_input);
         REQUIRE(digest_input->size() == ser_compact_sizeof(num_elements) + (kInvItemSize * kMaxInvItems));
         hasher.init(*digest_input);
         final_digest = hasher.finalize();
 
-        memcpy(header.checksum.data(), final_digest.data(), header.checksum.size());
+        memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
         REQUIRE(magic_enum::enum_name(net_message.validate()) == "kSuccess");
 
         // Test maximum number of vector elements with duplicate items
@@ -263,7 +263,7 @@ TEST_CASE("NetMessage", "[abi]") {
 
         // Lets move back to begin of body and compute checksum
         payload.seekg(kMessageHeaderLength);
-        header.length = static_cast<uint32_t>(payload.avail());
+        header.payload_length = static_cast<uint32_t>(payload.avail());
         digest_input = payload.read();
         REQUIRE(digest_input);
         REQUIRE(digest_input->size() ==
@@ -271,7 +271,7 @@ TEST_CASE("NetMessage", "[abi]") {
         hasher.init(*digest_input);
         final_digest = hasher.finalize();
 
-        memcpy(header.checksum.data(), final_digest.data(), header.checksum.size());
+        memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
         REQUIRE(magic_enum::enum_name(net_message.validate()) == "kMessagePayloadDuplicateVectorItems");
     }
 }

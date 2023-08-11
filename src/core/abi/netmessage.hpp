@@ -31,6 +31,9 @@ enum class NetMessageType : uint32_t {
     kVerack,            // Reply by dial-in nodes to version message
     kInv,               // Inventory message to advertise the knowledge of hashes of blocks or transactions
     kAddr,              // Address message to advertise the knowledge of addresses of other nodes
+    kPing,              // Ping message to measure the latency of a connection
+    kPong,              // Pong message to reply to a ping message
+    kGetheaders,        // Getheaders message to request/send a list of block headers
     kMissingOrUnknown,  // This must be the last entry
 };
 
@@ -86,6 +89,36 @@ inline constexpr MessageDefinition kMessageAddr{
     size_t{serialization::ser_compact_sizeof(kMaxAddrItems) + (kMaxAddrItems * kAddrItemSize)},  //
 };
 
+inline constexpr MessageDefinition kMessagePing{
+    "ping",                 //
+    NetMessageType::kPing,  //
+    false,
+    size_t{0},
+    size_t{0},
+    size_t{sizeof(uint64_t)},  //
+    size_t{sizeof(uint64_t)},  //
+};
+
+inline constexpr MessageDefinition kMessagePong{
+    "pong",                 //
+    NetMessageType::kPong,  //
+    false,
+    size_t{0},
+    size_t{0},
+    size_t{sizeof(uint64_t)},  //
+    size_t{sizeof(uint64_t)},  //
+};
+
+inline constexpr MessageDefinition kMessageGetheaders{
+    "getheaders",                 //
+    NetMessageType::kGetheaders,  //
+    false,
+    std::nullopt,
+    std::nullopt,
+    std::nullopt,  //
+    std::nullopt,  //
+};
+
 inline constexpr MessageDefinition kMessageMissingOrUnknown{
     nullptr,                            //
     NetMessageType::kMissingOrUnknown,  //
@@ -98,12 +131,15 @@ inline constexpr MessageDefinition kMessageMissingOrUnknown{
 
 //! \brief List of all supported messages
 //! \attention This must be kept in same order as the MessageCommand enum
-inline constexpr std::array<MessageDefinition, 5> kMessageDefinitions{
+inline constexpr std::array<MessageDefinition, 8> kMessageDefinitions{
     kMessageVersion,           // 0
     kMessageVerack,            // 1
     kMessageInv,               // 2
     kMessageAddr,              // 3
-    kMessageMissingOrUnknown,  // 4
+    kMessagePing,              // 4
+    kMessagePong,              // 5
+    kMessageGetheaders,        // 6
+    kMessageMissingOrUnknown,  // 7
 };
 
 static_assert(kMessageDefinitions.size() == static_cast<size_t>(NetMessageType::kMissingOrUnknown) + 1,
@@ -113,10 +149,10 @@ class NetMessageHeader : public serialization::Serializable {
   public:
     NetMessageHeader() : Serializable(){};
 
-    std::array<uint8_t, 4> magic{};     // Message magic (origin network)
-    std::array<uint8_t, 12> command{};  // ASCII string identifying the packet content, NULL padded
-    uint32_t length{0};                 // Length of payload in bytes
-    std::array<uint8_t, 4> checksum{};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
+    std::array<uint8_t, 4> network_magic{};     // Message magic (origin network)
+    std::array<uint8_t, 12> command{};          // ASCII string identifying the packet content, NULL padded
+    uint32_t payload_length{0};                 // Length of payload in bytes
+    std::array<uint8_t, 4> payload_checksum{};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
 
     //! \brief Returns the message definition
     [[nodiscard]] const MessageDefinition& get_definition() const noexcept {
@@ -148,14 +184,15 @@ class NetMessageHeader : public serialization::Serializable {
 class NetMessage {
   public:
     //! \brief Construct a blank NetMessage
-    NetMessage() : data_{serialization::Scope::kNetwork, 0} {};
+    NetMessage() : ser_stream_{serialization::Scope::kNetwork, 0} {};
 
     //! \brief Construct a blank NetMessage with a specific version
-    explicit NetMessage(int version) : data_{serialization::Scope::kNetwork, version} {};
+    explicit NetMessage(int version) : ser_stream_{serialization::Scope::kNetwork, version} {};
 
     //! \brief Construct a NetMessage with network magic provided
-    explicit NetMessage(int version, std::array<uint8_t, 4>& magic) : data_{serialization::Scope::kNetwork, version} {
-        header_.magic = magic;
+    explicit NetMessage(int version, std::array<uint8_t, 4>& magic)
+        : ser_stream_{serialization::Scope::kNetwork, version} {
+        header_.network_magic = magic;
     };
 
     // Not movable nor copyable
@@ -164,10 +201,10 @@ class NetMessage {
     NetMessage& operator=(const NetMessage&) = delete;
     ~NetMessage() = default;
 
-    [[nodiscard]] size_t size() const noexcept { return data_.size(); }
+    [[nodiscard]] size_t size() const noexcept { return ser_stream_.size(); }
     [[nodiscard]] NetMessageType get_type() const noexcept { return header_.get_type(); }
     [[nodiscard]] NetMessageHeader& header() noexcept { return header_; }
-    [[nodiscard]] serialization::SDataStream& data() noexcept { return data_; }
+    [[nodiscard]] serialization::SDataStream& data() noexcept { return ser_stream_; }
     [[nodiscard]] serialization::Error parse(ByteView& input_data) noexcept;
 
     //! \brief Sets the message version (generally inherited from the protocol version)
@@ -187,10 +224,9 @@ class NetMessage {
     serialization::Error push(NetMessageType message_type, serialization::Serializable& payload,
                               std::array<uint8_t, 4>& magic) noexcept;
 
-
   private:
-    NetMessageHeader header_{};        // Where the message header is deserialized
-    serialization::SDataStream data_;  // Contains all the message raw data
+    NetMessageHeader header_{};              // Where the message header is deserialized
+    serialization::SDataStream ser_stream_;  // Contains all the message raw data
 
     [[nodiscard]] serialization::Error validate_checksum() noexcept;
 };

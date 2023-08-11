@@ -24,4 +24,8 @@ Error Version::serialization(SDataStream& stream, Action action) {
     if (!ret) ret = stream.bind(relay, action);
     return ret;
 }
+
+Error PingPong::serialization(serialization::SDataStream& stream, serialization::Action action) {
+    return stream.bind(nonce, action);
+}
 }  // namespace zenpp::abi

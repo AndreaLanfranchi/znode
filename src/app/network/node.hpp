@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <boost/asio.hpp>
+#include <boost/asio/ssl.hpp>
 #include <magic_enum.hpp>
 #include <openssl/ssl.h>
 
@@ -47,10 +48,14 @@ enum class DataDirectionMode {
 //! \brief Maximum number of messages to parse in a single read operation
 static constexpr size_t kMaxMessagesPerRead = 32;
 
+//! \brief Maximum number of bytes to read/write in a single operation
+static constexpr size_t kMaxBytesPerIO = 64_KiB;
+
 class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
     Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost::asio::io_context& io_context,
-         SSL_CTX* ssl_context, std::function<void(std::shared_ptr<Node>)> on_disconnect,
+         boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
+         std::function<void(std::shared_ptr<Node>)> on_disconnect,
          std::function<void(DataDirectionMode, size_t)> on_data);
 
     Node(Node& other) = delete;
@@ -87,7 +92,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] boost::asio::ip::tcp::socket& socket() noexcept { return socket_; }
 
     //! \brief Returns whether the connection is secure
-    [[nodiscard]] bool is_secure() const noexcept { return ssl_ != nullptr; }
+    [[nodiscard]] bool is_secure() const noexcept { return ssl_context_ != nullptr; }
 
     //! \brief Returns whether the node is currently connected
     [[nodiscard]] bool is_connected() const noexcept { return !is_stopping() && is_connected_.load(); }
@@ -122,8 +127,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
   private:
     void start_ssl_handshake();
+    void handle_ssl_handshake(const boost::system::error_code& ec);
 
-    //! \brief Begin reading from the socket asychronously
+    void begin_inbound_message();
+    void end_inbound_message();
+
     void start_read();
     void handle_read(const boost::system::error_code& ec, size_t bytes_transferred);
     serialization::Error parse_messages(
@@ -131,28 +139,27 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
     //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
-    [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(abi::NetMessageType message_type);
+    [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
+                                                                               abi::NetMessageType message_type);
 
-    void start_write();        // Begin writing to the socket asynchronously
-    void start_write_ssl();    // Begins async writes to the SSL context by openssl
-    void start_write_plain();  // Begins async writes to the socket by boost asio
-    void handle_write_plain(const boost::system::error_code& ec, size_t bytes_transferred);  // Async write handler
+    void start_write();  // Begin writing to the socket asynchronously
+    void handle_write(const boost::system::error_code& ec, size_t bytes_transferred);  // Async write handler
 
-    AppSettings& app_settings_;                 // Reference to global application settings
-    static std::atomic_int next_node_id_;       // Used to generate unique node ids
-    const int node_id_{next_node_id()};         // Unique node id
-    const NodeConnectionMode connection_mode_;  // Whether inbound or outbound
+    AppSettings& app_settings_;                  // Reference to global application settings
+    static std::atomic_int next_node_id_;        // Used to generate unique node ids
+    const int node_id_{next_node_id()};          // Unique node id
+    const NodeConnectionMode connection_mode_;   // Whether inbound or outbound
     boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
-    boost::asio::ip::tcp::socket socket_;       // The underlying socket (either plain or SSL)
+    boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
     boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> remote_endpoint_;  // Remote endpoint
     boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> local_endpoint_;   // Local endpoint
 
-    SSL_CTX* ssl_context_;
-    SSL* ssl_{nullptr};
+    boost::asio::ssl::context* ssl_context_;
+    std::unique_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> ssl_stream_;  // SSL stream
 
     std::atomic<ProtocolHandShakeStatus> protocol_handshake_status_{
         ProtocolHandShakeStatus::kNotInitiated};                         // Status of protocol handshake
-    std::atomic_int version_{0};                                         // Protocol version negotiated during handshake
+    std::atomic_int version_{kDefaultProtocolVersion};                   // Protocol version negotiated during handshake
     std::atomic_bool is_started_{false};                                 // Guards against multiple calls to start()
     std::atomic_bool is_connected_{true};                                // Status of socket connection
     std::atomic<std::chrono::steady_clock::time_point> connected_time_;  // Time of connection
