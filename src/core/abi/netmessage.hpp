@@ -167,9 +167,7 @@ class NetMessageHeader : public serialization::Serializable {
     std::array<uint8_t, 4> payload_checksum{};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
 
     //! \brief Returns the message definition
-    [[nodiscard]] const MessageDefinition& get_definition() const noexcept {
-        return kMessageDefinitions[static_cast<int>(message_type_)];
-    }
+    [[nodiscard]] const MessageDefinition& get_definition() const noexcept;
 
     //! \brief Returns the decoded message type
     [[nodiscard]] NetMessageType get_type() const noexcept { return get_definition().message_type; }

@@ -23,6 +23,7 @@ void NetMessageHeader::reset() noexcept {
     message_type_ = NetMessageType::kMissingOrUnknown;
 }
 
+
 bool NetMessageHeader::pristine() const noexcept {
     return std::all_of(network_magic.begin(), network_magic.end(), [](const auto b) { return b == 0; }) &&
            std::all_of(command.begin(), command.end(), [](const auto b) { return b == 0; }) &&
@@ -99,6 +100,10 @@ serialization::Error NetMessageHeader::validate() noexcept {
     }
 
     return kSuccess;
+}
+
+const MessageDefinition& NetMessageHeader::get_definition() const noexcept {
+    return kMessageDefinitions[static_cast<decltype(kMessageDefinitions)::size_type>(message_type_)];
 }
 
 serialization::Error NetMessage::validate() noexcept {

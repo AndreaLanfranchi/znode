@@ -66,9 +66,9 @@ Error NetworkAddress::serialization(SDataStream& stream, Action action) {
     if (!ret) ret = stream.bind(services, action);
     // These two guys are big endian address is already BE by boost for port we need to swap bytes
     if (!ret) ret = stream.bind(address, action);
-    port = _byteswap_ushort(port);
+    port = bswap_16(port);
     if (!ret) ret = stream.bind(port, action);
-    port = _byteswap_ushort(port);
+    port = bswap_16(port);
 
     return ret;
 }
