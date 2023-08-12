@@ -87,8 +87,10 @@ class NodeHub : public Stoppable {
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};
 
-    std::map<int, std::shared_ptr<Node>> nodes_;  // All the connected nodes
-    mutable std::mutex nodes_mutex_;              // Guards access to nodes_
+    std::map<int, std::shared_ptr<Node>> nodes_;                        // All the connected nodes
+    std::map<boost::asio::ip::address, uint32_t> connected_addresses_;  // Addresses that are connected
+    mutable std::mutex nodes_mutex_;                                    // Guards access to nodes_
+
 
     size_t total_connections_{0};
     size_t total_disconnections_{0};

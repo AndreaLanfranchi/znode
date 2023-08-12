@@ -55,6 +55,12 @@ NetworkAddress::NetworkAddress(const std::string& address_string, uint16_t port_
     port = port_num;
 }
 
+NetworkAddress::NetworkAddress(const boost::asio::ip::address addr, uint16_t port_num) {
+    boost::system::error_code ec;
+    address = addr;
+    port = port_num;
+}
+
 NetworkAddress::NetworkAddress(boost::asio::ip::tcp::endpoint& endpoint)
     : address(endpoint.address()), port(endpoint.port()) {}
 

@@ -98,6 +98,12 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Returns whether the node is currently connected
     [[nodiscard]] bool is_connected() const noexcept { return !is_stopping() && is_connected_.load(); }
 
+    //! \brief Returns the remote endpoint
+    [[nodiscard]] boost::asio::ip::tcp::endpoint remote_endpoint() const noexcept { return remote_endpoint_; }
+
+    //! \brief Returns the local endpoint
+    [[nodiscard]] boost::asio::ip::tcp::endpoint local_endpoint() const noexcept { return local_endpoint_; }
+
     //! \brief The actual status of the protocol handshake
     [[nodiscard]] ProtocolHandShakeStatus get_protocol_handshake_status() const noexcept {
         return protocol_handshake_status_.load();

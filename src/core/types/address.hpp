@@ -30,6 +30,7 @@ class NetworkAddress : public serialization::Serializable {
   public:
     NetworkAddress();
     NetworkAddress(const std::string& address_string, uint16_t port_num);
+    NetworkAddress(const boost::asio::ip::address, uint16_t port_num);
     explicit NetworkAddress(std::string endpoint_string);
     explicit NetworkAddress(boost::asio::ip::tcp::endpoint& endpoint);
 
@@ -50,6 +51,7 @@ class NetworkAddress : public serialization::Serializable {
 class VersionNetworkAddress : public NetworkAddress {
   public:
     using NetworkAddress::NetworkAddress;
+
   private:
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;

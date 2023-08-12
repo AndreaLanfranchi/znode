@@ -68,11 +68,8 @@ void NodeHub::start_connecting() {
             if (!result.endpoint().address().is_v4()) {
                 continue;
             }
-            NetworkAddress address;
-            address.address = result.endpoint().address();
-            address.port = 9033;  // TODO get from chain params
+            NetworkAddress address{result.endpoint().address(), 9033};
             std::ignore = connect(address);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
 }
@@ -167,7 +164,16 @@ bool NodeHub::connect(const NetworkAddress& address) {
     if (current_active_connections_ >= app_settings_.network.max_active_connections) {
         log::Error("Service", {"name", "Node Hub", "action", "connect", "error", "max active connections reached"});
         return false;
-    }
+    } else {
+        std::scoped_lock lock{nodes_mutex_};
+        if (auto item = connected_addresses_.find(address.address); item != connected_addresses_.end()) {
+            if (item->second >= app_settings_.network.max_active_connections_per_ip) {
+                log::Error("Service",
+                           {"name", "Node Hub", "action", "connect", "error", "max active connections per ip reached"});
+                return false;
+            }
+        }
+    };
 
     // Create the socket and try connect
     boost::asio::ip::tcp::socket socket{asio_context_};
@@ -243,6 +249,18 @@ void NodeHub::handle_accept(const boost::system::error_code& ec, boost::asio::ip
         return;
     }
 
+    // Check we do not exceed the maximum number of connections per IP
+    if (auto item = connected_addresses_.find(socket.remote_endpoint().address()); item != connected_addresses_.end()) {
+        if (item->second >= app_settings_.network.max_active_connections_per_ip) {
+            ++total_rejected_connections_;
+            log::Warning("Service",
+                         {"name", "Node Hub", "action", "accept", "error", "max active connections per ip reached"});
+            close_socket(socket);
+            start_accept();
+            return;
+        }
+    }
+
     set_common_socket_options(socket);
     std::string remote{network::to_string(socket.remote_endpoint())};
     std::string local{network::to_string(socket.local_endpoint())};
@@ -262,6 +280,7 @@ void NodeHub::handle_accept(const boost::system::error_code& ec, boost::asio::ip
     {
         std::scoped_lock lock(nodes_mutex_);
         nodes_.emplace(new_node->id(), new_node);
+        connected_addresses_[new_node->remote_endpoint().address()]++;
     }
 
     new_node->start();
@@ -293,6 +312,13 @@ void NodeHub::initialize_acceptor() {
 
 void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
     std::scoped_lock lock(nodes_mutex_);
+
+    if (auto item{connected_addresses_.find(node->remote_endpoint().address())}; item != connected_addresses_.end()) {
+        if (--item->second == 0) {
+            connected_addresses_.erase(item);
+        }
+    }
+
     if (nodes_.contains(node->id())) {
         nodes_.erase(node->id());
         ++total_disconnections_;
@@ -306,7 +332,12 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
             case kManualOutbound:
                 if (current_active_outbound_connections_) --current_active_outbound_connections_;
                 break;
+            default:
+                ASSERT(false);  // Should never happen
         }
+    }
+
+    if (app_settings_.log.log_verbosity == log::Level::kTrace) {
         log::Trace("Service", {"name", "Node Hub", "total connections", std::to_string(total_connections_),
                                "total disconnections", std::to_string(total_disconnections_),
                                "total rejected connections", std::to_string(total_rejected_connections_)});

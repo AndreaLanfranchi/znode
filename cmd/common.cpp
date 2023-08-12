@@ -84,7 +84,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
     network_opts.add_option("--network.localendpoint", network_settings.local_endpoint, "Local node listening address")
         ->capture_default_str()
         ->check(IPEndPointValidator(/*allow_empty=*/true,
-                                    /*default_port=*/13383));  // TODO the port will be on behalf of network
+                                    /*default_port=*/9033));  // TODO the port will be on behalf of network
 
     auto notls_flag = network_opts.add_flag("--network.notls", "Disable TLS secure communications");
 
@@ -97,6 +97,12 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
                     "Maximum number of actively connected nodes")
         ->capture_default_str()
         ->check(CLI::Range(size_t(32), size_t(256)));
+
+    network_opts
+        .add_option("--network.maxconnectionsperip", network_settings.max_active_connections_per_ip,
+                    "Maximum number of connections allowed from a single IP address")
+        ->capture_default_str()
+        ->check(CLI::Range(size_t(1), size_t(256)));
 
     network_opts
         .add_option("--network.idletimeout", network_settings.idle_timeout_seconds,
