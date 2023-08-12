@@ -44,7 +44,37 @@ bool NodeHub::start() {
     info_stopwatch_.start(true);
     start_service_timer();
     start_accept();
+    asio::post(asio_strand_, [this]() { start_connecting(); });
     return true;
+}
+
+void NodeHub::start_connecting() {
+    // TODO: Get them from chain configuration parameters
+    const std::vector<std::string> seeds{"dnsseed.horizen.global", "dnsseed.zensystem.io", "mainnet.horizen.global",
+                                         "mainnet.zensystem.io", "node1.zenchain.info"};
+
+    boost::asio::ip::tcp::resolver resolver{asio_context_};
+    for (const auto& host : seeds) {
+        if (is_stopping()) return;
+        // Syncronous resolve
+        boost::system::error_code ec;
+        const auto results{resolver.resolve(host, "", ec)};
+        if (ec) {
+            log::Error("NodeHub", {"action", "start_connecting", "error", ec.message()});
+            continue;
+        }
+        for (const auto& result : results) {
+            if (is_stopping()) return;
+            if (!result.endpoint().address().is_v4()) {
+                continue;
+            }
+            NetworkAddress address;
+            address.address = result.endpoint().address();
+            address.port = 9033;  // TODO get from chain params
+            std::ignore = connect(address);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
 }
 
 void NodeHub::start_service_timer() {
@@ -78,8 +108,7 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& ec) {
 }
 
 void NodeHub::print_info() {
-    // In the unlucky case this fires with subsecond duration (i.e. returns 0), we'll just skip this lap
-    // to avoid division by zero
+    // Let each cycle to last at least 5 seconds to have meaningful data and, of course, to avoid division by zero
     const auto info_lap_duration{
         static_cast<uint32_t>(duration_cast<std::chrono::seconds>(info_stopwatch_.since_start()).count())};
     if (info_lap_duration < 5) {
@@ -131,6 +160,10 @@ bool NodeHub::stop(bool wait) noexcept {
 
 bool NodeHub::connect(const NetworkAddress& address) {
     if (is_stopping()) return false;
+
+    const std::string remote{network::to_string(address.to_endpoint())};
+
+    log::Info("Service", {"name", "Node Hub", "action", "connect", "remote", remote});
     if (current_active_connections_ >= app_settings_.network.max_active_connections) {
         log::Error("Service", {"name", "Node Hub", "action", "connect", "error", "max active connections reached"});
         return false;
@@ -142,8 +175,7 @@ bool NodeHub::connect(const NetworkAddress& address) {
         socket.connect(address.to_endpoint());
         set_common_socket_options(socket);
     } catch (const boost::system::system_error& ex) {
-        log::Error("Service", {"name", "Node Hub", "action", "connect", "remote",
-                               network::to_string(address.to_endpoint()), "error", ex.what()});
+        log::Error("Service", {"name", "Node Hub", "action", "connect", "remote", remote, "error", ex.what()});
         return false;
     }
 
@@ -187,7 +219,7 @@ void NodeHub::handle_accept(const boost::system::error_code& ec, boost::asio::ip
     }};
 
     if (ec) {
-        log::Error("Service", {"name", "Node Hub", "action", "handle_accept", "error", ec.message()});
+        log::Error("Service", {"name", "Node Hub", "action", "accept", "error", ec.message()});
         close_socket(socket);
         start_accept();
         return;
@@ -195,7 +227,7 @@ void NodeHub::handle_accept(const boost::system::error_code& ec, boost::asio::ip
 
     socket.non_blocking(true, local_ec);
     if (local_ec) {
-        log::Error("Service", {"name", "Node Hub", "action", "handle_accept", "error", local_ec.message()});
+        log::Error("Service", {"name", "Node Hub", "action", "handle", "error", local_ec.message()});
         close_socket(socket);
         start_accept();
         return;
@@ -205,8 +237,7 @@ void NodeHub::handle_accept(const boost::system::error_code& ec, boost::asio::ip
     // Check we do not exceed the maximum number of connections
     if (current_active_connections_ >= app_settings_.network.max_active_connections) {
         ++total_rejected_connections_;
-        log::Warning("Service",
-                     {"name", "Node Hub", "action", "handle_accept", "error", "max active connections reached"});
+        log::Warning("Service", {"name", "Node Hub", "action", "accept", "error", "max active connections reached"});
         close_socket(socket);
         start_accept();
         return;
@@ -223,8 +254,8 @@ void NodeHub::handle_accept(const boost::system::error_code& ec, boost::asio::ip
                 on_node_data(direction, bytes_transferred);
             }),
         Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
-    log::Trace("Service", {"name", "Node Hub", "status", "handle_accept", "node", std::to_string(new_node->id()),
-                           "local", local, "remote", remote});
+    log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local, "remote", remote, "id",
+                          std::to_string(new_node->id())});
 
     ++current_active_connections_;
     ++current_active_inbound_connections_;
@@ -257,8 +288,7 @@ void NodeHub::initialize_acceptor() {
     socket_acceptor_.listen();
 
     log::Info("Service", {"name", "Node Hub", "secure", (app_settings_.network.use_tls ? "yes" : "no"), "listening on",
-                          to_string(local_endpoint)})
-        << OPENSSL_VERSION_TEXT;
+                          to_string(local_endpoint)});
 }
 
 void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
@@ -315,7 +345,7 @@ size_t NodeHub::size() const {
 std::vector<std::shared_ptr<Node>> NodeHub::get_nodes() const {
     std::scoped_lock lock(nodes_mutex_);
     std::vector<std::shared_ptr<Node>> nodes;
-    for (const auto [id, node] : nodes_) {
+    for (const auto& [id, node] : nodes_) {
         nodes.emplace_back(node);
     }
     return nodes;

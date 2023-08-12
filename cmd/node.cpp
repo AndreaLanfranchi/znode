@@ -161,11 +161,10 @@ int main(int argc, char* argv[]) {
         node_hub.start();
 
         // Connect nodes if required
-        if(!settings.network.connect_nodes.empty()) {
-            for(auto const& node_address: settings.network.connect_nodes) {
-                log::Info("Connecting to peer", {"address", node_address}) << " ...";
+        if (!settings.network.connect_nodes.empty()) {
+            for (auto const& node_address : settings.network.connect_nodes) {
                 const NetworkAddress address{node_address};
-                if(!node_hub.connect(address)) break;
+                if (!node_hub.connect(address)) break;
             }
         }
 
@@ -174,13 +173,27 @@ int main(int argc, char* argv[]) {
 
         // Keep waiting till sync_loop stops
         // Signals are handled in sync_loop and below
-        auto t1{std::chrono::steady_clock::now()};
+        auto t1{start_time};
         const auto chaindata_dir{(*settings.data_directory)[DataDirectory::kChainDataName]};
         const auto etltmp_dir{(*settings.data_directory)[DataDirectory::kEtlTmpName]};
+        const auto nodes_dir{(*settings.data_directory)[DataDirectory::kNodesName]};
+
+        // Count how much time the node hub has been without any connection
+        // If it's too long, we'll stop the node
+        StopWatch node_hub_idle_sw(true);
 
         // TODO while (sync_loop.get_state() != Worker::State::kStopped) {
         while (true) {
             std::this_thread::sleep_for(500ms);
+            if (node_hub.active_connections_count() == 0) {
+                if (node_hub_idle_sw.since_start() > 5min /* TODO settings.node_hub_idle_timeout*/) {
+                    log::Warning("Service", {"name", "node_hub", "status", "idle", "elapsed", "5min"})
+                        << "Shutting down ...";
+                    break;
+                }
+            } else {
+                node_hub_idle_sw.start(true);  // Restart the timer
+            }
 
             // Check signals
             if (Ossignals::signalled()) {
@@ -198,6 +211,7 @@ int main(int argc, char* argv[]) {
                 const auto vmem_usage{get_memory_usage(false)};
                 const auto chaindata_usage{chaindata_dir.size(true)};
                 const auto etltmp_usage{etltmp_dir.size(true)};
+                const auto nodes_usage{nodes_dir.size(true)};
 
                 log::Info("Resource usage", {
                                                 "mem",
@@ -208,6 +222,8 @@ int main(int argc, char* argv[]) {
                                                 to_human_bytes(chaindata_usage, true),
                                                 std::string(DataDirectory::kEtlTmpName),
                                                 to_human_bytes(etltmp_usage, true),
+                                                std::string(DataDirectory::kNodesName),
+                                                to_human_bytes(nodes_usage, true),
                                                 "uptime",
                                                 StopWatch::format(total_duration),
                                             });

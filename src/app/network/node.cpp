@@ -14,7 +14,6 @@
 
 #include <app/common/log.hpp>
 #include <app/network/node.hpp>
-#include <app/network/secure.hpp>
 #include <app/serialization/exceptions.hpp>
 
 namespace zenpp::network {
@@ -41,9 +40,11 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     local_version_.timestamp = time::unix_now();
     local_version_.addr_recv.address = socket_.remote_endpoint().address();
     local_version_.addr_recv.port = socket_.remote_endpoint().port();
-    local_version_.nonce = 0;  // TODO
+    local_version_.addr_from.address = socket_.local_endpoint().address();
+    local_version_.addr_from.port = 9033;  // TODO Set this value to the current listening port
+    local_version_.nonce = randomize<decltype(local_version_.nonce)>();
     local_version_.user_agent = get_buildinfo_string();
-    local_version_.start_height = 0;  // TODO
+    local_version_.start_height = 0;  // TODO Set this value to the current blockchain height
     local_version_.relay = true;      // TODO
 }
 
@@ -106,34 +107,26 @@ void Node::start_ssl_handshake() {
 
 void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
     if (ec) {
-        log::Warning("P2P node", {"id", std::to_string(node_id_), "peer", network::to_string(remote_endpoint_),
-                                  "action", "SSL handshake", "error", ec.message()})
-            << "Disconnecting ...";
+        const std::list<std::string> log_params{"action", "SSL handshake", "status", "failure", "reason", ec.message()};
+        print_log(log::Level::kError, log_params, "Disconnecting ...");
         stop(true);
         return;
     }
-    log::Trace("P2P node", {"id", std::to_string(node_id_), "peer", network::to_string(remote_endpoint_), "action",
-                            "SSL handshake", "status", "success"});
-
+    const std::list<std::string> log_params{"action", "SSL handshake", "status", "success"};
+    print_log(log::Level::kInfo, log_params);
     start_read();
     push_message(abi::NetMessageType::kVersion, local_version_);
 }
 
 void Node::start_read() {
     if (is_stopping()) return;
+    auto read_handler{[self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
+        self->handle_read(ec, bytes_transferred);
+    }};
     if (ssl_stream_) {
-        ssl_stream_->async_read_some(
-            receive_buffer_.prepare(kMaxBytesPerIO),
-            [self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
-                self->handle_read(ec, bytes_transferred);
-            });
+        ssl_stream_->async_read_some(receive_buffer_.prepare(kMaxBytesPerIO), read_handler);
     } else {
-        // Plain unencrypted connection
-        socket_.async_read_some(
-            receive_buffer_.prepare(kMaxBytesPerIO),
-            [self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
-                self->handle_read(ec, bytes_transferred);
-            });
+        socket_.async_read_some(receive_buffer_.prepare(kMaxBytesPerIO), read_handler);
     }
 }
 
@@ -143,30 +136,27 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
     // is not relevant anymore.
     if (is_stopping()) return;
 
-    if (ec) {
-        log::Error("P2P node", {"id", std::to_string(node_id_), "peer", network::to_string(remote_endpoint_), "action",
-                                "handle_read", "code", ec.to_string(), "error", ec.message()})
-            << "Disconnecting ...";
+    if (ec) [[unlikely]] {
+        const std::list<std::string> log_params{"action", "handle_read", "status", "failure", "reason", ec.message()};
+        print_log(log::Level::kError, log_params, "Disconnecting ...");
         stop(true);
         return;
     }
 
-    if (bytes_transferred == 0) {
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
-        return;
-    }
+    if (bytes_transferred != 0) {
+        receive_buffer_.commit(bytes_transferred);
+        bytes_received_ += bytes_transferred;
+        on_data_(DataDirectionMode::kInbound, bytes_transferred);
 
-    bytes_received_ += bytes_transferred;  // This is the real traffic (including SSL overhead)
-    if (on_data_) on_data_(DataDirectionMode::kInbound, bytes_transferred);
-
-    const auto parse_result{parse_messages(bytes_transferred)};
-    if (serialization::is_fatal_error(parse_result)) {
-        log::Warning("Network message error",
-                     {"id", std::to_string(node_id_), "remote", network::to_string(remote_endpoint_), "error",
-                      std::string(magic_enum::enum_name(parse_result))})
-            << "Disconnecting peer ...";
-        stop(false);
-        return;
+        const auto parse_result{parse_messages(bytes_transferred)};
+        if (serialization::is_fatal_error(parse_result)) {
+            const std::list<std::string> log_params{"action", "handle_read",
+                                                    "status", "failure",
+                                                    "reason", std::string(magic_enum::enum_name(parse_result))};
+            print_log(log::Level::kError, log_params, "Disconnecting ...");
+            stop(false);
+            return;
+        }
     }
 
     // Continue reading from socket
@@ -201,22 +191,30 @@ void Node::start_write() {
     // If message has been just loaded into the barrel then we must check its validity
     // against protocol handshake rules
     if (outbound_message_->data().tellg() == 0) {
-        if (app_settings_.log.log_verbosity == log::Level::kTrace) [[unlikely]] {
-            log::Trace("Outbound message",
-                       {"peer", this->to_string(), "command",
-                        std::string(reinterpret_cast<const char*>(outbound_message_->header().command.data()))})
-                << "Data : " << outbound_message_->data().to_string();
+        if (app_settings_.log.log_verbosity == log::Level::kTrace) {
+            const std::list<std::string> log_params{
+                "action",    "message",
+                "direction", "out",
+                "message",   std::string(magic_enum::enum_name(outbound_message_->get_type())),
+                "size",      to_human_bytes(outbound_message_->data().size())};
+            print_log(log::Level::kTrace, log_params);
         }
+
         auto error{
             validate_message_for_protocol_handshake(DataDirectionMode::kOutbound, outbound_message_->get_type())};
-        if (error != serialization::Error::kSuccess) {
-            // TODO : Should we drop the connection here?
-            // Actually outgoing messages' correct sequence is local responsibility
-            // maybe we should either assert or push back the message into the queue
-            log::Warning("Network message error",
-                         {"id", std::to_string(node_id_), "remote", network::to_string(remote_endpoint_), "error",
-                          std::string(magic_enum::enum_name(error))})
-                << "Disconnecting peer but is local fault ...";
+        if (error != serialization::Error::kSuccess) [[unlikely]] {
+            if (app_settings_.log.log_verbosity >= log::Level::kError) {
+                // TODO : Should we drop the connection here?
+                // Actually outgoing messages' correct sequence is local responsibility
+                // maybe we should either assert or push back the message into the queue
+                const std::list<std::string> log_params{
+                    "action",    "message",
+                    "direction", "out",
+                    "message",   std::string(magic_enum::enum_name(outbound_message_->get_type())),
+                    "status",    "failure",
+                    "reason",    std::string(magic_enum::enum_name(error))};
+                print_log(log::Level::kError, log_params, "Disconnecting peer but is local fault ...");
+            }
             outbound_message_.reset();
             is_writing_.store(false);
             stop(false);
@@ -229,17 +227,14 @@ void Node::start_write() {
     const auto data{outbound_message_->data().read(bytes_to_write)};
     REQUIRES(data);
     send_buffer_.sputn(reinterpret_cast<const char*>(data->data()), static_cast<std::streamsize>(data->size()));
+
+    auto write_handler{[self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
+        self->handle_write(ec, bytes_transferred);
+    }};
     if (ssl_stream_) {
-        ssl_stream_->async_write_some(
-            send_buffer_.data(),
-            [self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
-                self->handle_write(ec, bytes_transferred);
-            });
+        ssl_stream_->async_write_some(send_buffer_.data(), write_handler);
     } else {
-        socket_.async_write_some(send_buffer_.data(), [self{shared_from_this()}](const boost::system::error_code& ec,
-                                                                                 const size_t bytes_transferred) {
-            self->handle_write(ec, bytes_transferred);
-        });
+        socket_.async_write_some(send_buffer_.data(), write_handler);
     }
 
     // We let handle_write to deal with re-entering the write cycle
@@ -252,9 +247,11 @@ void Node::handle_write(const boost::system::error_code& ec, size_t bytes_transf
     }
 
     if (ec) {
-        log::Error("Network error", {"connection", network::to_string(remote_endpoint_), "action", "handle_write",
-                                     "error", ec.message()})
-            << "Disconnecting ...";
+        if (app_settings_.log.log_verbosity >= log::Level::kError) {
+            const std::list<std::string> log_params{"action",  "handle_write", "status",
+                                                    "failure", "reason",       ec.message()};
+            print_log(log::Level::kError, log_params, "Disconnecting ...");
+        }
         stop(false);
         is_writing_.store(false);
         return;
@@ -268,18 +265,14 @@ void Node::handle_write(const boost::system::error_code& ec, size_t bytes_transf
 
     // If we have sent the whole message then we can start sending the next chunk
     if (send_buffer_.size()) {
+        auto write_handler{
+            [self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
+                self->handle_write(ec, bytes_transferred);
+            }};
         if (ssl_stream_) {
-            ssl_stream_->async_write_some(
-                send_buffer_.data(),
-                [self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
-                    self->handle_write(ec, bytes_transferred);
-                });
+            ssl_stream_->async_write_some(send_buffer_.data(), write_handler);
         } else {
-            socket_.async_write_some(
-                send_buffer_.data(),
-                [self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
-                    self->handle_write(ec, bytes_transferred);
-                });
+            socket_.async_write_some(send_buffer_.data(), write_handler);
         }
     } else {
         is_writing_.store(false);
@@ -294,9 +287,11 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type, 
     auto new_message = std::make_unique<abi::NetMessage>(version_);
     auto err{new_message->push(message_type, payload, app_settings_.network.magic_bytes)};
     if (!!err) {
-        log::Debug("Node::push_message",
-                   {"node_id", std::to_string(node_id_), "msg_type", std::string(magic_enum::enum_name(message_type)),
-                    "error", std::string(magic_enum::enum_name(err))});
+        if (app_settings_.log.log_verbosity >= log::Level::kError) {
+            const std::list<std::string> log_params{"action",  "push_message", "status",
+                                                    "failure", "reason",       std::string{magic_enum::enum_name(err)}};
+            print_log(log::Level::kError, log_params);
+        }
         return err;
     }
     std::unique_lock lock(outbound_messages_mutex_);
@@ -331,112 +326,98 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
     size_t messages_parsed{0};
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
     while (!data.empty()) {
-        // We begin to time measure an inbound message from the very first byte we receive
-        // This is to prevent a malicious peer from sending us a message in a SlowLoris mode
         if (!inbound_message_) begin_inbound_message();
-
-        err = inbound_message_->parse(data);  // Consumes data
+        err = inbound_message_->parse(data, app_settings_.network.magic_bytes);  // Consumes data
         if (err == kMessageHeaderIncomplete || is_fatal_error(err)) break;
 
-        if (!inbound_message_->header().pristine() /* has been deserialized */) {
-            if (const auto err_handshake =
-                    validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type());
-                err_handshake != kSuccess) {
-                err = err_handshake;
-                break;
-            }
-            //  Verify header's magic does match the network we're currently on
-            if (memcmp(inbound_message_->header().network_magic.data(), app_settings_.network.magic_bytes.data(),
-                       app_settings_.network.magic_bytes.size()) != 0) {
-                err = kMessageHeaderMagicMismatch;
-                break;
-            }
+        if (const auto err_handshake =
+                validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type());
+            err_handshake != kSuccess) {
+            err = err_handshake;
+            break;
         }
-        if (err == kMessageBodyIncomplete) break;  // Can't do anything but read other data
 
-        // If we get here the message has been successfully parsed and can be queued for processing
-        // unless we exceed the maximum number of messages per read
-        // Eventually we initialize a new message and continue parsing
+        if (err == kMessageBodyIncomplete) break;  // Can't do anything but read other data
         if (++messages_parsed > kMaxMessagesPerRead) {
             err = KMessagesFloodingDetected;
             break;
         }
-
-        if (app_settings_.log.log_verbosity == log::Level::kTrace) [[unlikely]] {
-            log::Trace("Inbound message",
-                       {"id", std::to_string(node_id_), "remote", network::to_string(remote_endpoint_), "message",
-                        std::string(magic_enum::enum_name(inbound_message_->get_type())), "size",
-                        to_human_bytes(inbound_message_->size())})
-                << "Data: " << inbound_message_->data().to_string();
-        }
-
-        switch (inbound_message_->get_type()) {
-            using enum abi::NetMessageType;
-            case kVersion:
-                if (err = remote_version_.deserialize(inbound_message_->data()); err != kSuccess) break;
-                if (remote_version_.version < kMinSupportedProtocolVersion ||
-                    remote_version_.version > kMaxSupportedProtocolVersion) {
-                    log::Trace("Unsupported protocol version",
-                               {"peer", this->to_string(), "version", std::to_string(version_)});
-                    err = kInvalidProtocolVersion;
-                    break;
-                }
-                version_.store(std::min(local_version_.version, remote_version_.version));
-                err = push_message(abi::NetMessageType::kVerack);
-                break;
-            case kVerack:
-                // Do nothing ... the protocol handshake status has already been updated
-                // Simply create a new message container
-                break;
-            case kPing: {
-                abi::PingPong ping_pong{};
-                if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) break;
-                err = push_message(abi::NetMessageType::kPong, ping_pong);
-            } break;
-            default:
-                std::scoped_lock lock{inbound_messages_mutex_};
-                inbound_messages_.push_back(std::move(inbound_message_));
-        }
-
+        if (err = process_inbound_message(); err != kSuccess) break;
         end_inbound_message();
-
-        //        // Protocol handshake messages can be handled directly here
-        //        // Other messages are queued for processing by higher levels
-        //        if (inbound_message_->get_type() == abi::NetMessageType::kVersion) {
-        //            // Deserialize into local_version_ and if everything is ok
-        //            // send back a verack message
-        //            err = remote_version_.deserialize(inbound_message_->data());
-        //            if (err == kSuccess) {
-        //                if (remote_version_.version < kMinSupportedProtocolVersion ||
-        //                    remote_version_.version > kMaxSupportedProtocolVersion) {
-        //                    log::Trace("Unsupported protocol version",
-        //                               {"peer", this->to_string(), "version", std::to_string(version_)});
-        //                    err = kInvalidProtocolVersion;
-        //                    break;
-        //                }
-        //
-        //                version_.store(std::min(local_version_.version, remote_version_.version));
-        //                err = push_message(abi::NetMessageType::kVerack);
-        //                end_inbound_message();
-        //            }
-        //        } else if (inbound_message_->get_type() == abi::NetMessageType::kVerack) {
-        //            // Do nothing ... the protocol handshake status has already been updated
-        //            // Simply create a new message container
-        //            inbound_message_ = std::make_unique<abi::NetMessage>(version_);
-        //        } else {
-        //            std::scoped_lock lock{inbound_messages_mutex_};
-        //            inbound_messages_.push_back(std::move(inbound_message_));
-        //            inbound_message_ = std::make_unique<abi::NetMessage>(version_);                   // Prepare a new
-        //            container inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());  // and
-        //            reset the timer
-        //
-        //            // TODO notify higher levels that a new message has been received
-        //        }
     }
-    receive_buffer_.consume(bytes_transferred);  // Discard data that has been processed
+    receive_buffer_.consume(bytes_transferred);
     if (!is_fatal_error(err) && messages_parsed != 0) {
         last_message_received_time_.store(std::chrono::steady_clock::now());
     }
+    return err;
+}
+
+serialization::Error Node::process_inbound_message() {
+    using namespace serialization;
+    using enum Error;
+    Error err{kSuccess};
+
+    REQUIRES(inbound_message_ != nullptr);
+
+    if (app_settings_.log.log_verbosity == log::Level::kTrace) [[unlikely]] {
+        const std::list<std::string> log_params{
+            "action",    "message",
+            "direction", "in ",
+            "message",   std::string{magic_enum::enum_name(inbound_message_->get_type())},
+            "size",      to_human_bytes(inbound_message_->size())};
+        print_log(log::Level::kTrace, log_params);
+    }
+
+    switch (inbound_message_->get_type()) {
+        using enum abi::NetMessageType;
+        case kVersion:
+            if (err = remote_version_.deserialize(inbound_message_->data()); err != kSuccess) break;
+            if (remote_version_.version < kMinSupportedProtocolVersion ||
+                remote_version_.version > kMaxSupportedProtocolVersion) {
+                err = kInvalidProtocolVersion;
+                const std::list<std::string> log_params{
+                    "action",    "message",
+                    "direction", "in ",
+                    "message",   std::string{magic_enum::enum_name(inbound_message_->get_type())},
+                    "size",      to_human_bytes(inbound_message_->size()),
+                    "status",    "failure",
+                    "reason",    std::string(magic_enum::enum_name(err))};
+                std::string extended_reason{"got " + std::to_string(remote_version_.version) +
+                                            " but supported versions are " +
+                                            std::to_string(kMinSupportedProtocolVersion) + " to " +
+                                            std::to_string(kMaxSupportedProtocolVersion)};
+                print_log(log::Level::kTrace, log_params, extended_reason);
+                break;
+            }
+            {
+                version_.store(std::min(local_version_.version, remote_version_.version));
+                const std::list<std::string> log_params{
+                    "agent",    remote_version_.user_agent,
+                    "version",  std::to_string(remote_version_.version),
+                    "nonce",    std::to_string(remote_version_.nonce),
+                    "services", std::to_string(remote_version_.services),
+                    "relay",    (remote_version_.relay ? "true" : "false"),
+                    "block",    std::to_string(remote_version_.start_height),
+                    "him",      network::to_string(remote_version_.addr_from.to_endpoint()),
+                    "me",       network::to_string(remote_version_.addr_recv.to_endpoint())};
+                print_log(log::Level::kInfo, log_params);
+                err = push_message(abi::NetMessageType::kVerack);
+            }
+            break;
+        case kVerack:
+            // Do nothing ... the protocol handshake status has already been updated
+            break;
+        case kPing: {
+            abi::PingPong ping_pong{};
+            if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) break;
+            err = push_message(abi::NetMessageType::kPong, ping_pong);
+        } break;
+        default:
+            std::scoped_lock lock{inbound_messages_mutex_};
+            inbound_messages_.push_back(std::move(inbound_message_));
+            // TODO notify higher level consumer(s)
+    }
+
     return err;
 }
 
@@ -511,8 +492,7 @@ NodeIdleResult Node::is_idle() const noexcept {
     using namespace std::chrono;
     const auto now{steady_clock::now()};
 
-    // Check we've at least completed protocol handshake
-    // in less than 10 seconds
+    // Check we've at least completed protocol handshake in a reasonable time
     if (protocol_handshake_status_.load() != ProtocolHandShakeStatus::kCompleted) {
         if (const auto connected_time{connected_time_.load()};
             static_cast<uint32_t>(duration_cast<seconds>(now - connected_time).count()) >
@@ -549,4 +529,11 @@ NodeIdleResult Node::is_idle() const noexcept {
 
 std::string Node::to_string() const noexcept { return network::to_string(remote_endpoint_); }
 
+void Node::print_log(const log::Level severity, const std::list<std::string>& params,
+                     std::string extra_data) const noexcept {
+    if (app_settings_.log.log_verbosity < severity) return;
+    std::vector<std::string> log_params{"id", std::to_string(node_id_), "remote", this->to_string()};
+    log_params.insert(log_params.end(), params.begin(), params.end());
+    log::BufferBase(severity, "Node", log_params) << extra_data;
+}
 }  // namespace zenpp::network

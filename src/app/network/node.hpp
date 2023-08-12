@@ -49,7 +49,7 @@ enum class DataDirectionMode {
 static constexpr size_t kMaxMessagesPerRead = 32;
 
 //! \brief Maximum number of bytes to read/write in a single operation
-static constexpr size_t kMaxBytesPerIO = 64_KiB;
+static constexpr size_t kMaxBytesPerIO = 256_KiB;
 
 class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
@@ -137,6 +137,8 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     serialization::Error parse_messages(
         size_t bytes_transferred);  // Reads messages from the receiving buffer and consumes buffered data
 
+    serialization::Error process_inbound_message();  // Local processing (when possible) of inbound message
+
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
     //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
     [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
@@ -144,6 +146,10 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     void start_write();  // Begin writing to the socket asynchronously
     void handle_write(const boost::system::error_code& ec, size_t bytes_transferred);  // Async write handler
+
+    //! \brief Local facility to print log lines in unified format
+    void print_log(log::Level severity, const std::list<std::string>& params,
+                   std::string extra_data = "") const noexcept;
 
     AppSettings& app_settings_;                  // Reference to global application settings
     static std::atomic_int next_node_id_;        // Used to generate unique node ids
@@ -164,13 +170,15 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic_bool is_connected_{true};                                // Status of socket connection
     std::atomic<std::chrono::steady_clock::time_point> connected_time_;  // Time of connection
     std::atomic<std::chrono::steady_clock::time_point> last_message_received_time_;  // Last fully "in" message tstamp
-    std::atomic<std::chrono::steady_clock::time_point> last_message_sent_time_;      // Last fully "out" message tstamp
-    std::function<void(std::shared_ptr<Node>)> on_disconnect_;                       // Called after stop (notifies hub)
-    std::function<void(DataDirectionMode, size_t)> on_data_;  // To gather receive data stats at node hub
-    boost::asio::streambuf receive_buffer_;                   // Socket receive buffer
-    boost::asio::streambuf send_buffer_;                      // Socket send buffer
-    std::atomic<size_t> bytes_received_{0};                   // Total bytes received from the socket during the session
-    std::atomic<size_t> bytes_sent_{0};                       // Total bytes sent to the socket during the session
+    std::atomic<std::chrono::steady_clock::time_point> last_message_sent_time_;      // Last fully "out" message
+
+    std::function<void(std::shared_ptr<Node>)> on_disconnect_;  // Called after stop (notifies hub)
+    std::function<void(DataDirectionMode, size_t)> on_data_;    // To gather receive data stats at node hub
+
+    boost::asio::streambuf receive_buffer_;  // Socket receive buffer
+    boost::asio::streambuf send_buffer_;     // Socket send buffer
+    std::atomic<size_t> bytes_received_{0};  // Total bytes received from the socket during the session
+    std::atomic<size_t> bytes_sent_{0};      // Total bytes sent to the socket during the session
 
     std::atomic<std::chrono::steady_clock::time_point> inbound_message_start_time_{
         std::chrono::steady_clock::time_point::min()};           // Start time of inbound msg

@@ -151,7 +151,7 @@ serialization::Error NetMessage::validate() noexcept {
     return kSuccess;
 }
 
-serialization::Error NetMessage::parse(ByteView& input_data) noexcept {
+serialization::Error NetMessage::parse(ByteView& input_data, ByteView network_magic) noexcept {
     using namespace serialization;
     using enum Error;
 
@@ -172,6 +172,14 @@ serialization::Error NetMessage::parse(ByteView& input_data) noexcept {
 
             ret = header_.deserialize(ser_stream_);
             if (ret == kSuccess) {
+
+                if (!network_magic.empty()) {
+                    REQUIRES(header_.network_magic.size() == network_magic.size());
+                    if (memcmp(header_.network_magic.data(), network_magic.data(), network_magic.size()) != 0) {
+                        ret = kMessageHeaderMagicMismatch;
+                    }
+                }
+
                 const auto& message_definition{header_.get_definition()};
                 if (message_definition.min_protocol_version.has_value() &&
                     ser_stream_.get_version() < *message_definition.min_protocol_version) {

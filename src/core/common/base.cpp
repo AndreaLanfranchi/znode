@@ -37,7 +37,9 @@ const buildinfo* get_buildinfo() noexcept { return zenpp_get_buildinfo(); }
 std::string get_buildinfo_string() noexcept {
     std::string ret{};
     const auto* build_info = get_buildinfo();
-    ret.append(build_info->project_name_with_version);
+    ret.append(build_info->project_name);
+    ret.append(" ");
+    ret.append(build_info->project_version);
     ret.append(" ");
     ret.append(build_info->system_name);
     ret.append("-");

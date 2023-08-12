@@ -96,7 +96,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         .add_option("--network.maxactiveconnections", network_settings.max_active_connections,
                     "Maximum number of actively connected nodes")
         ->capture_default_str()
-        ->check(CLI::Range(size_t(20), size_t(200)));
+        ->check(CLI::Range(size_t(32), size_t(256)));
 
     network_opts
         .add_option("--network.idletimeout", network_settings.idle_timeout_seconds,

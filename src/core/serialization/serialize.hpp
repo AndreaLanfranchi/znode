@@ -56,7 +56,7 @@ inline void write_data(Stream& stream, T obj) {
 //! \brief Lowest level serialization for bool
 template <class Stream>
 inline void write_data(Stream& stream, bool obj) {
-    const uint8_t out{static_cast<uint8_t>(obj ? 0x00 : 0x01)};
+    const uint8_t out{static_cast<uint8_t>(obj ? 0x01 : 0x00)};
     stream.push_back(out);
 }
 

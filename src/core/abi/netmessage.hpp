@@ -34,6 +34,7 @@ enum class NetMessageType : uint32_t {
     kPing,              // Ping message to measure the latency of a connection
     kPong,              // Pong message to reply to a ping message
     kGetheaders,        // Getheaders message to request/send a list of block headers
+    kMemPool,           // MemPool message to request/send a list of transactions in the mempool
     kMissingOrUnknown,  // This must be the last entry
 };
 
@@ -113,10 +114,20 @@ inline constexpr MessageDefinition kMessageGetheaders{
     "getheaders",                 //
     NetMessageType::kGetheaders,  //
     false,
+    std::nullopt,  // TODO
+    std::nullopt,  // TODO
+    std::nullopt,  // TODO
+    std::nullopt,  // TODO
+};
+
+inline constexpr MessageDefinition kMessageMempool{
+    "mempool",                 //
+    NetMessageType::kMemPool,  //
+    false,
     std::nullopt,
     std::nullopt,
-    std::nullopt,  //
-    std::nullopt,  //
+    size_t{0},
+    size_t{0},
 };
 
 inline constexpr MessageDefinition kMessageMissingOrUnknown{
@@ -131,7 +142,7 @@ inline constexpr MessageDefinition kMessageMissingOrUnknown{
 
 //! \brief List of all supported messages
 //! \attention This must be kept in same order as the MessageCommand enum
-inline constexpr std::array<MessageDefinition, 8> kMessageDefinitions{
+inline constexpr std::array<MessageDefinition, 9> kMessageDefinitions{
     kMessageVersion,           // 0
     kMessageVerack,            // 1
     kMessageInv,               // 2
@@ -139,7 +150,8 @@ inline constexpr std::array<MessageDefinition, 8> kMessageDefinitions{
     kMessagePing,              // 4
     kMessagePong,              // 5
     kMessageGetheaders,        // 6
-    kMessageMissingOrUnknown,  // 7
+    kMessageMempool,           // 7
+    kMessageMissingOrUnknown,  // 8
 };
 
 static_assert(kMessageDefinitions.size() == static_cast<size_t>(NetMessageType::kMissingOrUnknown) + 1,
@@ -205,7 +217,7 @@ class NetMessage {
     [[nodiscard]] NetMessageType get_type() const noexcept { return header_.get_type(); }
     [[nodiscard]] NetMessageHeader& header() noexcept { return header_; }
     [[nodiscard]] serialization::SDataStream& data() noexcept { return ser_stream_; }
-    [[nodiscard]] serialization::Error parse(ByteView& input_data) noexcept;
+    [[nodiscard]] serialization::Error parse(ByteView& input_data, ByteView network_magic = {}) noexcept;
 
     //! \brief Sets the message version (generally inherited from the protocol version)
     void set_version(int version) noexcept;

@@ -44,6 +44,7 @@ class NodeHub : public Stoppable {
 
     [[nodiscard]] size_t bytes_sent() const noexcept { return total_bytes_sent_.load(); }
     [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
+    [[nodiscard]] size_t active_connections_count() const noexcept { return current_active_connections_.load(); }
 
     bool start();                                               // Begins accepting connections
     bool stop(bool wait) noexcept override;                     // Stops accepting connections and stops all nodes
@@ -55,13 +56,15 @@ class NodeHub : public Stoppable {
     void handle_accept(const boost::system::error_code& ec,
                        boost::asio::ip::tcp::socket socket);  // Async accept handler
 
-    void on_node_disconnected(const std::shared_ptr<Node>& node);              // Handles disconnects from nodes
-    void on_node_data(DataDirectionMode direction, size_t bytes_transferred);  // Handles data from nodes
-    void set_common_socket_options(boost::asio::ip::tcp::socket& socket);      // Sets common socket options
+    void on_node_disconnected(const std::shared_ptr<Node>& node);                 // Handles disconnects from nodes
+    void on_node_data(DataDirectionMode direction, size_t bytes_transferred);     // Handles data from nodes
+    static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options
 
     void start_service_timer();                                      // Starts the majordomo timer
     bool handle_service_timer(const boost::system::error_code& ec);  // Majordomo to serve connections
     void print_info();                                               // Prints some stats about network usage
+
+    void start_connecting();  // Starts the initial dial-out connection process
 
     AppSettings& app_settings_;              // Reference to global application settings
     boost::asio::io_context& asio_context_;  // Reference to global asio context
