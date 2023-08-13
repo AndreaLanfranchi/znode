@@ -149,7 +149,9 @@ bool NodeHub::stop(bool wait) noexcept {
         lock.unlock();
         // Wait for all nodes to stop - active_connections get to zero
         while (wait && current_active_connections_.load() > 0) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            log::Info("Service", {"name", "Node Hub", "action", "stop", "info", "waiting for active connections"})
+                << std::to_string(current_active_connections_.load());
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
     return ret;
