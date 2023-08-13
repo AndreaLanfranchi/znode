@@ -46,9 +46,11 @@ class NodeHub : public Stoppable {
     [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
     [[nodiscard]] size_t active_connections_count() const noexcept { return current_active_connections_.load(); }
 
-    bool start();                                               // Begins accepting connections
-    bool stop(bool wait) noexcept override;                     // Stops accepting connections and stops all nodes
-    [[nodiscard]] bool connect(const NetworkAddress& address);  // Connects to a remote endpoint
+    bool start();                            // Begins accepting connections
+    bool stop(bool wait) noexcept override;  // Stops accepting connections and stops all nodes
+    [[nodiscard]] bool connect(
+        const NetworkAddress& address,
+        const NodeConnectionMode mode = NodeConnectionMode::kOutbound);  // Connects to a remote endpoint
 
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
@@ -90,7 +92,6 @@ class NodeHub : public Stoppable {
     std::map<int, std::shared_ptr<Node>> nodes_;                        // All the connected nodes
     std::map<boost::asio::ip::address, uint32_t> connected_addresses_;  // Addresses that are connected
     mutable std::mutex nodes_mutex_;                                    // Guards access to nodes_
-
 
     size_t total_connections_{0};
     size_t total_disconnections_{0};

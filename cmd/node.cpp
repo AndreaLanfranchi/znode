@@ -160,14 +160,6 @@ int main(int argc, char* argv[]) {
         network::NodeHub node_hub{settings, asio_context};
         node_hub.start();
 
-        // Connect nodes if required
-        if (!settings.network.connect_nodes.empty()) {
-            for (auto const& node_address : settings.network.connect_nodes) {
-                const NetworkAddress address{node_address};
-                if (!node_hub.connect(address)) break;
-            }
-        }
-
         // Start sync loop
         const auto start_time{std::chrono::steady_clock::now()};
 

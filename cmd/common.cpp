@@ -15,8 +15,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio/ip/address.hpp>
 
-#include <core/encoding/hex.hpp>
-
 namespace zenpp::cmd {
 
 void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& settings) {

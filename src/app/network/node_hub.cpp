@@ -49,6 +49,23 @@ bool NodeHub::start() {
 }
 
 void NodeHub::start_connecting() {
+    // Connect nodes if required
+    if (!app_settings_.network.connect_nodes.empty()) {
+        for (auto const& node_address : app_settings_.network.connect_nodes) {
+            if (is_stopping()) return;
+            const NetworkAddress address{node_address};
+            std::ignore = connect(address, NodeConnectionMode::kManualOutbound);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    if (current_active_connections_.load()) {
+        // TODO: Or we should continue if force dns seeding is enabled?
+        return;
+    }
+
+    // TODO: Seeding nodes
     // TODO: Get them from chain configuration parameters
     const std::vector<std::string> seeds{"dnsseed.horizen.global", "dnsseed.zensystem.io", "mainnet.horizen.global",
                                          "mainnet.zensystem.io", "node1.zenchain.info"};
@@ -68,7 +85,7 @@ void NodeHub::start_connecting() {
             if (!result.endpoint().address().is_v4()) {
                 continue;
             }
-            NetworkAddress address{result.endpoint().address(), 9033};
+            NetworkAddress address{result.endpoint().address(), 9033 /*TODO: Get from chain params*/};
             std::ignore = connect(address);
         }
     }
@@ -92,8 +109,7 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& ec) {
     print_info();  // Print info every 5 seconds
     std::scoped_lock lock{nodes_mutex_};
     for (auto [node_id, node_ptr] : nodes_) {
-        const auto result{node_ptr->is_idle()};
-        if (result != NodeIdleResult::kNotIdle) {
+        if (const auto result{node_ptr->is_idle()}; result != NodeIdleResult::kNotIdle) {
             std::string reason{magic_enum::enum_name(result)};
             log::Info("Service", {"name", "Node Hub", "action", "service", "node", std::to_string(node_id), "remote",
                                   node_ptr->to_string(), "reason", reason})
@@ -157,7 +173,7 @@ bool NodeHub::stop(bool wait) noexcept {
     return ret;
 }
 
-bool NodeHub::connect(const NetworkAddress& address) {
+bool NodeHub::connect(const NetworkAddress& address, const NodeConnectionMode mode) {
     if (is_stopping()) return false;
 
     const std::string remote{network::to_string(address.to_endpoint())};
@@ -191,14 +207,13 @@ bool NodeHub::connect(const NetworkAddress& address) {
     ++current_active_connections_;
     ++current_active_outbound_connections_;
 
-    std::shared_ptr<Node> new_node(
-        new Node(
-            app_settings_, NodeConnectionMode::kOutbound, asio_context_, std::move(socket), tls_client_context_.get(),
-            [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
-            [this](DataDirectionMode direction, size_t bytes_transferred) {
-                on_node_data(direction, bytes_transferred);
-            }),
-        Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
+    std::shared_ptr<Node> new_node(new Node(
+                                       app_settings_, mode, asio_context_, std::move(socket), tls_client_context_.get(),
+                                       [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
+                                       [this](DataDirectionMode direction, size_t bytes_transferred) {
+                                           on_node_data(direction, bytes_transferred);
+                                       }),
+                                   Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
     {
         std::scoped_lock lock(nodes_mutex_);
