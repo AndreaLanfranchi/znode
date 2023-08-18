@@ -49,7 +49,7 @@ tl::expected<std::string, EncodingError> encode(ByteView input) noexcept {
         value <<= 8;  // Mul by 256
         value += byte;
     }
-    if (intx::count_significant_words(value) == value.num_words) {
+    if (intx::count_significant_words(value) == intx::uint<kBigintSizeInBits>::num_words) {
         return tl::unexpected(EncodingError::kInputTooLong);
     }
 
@@ -140,8 +140,7 @@ tl::expected<Bytes, DecodingError> decode_check(std::string_view input) noexcept
     const ByteView checksum(&decoded_value[decoded_value.size() - kCheckSumLength], kCheckSumLength);
 
     // Recompute Digest256 from original and check it starts with checksum
-    crypto::Sha256 digest(original);
-    if (!digest.finalize().starts_with(checksum)) {
+    if (crypto::Sha256 digest{original};!digest.finalize().starts_with(checksum)) {
         return tl::unexpected(DecodingError::kInvalidBase58Checksum);
     }
     return Bytes(original);

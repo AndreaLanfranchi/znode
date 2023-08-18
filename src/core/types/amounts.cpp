@@ -103,7 +103,7 @@ tl::expected<Amount, DecodingError> Amount::parse(const std::string& input) {
     const auto value{whole * kCoin + fract};
     Amount ret(value);
     if (!ret.valid_money()) return tl::unexpected{DecodingError::kInvalidAmountRange};
-    return Amount(value);
+    return ret;
 }
 
 FeeRate::FeeRate(const Amount paid, size_t size) {

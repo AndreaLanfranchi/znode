@@ -14,11 +14,7 @@ namespace zenpp {
 
 using namespace serialization;
 
-NetworkAddress::NetworkAddress() { address = boost::asio::ip::address_v4(); }
-
 NetworkAddress::NetworkAddress(std::string endpoint_string) {
-    address = boost::asio::ip::address_v4();
-    port = 0;
 
     if (endpoint_string.empty()) return;
 

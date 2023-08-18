@@ -18,6 +18,7 @@ namespace zenpp {
 class Amount {
   public:
     Amount() = default;
+    ~Amount() = default;
     explicit Amount(int64_t value) : amount_{value} {};
 
     Amount(const Amount& other) = default;
@@ -34,8 +35,7 @@ class Amount {
     bool operator==(int64_t value) const noexcept;
     bool operator>(int64_t value) const noexcept;
     bool operator<(int64_t value) const noexcept;
-    bool operator==(const Amount& rhs) const noexcept = default;
-    friend auto operator<=>(const Amount& lhs, const Amount& rhs) = default;
+    auto operator<=>(const Amount& rhs) const noexcept = default;
 
     [[nodiscard]] int64_t operator*() const noexcept;
     Amount& operator=(int64_t value) noexcept;
@@ -62,6 +62,7 @@ class Amount {
 class FeeRate {
   public:
     FeeRate() = default;
+    ~FeeRate() = default;
     explicit FeeRate(const int64_t value) : satoshis_per_K_(value) {}
     explicit FeeRate(const Amount amount) : satoshis_per_K_(amount) {}
     FeeRate(Amount paid, size_t size);
@@ -70,10 +71,9 @@ class FeeRate {
     FeeRate(const FeeRate&& other) noexcept : satoshis_per_K_{other.satoshis_per_K_} {};
 
     [[nodiscard]] Amount fee(size_t bytes_size = 1'000) const;
-
     [[nodiscard]] std::string to_string() const;
 
-    friend auto operator<=>(const FeeRate& lhs, const FeeRate& rhs) = default;
+    auto operator<=>(const FeeRate& rhs) const noexcept = default;
 
   private:
     Amount satoshis_per_K_{0};

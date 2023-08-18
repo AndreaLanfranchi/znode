@@ -28,16 +28,16 @@ enum class NetworkServicesType : uint32_t {
 
 class NetworkAddress : public serialization::Serializable {
   public:
-    NetworkAddress();
+    NetworkAddress() = default;
     NetworkAddress(const std::string& address_string, uint16_t port_num);
     NetworkAddress(const boost::asio::ip::address, uint16_t port_num);
     explicit NetworkAddress(std::string endpoint_string);
     explicit NetworkAddress(boost::asio::ip::tcp::endpoint& endpoint);
 
-    uint32_t time{0};                  // unix timestamp : not serialized if protocol version < 31402
-    uint64_t services{0};              // services mask
-    boost::asio::ip::address address;  // the actual network address
-    uint16_t port{0};                  // Tcp port number
+    uint32_t time{0};      // unix timestamp : not serialized if protocol version < 31402
+    uint64_t services{0};  // services mask
+    boost::asio::ip::address address{boost::asio::ip::address_v4()};  // the actual network address
+    uint16_t port{0};                                                 // Tcp port number
 
     [[nodiscard]] boost::asio::ip::tcp::endpoint to_endpoint() const;
 

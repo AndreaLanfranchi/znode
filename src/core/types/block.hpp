@@ -17,7 +17,7 @@ static constexpr size_t kBlockHeaderSerializedSize{140};  // Excluding Equihash 
 
 class BlockHeader : public serialization::Serializable {
   public:
-    BlockHeader() : Serializable(){};
+    using serialization::Serializable::Serializable;
 
     int32_t version{0};
     h256 parent_hash{};

@@ -7,6 +7,7 @@
 #pragma once
 #include <array>
 #include <cstdint>
+#include <ranges>
 
 namespace zenpp::serialization {
 
@@ -60,8 +61,7 @@ inline bool operator!(Error e) { return e == static_cast<Error>(0); }
 
 inline constexpr std::array<Error, 3> kNonFatalErrors{Error::kSuccess, Error::kMessageHeaderIncomplete,
                                                       Error::kMessageBodyIncomplete};
-inline bool is_fatal_error(Error e) {
-    return std::find(kNonFatalErrors.begin(), kNonFatalErrors.end(), e) == kNonFatalErrors.end();
-}
+
+inline bool is_fatal_error(Error e) { return std::ranges::find(kNonFatalErrors, e) == kNonFatalErrors.end(); }
 
 }  // namespace zenpp::serialization
