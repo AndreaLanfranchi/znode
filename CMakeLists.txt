@@ -17,6 +17,10 @@ if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cable/.git)
     message(FATAL_ERROR "Git submodules not initialized, execute:\n$ git submodule update --init --recursive")
 endif ()
 
+if("${CMAKE_BINARY_DIR}" STREQUAL "${CMAKE_HOME_DIRECTORY}")
+    message(FATAL_ERROR "In-source builds are not allowed. Create a separate directory (eg build/) for build files.")
+endif()
+
 get_directory_property(PROJECT_HAS_PARENT PARENT_DIRECTORY)
 
 if (NOT PROJECT_HAS_PARENT)
