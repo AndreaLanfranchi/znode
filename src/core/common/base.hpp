@@ -29,7 +29,7 @@
 namespace boost {
 BOOST_NORETURN void throw_exception(const std::exception&);
 BOOST_NORETURN void throw_exception(const std::exception&, const boost::source_location&);
-}
+}  // namespace boost
 #endif
 
 static_assert(std::endian::native == std::endian::little, "Target architecture MUST be little endian");
@@ -49,7 +49,7 @@ concept Integral = UnsignedIntegral<T> || SignedIntegral<T>;
 
 template <class T>
 concept UnsignedIntegralEx = UnsignedIntegral<T> || std::same_as<T, intx::uint128> || std::same_as<T, intx::uint256> ||
-                             std::same_as<T, intx::uint512>;
+    std::same_as<T, intx::uint512>;
 
 //! \brief Used to allow passing string literals as template arguments
 template <size_t N>

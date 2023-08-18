@@ -23,7 +23,6 @@ void NetMessageHeader::reset() noexcept {
     message_type_ = NetMessageType::kMissingOrUnknown;
 }
 
-
 bool NetMessageHeader::pristine() const noexcept {
     return std::all_of(network_magic.begin(), network_magic.end(), [](const auto b) { return b == 0; }) &&
            std::all_of(command.begin(), command.end(), [](const auto b) { return b == 0; }) &&
@@ -177,7 +176,6 @@ serialization::Error NetMessage::parse(ByteView& input_data, ByteView network_ma
 
             ret = header_.deserialize(ser_stream_);
             if (ret == kSuccess) {
-
                 if (!network_magic.empty()) {
                     REQUIRES(header_.network_magic.size() == network_magic.size());
                     if (memcmp(header_.network_magic.data(), network_magic.data(), network_magic.size()) != 0) {

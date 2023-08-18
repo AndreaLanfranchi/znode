@@ -20,10 +20,8 @@ namespace zenpp::serialization {
 //! \remarks Do not define serializable classes members as size_t as it might lead to wrong results on
 //! MacOS/Xcode bundles
 template <class T>
-    requires std::is_arithmetic_v<T>
-inline uint32_t ser_sizeof(T obj) {
-    return sizeof(obj);
-}
+requires std::is_arithmetic_v<T>
+inline uint32_t ser_sizeof(T obj) { return sizeof(obj); }
 
 //! \brief Returns the serialized size of arithmetic types
 //! \remarks Specialization for bool which is stored in at least 1 byte
@@ -104,8 +102,7 @@ inline void write_compact(Stream& stream, uint64_t obj) {
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Stream>
-    requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
-inline Error read_data(Stream& stream, T& object) {
+requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) inline Error read_data(Stream& stream, T& object) {
     const uint32_t count{ser_sizeof(object)};
     const auto read_result{stream.read(count)};
     if (!read_result) return read_result.error();
@@ -115,7 +112,7 @@ inline Error read_data(Stream& stream, T& object) {
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Stream>
-    requires std::is_arithmetic_v<T>
+requires std::is_arithmetic_v<T>
 inline tl::expected<T, Error> read_data(Stream& stream) {
     T ret{0};
     auto result{read_data(stream, ret)};
@@ -127,7 +124,7 @@ inline tl::expected<T, Error> read_data(Stream& stream) {
 
 //! \brief Lowest level deserialization for bool
 template <typename T, class Stream>
-    requires std::is_same_v<T, bool>
+requires std::is_same_v<T, bool>
 inline Error read_data(Stream& stream, T& object) {
     const auto read_result{stream.read(1)};
     if (!read_result) return read_result.error();

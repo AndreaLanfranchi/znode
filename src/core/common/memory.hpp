@@ -76,7 +76,7 @@ class LockedPagesManagerBase : private boost::noncopyable {
         for (size_t page{start}; page <= end; page += page_size_) {
             auto item = locked_pages_.find(page);
             if (item == locked_pages_.end()) continue;  // Not previously locked
-            ENSURE(item->second > 0);               // It MUST have a value
+            ENSURE(item->second > 0);                   // It MUST have a value
             if (--item->second == 0) {                  // Decrement lock count
                 if (!locker_.unlock(reinterpret_cast<void*>(page), page_size_)) {
                     ret = false;

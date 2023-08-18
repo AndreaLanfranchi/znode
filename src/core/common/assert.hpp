@@ -16,7 +16,7 @@ namespace zenpp {
 }  // namespace zenpp
 
 //! \brief Always aborts program execution on assertion failure, even when NDEBUG is defined.
-#define ASSERT(expr)      \
+#define ASSERT(expr)          \
     if ((expr)) [[likely]]    \
         static_cast<void>(0); \
     else                      \

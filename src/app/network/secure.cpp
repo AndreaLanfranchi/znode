@@ -314,7 +314,6 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
     SSL_CTX_set_options(ctx, SSL_OP_NO_RENEGOTIATION);
 
     if (type == TLSContextType::kServer) {
-
         SSL_CTX_set_options(ctx, SSL_OP_CIPHER_SERVER_PREFERENCE);
         auto x509_cert{load_x509_certificate(directory_path)};
         auto rsa_pkey{load_rsa_private_key(directory_path, key_password)};

@@ -106,7 +106,7 @@ class Stage : public Stoppable {
 
     SyncContext* sync_context_;                                  // Shared context across stages
     const char* stage_name_;                                     // Human friendly identifier of the stage
-    AppSettings* node_settings_;                                // Pointer to shared node configuration settings
+    AppSettings* node_settings_;                                 // Pointer to shared node configuration settings
     std::atomic<OperationType> operation_{OperationType::None};  // Actual operation being carried out
     std::mutex sl_mutex_;                                        // To synchronize access by outer sync loop
     std::string log_prefix_;                                     // Log lines prefix holding the progress among stages
