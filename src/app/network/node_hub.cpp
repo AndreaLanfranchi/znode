@@ -400,6 +400,12 @@ std::vector<std::shared_ptr<Node>> NodeHub::get_nodes() const {
 }
 
 void NodeHub::set_common_socket_options(tcp::socket& socket) {
+    timeval timeout;
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
+    setsockopt(socket.native_handle(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
+    setsockopt(socket.native_handle(), SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
+
     socket.set_option(tcp::no_delay(true));
     socket.set_option(tcp::socket::keep_alive(true));
     socket.set_option(boost::asio::socket_base::linger(true, 5));
