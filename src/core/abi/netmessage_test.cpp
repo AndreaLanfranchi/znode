@@ -62,8 +62,8 @@ TEST_CASE("NetMessage", "[abi]") {
             "00000000";                 // ....               payload checksum
 
         CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderEmptyCommand");
-        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderEmptyCommand");
+        CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kMessageHeaderMalformedCommand");
+        CHECK(magic_enum::enum_name(header.validate()) == "kMessageHeaderMalformedCommand");
         payload.clear();
         header.reset();
 

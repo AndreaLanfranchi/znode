@@ -17,12 +17,13 @@ TEST_CASE("Network Address Serialization", "[serialization]") {
     address.port = 8333;
 
     serialization::SDataStream stream(serialization::Scope::kNetwork, 0);
-    CHECK(address.serialized_size(stream) == 26);
+    CHECK(address.serialized_size(stream) == 30);
     stream.clear();
     REQUIRE(address.serialize(stream) == serialization::Error::kSuccess);
 
     // See https://en.bitcoin.it/wiki/Protocol_documentation#Network_address
     std::string expected_hex_dump(
+        "00000000"
         "0100000000000000"
         "0000000000000000"
         "0000ffff0a000001"
