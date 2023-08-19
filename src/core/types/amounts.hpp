@@ -18,10 +18,8 @@ namespace zenpp {
 class Amount {
   public:
     Amount() = default;
-    ~Amount() = default;
-    explicit Amount(int64_t value) : amount_{value} {};
-
-    Amount(const Amount& other) = default;
+    virtual ~Amount() = default;
+    explicit Amount(int64_t value) : value_{value} {};
 
     static constexpr int64_t kMax{kCoinMaxSupply * kCoin};
 
@@ -30,53 +28,49 @@ class Amount {
     //! then an unexpected DecodingError is returned
     static tl::expected<Amount, DecodingError> parse(const std::string& input);
 
+    //! \brief Returns wether the amount value is in valid range (0, kMax)
     [[nodiscard]] bool valid_money() const noexcept;
-    explicit operator bool() const noexcept;
-    bool operator==(int64_t value) const noexcept;
-    bool operator>(int64_t value) const noexcept;
-    bool operator<(int64_t value) const noexcept;
+
+    explicit operator bool() const noexcept { return value_ != 0; }
     auto operator<=>(const Amount& rhs) const noexcept = default;
 
     [[nodiscard]] int64_t operator*() const noexcept;
     Amount& operator=(int64_t value) noexcept;
-    Amount& operator=(const Amount& rhs) noexcept;
-    void operator+=(int64_t value) noexcept;
-    void operator*=(int64_t value) noexcept;
-    void operator-=(int64_t value) noexcept;
+    Amount& operator+=(int64_t value) noexcept;
+    Amount& operator*=(int64_t value) noexcept;
+    Amount& operator-=(int64_t value) noexcept;
     void operator++() noexcept;
     void operator--() noexcept;
 
-    [[nodiscard]] std::string to_string() const;
+    [[nodiscard]] virtual std::string to_string() const;
 
-    friend Amount operator+(const Amount& lhs, const Amount& rhs) { return Amount(lhs.amount_ + rhs.amount_); }
-    friend Amount operator-(const Amount& lhs, const Amount& rhs) { return Amount(lhs.amount_ - rhs.amount_); }
-    friend Amount operator*(const Amount& lhs, const Amount& rhs) { return Amount(lhs.amount_ * rhs.amount_); }
-    friend Amount operator/(const Amount& lhs, const Amount& rhs) { return Amount(lhs.amount_ / rhs.amount_); }
-    friend Amount operator%(const Amount& lhs, const Amount& rhs) { return Amount(lhs.amount_ % rhs.amount_); }
+    friend Amount operator+(const Amount& lhs, const Amount& rhs) { return Amount(lhs.value_ + rhs.value_); }
+    friend Amount operator-(const Amount& lhs, const Amount& rhs) { return Amount(lhs.value_ - rhs.value_); }
+    friend Amount operator*(const Amount& lhs, const Amount& rhs) { return Amount(lhs.value_ * rhs.value_); }
+    friend Amount operator/(const Amount& lhs, const Amount& rhs) { return Amount(lhs.value_ / rhs.value_); }
+    friend Amount operator%(const Amount& lhs, const Amount& rhs) { return Amount(lhs.value_ % rhs.value_); }
 
   private:
-    int64_t amount_{0};
+    int64_t value_{0};
 };
 
+inline bool operator==(const Amount& lhs, int64_t value) noexcept { return *lhs == value; }
+inline auto operator<=>(const Amount& lhs, int64_t value) noexcept { return *lhs <=> value; }
+
 //! \brief Type-safe wrapper class to for fee rates i.e. how much a transaction pays for inclusion
-class FeeRate {
+//! \remarks The fee rate is expressed in Amount per 1'000 bytes (not 1024)
+class FeeRate : public Amount {
   public:
-    FeeRate() = default;
-    ~FeeRate() = default;
-    explicit FeeRate(const int64_t value) : satoshis_per_K_(value) {}
-    explicit FeeRate(const Amount amount) : satoshis_per_K_(amount) {}
-    FeeRate(Amount paid, size_t size);
+    using Amount::Amount;
+    ~FeeRate() override = default;
 
-    FeeRate(const FeeRate& other) = default;
-    FeeRate(const FeeRate&& other) noexcept : satoshis_per_K_{other.satoshis_per_K_} {};
+    FeeRate(const Amount& paid, size_t size)
+        : Amount(size ? *paid * static_cast<int64_t>(1_KB) / static_cast<int64_t>(size) : int64_t(0)){};
 
-    [[nodiscard]] Amount fee(size_t bytes_size = 1'000) const;
-    [[nodiscard]] std::string to_string() const;
+    [[nodiscard]] Amount fee(size_t bytes_size = 1_KB) const;
+    [[nodiscard]] std::string to_string() const override;
 
     auto operator<=>(const FeeRate& rhs) const noexcept = default;
-
-  private:
-    Amount satoshis_per_K_{0};
 };
 
 }  // namespace zenpp

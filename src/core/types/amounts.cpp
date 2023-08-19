@@ -16,34 +16,21 @@
 
 namespace zenpp {
 
-bool Amount::valid_money() const noexcept { return amount_ >= 0 && amount_ <= Amount::kMax; }
+bool Amount::valid_money() const noexcept { return value_ >= 0 && value_ <= Amount::kMax; }
 
-Amount::operator bool() const noexcept { return amount_ != 0; }
-
-bool Amount::operator==(int64_t value) const noexcept { return amount_ == value; }
-
-bool Amount::operator>(int64_t value) const noexcept { return amount_ > value; }
-
-bool Amount::operator<(int64_t value) const noexcept { return amount_ < value; }
-
-int64_t Amount::operator*() const noexcept { return amount_; }
+int64_t Amount::operator*() const noexcept { return value_; }
 
 Amount& Amount::operator=(int64_t value) noexcept {
-    amount_ = value;
-    return *this;
-}
-
-Amount& Amount::operator=(const Amount& rhs) noexcept {
-    amount_ = *rhs;
+    value_ = value;
     return *this;
 }
 
 std::string Amount::to_string() const {
-    if (!amount_) return std::string("0 ").append(kCurrency);
+    if (!value_) return std::string("0 ").append(kCurrency);
 
     std::string sign;
-    auto div{std::div(amount_, kCoin)};
-    if (amount_ < 0) {
+    auto div{std::div(value_, kCoin)};
+    if (value_ < 0) {
         sign.push_back('-');
         div.rem *= -1;
     }
@@ -70,15 +57,24 @@ std::string Amount::to_string() const {
     return formatted.append(" ").append(kCurrency);
 }
 
-void Amount::operator+=(int64_t value) noexcept { amount_ += value; }
+Amount& Amount::operator+=(int64_t value) noexcept {
+    value_ += value;
+    return *this;
+}
 
-void Amount::operator*=(int64_t value) noexcept { amount_ *= value; }
+Amount& Amount::operator*=(int64_t value) noexcept {
+    value_ *= value;
+    return *this;
+}
 
-void Amount::operator-=(int64_t value) noexcept { amount_ -= value; }
+Amount& Amount::operator-=(int64_t value) noexcept {
+    value_ -= value;
+    return *this;
+}
 
-void Amount::operator++() noexcept { ++amount_; }
+void Amount::operator++() noexcept { ++value_; }
 
-void Amount::operator--() noexcept { --amount_; }
+void Amount::operator--() noexcept { --value_; }
 
 tl::expected<Amount, DecodingError> Amount::parse(const std::string& input) {
     static const std::string kMaxWhole(std::to_string(kCoinMaxSupply));
@@ -106,14 +102,11 @@ tl::expected<Amount, DecodingError> Amount::parse(const std::string& input) {
     return ret;
 }
 
-FeeRate::FeeRate(const Amount paid, size_t size) {
-    satoshis_per_K_ = size ? *paid * 1'000L / static_cast<int64_t>(size) : 0;
-}
+std::string FeeRate::to_string() const { return Amount::to_string() + "/K"; }
 
-std::string FeeRate::to_string() const { return satoshis_per_K_.to_string() + "/K"; }
 Amount FeeRate::fee(size_t bytes_size) const {
-    Amount ret(*satoshis_per_K_ * static_cast<int64_t>(bytes_size) / 1'000);
-    if (!ret && satoshis_per_K_) ret = satoshis_per_K_;
-    return ret;
+    const auto ret{this->operator*() * static_cast<int64_t>(bytes_size) / static_cast<int64_t>(1_KB)};
+    if (!ret) return *this;
+    return Amount(ret);
 }
 }  // namespace zenpp

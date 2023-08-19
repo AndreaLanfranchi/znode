@@ -37,6 +37,7 @@ uint64_t Jenkins::Hash(const uint32_t* source, size_t length, const uint32_t* sa
             HashFinal(a, b, c);
             [[fallthrough]];
         default:
+            break;
     }
 
     return (static_cast<uint64_t>(b) << 32) | c;

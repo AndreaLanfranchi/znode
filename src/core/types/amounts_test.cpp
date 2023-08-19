@@ -61,7 +61,7 @@ TEST_CASE("Amounts", "[types]") {
     CHECK(parsed.error() == DecodingError::kInvalidInput);
     input.pop_back();
     parsed = Amount::parse(input);
-    CHECK((parsed && *parsed == Amount::kMax));
+    CHECK((parsed && *(*parsed) == Amount::kMax));
 
     input = std::to_string(kCoinMaxSupply + 2);  // To cause overflow on range
     parsed = Amount::parse(input);
