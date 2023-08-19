@@ -30,9 +30,9 @@ struct NetworkSettings {
     uint32_t idle_timeout_seconds{300};     // Number of seconds after which an inactive node is disconnected
     bool use_tls{true};                     // Whether to enforce SSL/TLS on network connections
     std::string tls_password{};             // Password to use to load a private key file
-    std::array<uint8_t, 4> magic_bytes{0x63, 0x61, 0x73,
-                                       0x68};  // Network magic bytes (ZEN mainnet) // TODO: change this
-    std::vector<std::string> connect_nodes{};  // List of nodes to connect to at startup
+    std::array<uint8_t, 4> magic_bytes{'c', 'a', 's', 'h'};  // Network magic bytes (ZEN mainnet) // TODO: change this
+    std::vector<std::string> connect_nodes{};                // List of nodes to connect to at startup
+    uint64_t nonce{0};  // Local nonce (identifies self in network) // TODO: might not be needed
 };
 
 struct AppSettings {

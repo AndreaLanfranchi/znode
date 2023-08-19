@@ -36,15 +36,6 @@ namespace zenpp {
 //! otherwise it will stop counting and return as soon as max_count is reached
 [[nodiscard]] size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size, size_t max_count = 0) noexcept;
 
-//! \brief Generates a random value of type T in range std::numeric_limits<T>::max() to std::numeric_limits<T>::max()
-template <typename T>
-typename std::enable_if<std::is_integral<T>::value, T>::type randomize() {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<T> dis(std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
-    return dis(gen);
-}
-
 //! \brief Generates a random value of type T in a provided (min, max) range
 template <typename T>
 typename std::enable_if<std::is_integral<T>::value, T>::type randomize(T min, T max) {
@@ -52,5 +43,17 @@ typename std::enable_if<std::is_integral<T>::value, T>::type randomize(T min, T 
     std::mt19937 gen(rd());
     std::uniform_int_distribution<T> dis(min, max);
     return dis(gen);
+}
+
+//! \brief Generates a random value of type T in range std::numeric_limits<T>::max() to std::numeric_limits<T>::max()
+template <typename T>
+typename std::enable_if<std::is_integral<T>::value, T>::type randomize(T min) {
+    return randomize<T>(static_cast<T>(min), std::numeric_limits<T>::max());
+}
+
+//! \brief Generates a random value of type T in range std::numeric_limits<T>::max() to std::numeric_limits<T>::max()
+template <typename T>
+typename std::enable_if<std::is_integral<T>::value, T>::type randomize() {
+    return randomize<T>(std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
 }
 }  // namespace zenpp

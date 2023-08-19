@@ -12,6 +12,7 @@
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
 
+#include <core/common/misc.hpp>
 #include <core/types/address.hpp>
 
 #include <app/common/settings.hpp>
@@ -29,7 +30,11 @@ class NodeHub : public Stoppable {
           asio_context_{io_context},
           asio_strand_{io_context},
           socket_acceptor_{io_context},
-          service_timer_{io_context} {};
+          service_timer_{io_context} {
+        if (!app_settings_.network.nonce) {
+            app_settings_.network.nonce = randomize<uint64_t>(uint64_t(/*min=*/1));
+        }
+    };
 
     // Not copyable or movable
     NodeHub(NodeHub& other) = delete;
@@ -79,11 +84,6 @@ class NodeHub : public Stoppable {
 
     std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure connections
     std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure connections
-
-    //    /* We use unique_ptr for SSL_CTX as connections / nodes are not meant to outlive NodeHub */
-    //    std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_server_context_{nullptr, SSLCTXDeleter()};  // For dial-in
-    //    connections std::unique_ptr<SSL_CTX, SSLCTXDeleter> ssl_client_context_{nullptr, SSLCTXDeleter()};  // For
-    //    dial-out connections
 
     std::atomic_uint32_t current_active_connections_{0};
     std::atomic_uint32_t current_active_inbound_connections_{0};

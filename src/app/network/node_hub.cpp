@@ -67,8 +67,7 @@ void NodeHub::start_connecting() {
 
     // TODO: Seeding nodes
     // TODO: Get them from chain configuration parameters
-    const std::vector<std::string> seeds{"dnsseed.horizen.global", "dnsseed.zensystem.io", "mainnet.horizen.global",
-                                         "mainnet.zensystem.io", "node1.zenchain.info"};
+    const std::vector<std::string> seeds{"mainnet.horizen.global", "mainnet.zensystem.io", "node1.zenchain.info"};
 
     boost::asio::ip::tcp::resolver resolver{asio_context_};
     for (const auto& host : seeds) {

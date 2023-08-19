@@ -42,7 +42,7 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     local_version_.addr_recv.port = socket_.remote_endpoint().port();
     local_version_.addr_from.address = socket_.local_endpoint().address();
     local_version_.addr_from.port = 9033;  // TODO Set this value to the current listening port
-    local_version_.nonce = randomize<decltype(local_version_.nonce)>();
+    local_version_.nonce = app_settings_.network.nonce;
     local_version_.user_agent = get_buildinfo_string();
     local_version_.start_height = 0;  // TODO Set this value to the current blockchain height
     local_version_.relay = true;      // TODO
@@ -400,8 +400,13 @@ serialization::Error Node::process_inbound_message() {
                     "block",    std::to_string(remote_version_.start_height),
                     "him",      network::to_string(remote_version_.addr_from.to_endpoint()),
                     "me",       network::to_string(remote_version_.addr_recv.to_endpoint())};
-                print_log(log::Level::kInfo, log_params);
-                err = push_message(abi::NetMessageType::kVerack);
+                if (remote_version_.nonce != local_version_.nonce) {
+                    print_log(log::Level::kInfo, log_params);
+                    err = push_message(abi::NetMessageType::kVerack);
+                } else {
+                    print_log(log::Level::kWarning, log_params, "Connected to self. Disconnecting ...");
+                    asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+                }
             }
             break;
         case kVerack:
