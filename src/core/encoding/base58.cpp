@@ -140,7 +140,7 @@ tl::expected<Bytes, DecodingError> decode_check(std::string_view input) noexcept
     const ByteView checksum(&decoded_value[decoded_value.size() - kCheckSumLength], kCheckSumLength);
 
     // Recompute Digest256 from original and check it starts with checksum
-    if (crypto::Sha256 digest{original};!digest.finalize().starts_with(checksum)) {
+    if (crypto::Sha256 digest{original}; !digest.finalize().starts_with(checksum)) {
         return tl::unexpected(DecodingError::kInvalidBase58Checksum);
     }
     return Bytes(original);

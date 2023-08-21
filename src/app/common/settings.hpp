@@ -32,7 +32,9 @@ struct NetworkSettings {
     std::string tls_password{};             // Password to use to load a private key file
     std::array<uint8_t, 4> magic_bytes{'c', 'a', 's', 'h'};  // Network magic bytes (ZEN mainnet) // TODO: change this
     std::vector<std::string> connect_nodes{};                // List of nodes to connect to at startup
-    uint64_t nonce{0};  // Local nonce (identifies self in network) // TODO: might not be needed
+    uint64_t nonce{0};                         // Local nonce (identifies self in network) // TODO: might not be needed
+    uint32_t ping_interval_seconds{30};        // Interval between ping messages
+    uint32_t ping_timeout_milliseconds{1000};  // Number of milliseconds to wait for a ping response before timing-out
 };
 
 struct AppSettings {

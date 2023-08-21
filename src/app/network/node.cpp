@@ -13,6 +13,7 @@
 #include <core/common/time.hpp>
 
 #include <app/common/log.hpp>
+#include <app/common/stopwatch.hpp>
 #include <app/network/node.hpp>
 #include <app/serialization/exceptions.hpp>
 
@@ -30,6 +31,7 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     : app_settings_(app_settings),
       connection_mode_(connection_mode),
       io_strand_(io_context),
+      ping_timer_(io_context),
       socket_(std::move(socket)),
       ssl_context_(ssl_context),
       on_disconnect_(std::move(on_disconnect)),
@@ -65,8 +67,10 @@ void Node::start() {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_ssl_handshake(); });
     } else {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
-        push_message(abi::NetMessageType::kVersion, local_version_);
+        std::ignore = push_message(abi::NetMessageType::kVersion, local_version_);
     }
+
+    start_ping_timer();
 }
 
 bool Node::stop(bool wait) noexcept {
@@ -74,6 +78,7 @@ bool Node::stop(bool wait) noexcept {
     if (ret) /* not already stopped */ {
         is_connected_.store(false);
         is_writing_.store(false);
+        ping_timer_.cancel();
 
         boost::system::error_code ec;
         if (ssl_stream_ != nullptr) {
@@ -91,6 +96,44 @@ bool Node::stop(bool wait) noexcept {
         }
     }
     return ret;
+}
+
+void Node::start_ping_timer() {
+    if (is_stopping()) return;
+
+    // It would be boring to send out pings on a costant basis
+    // So we randomize the interval a bit using a +/- 15% factor
+    static const auto ping_interval_seconds{app_settings_.network.ping_interval_seconds};
+    const auto ping_interval_seconds_min{ping_interval_seconds - ping_interval_seconds / 7};
+    const auto ping_interval_seconds_max{ping_interval_seconds + ping_interval_seconds / 7};
+    const auto ping_interval_seconds_randomized{
+        randomize<uint32_t>(ping_interval_seconds_min, ping_interval_seconds_max)};
+
+    ping_timer_.expires_after(std::chrono::seconds(ping_interval_seconds_randomized));
+    ping_timer_.async_wait([self{shared_from_this()}](const boost::system::error_code& ec) {
+        if (self->handle_ping_timer(ec)) {
+            self->start_ping_timer();
+        }
+    });
+}
+
+bool Node::handle_ping_timer(const boost::system::error_code& ec) {
+    if (ec == boost::asio::error::operation_aborted) return false;
+    if (is_stopping()) return false;
+    if (ping_nonce_.load()) return true;  // Wait for response to return
+    last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
+    ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
+    abi::PingPong ping{};
+    ping.nonce = ping_nonce_.load();
+    const auto ret{push_message(abi::NetMessageType::kPing, ping)};
+    if (ret != serialization::Error::kSuccess) {
+        const std::list<std::string> log_params{"action",  "ping",   "status",
+                                                "failure", "reason", std::string(magic_enum::enum_name(ret))};
+        print_log(log::Level::kError, log_params);
+        stop(false);
+        return false;
+    }
+    return true;
 }
 
 void Node::start_ssl_handshake() {
@@ -171,6 +214,10 @@ void Node::start_write() {
 
     if (outbound_message_ && outbound_message_->data().eof()) {
         // A message has been fully sent
+        // Unless it is a ping message we can reset the timer
+        if (outbound_message_->get_type() != abi::NetMessageType::kPing) {
+            last_message_sent_time_.store(std::chrono::steady_clock::now());
+        }
         outbound_message_.reset();
         outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
     }
@@ -219,6 +266,11 @@ void Node::start_write() {
             is_writing_.store(false);
             stop(false);
             return;
+        }
+
+        // Should this be a ping message start timing the response
+        if (outbound_message_->get_type() == abi::NetMessageType::kPing) {
+            last_ping_sent_time_.store(std::chrono::steady_clock::now());
         }
     }
 
@@ -443,6 +495,29 @@ serialization::Error Node::process_inbound_message() {
             if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) break;
             err = push_message(abi::NetMessageType::kPong, ping_pong);
         } break;
+        case kPong: {
+            abi::PingPong ping_pong{};
+            if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) break;
+            if (ping_pong.nonce != ping_nonce_.load()) {
+                err = kMismatchingPingPongNonce;
+                const std::list<std::string> log_params{
+                    "action",    "message",
+                    "direction", "in ",
+                    "message",   std::string{magic_enum::enum_name(inbound_message_->get_type())},
+                    "size",      to_human_bytes(inbound_message_->size()),
+                    "status",    "failure",
+                    "reason",    std::string(magic_enum::enum_name(err))};
+                print_log(log::Level::kTrace, log_params);
+                break;
+            }
+            // Calculate ping response time
+            const auto now{std::chrono::steady_clock::now()};
+            const auto ping_response_time{now - last_ping_sent_time_.load()};
+            print_log(log::Level::kInfo, {"action", "ping", "response time", StopWatch::format(ping_response_time)});
+
+            ping_nonce_.store(0);
+            last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
+        } break;
         default:
             std::scoped_lock lock{inbound_messages_mutex_};
             inbound_messages_.push_back(std::move(inbound_message_));
@@ -523,6 +598,14 @@ NodeIdleResult Node::is_idle() const noexcept {
     using namespace std::chrono;
     const auto now{steady_clock::now()};
 
+    // Check whether we're waiting for a ping response
+    if (ping_nonce_.load() != 0) {
+        const auto ping_duration{duration_cast<milliseconds>(now - last_ping_sent_time_.load()).count()};
+        if (ping_duration > app_settings_.network.ping_timeout_milliseconds) {
+            return kPingTimeout;
+        }
+    }
+
     // Check we've at least completed protocol handshake in a reasonable time
     if (protocol_handshake_status_.load() != ProtocolHandShakeStatus::kCompleted) {
         if (const auto connected_time{connected_time_.load()};
@@ -567,4 +650,5 @@ void Node::print_log(const log::Level severity, const std::list<std::string>& pa
     log_params.insert(log_params.end(), params.begin(), params.end());
     log::BufferBase(severity, "Node", log_params) << extra_data;
 }
+
 }  // namespace zenpp::network

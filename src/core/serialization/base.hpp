@@ -51,6 +51,7 @@ enum class Error {
     KMessagesFloodingDetected,                  // Message flooding detected
     kInvalidProtocolHandShake,                  // Wrong message sequence detected
     kInvalidProtocolVersion,                    // Wrong protocol version detected
+    kMismatchingPingPongNonce,                  // Ping nonce mismatch
     kDuplicateProtocolHandShake,                // Duplicate handshake message detected
     kUnsupportedMessageTypeForProtocolVersion,  // Message type is not supported in current protocol version
     kDeprecatedMessageTypeForProtocolVersion,   // Message type is deprecated in current protocol version

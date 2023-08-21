@@ -109,7 +109,20 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         ->check(CLI::Range(size_t(30), size_t(3600)));
 
     network_opts
-        .add_option("--connect", network_settings.connect_nodes, "Immediately connect to this remote nodes list")
+        .add_option("--network.pinginterval", network_settings.ping_interval_seconds,
+                    "Interval (in seconds) amongst outgoing pings (eventually randomized in a +/- 15 range)")
+        ->capture_default_str()
+        ->check(CLI::Range(size_t(30), size_t(3600)));
+
+    network_opts
+        .add_option("--network.pingtimeout", network_settings.ping_timeout_milliseconds,
+                    "Interval (in milliseconds) before a ping without response is considered timed-out")
+        ->capture_default_str()
+        ->check(CLI::Range(size_t(100), size_t(5000)));
+
+    network_opts
+        .add_option("--network.connect", network_settings.connect_nodes,
+                    "Immediately connect to this remote nodes list")
         ->capture_default_str()
         ->check(IPEndPointValidator(/*allow_empty=*/true,
                                     /*default_port=*/13383));  // TODO the port will be on behalf of network

@@ -38,6 +38,7 @@ enum class NodeIdleResult {
     kProtocolHandshakeTimeout,  // Too much time for protocol handshake
     kInboundTimeout,            // Too much time since the beginning of an inbound message
     kOutboundTimeout,           // Too much time since the beginning of an outbound message
+    kPingTimeout,               // Too much time since the last ping message
     kGlobalTimeout              // Too much time since the last completed activity
 };
 
@@ -139,6 +140,9 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     void begin_inbound_message();
     void end_inbound_message();
 
+    void start_ping_timer();
+    bool handle_ping_timer(const boost::system::error_code& ec);
+
     void start_read();
     void handle_read(const boost::system::error_code& ec, size_t bytes_transferred);
     serialization::Error parse_messages(
@@ -163,6 +167,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     const int node_id_{next_node_id()};          // Unique node id
     const NodeConnectionMode connection_mode_;   // Whether inbound or outbound
     boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
+    boost::asio::steady_timer ping_timer_;       // To periodically send ping messages
     boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
     boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> remote_endpoint_;  // Remote endpoint
     boost::asio::ip::basic_endpoint<boost::asio::ip::tcp> local_endpoint_;   // Local endpoint
@@ -178,6 +183,8 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<std::chrono::steady_clock::time_point> connected_time_;  // Time of connection
     std::atomic<std::chrono::steady_clock::time_point> last_message_received_time_;  // Last fully "in" message tstamp
     std::atomic<std::chrono::steady_clock::time_point> last_message_sent_time_;      // Last fully "out" message
+    std::atomic<std::chrono::steady_clock::time_point> last_ping_sent_time_;         // Last outgoing ping tstamp
+    std::atomic_uint64_t ping_nonce_{0};                                             // Last ping nonce sent
 
     std::function<void(std::shared_ptr<Node>)> on_disconnect_;  // Called after stop (notifies hub)
     std::function<void(DataDirectionMode, size_t)> on_data_;    // To gather receive data stats at node hub

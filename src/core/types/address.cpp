@@ -15,7 +15,6 @@ namespace zenpp {
 using namespace serialization;
 
 NetworkAddress::NetworkAddress(std::string endpoint_string) {
-
     if (endpoint_string.empty()) return;
 
     const std::regex pattern(R"(^([\d\.]*|\*|localhost)(:[\d]{1,4})?$)", std::regex_constants::icase);
