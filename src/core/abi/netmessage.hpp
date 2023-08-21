@@ -111,13 +111,13 @@ inline constexpr MessageDefinition kMessagePong{
 };
 
 inline constexpr MessageDefinition kMessageGetheaders{
-    "getheaders",                 //
-    NetMessageType::kGetheaders,  //
-    false,
-    std::nullopt,  // TODO
-    std::nullopt,  // TODO
-    std::nullopt,  // TODO
-    std::nullopt,  // TODO
+    "getheaders",                                                     //
+    NetMessageType::kGetheaders,                                      //
+    true,                                                             // vectorized
+    size_t{2000},                                                     // max vector items
+    size_t{32},                                                       // vector item size
+    size_t{4 + 1 + 32 + 32},                                          // min payload length
+    size_t{4 + serialization::ser_compact_sizeof(2000) + 32 * 2001},  // max payload length
 };
 
 inline constexpr MessageDefinition kMessageMempool{

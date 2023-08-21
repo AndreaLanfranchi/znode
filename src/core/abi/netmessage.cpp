@@ -133,13 +133,23 @@ serialization::Error NetMessage::validate() noexcept {
     // read of the vector size the payload size can be checked against the expected size
     if (message_definition.is_vectorized) {
         ser_stream_.seekg(kMessageHeaderLength);
+
+        // Message `getheaders` payload does not start with the number of items
+        // rather with version. We need to skip it (4 bytes)
+        if (message_definition.message_type == NetMessageType::kGetheaders) {
+            ser_stream_.ignore(4);
+        }
+
         const auto vector_size{serialization::read_compact(ser_stream_)};
         if (!vector_size) return vector_size.error();
         if (*vector_size == 0) return kMessagePayloadEmptyVector;  // MUST have at least 1 element
         if (*vector_size > message_definition.max_vector_items.value_or(UINT32_MAX))
             return kMessagePayloadOversizedVector;
         if (message_definition.vector_item_size.has_value()) {
-            const auto expected_vector_size{*vector_size * *message_definition.vector_item_size};
+            // Message `getheaders` has an extra item of 32 bytes (the stop hash)
+            const uint64_t extra_item{message_definition.message_type == NetMessageType::kGetheaders ? 1u : 0};
+            const auto expected_vector_size{(*vector_size + extra_item) * *message_definition.vector_item_size};
+
             if (ser_stream_.avail() != expected_vector_size) return kMessagePayloadMismatchesVectorSize;
             // Look for duplicates
             payload_view = ser_stream_.read();

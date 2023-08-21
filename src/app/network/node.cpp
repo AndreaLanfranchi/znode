@@ -417,6 +417,21 @@ serialization::Error Node::process_inbound_message() {
             if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) break;
             err = push_message(abi::NetMessageType::kPong, ping_pong);
         } break;
+        case kGetheaders: {
+            abi::GetHeaders payload{};
+            if (err = payload.deserialize(inbound_message_->data()); err != kSuccess) break;
+            if (app_settings_.log.log_verbosity == log::Level::kTrace) {
+                // TODO : Have payloads emit Json
+                std::vector<std::string> log_params{};
+                log_params.insert(log_params.end(), {"getheaders", std::to_string(payload.version)});
+                for (auto& hash : payload.block_locator_hashes) {
+                    log_params.insert(log_params.end(), {"hash", hash.to_string()});
+                }
+                log_params.insert(log_params.end(), {"stop", payload.hash_stop.to_string()});
+                log::Trace("Node", log_params);
+            }
+            // TODO
+        } break;
         default:
             std::scoped_lock lock{inbound_messages_mutex_};
             inbound_messages_.push_back(std::move(inbound_message_));

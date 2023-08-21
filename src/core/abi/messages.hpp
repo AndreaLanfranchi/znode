@@ -9,12 +9,13 @@
 
 #include <core/abi/netmessage.hpp>
 #include <core/types/address.hpp>
+#include <core/types/hash.hpp>
 
 namespace zenpp::abi {
 
 class NullData : public serialization::Serializable {
   public:
-    NullData() = default;
+    using serialization::Serializable::Serializable;
     ~NullData() override = default;
 
   private:
@@ -27,7 +28,7 @@ class NullData : public serialization::Serializable {
 
 class Version : public serialization::Serializable {
   public:
-    Version() = default;
+    using serialization::Serializable::Serializable;
     ~Version() override = default;
 
     int32_t version{0};
@@ -47,7 +48,7 @@ class Version : public serialization::Serializable {
 
 class PingPong : public serialization::Serializable {
   public:
-    PingPong() = default;
+    using serialization::Serializable::Serializable;
     ~PingPong() override = default;
 
     uint64_t nonce{0};
@@ -56,4 +57,19 @@ class PingPong : public serialization::Serializable {
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
+
+class GetHeaders : public serialization::Serializable {
+  public:
+    using serialization::Serializable::Serializable;
+    ~GetHeaders() override = default;
+
+    uint32_t version{0};
+    std::vector<h256> block_locator_hashes{};
+    h256 hash_stop{};
+
+  private:
+    friend class serialization::SDataStream;
+    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+};
+
 }  // namespace zenpp::abi

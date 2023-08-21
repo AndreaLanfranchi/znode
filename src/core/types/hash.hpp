@@ -22,7 +22,7 @@ namespace zenpp {
 template <uint32_t BITS>
 class Hash : public serialization::Serializable {
   public:
-    static_assert(BITS >= 8 && BITS % 8 == 0, "Must be a multiple of 8");
+    static_assert(BITS && (BITS & 7) == 0, "Must be a multiple of 8");
     enum : uint32_t {
         kSize = BITS / 8
     };
@@ -52,14 +52,16 @@ class Hash : public serialization::Serializable {
 
     //! \brief Returns a hash loaded from a hex string
     static tl::expected<Hash<BITS>, DecodingError> from_hex(std::string_view input) noexcept {
-        const auto parsed_bytes{hex::decode(input)};
+        auto parsed_bytes{hex::decode(input)};
         if (!parsed_bytes) return tl::unexpected(parsed_bytes.error());
+        std::ranges::reverse(parsed_bytes.value());
         return Hash<BITS>(ByteView(*parsed_bytes));
     }
 
     //! \brief Returns the hexadecimal representation of this hash
     [[nodiscard]] std::string to_hex(bool with_prefix = false) const noexcept {
-        return hex::encode({&bytes_[0], kSize}, with_prefix);
+        auto ret{hex::encode({&bytes_[0], kSize}, with_prefix)};
+        return hex::reverse_hex(ret);  // This is actually a nonsense from bitcoin code
     }
 
     //! \brief An alias for to_hex with no prefix

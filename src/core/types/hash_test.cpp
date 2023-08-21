@@ -23,42 +23,42 @@ TEST_CASE("Hash", "[types]") {
     // Empty hash hex
     std::string expected_hex{"0000000000000000000000000000000000000000000000000000000000000000"};
     std::string out_hex{hash.to_hex()};
-    REQUIRE(out_hex == expected_hex);
+    CHECK(out_hex == expected_hex);
 
     // Exact length valid hex
     std::string input_hex{"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"};
     auto parsed_hash = h256::from_hex(input_hex);
-    REQUIRE(parsed_hash);
-    REQUIRE(parsed_hash->data()[0] == 0xc5);
+    CHECK(parsed_hash);
+    CHECK(parsed_hash->data()[0] == 0x70);
     out_hex = parsed_hash->to_hex(/* with_prefix=*/true);
-    REQUIRE(input_hex == out_hex);
+    CHECK(input_hex == out_hex);
 
     // Exact length invalid hex
     input_hex = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85zzzz";
     parsed_hash = h256::from_hex(input_hex);
-    REQUIRE((!parsed_hash && parsed_hash.error() == DecodingError::kInvalidHexDigit));
+    CHECK((!parsed_hash && parsed_hash.error() == DecodingError::kInvalidHexDigit));
 
     // Oversize length (Hash loaded but null)
     input_hex = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470000000";
     parsed_hash = h256::from_hex(input_hex);
-    REQUIRE(parsed_hash);
-    REQUIRE(!(*parsed_hash));  // Is empty
+    CHECK(parsed_hash);
+    CHECK(!(*parsed_hash));  // Is empty
 
     // Shorter length valid hex
     input_hex = "0x460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
     parsed_hash = h256::from_hex(input_hex);
-    REQUIRE(parsed_hash);
+    CHECK(parsed_hash);
     out_hex = parsed_hash->to_hex(/*with_prefix=*/true);
-    REQUIRE(input_hex != out_hex);
-    expected_hex = "0x0000460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
-    REQUIRE(out_hex == expected_hex);
+    CHECK(input_hex != out_hex);
+    expected_hex = "0x460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a4700000";
+    CHECK(out_hex == expected_hex);
 
     // Comparison
     auto parsed_hash1 = h256::from_hex("0x01");
-    REQUIRE(parsed_hash1);
+    CHECK(parsed_hash1);
     auto parsed_hash2 = h256::from_hex("0x02");
-    REQUIRE(parsed_hash2);
-    REQUIRE((*parsed_hash1 != *parsed_hash2));
+    CHECK(parsed_hash2);
+    CHECK((*parsed_hash1 != *parsed_hash2));
 }
 
 TEST_CASE("Hash to jenkins hash", "[types]") {
