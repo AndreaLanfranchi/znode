@@ -51,21 +51,31 @@ class Hash : public serialization::Serializable {
     }
 
     //! \brief Returns a hash loaded from a hex string
-    static tl::expected<Hash<BITS>, DecodingError> from_hex(std::string_view input) noexcept {
+    //! \param input The hex string to de-hexify
+    //! \param reverse If true, the bytes sequence is reversed after being de-hexified
+    static tl::expected<Hash<BITS>, DecodingError> from_hex(std::string_view input, bool reverse = false) noexcept {
         auto parsed_bytes{hex::decode(input)};
         if (!parsed_bytes) return tl::unexpected(parsed_bytes.error());
-        std::ranges::reverse(parsed_bytes.value());
+        if (reverse) [[unlikely]]
+            std::ranges::reverse(*parsed_bytes);
         return Hash<BITS>(ByteView(*parsed_bytes));
     }
 
     //! \brief Returns the hexadecimal representation of this hash
-    [[nodiscard]] std::string to_hex(bool with_prefix = false) const noexcept {
-        auto ret{hex::encode({&bytes_[0], kSize}, with_prefix)};
-        return hex::reverse_hex(ret);  // This is actually a nonsense from bitcoin code
+    //! \param reverse If true, the bytes sequence is reversed before being hexed
+    //! \param with_prefix If true, the returned string will have the 0x prefix
+    [[nodiscard]] std::string to_hex(bool reverse = false, bool with_prefix = false) const noexcept {
+        if (reverse) [[unlikely]] {
+            auto reversed{bytes_};
+            std::ranges::reverse(reversed);
+            return hex::encode({&reversed[0], kSize}, with_prefix);
+        }
+        return hex::encode({&bytes_[0], kSize}, with_prefix);
     }
 
     //! \brief An alias for to_hex with no prefix
-    [[nodiscard]] std::string to_string() const noexcept { return to_hex(false); }
+    //! \param reverse If true, the bytes sequence is reversed before being hexed
+    [[nodiscard]] std::string to_string(bool reverse = false) const noexcept { return to_hex(reverse); }
 
     //! \brief The size of a Hash
     static constexpr size_t size() { return kSize; }

@@ -328,7 +328,24 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
     while (!data.empty()) {
         if (!inbound_message_) begin_inbound_message();
         err = inbound_message_->parse(data, app_settings_.network.magic_bytes);  // Consumes data
-        if (err == kMessageHeaderIncomplete || is_fatal_error(err)) break;
+        if (err == kMessageHeaderIncomplete) break;
+        if (is_fatal_error(err)) {
+            // Some debugging before exiting for fatal
+            if (app_settings_.log.log_verbosity >= log::Level::kDebug) {
+                switch (err) {
+                    using enum Error;
+                    case kMessageHeaderUnknownCommand:
+                        print_log(
+                            log::Level::kDebug,
+                            {"action", "parse_messages", "unknown command",
+                             std::string(reinterpret_cast<char*>(inbound_message_->header().command.data()), 12)});
+                        break;
+                    default:
+                        break;
+                }
+            }
+            break;
+        }
 
         if (const auto err_handshake =
                 validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type());
@@ -342,6 +359,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
             err = KMessagesFloodingDetected;
             break;
         }
+
         if (err = process_inbound_message(); err != kSuccess) break;
         end_inbound_message();
     }
@@ -410,27 +428,20 @@ serialization::Error Node::process_inbound_message() {
             }
             break;
         case kVerack:
-            // Do nothing ... the protocol handshake status has already been updated
+            // If remote appears to be ahead of us request headers
+            {
+                abi::GetHeaders payload{};
+                payload.version = version_.load();
+                auto genesis_hash{h256::from_hex("0007104ccda289427919efc39dc9e4d499804b7bebc22df55f8b834301260602",
+                                                 /*reverse=*/true)};
+                payload.block_locator_hashes.push_back(*genesis_hash);
+                err = push_message(abi::NetMessageType::kGetheaders, payload);
+            }
             break;
         case kPing: {
             abi::PingPong ping_pong{};
             if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) break;
             err = push_message(abi::NetMessageType::kPong, ping_pong);
-        } break;
-        case kGetheaders: {
-            abi::GetHeaders payload{};
-            if (err = payload.deserialize(inbound_message_->data()); err != kSuccess) break;
-            if (app_settings_.log.log_verbosity == log::Level::kTrace) {
-                // TODO : Have payloads emit Json
-                std::vector<std::string> log_params{};
-                log_params.insert(log_params.end(), {"getheaders", std::to_string(payload.version)});
-                for (auto& hash : payload.block_locator_hashes) {
-                    log_params.insert(log_params.end(), {"hash", hash.to_string()});
-                }
-                log_params.insert(log_params.end(), {"stop", payload.hash_stop.to_string()});
-                log::Trace("Node", log_params);
-            }
-            // TODO
         } break;
         default:
             std::scoped_lock lock{inbound_messages_mutex_};
