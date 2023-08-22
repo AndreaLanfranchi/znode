@@ -110,6 +110,15 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
         return protocol_handshake_status_.load();
     }
 
+    //! \brief Returns whether the socket is connected and the protocol handshake is completed
+    [[nodiscard]] bool fully_connected() const noexcept {
+        return is_stopping() == false && is_connected_.load() &&
+               get_protocol_handshake_status() == ProtocolHandShakeStatus::kCompleted;
+    }
+
+    //! \brief Returns the average ping latency in milliseconds
+    [[nodiscard]] uint64_t ping_latency() const noexcept { return ema_ping_latency_.load(); }
+
     //! \brief Returns whether the node (i.e. the remote) has been inactive/unresponsive beyond the amounts
     //! of time specified in network settings
     [[nodiscard]] NodeIdleResult is_idle() const noexcept;
@@ -142,6 +151,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     void start_ping_timer();
     bool handle_ping_timer(const boost::system::error_code& ec);
+    void process_ping_latency(const uint64_t latency_ms);
 
     void start_read();
     void handle_read(const boost::system::error_code& ec, size_t bytes_transferred);
@@ -183,8 +193,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<std::chrono::steady_clock::time_point> connected_time_;  // Time of connection
     std::atomic<std::chrono::steady_clock::time_point> last_message_received_time_;  // Last fully "in" message tstamp
     std::atomic<std::chrono::steady_clock::time_point> last_message_sent_time_;      // Last fully "out" message
-    std::atomic<std::chrono::steady_clock::time_point> last_ping_sent_time_;         // Last outgoing ping tstamp
-    std::atomic_uint64_t ping_nonce_{0};                                             // Last ping nonce sent
+
+    std::atomic<std::chrono::steady_clock::time_point> last_ping_sent_time_;  // Last outgoing ping tstamp
+    std::atomic_uint64_t ping_nonce_{0};                                      // Last ping nonce sent
+    std::atomic_uint64_t min_ping_latency_{0};                                // Minimum ping latency
+    std::atomic_uint64_t ema_ping_latency_{0};  // Exponential moving average of ping latency
 
     std::function<void(std::shared_ptr<Node>)> on_disconnect_;  // Called after stop (notifies hub)
     std::function<void(DataDirectionMode, size_t)> on_data_;    // To gather receive data stats at node hub
