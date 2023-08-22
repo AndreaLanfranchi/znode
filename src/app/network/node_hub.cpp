@@ -113,7 +113,7 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& ec) {
             log::Info("Service", {"name", "Node Hub", "action", "service", "node", std::to_string(node_id), "remote",
                                   node_ptr->to_string(), "reason", reason})
                 << "Disconnecting ...";
-            node_ptr->stop(false);
+            std::ignore = node_ptr->stop(false);
         }
     }
     return !is_stopping();  // Required to resubmit the timer
@@ -206,13 +206,17 @@ bool NodeHub::connect(const NetworkAddress& address, const NodeConnectionMode mo
     ++current_active_connections_;
     ++current_active_outbound_connections_;
 
-    std::shared_ptr<Node> new_node(new Node(
-                                       app_settings_, mode, asio_context_, std::move(socket), tls_client_context_.get(),
-                                       [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
-                                       [this](DataDirectionMode direction, size_t bytes_transferred) {
-                                           on_node_data(direction, bytes_transferred);
-                                       }),
-                                   Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
+    std::shared_ptr<Node> new_node(
+        new Node(
+            app_settings_, mode, asio_context_, std::move(socket), tls_client_context_.get(),
+            [this](const std::shared_ptr<Node> node) { on_node_disconnected(node); },
+            [this](DataDirectionMode direction, size_t bytes_transferred) {
+                on_node_data(direction, bytes_transferred);
+            },
+            [this](const std::shared_ptr<Node> node, std::unique_ptr<abi::NetMessage>& message) {
+                on_node_received_message(node, message);
+            }),
+        Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
     {
         std::scoped_lock lock(nodes_mutex_);
@@ -283,9 +287,12 @@ void NodeHub::handle_accept(const boost::system::error_code& ec, boost::asio::ip
     std::shared_ptr<Node> new_node(
         new Node(
             app_settings_, NodeConnectionMode::kInbound, asio_context_, std::move(socket), tls_server_context_.get(),
-            [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
+            [this](const std::shared_ptr<Node> node) { on_node_disconnected(node); },
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
+            },
+            [this](const std::shared_ptr<Node> node, std::unique_ptr<abi::NetMessage>& message) {
+                on_node_received_message(node, message);
             }),
         Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
     log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local, "remote", remote, "id",
@@ -326,7 +333,7 @@ void NodeHub::initialize_acceptor() {
                           to_string(local_endpoint)});
 }
 
-void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
+void NodeHub::on_node_disconnected(const std::shared_ptr<Node> node) {
     std::scoped_lock lock(nodes_mutex_);
 
     if (auto item{connected_addresses_.find(node->remote_endpoint().address())}; item != connected_addresses_.end()) {
@@ -371,6 +378,12 @@ void NodeHub::on_node_data(network::DataDirectionMode direction, const size_t by
     }
 }
 
+void NodeHub::on_node_received_message(const std::shared_ptr<Node> node, std::unique_ptr<abi::NetMessage>& message) {
+    // This function behaves as a collector of messages from nodes
+    (void)node;
+    (void)message;
+}
+
 std::shared_ptr<Node> NodeHub::operator[](int id) const {
     std::scoped_lock lock(nodes_mutex_);
     if (nodes_.contains(id)) {
@@ -399,9 +412,7 @@ std::vector<std::shared_ptr<Node>> NodeHub::get_nodes() const {
 }
 
 void NodeHub::set_common_socket_options(tcp::socket& socket) {
-    timeval timeout;
-    timeout.tv_sec = 2;
-    timeout.tv_usec = 0;
+    timeval timeout{2, 0};
     setsockopt(socket.native_handle(), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
     setsockopt(socket.native_handle(), SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
 

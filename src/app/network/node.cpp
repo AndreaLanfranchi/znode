@@ -27,7 +27,8 @@ std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost::asio::io_context& io_context,
            boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
            std::function<void(std::shared_ptr<Node>)> on_disconnect,
-           std::function<void(DataDirectionMode, size_t)> on_data)
+           std::function<void(DataDirectionMode, size_t)> on_data,
+           std::function<void(std::shared_ptr<Node>, std::unique_ptr<abi::NetMessage>&)> on_message)
     : app_settings_(app_settings),
       connection_mode_(connection_mode),
       io_strand_(io_context),
@@ -35,7 +36,8 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
       socket_(std::move(socket)),
       ssl_context_(ssl_context),
       on_disconnect_(std::move(on_disconnect)),
-      on_data_(std::move(on_data)) {
+      on_data_(std::move(on_data)),
+      on_message_(std::move(on_message)) {
     // TODO Set version's services according to settings
     local_version_.version = kDefaultProtocolVersion;
     local_version_.services = static_cast<uint64_t>(NetworkServicesType::kNodeNetwork);
@@ -119,13 +121,12 @@ void Node::start_ping_timer() {
 
 bool Node::handle_ping_timer(const boost::system::error_code& ec) {
     if (ec == boost::asio::error::operation_aborted) return false;
-    if (is_stopping()) return false;
-    if (ping_nonce_.load()) return true;  // Wait for response to return
+    if (ping_nonce_.load()) return !is_stopping();  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
     ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
-    abi::PingPong ping{};
-    ping.nonce = ping_nonce_.load();
-    const auto ret{push_message(abi::NetMessageType::kPing, ping)};
+    abi::PingPong pong_payload{};
+    pong_payload.nonce = ping_nonce_.load();
+    const auto ret{push_message(abi::NetMessageType::kPing, pong_payload)};
     if (ret != serialization::Error::kSuccess) {
         const std::list<std::string> log_params{"action",  "ping",   "status",
                                                 "failure", "reason", std::string(magic_enum::enum_name(ret))};
@@ -133,7 +134,7 @@ bool Node::handle_ping_timer(const boost::system::error_code& ec) {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return false;
     }
-    return true;
+    return !is_stopping();
 }
 
 void Node::process_ping_latency(const uint64_t latency_ms) {
@@ -545,9 +546,9 @@ serialization::Error Node::process_inbound_message() {
 
         } break;
         default:
-            std::scoped_lock lock{inbound_messages_mutex_};
-            inbound_messages_.push_back(std::move(inbound_message_));
-            // TODO notify higher level consumer(s)
+            // Notify node-hub of the inbound message which will eventually take ownership of it
+            // As a result we can safely reset it which is done after this function returns
+            on_message_(shared_from_this(), inbound_message_);
     }
 
     return err;

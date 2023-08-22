@@ -51,14 +51,16 @@ enum class DataDirectionMode {
 static constexpr size_t kMaxMessagesPerRead = 32;
 
 //! \brief Maximum number of bytes to read/write in a single operation
-static constexpr size_t kMaxBytesPerIO = 256_KiB;
+static constexpr size_t kMaxBytesPerIO = 64_KiB;
 
 class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
     Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost::asio::io_context& io_context,
          boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
-         std::function<void(std::shared_ptr<Node>)> on_disconnect,
-         std::function<void(DataDirectionMode, size_t)> on_data);
+         std::function<void(std::shared_ptr<Node>)> on_disconnect /* handles disconnections on node-hub */,
+         std::function<void(DataDirectionMode, size_t)> on_data /* handles data size accounting on node-hub */,
+         std::function<void(std::shared_ptr<Node>, std::unique_ptr<abi::NetMessage>&)>
+             on_message /* handles connections on node-hub */);
 
     Node(Node& other) = delete;
     Node(Node&& other) = delete;
@@ -112,9 +114,12 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the socket is connected and the protocol handshake is completed
     [[nodiscard]] bool fully_connected() const noexcept {
-        return is_stopping() == false && is_connected_.load() &&
+        return !is_stopping() && is_connected_.load() &&
                get_protocol_handshake_status() == ProtocolHandShakeStatus::kCompleted;
     }
+
+    //! \brief Returns information about the received Version message
+    [[nodiscard]] const abi::Version& version_info() const noexcept { return remote_version_; }
 
     //! \brief Returns the average ping latency in milliseconds
     [[nodiscard]] uint64_t ping_latency() const noexcept { return ema_ping_latency_.load(); }
@@ -151,7 +156,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     void start_ping_timer();
     bool handle_ping_timer(const boost::system::error_code& ec);
-    void process_ping_latency(const uint64_t latency_ms);
+    void process_ping_latency(uint64_t latency_ms);
 
     void start_read();
     void handle_read(const boost::system::error_code& ec, size_t bytes_transferred);
@@ -200,7 +205,9 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic_uint64_t ema_ping_latency_{0};  // Exponential moving average of ping latency
 
     std::function<void(std::shared_ptr<Node>)> on_disconnect_;  // Called after stop (notifies hub)
-    std::function<void(DataDirectionMode, size_t)> on_data_;    // To gather receive data stats at node hub
+    std::function<void(DataDirectionMode, size_t)> on_data_;    // To account data sizes stats at node hub
+    std::function<void(std::shared_ptr<Node>, std::unique_ptr<abi::NetMessage>& message)>
+        on_message_;  // Called on inbound message
 
     boost::asio::streambuf receive_buffer_;  // Socket receive buffer
     boost::asio::streambuf send_buffer_;     // Socket send buffer
@@ -210,9 +217,6 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<std::chrono::steady_clock::time_point> inbound_message_start_time_{
         std::chrono::steady_clock::time_point::min()};           // Start time of inbound msg
     std::unique_ptr<abi::NetMessage> inbound_message_{nullptr};  // The "next" message being received
-    std::vector<std::shared_ptr<abi::NetMessage>>
-        inbound_messages_{};               // Queue of received messages awaiting processing
-    std::mutex inbound_messages_mutex_{};  // Lock guard for received messages
 
     std::atomic_bool is_writing_{false};  // Whether a write operation is in progress
     std::atomic<std::chrono::steady_clock::time_point> outbound_message_start_time_{
