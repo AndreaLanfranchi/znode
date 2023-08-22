@@ -4,10 +4,13 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include <utility>
+
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/lexical_cast.hpp>
 
+#include <core/common/assert.hpp>
 #include <core/common/misc.hpp>
 
 #include <app/common/log.hpp>
@@ -102,7 +105,7 @@ void NodeHub::start_service_timer() {
 bool NodeHub::handle_service_timer(const boost::system::error_code& ec) {
     if (ec == boost::asio::error::operation_aborted) return false;
     if (ec) {
-        log::Error("Service", {"name", "Node Hub", "action", "info_timer_tick", "error", ec.message()});
+        log::Error("Service", {"name", "Node Hub", "action", "handle_service_timer", "error", ec.message()});
         return false;
     }
     print_info();  // Print info every 5 seconds
@@ -110,8 +113,8 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& ec) {
     for (auto [node_id, node_ptr] : nodes_) {
         if (const auto result{node_ptr->is_idle()}; result != NodeIdleResult::kNotIdle) {
             std::string reason{magic_enum::enum_name(result)};
-            log::Info("Service", {"name", "Node Hub", "action", "service", "node", std::to_string(node_id), "remote",
-                                  node_ptr->to_string(), "reason", reason})
+            log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "node",
+                                     std::to_string(node_id), "remote", node_ptr->to_string(), "reason", reason})
                 << "Disconnecting ...";
             std::ignore = node_ptr->stop(false);
         }
@@ -190,7 +193,7 @@ bool NodeHub::connect(const NetworkAddress& address, const NodeConnectionMode mo
                 return false;
             }
         }
-    };
+    }
 
     // Create the socket and try connect
     boost::asio::ip::tcp::socket socket{asio_context_};
@@ -206,17 +209,16 @@ bool NodeHub::connect(const NetworkAddress& address, const NodeConnectionMode mo
     ++current_active_connections_;
     ++current_active_outbound_connections_;
 
-    std::shared_ptr<Node> new_node(
-        new Node(
-            app_settings_, mode, asio_context_, std::move(socket), tls_client_context_.get(),
-            [this](const std::shared_ptr<Node> node) { on_node_disconnected(node); },
-            [this](DataDirectionMode direction, size_t bytes_transferred) {
-                on_node_data(direction, bytes_transferred);
-            },
-            [this](const std::shared_ptr<Node> node, std::unique_ptr<abi::NetMessage>& message) {
-                on_node_received_message(node, message);
-            }),
-        Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
+    std::shared_ptr<Node> new_node(new Node(
+                                       app_settings_, mode, asio_context_, std::move(socket), tls_client_context_.get(),
+                                       [this](std::shared_ptr<Node> node) { on_node_disconnected(std::move(node)); },
+                                       [this](DataDirectionMode direction, size_t bytes_transferred) {
+                                           on_node_data(direction, bytes_transferred);
+                                       },
+                                       [this](std::shared_ptr<Node> node, std::unique_ptr<abi::NetMessage>& message) {
+                                           on_node_received_message(std::move(node), message);
+                                       }),
+                                   Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
     {
         std::scoped_lock lock(nodes_mutex_);
@@ -287,12 +289,12 @@ void NodeHub::handle_accept(const boost::system::error_code& ec, boost::asio::ip
     std::shared_ptr<Node> new_node(
         new Node(
             app_settings_, NodeConnectionMode::kInbound, asio_context_, std::move(socket), tls_server_context_.get(),
-            [this](const std::shared_ptr<Node> node) { on_node_disconnected(node); },
+            [this](std::shared_ptr<Node> node) { on_node_disconnected(std::move(node)); },
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
             },
-            [this](const std::shared_ptr<Node> node, std::unique_ptr<abi::NetMessage>& message) {
-                on_node_received_message(node, message);
+            [this](std::shared_ptr<Node> node, std::unique_ptr<abi::NetMessage>& message) {
+                on_node_received_message(std::move(node), message);
             }),
         Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
     log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local, "remote", remote, "id",
@@ -379,9 +381,35 @@ void NodeHub::on_node_data(network::DataDirectionMode direction, const size_t by
 }
 
 void NodeHub::on_node_received_message(const std::shared_ptr<Node> node, std::unique_ptr<abi::NetMessage>& message) {
+    using namespace serialization;
+    using enum Error;
+
+    REQUIRES(message != nullptr);
+
     // This function behaves as a collector of messages from nodes
-    (void)node;
-    (void)message;
+    if (message->get_type() == abi::NetMessageType::kAddr) {
+        abi::Addr addr_payload{};
+        if (auto ret{addr_payload.deserialize(message->data())}; ret != Error::kSuccess) {
+            log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote",
+                                   node->to_string(), "error", std::string(magic_enum::enum_name(ret))})
+                << "Disconnecting ...";
+            std::ignore = node->stop(false);
+            return;
+        }
+        for (const auto& item : addr_payload.addresses) {
+            const auto item_endpoint{item.to_endpoint()};
+            log::Trace("Service", {"name", "Node Hub", "action", "on_node_received_message", "new address",
+                                   network::to_string(item_endpoint)});
+            if (item_endpoint.address().is_v4() &&
+                current_active_connections_ < app_settings_.network.max_active_connections &&
+                current_active_outbound_connections_ < 64) {
+                std::scoped_lock lock(nodes_mutex_);
+                if (!connected_addresses_.contains(item_endpoint.address())) {
+                    asio::post(asio_strand_, [this, item]() { std::ignore = connect(item); });
+                }
+            }
+        }
+    }
 }
 
 std::shared_ptr<Node> NodeHub::operator[](int id) const {

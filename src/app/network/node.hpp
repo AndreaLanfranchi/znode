@@ -206,7 +206,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     std::function<void(std::shared_ptr<Node>)> on_disconnect_;  // Called after stop (notifies hub)
     std::function<void(DataDirectionMode, size_t)> on_data_;    // To account data sizes stats at node hub
-    std::function<void(std::shared_ptr<Node>, std::unique_ptr<abi::NetMessage>& message)>
+    std::function<void(std::shared_ptr<Node>, std::unique_ptr<abi::NetMessage>&)>
         on_message_;  // Called on inbound message
 
     boost::asio::streambuf receive_buffer_;  // Socket receive buffer

@@ -63,10 +63,10 @@ class NodeHub : public Stoppable {
     void handle_accept(const boost::system::error_code& ec,
                        boost::asio::ip::tcp::socket socket);  // Async accept handler
 
-    void on_node_disconnected(const std::shared_ptr<Node> node);  // Handles disconnects from nodes
+    void on_node_disconnected(std::shared_ptr<Node> node);  // Handles disconnects from nodes
     void on_node_data(DataDirectionMode direction,
                       size_t bytes_transferred);  // Handles data size accounting from nodes
-    void on_node_received_message(const std::shared_ptr<Node> node,
+    void on_node_received_message(std::shared_ptr<Node> node,
                                   std::unique_ptr<abi::NetMessage>& message);  // Handles inbound messages from nodes
 
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options

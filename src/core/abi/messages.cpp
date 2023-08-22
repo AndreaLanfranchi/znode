@@ -66,4 +66,36 @@ Error GetHeaders::serialization(SDataStream& stream, serialization::Action actio
 
     return ret;
 }
+serialization::Error Addr::serialization(SDataStream& stream, serialization::Action action) {
+    using enum Error;
+    Error ret{kSuccess};
+    if (action == Action::kSerialize) {
+        const auto vector_size = addresses.size();
+        if (!vector_size) return Error::kMessagePayloadEmptyVector;
+        if (vector_size > kMaxAddrItems) return Error::kMessagePayloadOversizedVector;
+        write_compact(stream, vector_size);
+        for (auto& item : addresses) {
+            if (!ret) {
+                ret = item.serialize(stream);
+            } else {
+                break;
+            }
+        }
+    } else {
+        const auto vector_size = read_compact(stream);
+        if (!vector_size) return vector_size.error();
+        if (vector_size.value() == 0) return Error::kMessagePayloadEmptyVector;
+        if (vector_size.value() > kMaxAddrItems) return Error::kMessagePayloadOversizedVector;
+        addresses.resize(vector_size.value());
+        for (auto& item : addresses) {
+            if (!ret) {
+                ret = item.deserialize(stream);
+            } else {
+                break;
+            }
+        }
+    }
+
+    return ret;
+}
 }  // namespace zenpp::abi

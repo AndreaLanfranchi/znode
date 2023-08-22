@@ -139,13 +139,11 @@ bool Node::handle_ping_timer(const boost::system::error_code& ec) {
 
 void Node::process_ping_latency(const uint64_t latency_ms) {
     if (is_stopping()) return;
+
+    std::list<std::string> log_params{"action", "ping", "latency", std::to_string(latency_ms) + "ms"};
+
     if (latency_ms > app_settings_.network.ping_timeout_milliseconds) {
-        const std::list<std::string> log_params{
-            "action",        "ping",
-            "status",        "timeout",
-            "response time", std::to_string(latency_ms) + "ms",
-            "max allowed",   std::to_string(app_settings_.network.ping_timeout_milliseconds) + "ms"};
-        print_log(log::Level::kWarning, log_params, "Disconnecting ...");
+        print_log(log::Level::kWarning, log_params, "Timeout! Disconnecting ...");
         asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return;
     }
@@ -153,14 +151,17 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
     min_ping_latency_.store(std::min(min_ping_latency_.load(), latency_ms));
     if (ema_ping_latency_.load() == 0) {
         ema_ping_latency_.store(latency_ms);
-        return;
+    } else {
+        // Compute the EMA
+        const auto alpha{0.65};  // Newer values are more important
+        const auto ema{alpha * static_cast<float>(latency_ms) +
+                       (1.0 - alpha) * static_cast<float>(ema_ping_latency_.load())};
+        ema_ping_latency_.store(static_cast<uint64_t>(ema));
     }
 
-    // Compute the EMA
-    const auto alpha{0.65};  // Newer values are more important
-    const auto ema{alpha * static_cast<float>(latency_ms) +
-                   (1.0 - alpha) * static_cast<float>(ema_ping_latency_.load())};
-    ema_ping_latency_.store(static_cast<uint64_t>(ema));
+    log_params.insert(log_params.end(), {"min", std::to_string(min_ping_latency_.load()) + "ms", "ema",
+                                         std::to_string(ema_ping_latency_.load()) + "ms"});
+    print_log(log::Level::kTrace, log_params);
 }
 
 void Node::start_ssl_handshake() {
@@ -512,43 +513,46 @@ serialization::Error Node::process_inbound_message() {
             break;
         case kPing: {
             abi::PingPong ping_pong{};
-            if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) break;
-            err = push_message(abi::NetMessageType::kPong, ping_pong);
+            if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) {
+                err = push_message(abi::NetMessageType::kPong, ping_pong);
+            }
         } break;
         case kPong: {
             abi::PingPong ping_pong{};
-            if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) break;
-            if (ping_pong.nonce != ping_nonce_.load()) {
-                err = kMismatchingPingPongNonce;
-                const std::list<std::string> log_params{
-                    "action",    "message",
-                    "direction", "in ",
-                    "message",   std::string{magic_enum::enum_name(inbound_message_->get_type())},
-                    "size",      to_human_bytes(inbound_message_->size()),
-                    "status",    "failure",
-                    "reason",    std::string(magic_enum::enum_name(err))};
-                print_log(log::Level::kTrace, log_params);
-                break;
-            }
-            // Calculate ping response time in milliseconds
-            const auto now{std::chrono::steady_clock::now()};
-            const auto ping_response_time{now - last_ping_sent_time_.load()};
-            process_ping_latency((std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_time)).count());
-            print_log(log::Level::kInfo, {"action", "ping", "response time", StopWatch::format(ping_response_time),
-                                          "avg ms", std::to_string(ema_ping_latency_.load())});
+            if (err = ping_pong.deserialize(inbound_message_->data()); err == kSuccess) {
+                if (ping_pong.nonce != ping_nonce_.load()) {
+                    err = kMismatchingPingPongNonce;
+                    const std::list<std::string> log_params{
+                        "action",    "message",
+                        "direction", "in ",
+                        "message",   std::string{magic_enum::enum_name(inbound_message_->get_type())},
+                        "size",      to_human_bytes(inbound_message_->size()),
+                        "status",    "failure",
+                        "reason",    std::string(magic_enum::enum_name(err))};
+                    print_log(log::Level::kTrace, log_params);
+                    break;
+                }
+                // Calculate ping response time in milliseconds
+                const auto now{std::chrono::steady_clock::now()};
+                const auto ping_response_time{now - last_ping_sent_time_.load()};
+                process_ping_latency(
+                    (std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_time)).count());
+                print_log(log::Level::kTrace, {"action", "ping", "response time", StopWatch::format(ping_response_time),
+                                               "avg ms", std::to_string(ema_ping_latency_.load())});
 
-            // If the response time in milliseconds is greater than settings' threshold
-            // we don't reset the timers and the nonce and let idle checks do their tasks
-            if (ping_response_time <= std::chrono::milliseconds(app_settings_.network.ping_timeout_milliseconds)) {
-                ping_nonce_.store(0);
-                last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
+                // If the response time in milliseconds is greater than settings' threshold
+                // we don't reset the timers and the nonce and let idle checks do their tasks
+                if (ping_response_time <= std::chrono::milliseconds(app_settings_.network.ping_timeout_milliseconds)) {
+                    ping_nonce_.store(0);
+                    last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
+                }
             }
-
         } break;
         default:
             // Notify node-hub of the inbound message which will eventually take ownership of it
             // As a result we can safely reset it which is done after this function returns
             on_message_(shared_from_this(), inbound_message_);
+            break;
     }
 
     return err;

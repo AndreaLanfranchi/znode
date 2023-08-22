@@ -72,4 +72,16 @@ class GetHeaders : public serialization::Serializable {
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 
+class Addr : public serialization::Serializable {
+  public:
+    using serialization::Serializable::Serializable;
+    ~Addr() override = default;
+
+    std::vector<NetworkAddress> addresses{};
+
+  private:
+    friend class serialization::SDataStream;
+    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+};
+
 }  // namespace zenpp::abi
