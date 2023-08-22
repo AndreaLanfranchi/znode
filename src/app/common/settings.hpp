@@ -23,7 +23,7 @@ namespace zenpp {
 struct NetworkSettings {
     std::string local_endpoint{"0.0.0.0:9033"};       // Local node listen address
     uint32_t max_active_connections{256};             // Maximum allowed number of connected nodes
-    uint32_t max_active_connections_per_ip{5};        // Maximum allowed number of connected nodes per single IP address
+    uint32_t max_active_connections_per_ip{2};        // Maximum allowed number of connected nodes per single IP address
     uint32_t protocol_handshake_timeout_seconds{10};  // Number of seconds to wait for protocol handshake completion
     uint32_t inbound_timeout_seconds{10};   // Number of seconds to wait for the completion of an inbound message
     uint32_t outbound_timeout_seconds{10};  // Number of seconds to wait for the completion of an outbound message
@@ -32,9 +32,9 @@ struct NetworkSettings {
     std::string tls_password{};             // Password to use to load a private key file
     std::array<uint8_t, 4> magic_bytes{'c', 'a', 's', 'h'};  // Network magic bytes (ZEN mainnet) // TODO: change this
     std::vector<std::string> connect_nodes{};                // List of nodes to connect to at startup
-    uint64_t nonce{0};                         // Local nonce (identifies self in network) // TODO: might not be needed
-    uint32_t ping_interval_seconds{30};        // Interval between ping messages
-    uint32_t ping_timeout_milliseconds{1000};  // Number of milliseconds to wait for a ping response before timing-out
+    uint64_t nonce{0};                        // Local nonce (identifies self in network) // TODO: might not be needed
+    uint32_t ping_interval_seconds{120};      // Interval between ping messages
+    uint32_t ping_timeout_milliseconds{500};  // Number of milliseconds to wait for a ping response before timing-out
 };
 
 struct AppSettings {

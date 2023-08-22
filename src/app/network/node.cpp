@@ -506,15 +506,8 @@ serialization::Error Node::process_inbound_message() {
             }
             break;
         case kVerack:
-            // If remote appears to be ahead of us request headers
-            {
-                abi::GetHeaders payload{};
-                payload.version = version_.load();
-                auto genesis_hash{h256::from_hex("0007104ccda289427919efc39dc9e4d499804b7bebc22df55f8b834301260602",
-                                                 /*reverse=*/true)};
-                payload.block_locator_hashes.push_back(*genesis_hash);
-                err = push_message(abi::NetMessageType::kGetheaders, payload);
-            }
+            // This actually requires no action. Handshake flags already set
+            // and we don't need to forward the message elsewhere
             break;
         case kPing: {
             abi::PingPong ping_pong{};
