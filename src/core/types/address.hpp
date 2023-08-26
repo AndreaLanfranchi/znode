@@ -6,14 +6,17 @@
 
 #pragma once
 
+#include <string_view>
+
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
+#include <core/common/time.hpp>
 #include <core/serialization/serializable.hpp>
 
 namespace zenpp {
 
-enum class NetworkServicesType : uint32_t {
+enum class NodeServicesType : uint64_t {
     kNone = 0,                      // No services
     kNodeNetwork = 1 << 0,          // NODE_NETWORK
     kNodeGetUTXO = 1 << 1,          // NODE_GETUTXO
@@ -26,20 +29,31 @@ enum class NetworkServicesType : uint32_t {
                       kNodeNetworkLimited,
 };
 
-class NetworkAddress : public serialization::Serializable {
+class NodeContactInfo : public serialization::Serializable {
   public:
-    NetworkAddress() = default;
-    NetworkAddress(const std::string& address_string, uint16_t port_num);
-    NetworkAddress(const boost::asio::ip::address, uint16_t port_num);
-    explicit NetworkAddress(std::string endpoint_string);
-    explicit NetworkAddress(boost::asio::ip::tcp::endpoint& endpoint);
+    using serialization::Serializable::Serializable;
+    NodeContactInfo(std::string_view address, uint16_t port_num);
+    NodeContactInfo(boost::asio::ip::address address, uint16_t port_num);
+    explicit NodeContactInfo(std::string_view endpoint);
+    explicit NodeContactInfo(boost::asio::ip::tcp::endpoint& endpoint);
 
-    uint32_t time{0};      // unix timestamp : not serialized if protocol version < 31402
-    uint64_t services{0};  // services mask
-    boost::asio::ip::address address{boost::asio::ip::address_v4()};  // the actual network address
-    uint16_t port{0};                                                 // Tcp port number
+    NodeContactInfo(const NodeContactInfo& other) = default;
+
+    uint32_t time_{0};      // unix timestamp
+    uint64_t services_{0};  // services mask (OR'ed from NetworkServicesType)
+    boost::asio::ip::address ip_address_{boost::asio::ip::address_v4()};
+    uint16_t port_number_{0};
 
     [[nodiscard]] boost::asio::ip::tcp::endpoint to_endpoint() const;
+
+    [[nodiscard]] bool is_address_loopback() const;
+    [[nodiscard]] bool is_address_multicast() const;
+
+    [[nodiscard]] bool is_rfc1918() const;  // Address Allocation for Private Internets
+    [[nodiscard]] bool is_rfc2544() const;  // Benchmarking Methodology for Network Interconnect Devices
+    [[nodiscard]] bool is_rfc3927() const;  // Dynamic Configuration of IPv4 Link-Local Addresses
+    [[nodiscard]] bool is_rfc3849() const;  // IPv6 Address Prefix Reserved for Documentation
+    [[nodiscard]] bool is_rfc6145() const;
 
   private:
     friend class serialization::SDataStream;
@@ -47,10 +61,10 @@ class NetworkAddress : public serialization::Serializable {
 };
 
 //! \brief VersionNetworkAddress is a NetworkAddress which is used in the Version message
-//! and it is (de)serialized without the time field.
-class VersionNetworkAddress : public NetworkAddress {
+//! where it is required to be serialized/deserialized **without** the time field.
+class VersionNetworkAddress : public NodeContactInfo {
   public:
-    using NetworkAddress::NetworkAddress;
+    using NodeContactInfo::NodeContactInfo;
 
   private:
     friend class serialization::SDataStream;

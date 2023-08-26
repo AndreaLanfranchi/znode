@@ -25,6 +25,7 @@ std::optional<boost::asio::ip::tcp::endpoint> get_local_endpoint(const boost::as
     }
     return endpoint;
 }
+
 std::string to_string(const boost::asio::ip::tcp::endpoint& endpoint) {
     return endpoint.address().to_string() + ":" + std::to_string(endpoint.port());
 }

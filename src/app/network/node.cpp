@@ -13,7 +13,6 @@
 #include <core/common/time.hpp>
 
 #include <app/common/log.hpp>
-#include <app/common/stopwatch.hpp>
 #include <app/network/node.hpp>
 #include <app/serialization/exceptions.hpp>
 
@@ -40,12 +39,12 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
       on_message_(std::move(on_message)) {
     // TODO Set version's services according to settings
     local_version_.version = kDefaultProtocolVersion;
-    local_version_.services = static_cast<uint64_t>(NetworkServicesType::kNodeNetwork);
+    local_version_.services = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
     local_version_.timestamp = time::unix_now();
-    local_version_.addr_recv.address = socket_.remote_endpoint().address();
-    local_version_.addr_recv.port = socket_.remote_endpoint().port();
-    local_version_.addr_from.address = socket_.local_endpoint().address();
-    local_version_.addr_from.port = 9033;  // TODO Set this value to the current listening port
+    local_version_.addr_recv.ip_address_ = socket_.remote_endpoint().address();
+    local_version_.addr_recv.port_number_ = socket_.remote_endpoint().port();
+    local_version_.addr_from.ip_address_ = socket_.local_endpoint().address();
+    local_version_.addr_from.port_number_ = 9033;  // TODO Set this value to the current listening port
     local_version_.nonce = app_settings_.network.nonce;
     local_version_.user_agent = get_buildinfo_string();
     local_version_.start_height = 0;  // TODO Set this value to the current blockchain height
@@ -128,7 +127,7 @@ bool Node::handle_ping_timer(const boost::system::error_code& ec) {
     pong_payload.nonce = ping_nonce_.load();
     const auto ret{push_message(abi::NetMessageType::kPing, pong_payload)};
     if (ret != serialization::Error::kSuccess) {
-        const std::list<std::string> log_params{"action",  "ping",   "status",
+        const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", std::string(magic_enum::enum_name(ret))};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
         asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
@@ -140,28 +139,39 @@ bool Node::handle_ping_timer(const boost::system::error_code& ec) {
 void Node::process_ping_latency(const uint64_t latency_ms) {
     if (is_stopping()) return;
 
-    std::list<std::string> log_params{"action", "ping", "latency", std::to_string(latency_ms) + "ms"};
+    std::list<std::string> log_params{"action", __func__, "latency", std::to_string(latency_ms) + "ms"};
 
     if (latency_ms > app_settings_.network.ping_timeout_milliseconds) {
+        log_params.insert(log_params.end(),
+                          {"max", std::to_string(app_settings_.network.ping_timeout_milliseconds) + "ms"});
         print_log(log::Level::kWarning, log_params, "Timeout! Disconnecting ...");
         asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return;
     }
 
-    min_ping_latency_.store(std::min(min_ping_latency_.load(), latency_ms));
-    if (ema_ping_latency_.load() == 0) {
-        ema_ping_latency_.store(latency_ms);
+    const auto tmp_min_latency{min_ping_latency_.load()};
+    if (tmp_min_latency) {
+        min_ping_latency_.store(std::min(tmp_min_latency, latency_ms));
     } else {
+        min_ping_latency_.store(latency_ms);
+    }
+
+    const auto tmp_ema_latency{ema_ping_latency_.load()};
+    if (tmp_ema_latency) {
         // Compute the EMA
         const auto alpha{0.65};  // Newer values are more important
-        const auto ema{alpha * static_cast<float>(latency_ms) +
-                       (1.0 - alpha) * static_cast<float>(ema_ping_latency_.load())};
+        const auto ema{alpha * static_cast<float>(latency_ms) + (1.0 - alpha) * static_cast<float>(tmp_ema_latency)};
         ema_ping_latency_.store(static_cast<uint64_t>(ema));
+    } else {
+        ema_ping_latency_.store(latency_ms);
     }
 
     log_params.insert(log_params.end(), {"min", std::to_string(min_ping_latency_.load()) + "ms", "ema",
                                          std::to_string(ema_ping_latency_.load()) + "ms"});
-    print_log(log::Level::kTrace, log_params);
+    print_log(log::Level::kInfo, log_params);
+
+    ping_nonce_.store(0);
+    last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
 }
 
 void Node::start_ssl_handshake() {
@@ -178,12 +188,12 @@ void Node::start_ssl_handshake() {
 
 void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
     if (ec) {
-        const std::list<std::string> log_params{"action", "SSL handshake", "status", "failure", "reason", ec.message()};
+        const std::list<std::string> log_params{"action", __func__, "status", "failure", "reason", ec.message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
         stop(true);
         return;
     }
-    const std::list<std::string> log_params{"action", "SSL handshake", "status", "success"};
+    const std::list<std::string> log_params{"action", __func__, "status", "success"};
     print_log(log::Level::kInfo, log_params);
     start_read();
     push_message(abi::NetMessageType::kVersion, local_version_);
@@ -208,7 +218,7 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
     if (is_stopping()) return;
 
     if (ec) [[unlikely]] {
-        const std::list<std::string> log_params{"action", "handle_read", "status", "failure", "reason", ec.message()};
+        const std::list<std::string> log_params{"action", __func__, "status", "failure", "reason", ec.message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
         stop(true);
         return;
@@ -221,9 +231,8 @@ void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_t
 
         const auto parse_result{parse_messages(bytes_transferred)};
         if (serialization::is_fatal_error(parse_result)) {
-            const std::list<std::string> log_params{"action", "handle_read",
-                                                    "status", "failure",
-                                                    "reason", std::string(magic_enum::enum_name(parse_result))};
+            const std::list<std::string> log_params{
+                "action", __func__, "status", "failure", "reason", std::string(magic_enum::enum_name(parse_result))};
             print_log(log::Level::kError, log_params, "Disconnecting ...");
             stop(false);
             return;
@@ -268,10 +277,9 @@ void Node::start_write() {
     if (outbound_message_->data().tellg() == 0) {
         if (app_settings_.log.log_verbosity == log::Level::kTrace) {
             const std::list<std::string> log_params{
-                "action",    "message",
-                "direction", "out",
-                "message",   std::string(magic_enum::enum_name(outbound_message_->get_type())),
-                "size",      to_human_bytes(outbound_message_->data().size())};
+                "action",  __func__,
+                "message", std::string(magic_enum::enum_name(outbound_message_->get_type())),
+                "size",    to_human_bytes(outbound_message_->data().size())};
             print_log(log::Level::kTrace, log_params);
         }
 
@@ -283,11 +291,8 @@ void Node::start_write() {
                 // Actually outgoing messages' correct sequence is local responsibility
                 // maybe we should either assert or push back the message into the queue
                 const std::list<std::string> log_params{
-                    "action",    "message",
-                    "direction", "out",
-                    "message",   std::string(magic_enum::enum_name(outbound_message_->get_type())),
-                    "status",    "failure",
-                    "reason",    std::string(magic_enum::enum_name(error))};
+                    "action", __func__,  "message", std::string(magic_enum::enum_name(outbound_message_->get_type())),
+                    "status", "failure", "reason",  std::string(magic_enum::enum_name(error))};
                 print_log(log::Level::kError, log_params, "Disconnecting peer but is local fault ...");
             }
             outbound_message_.reset();
@@ -328,8 +333,7 @@ void Node::handle_write(const boost::system::error_code& ec, size_t bytes_transf
 
     if (ec) {
         if (app_settings_.log.log_verbosity >= log::Level::kError) {
-            const std::list<std::string> log_params{"action",  "handle_write", "status",
-                                                    "failure", "reason",       ec.message()};
+            const std::list<std::string> log_params{"action", __func__, "status", "failure", "reason", ec.message()};
             print_log(log::Level::kError, log_params, "Disconnecting ...");
         }
         stop(false);
@@ -368,8 +372,8 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type, 
     auto err{new_message->push(message_type, payload, app_settings_.network.magic_bytes)};
     if (!!err) {
         if (app_settings_.log.log_verbosity >= log::Level::kError) {
-            const std::list<std::string> log_params{"action",  "push_message", "status",
-                                                    "failure", "reason",       std::string{magic_enum::enum_name(err)}};
+            const std::list<std::string> log_params{"action",  __func__, "status",
+                                                    "failure", "reason", std::string{magic_enum::enum_name(err)}};
             print_log(log::Level::kError, log_params);
         }
         return err;
@@ -417,7 +421,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
                     case kMessageHeaderUnknownCommand:
                         print_log(
                             log::Level::kDebug,
-                            {"action", "parse_messages", "unknown command",
+                            {"action", __func__, "unknown command",
                              std::string(reinterpret_cast<char*>(inbound_message_->header().command.data()), 12)});
                         break;
                     default:
@@ -459,10 +463,9 @@ serialization::Error Node::process_inbound_message() {
 
     if (app_settings_.log.log_verbosity == log::Level::kTrace) [[unlikely]] {
         const std::list<std::string> log_params{
-            "action",    "message",
-            "direction", "in ",
-            "message",   std::string{magic_enum::enum_name(inbound_message_->get_type())},
-            "size",      to_human_bytes(inbound_message_->size())};
+            "action",  __func__,
+            "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
+            "size",    to_human_bytes(inbound_message_->size())};
         print_log(log::Level::kTrace, log_params);
     }
 
@@ -474,12 +477,11 @@ serialization::Error Node::process_inbound_message() {
                 remote_version_.version > kMaxSupportedProtocolVersion) {
                 err = kInvalidProtocolVersion;
                 const std::list<std::string> log_params{
-                    "action",    "message",
-                    "direction", "in ",
-                    "message",   std::string{magic_enum::enum_name(inbound_message_->get_type())},
-                    "size",      to_human_bytes(inbound_message_->size()),
-                    "status",    "failure",
-                    "reason",    std::string(magic_enum::enum_name(err))};
+                    "action",  __func__,
+                    "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
+                    "size",    to_human_bytes(inbound_message_->size()),
+                    "status",  "failure",
+                    "reason",  std::string(magic_enum::enum_name(err))};
                 std::string extended_reason{"got " + std::to_string(remote_version_.version) +
                                             " but supported versions are " +
                                             std::to_string(kMinSupportedProtocolVersion) + " to " +
@@ -523,29 +525,22 @@ serialization::Error Node::process_inbound_message() {
                 if (ping_pong.nonce != ping_nonce_.load()) {
                     err = kMismatchingPingPongNonce;
                     const std::list<std::string> log_params{
-                        "action",    "message",
-                        "direction", "in ",
-                        "message",   std::string{magic_enum::enum_name(inbound_message_->get_type())},
-                        "size",      to_human_bytes(inbound_message_->size()),
-                        "status",    "failure",
-                        "reason",    std::string(magic_enum::enum_name(err))};
+                        "action",  __func__,
+                        "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
+                        "size",    to_human_bytes(inbound_message_->size()),
+                        "status",  "failure",
+                        "reason",  std::string(magic_enum::enum_name(err))};
                     print_log(log::Level::kTrace, log_params);
                     break;
                 }
                 // Calculate ping response time in milliseconds
                 const auto now{std::chrono::steady_clock::now()};
                 const auto ping_response_time{now - last_ping_sent_time_.load()};
-                process_ping_latency(
-                    (std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_time)).count());
-                print_log(log::Level::kTrace, {"action", "ping", "response time", StopWatch::format(ping_response_time),
-                                               "avg ms", std::to_string(ema_ping_latency_.load())});
 
                 // If the response time in milliseconds is greater than settings' threshold
-                // we don't reset the timers and the nonce and let idle checks do their tasks
-                if (ping_response_time <= std::chrono::milliseconds(app_settings_.network.ping_timeout_milliseconds)) {
-                    ping_nonce_.store(0);
-                    last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
-                }
+                // this won't reset the timers and the nonce and let idle checks do their tasks
+                process_ping_latency(
+                    (std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_time)).count());
             }
         } break;
         default:
@@ -602,6 +597,9 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
                 break;
         }
         protocol_handshake_status_.store(static_cast<ProtocolHandShakeStatus>(status));
+        if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) {
+            on_fully_connected();
+        }
     } else {
         switch (message_type) {
             using enum NetMessageType;
@@ -613,6 +611,12 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
         }
     }
     return kSuccess;
+}
+
+void Node::on_fully_connected() {
+    if (is_stopping()) return;
+    // Ask the peer to send its known addresses
+    std::ignore = push_message(abi::NetMessageType::kGetaddr);
 }
 
 void Node::clean_up(Node* ptr) noexcept {
@@ -634,10 +638,10 @@ NodeIdleResult Node::is_idle() const noexcept {
         const auto ping_duration{duration_cast<milliseconds>(now - last_ping_sent_time_.load()).count()};
         if (ping_duration > app_settings_.network.ping_timeout_milliseconds) {
             const std::list<std::string> log_params{
-                "action",        "idle check",
-                "status",        "ping timeout",
-                "response time", std::to_string(ping_duration) + "ms",
-                "max allowed",   std::to_string(app_settings_.network.ping_timeout_milliseconds) + "ms"};
+                "action",  __func__,
+                "status",  "ping timeout",
+                "latency", std::to_string(ping_duration) + "ms",
+                "max",     std::to_string(app_settings_.network.ping_timeout_milliseconds) + "ms"};
             print_log(log::Level::kDebug, log_params, "Disconnecting ...");
             return kPingTimeout;
         }
@@ -648,10 +652,10 @@ NodeIdleResult Node::is_idle() const noexcept {
         const auto handshake_duration{duration_cast<seconds>(now - connected_time_.load()).count()};
         if (handshake_duration > app_settings_.network.protocol_handshake_timeout_seconds) {
             const std::list<std::string> log_params{
-                "action",      "idle check",
-                "status",      "handshake timeout",
-                "duration",    std::to_string(handshake_duration) + "s",
-                "max allowed", std::to_string(app_settings_.network.protocol_handshake_timeout_seconds) + "s"};
+                "action",   __func__,
+                "status",   "handshake timeout",
+                "duration", std::to_string(handshake_duration) + "s",
+                "max",      std::to_string(app_settings_.network.protocol_handshake_timeout_seconds) + "s"};
             print_log(log::Level::kDebug, log_params, "Disconnecting ...");
             return kProtocolHandshakeTimeout;
         }
@@ -662,10 +666,10 @@ NodeIdleResult Node::is_idle() const noexcept {
         const auto inbound_message_duration{duration_cast<seconds>(now - value).count()};
         if (inbound_message_duration > app_settings_.network.inbound_timeout_seconds) {
             const std::list<std::string> log_params{
-                "action",      "idle check",
-                "status",      "inbound timeout",
-                "duration",    std::to_string(inbound_message_duration) + "s",
-                "max allowed", std::to_string(app_settings_.network.inbound_timeout_seconds) + "s"};
+                "action",   __func__,
+                "status",   "inbound timeout",
+                "duration", std::to_string(inbound_message_duration) + "s",
+                "max",      std::to_string(app_settings_.network.inbound_timeout_seconds) + "s"};
             print_log(log::Level::kDebug, log_params, "Disconnecting ...");
             return kInboundTimeout;
         }
@@ -676,10 +680,10 @@ NodeIdleResult Node::is_idle() const noexcept {
         const auto outbound_message_duration{duration_cast<seconds>(now - value).count()};
         if (outbound_message_duration > app_settings_.network.outbound_timeout_seconds) {
             const std::list<std::string> log_params{
-                "action",      "idle check",
-                "status",      "outbound timeout",
-                "duration",    std::to_string(outbound_message_duration) + "s",
-                "max allowed", std::to_string(app_settings_.network.outbound_timeout_seconds) + "s"};
+                "action",   __func__,
+                "status",   "outbound timeout",
+                "duration", std::to_string(outbound_message_duration) + "s",
+                "max",      std::to_string(app_settings_.network.outbound_timeout_seconds) + "s"};
             print_log(log::Level::kDebug, log_params, "Disconnecting ...");
             return kOutboundTimeout;
         }
@@ -690,10 +694,10 @@ NodeIdleResult Node::is_idle() const noexcept {
     const auto idle_seconds{duration_cast<seconds>(now - most_recent_activity_time).count()};
     if (static_cast<uint32_t>(idle_seconds) >= app_settings_.network.idle_timeout_seconds) {
         const std::list<std::string> log_params{
-            "action",      "idle check",
-            "status",      "inactivity timeout",
-            "duration",    std::to_string(idle_seconds) + "s",
-            "max allowed", std::to_string(app_settings_.network.idle_timeout_seconds) + "s"};
+            "action",   __func__,
+            "status",   "inactivity timeout",
+            "duration", std::to_string(idle_seconds) + "s",
+            "max",      std::to_string(app_settings_.network.idle_timeout_seconds) + "s"};
         print_log(log::Level::kDebug, log_params, "Disconnecting ...");
         return kGlobalTimeout;
     }

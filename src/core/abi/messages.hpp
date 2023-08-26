@@ -32,7 +32,7 @@ class Version : public serialization::Serializable {
     ~Version() override = default;
 
     int32_t version{0};
-    uint64_t services{static_cast<uint64_t>(NetworkServicesType::kNone)};
+    uint64_t services{static_cast<uint64_t>(NodeServicesType::kNone)};
     int64_t timestamp{0};
     VersionNetworkAddress addr_recv{};
     VersionNetworkAddress addr_from{};
@@ -77,7 +77,7 @@ class Addr : public serialization::Serializable {
     using serialization::Serializable::Serializable;
     ~Addr() override = default;
 
-    std::vector<NetworkAddress> addresses{};
+    std::vector<NodeContactInfo> addresses{};
 
   private:
     friend class serialization::SDataStream;

@@ -11,10 +11,10 @@
 namespace zenpp {
 
 TEST_CASE("Network Address Serialization", "[serialization]") {
-    NetworkAddress address{};
-    address.services = static_cast<decltype(NetworkAddress::services)>(NetworkServicesType::kNodeNetwork);
-    address.address = boost::asio::ip::make_address("10.0.0.1");
-    address.port = 8333;
+    NodeContactInfo address{};
+    address.services_ = static_cast<decltype(NodeContactInfo::services_)>(NodeServicesType::kNodeNetwork);
+    address.ip_address_ = boost::asio::ip::make_address("10.0.0.1");
+    address.port_number_ = 8333;
 
     serialization::SDataStream stream(serialization::Scope::kNetwork, 0);
     CHECK(address.serialized_size(stream) == 30);
@@ -30,10 +30,10 @@ TEST_CASE("Network Address Serialization", "[serialization]") {
         "208d");
     CHECK(stream.to_string() == expected_hex_dump);
 
-    NetworkAddress address2{};
+    NodeContactInfo address2{};
     REQUIRE(address2.deserialize(stream) == serialization::Error::kSuccess);
-    CHECK(address2.services == address.services);
-    CHECK(address2.address == address.address);
-    CHECK(address2.port == address.port);
+    CHECK(address2.services_ == address.services_);
+    CHECK(address2.ip_address_ == address.ip_address_);
+    CHECK(address2.port_number_ == address.port_number_);
 }
 }  // namespace zenpp

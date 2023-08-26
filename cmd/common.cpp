@@ -122,7 +122,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
 
     network_opts
         .add_option("--network.connect", network_settings.connect_nodes,
-                    "Immediately connect to this remote nodes list")
+                    "Immediately connect to this remote nodes list (space separated)")
         ->capture_default_str()
         ->check(IPEndPointValidator(/*allow_empty=*/true,
                                     /*default_port=*/13383));  // TODO the port will be on behalf of network
@@ -183,50 +183,23 @@ void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
     log_opts.add_option("--log.file", log_settings.log_file, "Tee all log lines to given file name");
 }
 
-IPEndPointValidator::IPEndPointValidator(bool allow_empty, int default_port) {
+IPEndPointValidator::IPEndPointValidator(bool allow_empty, uint16_t default_port) {
     func_ = [allow_empty, default_port](std::string& value) -> std::string {
         if (value.empty() && allow_empty) {
             return {};
         }
 
-        const std::regex pattern(R"(^([\d\.]*|\*|localhost)(:[\d]{1,4})?$)", std::regex_constants::icase);
-        std::smatch matches;
-        if (!std::regex_match(value, matches, pattern)) {
-            return "Value " + value + " is not a valid endpoint";
+        boost::asio::ip::address address;
+        uint16_t port{0};
+
+        if (!parse_ip_address_and_port(value, address, port)) {
+            return "Value \"" + value + "\" is not a valid endpoint";
+        }
+        if (!port) {
+            port = static_cast<uint16_t>(default_port);
         }
 
-        std::string address_part{matches[1].str()};
-        std::string port_part{matches[2].str()};
-
-        if (address_part.empty() || boost::iequals(address_part, "*")) {
-            address_part = "0.0.0.0";
-        } else if (boost::iequals(address_part, "localhost")) {
-            address_part = "127.0.0.1";
-        }
-
-        if (!port_part.empty()) {
-            port_part.erase(0, 1);  // Get rid of initial ":"
-        } else {
-            if (default_port) {
-                port_part = std::to_string(default_port);
-            } else {
-                return "Value " + value + " does not contain a valid port";
-            }
-        }
-
-        // Validate IP address
-        boost::system::error_code err;
-        boost::asio::ip::make_address(address_part, err).to_string();
-        if (err) {
-            return "Value " + std::string(address_part) + " is not a valid ip address";
-        }
-
-        // Validate port
-        if (int port{std::stoi(port_part)}; port < 1 || port > 65535) {
-            return "Value " + port_part + " is not a valid port";
-        }
-
-        value = address_part + ":" + port_part;
+        value = address.to_string() + ":" + std::to_string(port);
         return {};
     };
 }

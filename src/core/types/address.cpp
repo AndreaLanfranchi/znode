@@ -6,83 +6,98 @@
 
 #include <regex>
 
-#include <boost/algorithm/string/predicate.hpp>
-
+#include <core/common/misc.hpp>
 #include <core/types/address.hpp>
 
 namespace zenpp {
 
 using namespace serialization;
 
-NetworkAddress::NetworkAddress(std::string endpoint_string) {
-    if (endpoint_string.empty()) return;
+NodeContactInfo::NodeContactInfo(std::string_view endpoint) {
+    if (endpoint.empty()) return;
+    std::ignore = parse_ip_address_and_port(endpoint, ip_address_, port_number_);
+}
 
-    const std::regex pattern(R"(^([\d\.]*|\*|localhost)(:[\d]{1,4})?$)", std::regex_constants::icase);
-    std::smatch matches;
-    if (!std::regex_match(endpoint_string, matches, pattern)) return;
-
-    std::string address_part{matches[1].str()};
-    std::string port_part{matches[2].str()};
-    if (address_part.empty() || boost::iequals(address_part, "*")) {
-        address_part = "0.0.0.0";
-    } else if (boost::iequals(address_part, "localhost")) {
-        address_part = "127.0.0.1";
-    }
-    if (!port_part.empty()) {
-        port_part.erase(0, 1);  // Get rid of initial ":"
-    }
-    // Validate IP address
-    boost::system::error_code err;
-    address = boost::asio::ip::make_address(address_part, err);
-    if (err) return;
-    // Validate port
-    if (!port_part.empty()) {
-        if (int p{std::stoi(port_part)}; p > 0 && p < 65535) {
-            port = static_cast<uint16_t>(p);
-        }
+NodeContactInfo::NodeContactInfo(std::string_view address, uint16_t port_num) {
+    if (address.empty()) return;
+    if (parse_ip_address_and_port(address, ip_address_, port_number_)) {
+        port_number_ = port_num;
     }
 }
 
-NetworkAddress::NetworkAddress(const std::string& address_string, uint16_t port_num) {
-    boost::system::error_code ec;
-    address = boost::asio::ip::make_address(address_string, ec);
-    if (ec) address = boost::asio::ip::address_v4();
-    port = port_num;
-}
+NodeContactInfo::NodeContactInfo(const boost::asio::ip::address ip_address, uint16_t port_num)
+    : ip_address_(ip_address), port_number_(port_num) {}
 
-NetworkAddress::NetworkAddress(const boost::asio::ip::address addr, uint16_t port_num)
-    : address(addr), port(port_num) {}
+NodeContactInfo::NodeContactInfo(boost::asio::ip::tcp::endpoint& endpoint)
+    : ip_address_(endpoint.address()), port_number_(endpoint.port()) {}
 
-NetworkAddress::NetworkAddress(boost::asio::ip::tcp::endpoint& endpoint)
-    : address(endpoint.address()), port(endpoint.port()) {}
-
-Error NetworkAddress::serialization(SDataStream& stream, Action action) {
+Error NodeContactInfo::serialization(SDataStream& stream, Action action) {
     using enum Error;
     Error ret{kSuccess};
 
-    if (!ret) ret = stream.bind(time, action);
-    if (!ret) ret = stream.bind(services, action);
+    if (!ret) ret = stream.bind(time_, action);
+    if (!ret) ret = stream.bind(services_, action);
     // These two guys are big endian address is already BE by boost for port we need to swap bytes
-    if (!ret) ret = stream.bind(address, action);
-    port = bswap_16(port);
-    if (!ret) ret = stream.bind(port, action);
-    port = bswap_16(port);
+    if (!ret) ret = stream.bind(ip_address_, action);
+    port_number_ = bswap_16(port_number_);
+    if (!ret) ret = stream.bind(port_number_, action);
+    port_number_ = bswap_16(port_number_);
 
     return ret;
 }
 
-boost::asio::ip::tcp::endpoint NetworkAddress::to_endpoint() const { return {address, port}; }
+boost::asio::ip::tcp::endpoint NodeContactInfo::to_endpoint() const { return {ip_address_, port_number_}; }
+
+bool NodeContactInfo::is_address_loopback() const { return ip_address_.is_loopback(); }
+
+bool NodeContactInfo::is_address_multicast() const { return ip_address_.is_multicast(); }
+
+bool NodeContactInfo::is_rfc3849() const {
+    if (!ip_address_.is_v6()) return false;
+
+    /* RFC3849 provides a prefix (2001:DB8::/32) for IPv6 documentation.
+    So we need to check whether the first 32 bits (4 bytes) match 2001:0DB8 */
+    const auto addr_bytes = ip_address_.to_v6().to_bytes();
+    return addr_bytes[15] == 0x20 && addr_bytes[14] == 0x01 && addr_bytes[13] == 0x0D && addr_bytes[12] == 0xB8;
+}
+bool NodeContactInfo::is_rfc6145() const {
+    /*
+     * IPv4-Embedded IPv6 Address Format:
+     * +--------------+--+-------------------+
+       |   80 bits    |16|      32 bits      |
+       +--------------+--+-------------------+
+       | 0x00000000   |FF| IPv4 Address (32) |
+       +--------------+--+-------------------+
+     * */
+
+    if (!ip_address_.is_v6()) return false;
+    const auto addr_bytes = ip_address_.to_v6().to_bytes();
+    for (int i{0}; i < 10; ++i) {
+        if (addr_bytes[i] != 0x00) return false;
+    }
+
+    return addr_bytes[10] == 0xFF && addr_bytes[11] == 0xFF;
+}
+bool NodeContactInfo::is_rfc1918() const {
+    /*
+     * RFC1918 provides three prefixes for IPv4 private networks:
+     */
+    if (!ip_address_.is_v4()) return false;
+    const auto addr_bytes = ip_address_.to_v4().to_bytes();
+    return (addr_bytes[0] == 10) || (addr_bytes[0] == 172 && addr_bytes[1] >= 16 && addr_bytes[1] <= 31) ||
+           (addr_bytes[0] == 192 && addr_bytes[1] == 168);
+}
 
 Error VersionNetworkAddress::serialization(SDataStream& stream, Action action) {
     using enum Error;
     Error ret{kSuccess};
 
-    if (!ret) ret = stream.bind(services, action);
+    if (!ret) ret = stream.bind(services_, action);
     // These two guys are big endian address is already BE by boost for port we need to swap bytes
-    if (!ret) ret = stream.bind(address, action);
-    port = bswap_16(port);
-    if (!ret) ret = stream.bind(port, action);
-    port = bswap_16(port);
+    if (!ret) ret = stream.bind(ip_address_, action);
+    port_number_ = bswap_16(port_number_);
+    if (!ret) ret = stream.bind(port_number_, action);
+    port_number_ = bswap_16(port_number_);
 
     return ret;
 }

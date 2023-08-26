@@ -9,7 +9,9 @@
 
 #include <limits>
 #include <random>
+#include <string_view>
 
+#include <boost/asio/ip/address.hpp>
 #include <tl/expected.hpp>
 
 #include <core/common/base.hpp>
@@ -36,6 +38,31 @@ namespace zenpp {
 //! otherwise it will stop counting and return as soon as max_count is reached
 [[nodiscard]] size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size, size_t max_count = 0) noexcept;
 
+//! \brief Parses a string representing an unsigned integer
+template <typename T>
+    requires std::unsigned_integral<T>
+bool parse_uint(std::string_view input, int base, T& output) noexcept {
+    size_t pos{0};
+    if (input.empty()) return false;
+    auto input_str{std::string(input)};
+    auto value{std::stoull(input_str, &pos, base)};
+    if (pos != input_str.length() || value > std::numeric_limits<T>::max()) {
+        return false;
+    }
+    output = static_cast<T>(value);
+    return true;
+};
+
+//! \brief Parses a string representing an IP address and port
+//! \remarks If port is not provided then it will be set to zero
+//! \details The following formats are supported:
+//! - [ipv6_address]:port
+//! - ipv4_address:port
+//! - ipv4_address
+//! - [ipv6_address]
+//! - "localhost" literal can be used in place of ipv4_address
+bool parse_ip_address_and_port(std::string_view endpoint, boost::asio::ip::address& address, uint16_t& port) noexcept;
+
 //! \brief Generates a random value of type T in a provided (min, max) range
 template <typename T>
 typename std::enable_if<std::is_integral<T>::value, T>::type randomize(T min, T max) {
@@ -45,13 +72,13 @@ typename std::enable_if<std::is_integral<T>::value, T>::type randomize(T min, T 
     return dis(gen);
 }
 
-//! \brief Generates a random value of type T in range std::numeric_limits<T>::max() to std::numeric_limits<T>::max()
+//! \brief Generates a random value of type T in range (min,std::numeric_limits<T>::max())
 template <typename T>
 typename std::enable_if<std::is_integral<T>::value, T>::type randomize(T min) {
     return randomize<T>(static_cast<T>(min), std::numeric_limits<T>::max());
 }
 
-//! \brief Generates a random value of type T in range std::numeric_limits<T>::max() to std::numeric_limits<T>::max()
+//! \brief Generates a random value of type T in range (std::numeric_limits<T>::max(),std::numeric_limits<T>::max())
 template <typename T>
 typename std::enable_if<std::is_integral<T>::value, T>::type randomize() {
     return randomize<T>(std::numeric_limits<T>::min(), std::numeric_limits<T>::max());

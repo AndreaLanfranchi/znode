@@ -19,6 +19,7 @@
 
 #include <core/abi/netmessage.hpp>
 #include <core/common/base.hpp>
+#include <core/types/address.hpp>
 
 #include <app/common/settings.hpp>
 #include <app/concurrency/stoppable.hpp>
@@ -121,6 +122,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Returns information about the received Version message
     [[nodiscard]] const abi::Version& version_info() const noexcept { return remote_version_; }
 
+    //! \brief Returns whether the remote node supports the specified service
+    [[nodiscard]] bool has_service(NodeServicesType service) const noexcept {
+        return (fully_connected() && (((local_version_.services & static_cast<uint64_t>(service)) != 0)));
+    }
+
     //! \brief Returns the average ping latency in milliseconds
     [[nodiscard]] uint64_t ping_latency() const noexcept { return ema_ping_latency_.load(); }
 
@@ -169,6 +175,8 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
     [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
                                                                                abi::NetMessageType message_type);
+
+    void on_fully_connected();  // Called when the protocol handshake is completed
 
     void start_write();  // Begin writing to the socket asynchronously
     void handle_write(const boost::system::error_code& ec, size_t bytes_transferred);  // Async write handler

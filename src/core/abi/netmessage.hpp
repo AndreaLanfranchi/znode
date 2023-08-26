@@ -34,7 +34,8 @@ enum class NetMessageType : uint32_t {
     kPing,              // Ping message to measure the latency of a connection
     kPong,              // Pong message to reply to a ping message
     kGetheaders,        // Getheaders message to request/send a list of block headers
-    kHeaders,           // Headers message to send a list of block headers
+    kHeaders,           // Headers message to send a list of block
+    kGetaddr,           // Getaddr message to request a list of known active peers
     kMemPool,           // MemPool message to request/send a list of transactions in the mempool
     kMissingOrUnknown,  // This must be the last entry
 };
@@ -121,7 +122,7 @@ inline constexpr MessageDefinition kMessageGetheaders{
     size_t{4 + serialization::ser_compact_sizeof(2000) + 32 * 2001},  // max payload length
 };
 
-inline constexpr MessageDefinition kHeaders{
+inline constexpr MessageDefinition kMessageHeaders{
     "headers",                 //
     NetMessageType::kHeaders,  //
     true,                      // vectorized
@@ -129,6 +130,16 @@ inline constexpr MessageDefinition kHeaders{
     std::nullopt,              // vector item size
     size_t{1 + 140},           // min payload length
     std::nullopt,              // max payload length
+};
+
+inline constexpr MessageDefinition kMessageGetAddr{
+    "getaddr",                 //
+    NetMessageType::kGetaddr,  //
+    false,                     // vectorized
+    std::nullopt,              // max vector items
+    std::nullopt,              // vector item size
+    size_t{0},                 // min payload length
+    size_t{0},                 // max payload length
 };
 
 inline constexpr MessageDefinition kMessageMempool{
@@ -153,7 +164,7 @@ inline constexpr MessageDefinition kMessageMissingOrUnknown{
 
 //! \brief List of all supported messages
 //! \attention This must be kept in same order as the MessageCommand enum
-inline constexpr std::array<MessageDefinition, 10> kMessageDefinitions{
+inline constexpr std::array<MessageDefinition, 11> kMessageDefinitions{
     kMessageVersion,           // 0
     kMessageVerack,            // 1
     kMessageInv,               // 2
@@ -161,9 +172,10 @@ inline constexpr std::array<MessageDefinition, 10> kMessageDefinitions{
     kMessagePing,              // 4
     kMessagePong,              // 5
     kMessageGetheaders,        // 6
-    kHeaders,                  // 7
-    kMessageMempool,           // 8
-    kMessageMissingOrUnknown,  // 9
+    kMessageHeaders,           // 7
+    kMessageGetAddr,           // 8
+    kMessageMempool,           // 9
+    kMessageMissingOrUnknown,  // 10
 };
 
 static_assert(kMessageDefinitions.size() == static_cast<size_t>(NetMessageType::kMissingOrUnknown) + 1,

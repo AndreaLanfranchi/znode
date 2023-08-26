@@ -56,7 +56,7 @@ void NodeHub::start_connecting() {
     if (!app_settings_.network.connect_nodes.empty()) {
         for (auto const& node_address : app_settings_.network.connect_nodes) {
             if (is_stopping()) return;
-            const NetworkAddress address{node_address};
+            const NodeContactInfo address{node_address};
             std::ignore = connect(address, NodeConnectionMode::kManualOutbound);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -87,7 +87,7 @@ void NodeHub::start_connecting() {
             if (!result.endpoint().address().is_v4()) {
                 continue;
             }
-            NetworkAddress address{result.endpoint().address(), 9033 /*TODO: Get from chain params*/};
+            NodeContactInfo address{result.endpoint().address(), 9033 /*TODO: Get from chain params*/};
             std::ignore = connect(address);
         }
     }
@@ -167,15 +167,15 @@ bool NodeHub::stop(bool wait) noexcept {
         lock.unlock();
         // Wait for all nodes to stop - active_connections get to zero
         while (wait && current_active_connections_.load() > 0) {
-            log::Info("Service", {"name", "Node Hub", "action", "stop", "info", "waiting for active connections"})
-                << std::to_string(current_active_connections_.load());
+            log::Info("Service", {"name", "Node Hub", "action", "stop", "pending connections",
+                                  std::to_string(current_active_connections_.load())});
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
     return ret;
 }
 
-bool NodeHub::connect(const NetworkAddress& address, const NodeConnectionMode mode) {
+bool NodeHub::connect(const NodeContactInfo& address, const NodeConnectionMode mode) {
     if (is_stopping()) return false;
 
     const std::string remote{network::to_string(address.to_endpoint())};
@@ -186,7 +186,7 @@ bool NodeHub::connect(const NetworkAddress& address, const NodeConnectionMode mo
         return false;
     } else {
         std::scoped_lock lock{nodes_mutex_};
-        if (auto item = connected_addresses_.find(address.address); item != connected_addresses_.end()) {
+        if (auto item = connected_addresses_.find(address.ip_address_); item != connected_addresses_.end()) {
             if (item->second >= app_settings_.network.max_active_connections_per_ip) {
                 log::Error("Service",
                            {"name", "Node Hub", "action", "connect", "error", "max active connections per ip reached"});
@@ -231,7 +231,7 @@ bool NodeHub::connect(const NetworkAddress& address, const NodeConnectionMode mo
 void NodeHub::start_accept() {
     if (is_stopping()) return;
 
-    log::Trace("Service", {"name", "Node Hub", "status", "Waiting for connections ..."});
+    log::Trace("Service", {"name", "Node Hub", "status", "Listening for connections ..."});
     socket_acceptor_.async_accept([this](const boost::system::error_code& ec, boost::asio::ip::tcp::socket socket) {
         handle_accept(ec, std::move(socket));
     });
@@ -331,7 +331,7 @@ void NodeHub::initialize_acceptor() {
     socket_acceptor_.bind(local_endpoint);
     socket_acceptor_.listen();
 
-    log::Info("Service", {"name", "Node Hub", "secure", (app_settings_.network.use_tls ? "yes" : "no"), "listening on",
+    log::Info("Service", {"name", "Node Hub", "secure", (app_settings_.network.use_tls ? "yes" : "no"), "bound to",
                           to_string(local_endpoint)});
 }
 
@@ -389,7 +389,7 @@ void NodeHub::on_node_received_message(const std::shared_ptr<Node> node, std::un
     // This function behaves as a collector of messages from nodes
     if (message->get_type() == abi::NetMessageType::kAddr) {
         abi::Addr addr_payload{};
-        if (auto ret{addr_payload.deserialize(message->data())}; ret != Error::kSuccess) {
+        if (const auto ret{addr_payload.deserialize(message->data())}; ret != Error::kSuccess) {
             log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote",
                                    node->to_string(), "error", std::string(magic_enum::enum_name(ret))})
                 << "Disconnecting ...";
@@ -398,16 +398,16 @@ void NodeHub::on_node_received_message(const std::shared_ptr<Node> node, std::un
         }
         for (const auto& item : addr_payload.addresses) {
             const auto item_endpoint{item.to_endpoint()};
-            log::Trace("Service", {"name", "Node Hub", "action", "on_node_received_message", "new address",
+            log::Trace("Service", {"name", "Node Hub", "action", "on_node_received_message[addr]", "new address",
                                    network::to_string(item_endpoint)});
-            if (item_endpoint.address().is_v4() &&
-                current_active_connections_ < app_settings_.network.max_active_connections &&
-                current_active_outbound_connections_ < 64) {
-                std::scoped_lock lock(nodes_mutex_);
-                if (!connected_addresses_.contains(item_endpoint.address())) {
-                    asio::post(asio_strand_, [this, item]() { std::ignore = connect(item); });
-                }
-            }
+            //            if (item_endpoint.address().is_v4() &&
+            //                current_active_connections_ < app_settings_.network.max_active_connections &&
+            //                current_active_outbound_connections_ < 64) {
+            //                std::scoped_lock lock(nodes_mutex_);
+            //                if (!connected_addresses_.contains(item_endpoint.address())) {
+            //                    asio::post(asio_strand_, [this, item]() { std::ignore = connect(item); });
+            //                }
+            //            }
         }
     }
 }
