@@ -31,7 +31,7 @@ class NodeHub : public Stoppable {
           asio_strand_{io_context},
           socket_acceptor_{io_context},
           service_timer_{io_context} {
-        if (!app_settings_.network.nonce) {
+        if (app_settings_.network.nonce == 0U) {
             app_settings_.network.nonce = randomize<uint64_t>(uint64_t(/*min=*/1));
         }
     };
@@ -40,11 +40,12 @@ class NodeHub : public Stoppable {
     NodeHub(NodeHub& other) = delete;
     NodeHub(NodeHub&& other) = delete;
     NodeHub& operator=(const NodeHub& other) = delete;
+    NodeHub& operator=(const NodeHub&& other) = delete;
     ~NodeHub() override = default;
 
-    [[nodiscard]] bool contains(int id) const;                     // Returns whether a node id is actually connected
-    [[nodiscard]] size_t size() const;                             // Returns the number of nodes
-    [[nodiscard]] std::shared_ptr<Node> operator[](int id) const;  // Returns a shared_ptr<Node> by id
+    [[nodiscard]] bool contains(int node_id) const;  // Returns whether a node node_id is actually connected
+    [[nodiscard]] size_t size() const;               // Returns the number of nodes
+    [[nodiscard]] std::shared_ptr<Node> operator[](int node_id) const;   // Returns a shared_ptr<Node> by node_id
     [[nodiscard]] std::vector<std::shared_ptr<Node>> get_nodes() const;  // Returns a vector of all nodes
 
     [[nodiscard]] size_t bytes_sent() const noexcept { return total_bytes_sent_.load(); }
@@ -60,7 +61,7 @@ class NodeHub : public Stoppable {
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
     void start_accept();         // Begin async accept operation
-    void handle_accept(const boost::system::error_code& ec,
+    void handle_accept(const boost::system::error_code& error_code,
                        boost::asio::ip::tcp::socket socket);  // Async accept handler
 
     void on_node_disconnected(std::shared_ptr<Node> node);  // Handles disconnects from nodes
@@ -71,9 +72,9 @@ class NodeHub : public Stoppable {
 
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options
 
-    void start_service_timer();                                      // Starts the majordomo timer
-    bool handle_service_timer(const boost::system::error_code& ec);  // Majordomo to serve connections
-    void print_info();                                               // Prints some stats about network usage
+    void start_service_timer();                                              // Starts the majordomo timer
+    bool handle_service_timer(const boost::system::error_code& error_code);  // Majordomo to serve connections
+    void print_info();                                                       // Prints some stats about network usage
 
     void start_connecting();  // Starts the initial dial-out connection process
 
