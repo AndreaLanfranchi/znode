@@ -79,11 +79,11 @@ serialization::Error MsgAddrPayload::serialization(SDataStream& stream, serializ
             ret = item.serialize(stream);
         }
     } else {
-        const auto vector_size = read_compact(stream);
-        if (!vector_size) return vector_size.error();
-        if (vector_size.value() == 0) return Error::kMessagePayloadEmptyVector;
-        if (vector_size.value() > kMaxAddrItems) return Error::kMessagePayloadOversizedVector;
-        identifiers_.resize(vector_size.value());
+        const auto expected_vector_size = read_compact(stream);
+        if (!expected_vector_size) return expected_vector_size.error();
+        if (*expected_vector_size == 0U) return Error::kMessagePayloadEmptyVector;
+        if (*expected_vector_size > kMaxAddrItems) return Error::kMessagePayloadOversizedVector;
+        identifiers_.resize(*expected_vector_size);
         for (auto& item : identifiers_) {
             if (ret != Error::kSuccess) break;
             ret = item.deserialize(stream);

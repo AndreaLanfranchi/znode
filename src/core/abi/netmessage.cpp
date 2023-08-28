@@ -24,9 +24,10 @@ void NetMessageHeader::reset() noexcept {
 }
 
 bool NetMessageHeader::pristine() const noexcept {
-    return std::all_of(network_magic.begin(), network_magic.end(), [](const auto b) { return b == 0; }) &&
-           std::all_of(command.begin(), command.end(), [](const auto b) { return b == 0; }) &&
-           std::all_of(payload_checksum.begin(), payload_checksum.end(), [](const auto b) { return b == 0; }) &&
+    return std::all_of(network_magic.begin(), network_magic.end(), [](const auto ubyte) { return ubyte == 0U; }) &&
+           std::all_of(command.begin(), command.end(), [](const auto ubyte) { return ubyte == 0U; }) &&
+           std::all_of(payload_checksum.begin(), payload_checksum.end(),
+                       [](const auto ubyte) { return ubyte == 0U; }) &&
            message_type_ == NetMessageType::kMissingOrUnknown && payload_length == 0;
 }
 
@@ -105,6 +106,8 @@ const MessageDefinition& NetMessageHeader::get_definition() const noexcept {
     return kMessageDefinitions[static_cast<decltype(kMessageDefinitions)::size_type>(message_type_)];
 }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "readability-function-cognitive-complexity"
 serialization::Error NetMessage::validate() noexcept {
     using enum serialization::Error;
 
@@ -164,13 +167,14 @@ serialization::Error NetMessage::validate() noexcept {
 
     return kSuccess;
 }
+#pragma clang diagnostic pop
 
 serialization::Error NetMessage::parse(ByteView& input_data, ByteView network_magic) noexcept {
     using namespace serialization;
     using enum Error;
 
     Error ret{kSuccess};
-    while (!input_data.empty()) {
+    while (!ret && !input_data.empty()) {
         const bool header_mode(ser_stream_.tellg() < kMessageHeaderLength);
         auto bytes_to_read(header_mode ? kMessageHeaderLength - ser_stream_.avail()
                                        : header_.payload_length - ser_stream_.avail());
@@ -179,41 +183,35 @@ serialization::Error NetMessage::parse(ByteView& input_data, ByteView network_ma
         input_data.remove_prefix(bytes_to_read);
 
         if (header_mode) {
-            if (ser_stream_.avail() < kMessageHeaderLength) {
-                ret = kMessageHeaderIncomplete;  // Not enough data for a full header
-                break;                           // All data consumed nevertheless
-            }
+            if (ser_stream_.avail() < kMessageHeaderLength) return kMessageHeaderIncomplete;
 
             ret = header_.deserialize(ser_stream_);
-            if (ret == kSuccess) {
-                if (!network_magic.empty()) {
-                    REQUIRES(header_.network_magic.size() == network_magic.size());
-                    if (memcmp(header_.network_magic.data(), network_magic.data(), network_magic.size()) != 0) {
-                        ret = kMessageHeaderMagicMismatch;
-                    }
-                }
+            if (ret != kSuccess) return ret;
 
-                const auto& message_definition{header_.get_definition()};
-                if (message_definition.min_protocol_version.has_value() &&
-                    ser_stream_.get_version() < *message_definition.min_protocol_version) {
-                    ret = kUnsupportedMessageTypeForProtocolVersion;
-                }
-                if (message_definition.max_protocol_version.has_value() &&
-                    ser_stream_.get_version() > *message_definition.max_protocol_version) {
-                    ret = kDeprecatedMessageTypeForProtocolVersion;
-                }
+            REQUIRES(network_magic.size() == header_.network_magic.size());
+            if (memcmp(header_.network_magic.data(), network_magic.data(), network_magic.size()) != 0) {
+                return kMessageHeaderMagicMismatch;
             }
-            if (ret == kSuccess) ret = header_.validate();
-            if (ret == kSuccess) {
-                if (header_.payload_length == 0) return validate_checksum();  // No payload to read
-                continue;                                                     // Keep reading the body payload - if any
+
+            const auto& message_definition{header_.get_definition()};
+            if (message_definition.min_protocol_version.has_value() &&
+                ser_stream_.get_version() < *message_definition.min_protocol_version) {
+                return kUnsupportedMessageTypeForProtocolVersion;
             }
-            break;  // Exit on any error - here are all fatal
+            if (message_definition.max_protocol_version.has_value() &&
+                ser_stream_.get_version() > *message_definition.max_protocol_version) {
+                return kDeprecatedMessageTypeForProtocolVersion;
+            }
+
+            ret = header_.validate();
+            if (ret != kSuccess) return ret;
+
+            if (header_.payload_length == 0) ret = validate_checksum();  // No payload to read
+
+        } else {
+            // We are in body mode
+            ret = (ser_stream_.avail() < header_.payload_length) ? kMessageBodyIncomplete : validate();
         }
-
-        // We are in body mode
-        ret = (ser_stream_.avail() < header_.payload_length) ? kMessageBodyIncomplete : validate();
-        break;  // Exit anyway as either there is an or we have consumed all input data
     }
 
     return ret;

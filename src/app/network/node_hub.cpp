@@ -112,7 +112,7 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& error_code) 
     print_info();  // Print info every 5 seconds
     const std::scoped_lock lock{nodes_mutex_};
     for (auto& [node_id, node_ptr] : nodes_) {
-        if (const auto result{node_ptr->is_idle()}; result == NodeIdleResult::kNotIdle) {
+        if (const auto result{node_ptr->is_idle()}; result != NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "node",
                                      std::to_string(node_id), "remote", node_ptr->to_string(), "reason", reason})
