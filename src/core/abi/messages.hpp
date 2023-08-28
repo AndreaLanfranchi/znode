@@ -13,10 +13,10 @@
 
 namespace zenpp::abi {
 
-class NullData : public serialization::Serializable {
+class MsgNullPayload : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
-    ~NullData() override = default;
+    ~MsgNullPayload() override = default;
 
   private:
     friend class serialization::SDataStream;
@@ -26,10 +26,10 @@ class NullData : public serialization::Serializable {
     };
 };
 
-class Version : public serialization::Serializable {
+class MsgVersionPayload : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
-    ~Version() override = default;
+    ~MsgVersionPayload() override = default;
 
     int32_t version{0};
     uint64_t services{static_cast<uint64_t>(NodeServicesType::kNone)};

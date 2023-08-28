@@ -10,7 +10,7 @@ namespace zenpp::abi {
 
 using namespace serialization;
 
-Error Version::serialization(SDataStream& stream, Action action) {
+Error MsgVersionPayload::serialization(SDataStream& stream, Action action) {
     using enum Error;
     Error ret{kSuccess};
     if (!ret) ret = stream.bind(version, action);
@@ -29,6 +29,8 @@ Error PingPong::serialization(serialization::SDataStream& stream, serialization:
     return stream.bind(nonce, action);
 }
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "readability-function-cognitive-complexity"
 Error GetHeaders::serialization(SDataStream& stream, serialization::Action action) {
     using enum Error;
     Error ret{kSuccess};
@@ -36,7 +38,7 @@ Error GetHeaders::serialization(SDataStream& stream, serialization::Action actio
     if (!ret) {
         if (action == Action::kSerialize) {
             const auto vector_size = block_locator_hashes.size();
-            if (!vector_size) return Error::kMessagePayloadEmptyVector;
+            if (vector_size == 0U) return Error::kMessagePayloadEmptyVector;
             if (vector_size > 2000) return Error::kMessagePayloadOversizedVector;
             write_compact(stream, vector_size);
             for (auto& item : block_locator_hashes) {
@@ -66,12 +68,14 @@ Error GetHeaders::serialization(SDataStream& stream, serialization::Action actio
 
     return ret;
 }
+#pragma clang diagnostic pop
+
 serialization::Error Addr::serialization(SDataStream& stream, serialization::Action action) {
     using enum Error;
     Error ret{kSuccess};
     if (action == Action::kSerialize) {
         const auto vector_size = addresses.size();
-        if (!vector_size) return Error::kMessagePayloadEmptyVector;
+        if (vector_size == 0U) return Error::kMessagePayloadEmptyVector;
         if (vector_size > kMaxAddrItems) return Error::kMessagePayloadOversizedVector;
         write_compact(stream, vector_size);
         for (auto& item : addresses) {

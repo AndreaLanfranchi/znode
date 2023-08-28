@@ -14,6 +14,7 @@
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
+#include <gsl/pointers>
 #include <magic_enum.hpp>
 #include <openssl/ssl.h>
 
@@ -76,7 +77,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Used as custom deleter for shared_ptr<Node> to ensure proper closure of the socket
     //! \attention Do not call directly, use in std::shared_ptr<Node> instead
-    static void clean_up(Node* ptr) noexcept;
+    static void clean_up(gsl::owner<Node*> ptr) noexcept;
 
     enum class ProtocolHandShakeStatus : uint32_t {
         kNotInitiated = 0,                  // 0
@@ -120,7 +121,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     }
 
     //! \brief Returns information about the received Version message
-    [[nodiscard]] const abi::Version& version_info() const noexcept { return remote_version_; }
+    [[nodiscard]] const abi::MsgVersionPayload& version_info() const noexcept { return remote_version_; }
 
     //! \brief Returns whether the remote node supports the specified service
     [[nodiscard]] bool has_service(NodeServicesType service) const noexcept {
@@ -155,17 +156,17 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
   private:
     void start_ssl_handshake();
-    void handle_ssl_handshake(const boost::system::error_code& ec);
+    void handle_ssl_handshake(const boost::system::error_code& error_code);
 
     void begin_inbound_message();
     void end_inbound_message();
 
     void start_ping_timer();
-    bool handle_ping_timer(const boost::system::error_code& ec);
+    bool handle_ping_timer(const boost::system::error_code& error_code);
     void process_ping_latency(uint64_t latency_ms);
 
     void start_read();
-    void handle_read(const boost::system::error_code& ec, size_t bytes_transferred);
+    void handle_read(const boost::system::error_code& error_code, size_t bytes_transferred);
     serialization::Error parse_messages(
         size_t bytes_transferred);  // Reads messages from the receiving buffer and consumes buffered data
 
@@ -179,11 +180,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     void on_fully_connected();  // Called when the protocol handshake is completed
 
     void start_write();  // Begin writing to the socket asynchronously
-    void handle_write(const boost::system::error_code& ec, size_t bytes_transferred);  // Async write handler
+    void handle_write(const boost::system::error_code& error_code, size_t bytes_transferred);  // Async write handler
 
     //! \brief Local facility to print log lines in unified format
     void print_log(log::Level severity, const std::list<std::string>& params,
-                   std::string extra_data = "") const noexcept;
+                   const std::string& extra_data = "") const noexcept;
 
     AppSettings& app_settings_;                  // Reference to global application settings
     static std::atomic_int next_node_id_;        // Used to generate unique node ids
@@ -233,7 +234,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::vector<decltype(outbound_message_)> outbound_messages_{};  // Queue of messages awaiting to be sent
     std::mutex outbound_messages_mutex_{};                          // Lock guard for messages to be sent
 
-    abi::Version local_version_{};   // Local protocol version
-    abi::Version remote_version_{};  // Remote protocol version
+    abi::MsgVersionPayload local_version_{};   // Local protocol version
+    abi::MsgVersionPayload remote_version_{};  // Remote protocol version
 };
 }  // namespace zenpp::network

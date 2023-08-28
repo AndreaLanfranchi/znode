@@ -33,7 +33,7 @@ class NodeContactInfo : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
     NodeContactInfo(std::string_view address, uint16_t port_num);
-    NodeContactInfo(boost::asio::ip::address address, uint16_t port_num);
+    NodeContactInfo(boost::asio::ip::address  address, uint16_t port_num);
     explicit NodeContactInfo(std::string_view endpoint);
     explicit NodeContactInfo(boost::asio::ip::tcp::endpoint& endpoint);
 

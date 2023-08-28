@@ -59,26 +59,26 @@ serialization::Error NetMessageHeader::validate() noexcept {
     // eventually right padded to 12 bytes with NUL (0x00) characters.
     bool null_terminator_matched{false};
     size_t got_command_len{0};
-    for (const auto c : command) {
-        if (null_terminator_matched && c != 0) return kMessageHeaderMalformedCommand;
-        if (c == 0) {
+    for (const auto chr : command) {
+        if (null_terminator_matched && chr != 0) return kMessageHeaderMalformedCommand;
+        if (chr == 0) {
             null_terminator_matched = true;
             continue;
         }
-        if (c < 32 || c > 126) return kMessageHeaderMalformedCommand;
+        if (chr < 32U || chr > 126U) return kMessageHeaderMalformedCommand;
         ++got_command_len;
     }
-    if (!got_command_len) return kMessageHeaderEmptyCommand;
+    if (got_command_len == 0U) return kMessageHeaderEmptyCommand;
 
     // Identify the command amongst the known ones
-    int id{0};
+    int definition_id{0};
     for (const auto& msg_def : kMessageDefinitions) {
         const auto def_command_len{strnlen_s(msg_def.command, command.size())};
         if (got_command_len == def_command_len && memcmp(msg_def.command, command.data(), def_command_len) == 0) {
-            message_type_ = static_cast<NetMessageType>(id);
+            message_type_ = static_cast<NetMessageType>(definition_id);
             break;
         }
-        ++id;
+        ++definition_id;
     }
 
     if (message_type_ == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
@@ -147,7 +147,7 @@ serialization::Error NetMessage::validate() noexcept {
             return kMessagePayloadOversizedVector;
         if (message_definition.vector_item_size.has_value()) {
             // Message `getheaders` has an extra item of 32 bytes (the stop hash)
-            const uint64_t extra_item{message_definition.message_type == NetMessageType::kGetheaders ? 1u : 0};
+            const uint64_t extra_item{message_definition.message_type == NetMessageType::kGetheaders ? 1U : 0};
             const auto expected_vector_size{(*vector_size + extra_item) * *message_definition.vector_item_size};
 
             if (ser_stream_.avail() != expected_vector_size) return kMessagePayloadMismatchesVectorSize;
@@ -203,21 +203,17 @@ serialization::Error NetMessage::parse(ByteView& input_data, ByteView network_ma
                     ret = kDeprecatedMessageTypeForProtocolVersion;
                 }
             }
-            if (ret == kSuccess) ret = header_.validate(/* TODO Network magic here */);
+            if (ret == kSuccess) ret = header_.validate();
             if (ret == kSuccess) {
                 if (header_.payload_length == 0) return validate_checksum();  // No payload to read
                 continue;                                                     // Keep reading the body payload - if any
             }
             break;  // Exit on any error - here are all fatal
-
-        } else {
-            if (ser_stream_.avail() < header_.payload_length) {
-                ret = kMessageBodyIncomplete;  // Not enough data for a full body
-                break;                         // All data consumed nevertheless
-            }
-            ret = validate();  // Validate the whole payload of the message
-            break;             // Exit anyway as either there is an or we have consumed all input data
         }
+
+        // We are in body mode
+        ret = (ser_stream_.avail() < header_.payload_length) ? kMessageBodyIncomplete : validate();
+        break;  // Exit anyway as either there is an or we have consumed all input data
     }
 
     return ret;
@@ -283,7 +279,7 @@ serialization::Error NetMessage::push(const NetMessageType message_type, seriali
 
 serialization::Error NetMessage::push(NetMessageType message_type, serialization::Serializable& payload,
                                       std::array<uint8_t, 4>& magic) noexcept {
-    ByteView magic_view{magic.data(), magic.size()};
+    const ByteView magic_view{magic.data(), magic.size()};
     return push(message_type, payload, magic_view);
 }
 }  // namespace zenpp::abi

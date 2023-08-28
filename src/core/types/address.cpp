@@ -5,6 +5,7 @@
 */
 
 #include <regex>
+#include <utility>
 
 #include <core/common/misc.hpp>
 #include <core/types/address.hpp>
@@ -25,8 +26,8 @@ NodeContactInfo::NodeContactInfo(std::string_view address, uint16_t port_num) {
     }
 }
 
-NodeContactInfo::NodeContactInfo(const boost::asio::ip::address ip_address, uint16_t port_num)
-    : ip_address_(ip_address), port_number_(port_num) {}
+NodeContactInfo::NodeContactInfo(boost::asio::ip::address address, uint16_t port_num)
+    : ip_address_(std::move(address)), port_number_(port_num) {}
 
 NodeContactInfo::NodeContactInfo(boost::asio::ip::tcp::endpoint& endpoint)
     : ip_address_(endpoint.address()), port_number_(endpoint.port()) {}

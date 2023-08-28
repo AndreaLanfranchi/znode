@@ -81,16 +81,16 @@ bool Node::stop(bool wait) noexcept {
         is_writing_.store(false);
         ping_timer_.cancel();
 
-        boost::system::error_code ec;
+        boost::system::error_code error_code;
         if (ssl_stream_ != nullptr) {
-            ssl_stream_->shutdown(ec);
-            ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-            ssl_stream_->lowest_layer().close(ec);
+            std::ignore = ssl_stream_->shutdown(error_code);
+            std::ignore = ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
+            std::ignore = ssl_stream_->lowest_layer().close(error_code);
             // Don't reset the stream !!! There might be outstanding async operations
             // Let them gracefully complete
         } else {
-            socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-            socket_.close(ec);
+            std::ignore = socket_.shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
+            std::ignore = socket_.close(error_code);
         }
         if (bool expected{true}; is_started_.compare_exchange_strong(expected, false)) {
             asio::post(io_strand_, [self{shared_from_this()}]() { self->on_disconnect_(self); });
@@ -111,16 +111,16 @@ void Node::start_ping_timer() {
         randomize<uint32_t>(ping_interval_seconds_min, ping_interval_seconds_max)};
 
     ping_timer_.expires_after(std::chrono::seconds(ping_interval_seconds_randomized));
-    ping_timer_.async_wait([self{shared_from_this()}](const boost::system::error_code& ec) {
-        if (self->handle_ping_timer(ec)) {
+    ping_timer_.async_wait([self{shared_from_this()}](const boost::system::error_code& error_code) {
+        if (self->handle_ping_timer(error_code)) {
             self->start_ping_timer();
         }
     });
 }
 
-bool Node::handle_ping_timer(const boost::system::error_code& ec) {
-    if (ec == boost::asio::error::operation_aborted) return false;
-    if (ping_nonce_.load()) return !is_stopping();  // Wait for response to return
+bool Node::handle_ping_timer(const boost::system::error_code& error_code) {
+    if (error_code == boost::asio::error::operation_aborted) return false;
+    if (ping_nonce_.load() != 0U) return !is_stopping();  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
     ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
     abi::PingPong pong_payload{};
@@ -150,14 +150,14 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
     }
 
     const auto tmp_min_latency{min_ping_latency_.load()};
-    if (tmp_min_latency) {
+    if (tmp_min_latency != 0U) {
         min_ping_latency_.store(std::min(tmp_min_latency, latency_ms));
     } else {
         min_ping_latency_.store(latency_ms);
     }
 
     const auto tmp_ema_latency{ema_ping_latency_.load()};
-    if (tmp_ema_latency) {
+    if (tmp_ema_latency != 0U) {
         // Compute the EMA
         const auto alpha{0.65};  // Newer values are more important
         const auto ema{alpha * static_cast<float>(latency_ms) + (1.0 - alpha) * static_cast<float>(tmp_ema_latency)};
@@ -177,18 +177,20 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
 void Node::start_ssl_handshake() {
     REQUIRES(ssl_context_ != nullptr);
     if (!is_connected_.load() || !socket_.is_open()) return;
-    asio::ssl::stream_base::handshake_type handshake_type{connection_mode_ == NodeConnectionMode::kInbound
-                                                              ? asio::ssl::stream_base::server
-                                                              : asio::ssl::stream_base::client};
+    const asio::ssl::stream_base::handshake_type handshake_type{connection_mode_ == NodeConnectionMode::kInbound
+                                                                    ? asio::ssl::stream_base::server
+                                                                    : asio::ssl::stream_base::client};
     ssl_stream_->set_verify_mode(asio::ssl::verify_none);
-    ssl_stream_->async_handshake(handshake_type, [self{shared_from_this()}](const boost::system::error_code& ec) {
-        self->handle_ssl_handshake(ec);
-    });
+    ssl_stream_->async_handshake(handshake_type,
+                                 [self{shared_from_this()}](const boost::system::error_code& error_code) {
+                                     self->handle_ssl_handshake(error_code);
+                                 });
 }
 
-void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
-    if (ec) {
-        const std::list<std::string> log_params{"action", __func__, "status", "failure", "reason", ec.message()};
+void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
+    if (error_code) {
+        const std::list<std::string> log_params{"action",  __func__, "status",
+                                                "failure", "reason", error_code.message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
         stop(true);
         return;
@@ -201,9 +203,10 @@ void Node::handle_ssl_handshake(const boost::system::error_code& ec) {
 
 void Node::start_read() {
     if (is_stopping()) return;
-    auto read_handler{[self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
-        self->handle_read(ec, bytes_transferred);
-    }};
+    auto read_handler{
+        [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
+            self->handle_read(error_code, bytes_transferred);
+        }};
     if (ssl_stream_) {
         ssl_stream_->async_read_some(receive_buffer_.prepare(kMaxBytesPerIO), read_handler);
     } else {
@@ -211,14 +214,15 @@ void Node::start_read() {
     }
 }
 
-void Node::handle_read(const boost::system::error_code& ec, const size_t bytes_transferred) {
+void Node::handle_read(const boost::system::error_code& error_code, const size_t bytes_transferred) {
     // Due to the nature of asio, this function might be called late after stop() has been called
     // and the socket has been closed. In this case we should do nothing as the payload received (if any)
     // is not relevant anymore.
     if (is_stopping()) return;
 
-    if (ec) [[unlikely]] {
-        const std::list<std::string> log_params{"action", __func__, "status", "failure", "reason", ec.message()};
+    if (error_code) [[unlikely]] {
+        const std::list<std::string> log_params{"action",  __func__, "status",
+                                                "failure", "reason", error_code.message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
         stop(true);
         return;
@@ -261,7 +265,7 @@ void Node::start_write() {
 
     if (!outbound_message_) {
         // Try to get a new message from the queue
-        std::scoped_lock lock{outbound_messages_mutex_};
+        const std::scoped_lock lock{outbound_messages_mutex_};
         if (outbound_messages_.empty()) {
             is_writing_.store(false);
             return;  // Eventually next message submission to the queue will trigger a new write cycle
@@ -313,9 +317,10 @@ void Node::start_write() {
     REQUIRES(data);
     send_buffer_.sputn(reinterpret_cast<const char*>(data->data()), static_cast<std::streamsize>(data->size()));
 
-    auto write_handler{[self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
-        self->handle_write(ec, bytes_transferred);
-    }};
+    auto write_handler{
+        [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
+            self->handle_write(error_code, bytes_transferred);
+        }};
     if (ssl_stream_) {
         ssl_stream_->async_write_some(send_buffer_.data(), write_handler);
     } else {
@@ -325,15 +330,16 @@ void Node::start_write() {
     // We let handle_write to deal with re-entering the write cycle
 }
 
-void Node::handle_write(const boost::system::error_code& ec, size_t bytes_transferred) {
+void Node::handle_write(const boost::system::error_code& error_code, size_t bytes_transferred) {
     if (is_stopping()) {
         is_writing_.store(false);
         return;
     }
 
-    if (ec) {
+    if (error_code) {
         if (app_settings_.log.log_verbosity >= log::Level::kError) {
-            const std::list<std::string> log_params{"action", __func__, "status", "failure", "reason", ec.message()};
+            const std::list<std::string> log_params{"action",  __func__, "status",
+                                                    "failure", "reason", error_code.message()};
             print_log(log::Level::kError, log_params, "Disconnecting ...");
         }
         stop(false);
@@ -348,10 +354,10 @@ void Node::handle_write(const boost::system::error_code& ec, size_t bytes_transf
     }
 
     // If we have sent the whole message then we can start sending the next chunk
-    if (send_buffer_.size()) {
+    if (send_buffer_.size() != 0U) {
         auto write_handler{
-            [self{shared_from_this()}](const boost::system::error_code& ec, const size_t bytes_transferred) {
-                self->handle_write(ec, bytes_transferred);
+            [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
+                self->handle_write(error_code, bytes_transferred);
             }};
         if (ssl_stream_) {
             ssl_stream_->async_write_some(send_buffer_.data(), write_handler);
@@ -388,7 +394,7 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type, 
 }
 
 serialization::Error Node::push_message(const abi::NetMessageType message_type) {
-    abi::NullData null_payload{};
+    abi::MsgNullPayload null_payload{};
     return push_message(message_type, null_payload);
 }
 
@@ -482,10 +488,10 @@ serialization::Error Node::process_inbound_message() {
                     "size",    to_human_bytes(inbound_message_->size()),
                     "status",  "failure",
                     "reason",  std::string(magic_enum::enum_name(err))};
-                std::string extended_reason{"got " + std::to_string(remote_version_.version) +
-                                            " but supported versions are " +
-                                            std::to_string(kMinSupportedProtocolVersion) + " to " +
-                                            std::to_string(kMaxSupportedProtocolVersion)};
+                const std::string extended_reason{"got " + std::to_string(remote_version_.version) +
+                                                  " but supported versions are " +
+                                                  std::to_string(kMinSupportedProtocolVersion) + " to " +
+                                                  std::to_string(kMaxSupportedProtocolVersion)};
                 print_log(log::Level::kTrace, log_params, extended_reason);
                 break;
             }
@@ -558,58 +564,43 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
     using namespace zenpp::abi;
     using enum serialization::Error;
 
-    if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) [[unlikely]] {
-        // Only these two guys during handshake
-        // See the switch below for details about the order
-        if (message_type != NetMessageType::kVersion && message_type != NetMessageType::kVerack)
-            return kInvalidProtocolHandShake;
-
-        auto status{static_cast<uint32_t>(protocol_handshake_status_.load())};
-        switch (direction) {
-            using enum DataDirectionMode;
-            using enum ProtocolHandShakeStatus;
-            case kInbound:
-                if (message_type == NetMessageType::kVersion &&
-                    ((status & static_cast<uint32_t>(kRemoteVersionReceived)) ==
-                     static_cast<uint32_t>(kRemoteVersionReceived))) {
-                    return kDuplicateProtocolHandShake;
-                }
-                if (message_type == NetMessageType::kVerack &&
-                    ((status & static_cast<uint32_t>(kLocalVersionAckReceived)) ==
-                     static_cast<uint32_t>(kLocalVersionAckReceived))) {
-                    return kDuplicateProtocolHandShake;
-                }
-                status |= static_cast<uint32_t>(message_type == NetMessageType::kVersion ? kRemoteVersionReceived
-                                                                                         : kLocalVersionAckReceived);
-                break;
-            case kOutbound:
-                if (message_type == NetMessageType::kVersion &&
-                    ((status & static_cast<uint32_t>(kLocalVersionSent)) == static_cast<uint32_t>(kLocalVersionSent))) {
-                    return kDuplicateProtocolHandShake;
-                }
-                if (message_type == NetMessageType::kVerack &&
-                    ((status & static_cast<uint32_t>(kRemoteVersionAckSent)) ==
-                     static_cast<uint32_t>(kRemoteVersionAckSent))) {
-                    return kDuplicateProtocolHandShake;
-                }
-                status |= static_cast<uint32_t>(message_type == NetMessageType::kVersion ? kLocalVersionSent
-                                                                                         : kRemoteVersionAckSent);
-                break;
-        }
-        protocol_handshake_status_.store(static_cast<ProtocolHandShakeStatus>(status));
-        if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) {
-            on_fully_connected();
-        }
-    } else {
-        switch (message_type) {
-            using enum NetMessageType;
-            case kVersion:  // None of these two is allowed
-            case kVerack:   // after completed handshake
+    // During protocol handshake we only allow version and verack messages
+    // After protocol handshake we only allow other messages
+    switch (message_type) {
+        using enum NetMessageType;
+        case kVersion:
+        case kVerack:
+            if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) [[likely]]
                 return kDuplicateProtocolHandShake;
-            default:
-                break;
-        }
+            break;  // Continue with validation
+        default:
+            if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) [[likely]]
+                return kInvalidProtocolHandShake;
+            return kSuccess;
     }
+
+    uint32_t new_status_flag{0U};
+    switch (direction) {
+        using enum DataDirectionMode;
+        using enum ProtocolHandShakeStatus;
+        case kInbound:
+            new_status_flag = static_cast<uint32_t>(
+                message_type == NetMessageType::kVersion ? kRemoteVersionReceived : kLocalVersionAckReceived);
+            break;
+        case kOutbound:
+            new_status_flag = static_cast<uint32_t>(message_type == NetMessageType::kVersion ? kLocalVersionSent
+                                                                                             : kRemoteVersionAckSent);
+            break;
+    }
+
+    const auto status{static_cast<uint32_t>(protocol_handshake_status_.load())};
+    if ((status & new_status_flag) == new_status_flag) return kDuplicateProtocolHandShake;
+    protocol_handshake_status_.store(static_cast<ProtocolHandShakeStatus>(status | new_status_flag));
+    if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) {
+        // Happens only once per session
+        on_fully_connected();
+    }
+
     return kSuccess;
 }
 
@@ -619,8 +610,8 @@ void Node::on_fully_connected() {
     std::ignore = push_message(abi::NetMessageType::kGetaddr);
 }
 
-void Node::clean_up(Node* ptr) noexcept {
-    if (ptr) {
+void Node::clean_up(gsl::owner<Node*> ptr) noexcept {
+    if (ptr != nullptr) {
         ptr->stop(true);
         delete ptr;
     }
@@ -708,7 +699,7 @@ NodeIdleResult Node::is_idle() const noexcept {
 std::string Node::to_string() const noexcept { return network::to_string(remote_endpoint_); }
 
 void Node::print_log(const log::Level severity, const std::list<std::string>& params,
-                     std::string extra_data) const noexcept {
+                     const std::string& extra_data) const noexcept {
     if (app_settings_.log.log_verbosity < severity) return;
     std::vector<std::string> log_params{"id", std::to_string(node_id_), "remote", this->to_string()};
     log_params.insert(log_params.end(), params.begin(), params.end());

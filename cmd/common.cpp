@@ -110,7 +110,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
 
     network_opts
         .add_option("--network.pinginterval", network_settings.ping_interval_seconds,
-                    "Interval (in seconds) amongst outgoing pings (eventually randomized in a +/- 15 range)")
+                    "Interval (in seconds) amongst outgoing pings (eventually randomized in a +/- 15% range)")
         ->capture_default_str()
         ->check(CLI::Range(size_t(30), size_t(3600)));
 
