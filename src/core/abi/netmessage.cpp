@@ -24,10 +24,9 @@ void NetMessageHeader::reset() noexcept {
 }
 
 bool NetMessageHeader::pristine() const noexcept {
-    return std::all_of(network_magic.begin(), network_magic.end(), [](const auto ubyte) { return ubyte == 0U; }) &&
-           std::all_of(command.begin(), command.end(), [](const auto ubyte) { return ubyte == 0U; }) &&
-           std::all_of(payload_checksum.begin(), payload_checksum.end(),
-                       [](const auto ubyte) { return ubyte == 0U; }) &&
+    return std::ranges::all_of(network_magic, [](const auto ubyte) { return ubyte == 0U; }) &&
+           std::ranges::all_of(command, [](const auto ubyte) { return ubyte == 0U; }) &&
+           std::ranges::all_of(payload_checksum, [](const auto ubyte) { return ubyte == 0U; }) &&
            message_type_ == NetMessageType::kMissingOrUnknown && payload_length == 0;
 }
 
@@ -74,8 +73,8 @@ serialization::Error NetMessageHeader::validate() noexcept {
     // Identify the command amongst the known ones
     int definition_id{0};
     for (const auto& msg_def : kMessageDefinitions) {
-        const auto def_command_len{strnlen_s(msg_def.command, command.size())};
-        if (got_command_len == def_command_len && memcmp(msg_def.command, command.data(), def_command_len) == 0) {
+        if (const auto def_command_len{strnlen_s(msg_def.command, command.size())};
+            got_command_len == def_command_len && memcmp(msg_def.command, command.data(), def_command_len) == 0) {
             message_type_ = static_cast<NetMessageType>(definition_id);
             break;
         }
@@ -126,42 +125,39 @@ serialization::Error NetMessage::validate() noexcept {
 
     // Validate payload : length and checksum
     ser_stream_.seekg(kMessageHeaderLength);  // Important : skip the header !!!
-    if (ser_stream_.avail() != header_.payload_length) return kMessageMismatchingPayloadLength;
-    auto payload_view{ser_stream_.read()};
-    if (!payload_view) return payload_view.error();
     if (auto error{validate_checksum()}; error != kSuccess) return error;
+    if (!message_definition.is_vectorized) return kSuccess;
 
     // For specific messages the vectorized data size can be known in advance
     // e.g. inventory messages are made of 36 bytes elements hence, after the initial
     // read of the vector size the payload size can be checked against the expected size
-    if (message_definition.is_vectorized) {
-        ser_stream_.seekg(kMessageHeaderLength);
+    ser_stream_.seekg(kMessageHeaderLength);
 
-        // Message `getheaders` payload does not start with the number of items
-        // rather with version. We need to skip it (4 bytes)
-        if (message_definition.message_type == NetMessageType::kGetheaders) {
-            ser_stream_.ignore(4);
-        }
+    // Message `getheaders` payload does not start with the number of items
+    // rather with version. We need to skip it (4 bytes)
+    if (message_definition.message_type == NetMessageType::kGetheaders) {
+        ser_stream_.ignore(4);
+    }
 
-        const auto vector_size{serialization::read_compact(ser_stream_)};
-        if (!vector_size) return vector_size.error();
-        if (*vector_size == 0) return kMessagePayloadEmptyVector;  // MUST have at least 1 element
-        if (*vector_size > message_definition.max_vector_items.value_or(UINT32_MAX))
-            return kMessagePayloadOversizedVector;
-        if (message_definition.vector_item_size.has_value()) {
-            // Message `getheaders` has an extra item of 32 bytes (the stop hash)
-            const uint64_t extra_item{message_definition.message_type == NetMessageType::kGetheaders ? 1U : 0};
-            const auto expected_vector_size{(*vector_size + extra_item) * *message_definition.vector_item_size};
+    const auto expected_vector_size{serialization::read_compact(ser_stream_)};
+    if (!expected_vector_size) return expected_vector_size.error();
+    if (*expected_vector_size == 0U) return kMessagePayloadEmptyVector;  // MUST have at least 1 element
+    if (*expected_vector_size > message_definition.max_vector_items.value_or(UINT32_MAX))
+        return kMessagePayloadOversizedVector;
+    if (message_definition.vector_item_size.has_value()) {
+        // Message `getheaders` has an extra item of 32 bytes (the stop hash)
+        const uint64_t extra_item{message_definition.message_type == NetMessageType::kGetheaders ? 1U : 0U};
+        const auto expected_vector_data_size{(*expected_vector_size + extra_item) *
+                                             *message_definition.vector_item_size};
 
-            if (ser_stream_.avail() != expected_vector_size) return kMessagePayloadMismatchesVectorSize;
-            // Look for duplicates
-            payload_view = ser_stream_.read();
-            ASSERT(payload_view);
-            if (const auto duplicate_count{count_duplicate_data_chunks(
-                    *payload_view, *message_definition.vector_item_size, 1 /* one is enough */)};
-                duplicate_count > 0) {
-                return kMessagePayloadDuplicateVectorItems;
-            }
+        if (ser_stream_.avail() != expected_vector_data_size) return kMessagePayloadMismatchesVectorSize;
+        // Look for duplicates
+        const auto payload_view{ser_stream_.read()};
+        ASSERT(payload_view);
+        if (const auto duplicate_count{count_duplicate_data_chunks(*payload_view, *message_definition.vector_item_size,
+                                                                   1 /* one is enough */)};
+            duplicate_count > 0) {
+            return kMessagePayloadDuplicateVectorItems;
         }
     }
 
@@ -178,40 +174,39 @@ serialization::Error NetMessage::parse(ByteView& input_data, ByteView network_ma
         const bool header_mode(ser_stream_.tellg() < kMessageHeaderLength);
         auto bytes_to_read(header_mode ? kMessageHeaderLength - ser_stream_.avail()
                                        : header_.payload_length - ser_stream_.avail());
-        if (bytes_to_read > input_data.size()) bytes_to_read = input_data.size();
+        bytes_to_read = std::min(bytes_to_read, input_data.size());
         ser_stream_.write(input_data.substr(0, bytes_to_read));
         input_data.remove_prefix(bytes_to_read);
 
-        if (header_mode) {
-            if (ser_stream_.avail() < kMessageHeaderLength) return kMessageHeaderIncomplete;
-
-            ret = header_.deserialize(ser_stream_);
-            if (ret != kSuccess) return ret;
-
-            REQUIRES(network_magic.size() == header_.network_magic.size());
-            if (memcmp(header_.network_magic.data(), network_magic.data(), network_magic.size()) != 0) {
-                return kMessageHeaderMagicMismatch;
-            }
-
-            const auto& message_definition{header_.get_definition()};
-            if (message_definition.min_protocol_version.has_value() &&
-                ser_stream_.get_version() < *message_definition.min_protocol_version) {
-                return kUnsupportedMessageTypeForProtocolVersion;
-            }
-            if (message_definition.max_protocol_version.has_value() &&
-                ser_stream_.get_version() > *message_definition.max_protocol_version) {
-                return kDeprecatedMessageTypeForProtocolVersion;
-            }
-
-            ret = header_.validate();
-            if (ret != kSuccess) return ret;
-
-            if (header_.payload_length == 0) ret = validate_checksum();  // No payload to read
-
-        } else {
-            // We are in body mode
+        if (!header_mode) {
             ret = (ser_stream_.avail() < header_.payload_length) ? kMessageBodyIncomplete : validate();
+            break;  // We are done with this message
         }
+
+        if (ser_stream_.avail() < kMessageHeaderLength) return kMessageHeaderIncomplete;
+
+        ret = header_.deserialize(ser_stream_);
+        if (ret != kSuccess) return ret;
+
+        REQUIRES(network_magic.size() == header_.network_magic.size());
+        if (memcmp(header_.network_magic.data(), network_magic.data(), network_magic.size()) != 0) {
+            return kMessageHeaderMagicMismatch;
+        }
+
+        const auto& message_definition{header_.get_definition()};
+        if (message_definition.min_protocol_version.has_value() &&
+            ser_stream_.get_version() < *message_definition.min_protocol_version) {
+            return kUnsupportedMessageTypeForProtocolVersion;
+        }
+        if (message_definition.max_protocol_version.has_value() &&
+            ser_stream_.get_version() > *message_definition.max_protocol_version) {
+            return kDeprecatedMessageTypeForProtocolVersion;
+        }
+
+        ret = header_.validate();
+        if (ret != kSuccess) return ret;
+
+        if (header_.payload_length == 0) ret = validate_checksum();  // No payload to read
     }
 
     return ret;

@@ -129,10 +129,10 @@ void NodeHub::print_info() {
         gsl::narrow_cast<uint32_t>(duration_cast<std::chrono::seconds>(info_stopwatch_.since_start()).count())};
     if (info_lap_duration < 5) return;
 
-    auto current_total_bytes_received{total_bytes_received_.load()};
-    auto current_total_bytes_sent{total_bytes_sent_.load()};
-    auto period_total_bytes_received{current_total_bytes_received - last_info_total_bytes_received_.load()};
-    auto period_total_bytes_sent{current_total_bytes_sent - last_info_total_bytes_sent_.load()};
+    const auto current_total_bytes_received{total_bytes_received_.load()};
+    const auto current_total_bytes_sent{total_bytes_sent_.load()};
+    const auto period_total_bytes_received{current_total_bytes_received - last_info_total_bytes_received_.load()};
+    const auto period_total_bytes_sent{current_total_bytes_sent - last_info_total_bytes_sent_.load()};
 
     std::vector<std::string> info_data;
     info_data.insert(info_data.end(), {"peers i/o", std::to_string(current_active_inbound_connections_.load()) + "/" +
