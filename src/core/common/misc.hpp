@@ -40,7 +40,7 @@ namespace zenpp {
 
 //! \brief Parses a string representing an unsigned integer
 template <typename T>
-    requires std::unsigned_integral<T>
+requires std::unsigned_integral<T>
 bool parse_uint(std::string_view input, int base, T& output) noexcept {
     size_t pos{0};
     if (input.empty()) return false;

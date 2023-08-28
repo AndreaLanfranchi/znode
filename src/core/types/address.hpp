@@ -29,15 +29,15 @@ enum class NodeServicesType : uint64_t {
                       kNodeNetworkLimited,
 };
 
-class NodeContactInfo : public serialization::Serializable {
+class NodeIdentifier : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
-    NodeContactInfo(std::string_view address, uint16_t port_num);
-    NodeContactInfo(boost::asio::ip::address  address, uint16_t port_num);
-    explicit NodeContactInfo(std::string_view endpoint);
-    explicit NodeContactInfo(boost::asio::ip::tcp::endpoint& endpoint);
+    NodeIdentifier(std::string_view address, uint16_t port_num);
+    NodeIdentifier(boost::asio::ip::address address, uint16_t port_num);
+    explicit NodeIdentifier(std::string_view endpoint);
+    explicit NodeIdentifier(boost::asio::ip::tcp::endpoint& endpoint);
 
-    NodeContactInfo(const NodeContactInfo& other) = default;
+    NodeIdentifier(const NodeIdentifier& other) = default;
 
     uint32_t time_{0};      // unix timestamp
     uint64_t services_{0};  // services mask (OR'ed from NetworkServicesType)
@@ -60,11 +60,11 @@ class NodeContactInfo : public serialization::Serializable {
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 
-//! \brief VersionNetworkAddress is a NetworkAddress which is used in the Version message
-//! where it is required to be serialized/deserialized **without** the time field.
-class VersionNetworkAddress : public NodeContactInfo {
+//! \brief VersionNodeIdentifier subclasses NodeIdentifier only to customize serialization
+//! in Version message where it is required to be serialized/deserialized **without** the time field.
+class VersionNodeIdentifier : public NodeIdentifier {
   public:
-    using NodeContactInfo::NodeContactInfo;
+    using NodeIdentifier::NodeIdentifier;
 
   private:
     friend class serialization::SDataStream;

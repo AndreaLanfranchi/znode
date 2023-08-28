@@ -38,17 +38,17 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
       on_data_(std::move(on_data)),
       on_message_(std::move(on_message)) {
     // TODO Set version's services according to settings
-    local_version_.version = kDefaultProtocolVersion;
-    local_version_.services = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
-    local_version_.timestamp = time::unix_now();
-    local_version_.addr_recv.ip_address_ = socket_.remote_endpoint().address();
-    local_version_.addr_recv.port_number_ = socket_.remote_endpoint().port();
-    local_version_.addr_from.ip_address_ = socket_.local_endpoint().address();
-    local_version_.addr_from.port_number_ = 9033;  // TODO Set this value to the current listening port
-    local_version_.nonce = app_settings_.network.nonce;
-    local_version_.user_agent = get_buildinfo_string();
-    local_version_.start_height = 0;  // TODO Set this value to the current blockchain height
-    local_version_.relay = true;      // TODO
+    local_version_.protocol_version_ = kDefaultProtocolVersion;
+    local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
+    local_version_.timestamp_ = time::unix_now();
+    local_version_.addr_recv_.ip_address_ = socket_.remote_endpoint().address();
+    local_version_.addr_recv_.port_number_ = socket_.remote_endpoint().port();
+    local_version_.addr_from_.ip_address_ = socket_.local_endpoint().address();
+    local_version_.addr_from_.port_number_ = 9033;  // TODO Set this value to the current listening port
+    local_version_.nonce_ = app_settings_.network.nonce;
+    local_version_.user_agent_ = get_buildinfo_string();
+    local_version_.last_block_height_ = 0;  // TODO Set this value to the current blockchain height
+    local_version_.relay_ = true;           // TODO
 }
 
 void Node::start() {
@@ -123,8 +123,8 @@ bool Node::handle_ping_timer(const boost::system::error_code& error_code) {
     if (ping_nonce_.load() != 0U) return !is_stopping();  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
     ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
-    abi::PingPong pong_payload{};
-    pong_payload.nonce = ping_nonce_.load();
+    abi::MsgPingPongPayload pong_payload{};
+    pong_payload.nonce_ = ping_nonce_.load();
     const auto ret{push_message(abi::NetMessageType::kPing, pong_payload)};
     if (ret != serialization::Error::kSuccess) {
         const std::list<std::string> log_params{"action",  __func__, "status",
@@ -479,8 +479,8 @@ serialization::Error Node::process_inbound_message() {
         using enum abi::NetMessageType;
         case kVersion:
             if (err = remote_version_.deserialize(inbound_message_->data()); err != kSuccess) break;
-            if (remote_version_.version < kMinSupportedProtocolVersion ||
-                remote_version_.version > kMaxSupportedProtocolVersion) {
+            if (remote_version_.protocol_version_ < kMinSupportedProtocolVersion ||
+                remote_version_.protocol_version_ > kMaxSupportedProtocolVersion) {
                 err = kInvalidProtocolVersion;
                 const std::list<std::string> log_params{
                     "action",  __func__,
@@ -488,7 +488,7 @@ serialization::Error Node::process_inbound_message() {
                     "size",    to_human_bytes(inbound_message_->size()),
                     "status",  "failure",
                     "reason",  std::string(magic_enum::enum_name(err))};
-                const std::string extended_reason{"got " + std::to_string(remote_version_.version) +
+                const std::string extended_reason{"got " + std::to_string(remote_version_.protocol_version_) +
                                                   " but supported versions are " +
                                                   std::to_string(kMinSupportedProtocolVersion) + " to " +
                                                   std::to_string(kMaxSupportedProtocolVersion)};
@@ -496,17 +496,17 @@ serialization::Error Node::process_inbound_message() {
                 break;
             }
             {
-                version_.store(std::min(local_version_.version, remote_version_.version));
+                version_.store(std::min(local_version_.protocol_version_, remote_version_.protocol_version_));
                 const std::list<std::string> log_params{
-                    "agent",    remote_version_.user_agent,
-                    "version",  std::to_string(remote_version_.version),
-                    "nonce",    std::to_string(remote_version_.nonce),
-                    "services", std::to_string(remote_version_.services),
-                    "relay",    (remote_version_.relay ? "true" : "false"),
-                    "block",    std::to_string(remote_version_.start_height),
-                    "him",      network::to_string(remote_version_.addr_from.to_endpoint()),
-                    "me",       network::to_string(remote_version_.addr_recv.to_endpoint())};
-                if (remote_version_.nonce != local_version_.nonce) {
+                    "agent",    remote_version_.user_agent_,
+                    "version",  std::to_string(remote_version_.protocol_version_),
+                    "nonce",    std::to_string(remote_version_.nonce_),
+                    "services", std::to_string(remote_version_.services_),
+                    "relay",    (remote_version_.relay_ ? "true" : "false"),
+                    "block",    std::to_string(remote_version_.last_block_height_),
+                    "him",      network::to_string(remote_version_.addr_from_.to_endpoint()),
+                    "me",       network::to_string(remote_version_.addr_recv_.to_endpoint())};
+                if (remote_version_.nonce_ != local_version_.nonce_) {
                     print_log(log::Level::kInfo, log_params);
                     err = push_message(abi::NetMessageType::kVerack);
                 } else {
@@ -520,15 +520,15 @@ serialization::Error Node::process_inbound_message() {
             // and we don't need to forward the message elsewhere
             break;
         case kPing: {
-            abi::PingPong ping_pong{};
+            abi::MsgPingPongPayload ping_pong{};
             if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) {
                 err = push_message(abi::NetMessageType::kPong, ping_pong);
             }
         } break;
         case kPong: {
-            abi::PingPong ping_pong{};
+            abi::MsgPingPongPayload ping_pong{};
             if (err = ping_pong.deserialize(inbound_message_->data()); err == kSuccess) {
-                if (ping_pong.nonce != ping_nonce_.load()) {
+                if (ping_pong.nonce_ != ping_nonce_.load()) {
                     err = kMismatchingPingPongNonce;
                     const std::list<std::string> log_params{
                         "action",  __func__,

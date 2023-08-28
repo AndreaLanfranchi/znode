@@ -57,7 +57,7 @@ void NodeHub::start_connecting() {
     if (!app_settings_.network.connect_nodes.empty()) {
         for (auto const& node_address : app_settings_.network.connect_nodes) {
             if (is_stopping()) return;
-            const NodeContactInfo address{node_address};
+            const NodeIdentifier address{node_address};
             std::ignore = connect(address, NodeConnectionMode::kManualOutbound);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -86,7 +86,7 @@ void NodeHub::start_connecting() {
         for (const auto& result : results) {
             if (is_stopping()) return;
             if (!result.endpoint().address().is_v4()) continue;
-            const NodeContactInfo address{result.endpoint().address(), 9033 /*TODO: Get from chain params*/};
+            const NodeIdentifier address{result.endpoint().address(), 9033 /*TODO: Get from chain params*/};
             std::ignore = connect(address);
         }
     }
@@ -112,7 +112,7 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& error_code) 
     print_info();  // Print info every 5 seconds
     const std::scoped_lock lock{nodes_mutex_};
     for (auto& [node_id, node_ptr] : nodes_) {
-        if (const auto result{node_ptr->is_idle()}; result != NodeIdleResult::kNotIdle) {
+        if (const auto result{node_ptr->is_idle()}; result == NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "node",
                                      std::to_string(node_id), "remote", node_ptr->to_string(), "reason", reason})
@@ -174,7 +174,7 @@ bool NodeHub::stop(bool wait) noexcept {
     return ret;
 }
 
-bool NodeHub::connect(const NodeContactInfo& address, const NodeConnectionMode mode) {
+bool NodeHub::connect(const NodeIdentifier& address, const NodeConnectionMode mode) {
     if (is_stopping()) return false;
 
     const std::string remote{network::to_string(address.to_endpoint())};
@@ -398,7 +398,7 @@ void NodeHub::on_node_received_message(const std::shared_ptr<Node>& node, std::u
 
     // This function behaves as a collector of messages from nodes
     if (message->get_type() == abi::NetMessageType::kAddr) {
-        abi::Addr addr_payload{};
+        abi::MsgAddrPayload addr_payload{};
         if (const auto ret{addr_payload.deserialize(message->data())}; ret != Error::kSuccess) {
             log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote",
                                    node->to_string(), "error", std::string(magic_enum::enum_name(ret))})
@@ -410,7 +410,7 @@ void NodeHub::on_node_received_message(const std::shared_ptr<Node>& node, std::u
             log::Trace("Service",
                        {"name", "Node Hub", "action", "on_node_received_message[addr]", "remote", node->to_string(),
                         "message", std::string(magic_enum::enum_name(message->get_type())), "count",
-                        std::to_string(addr_payload.addresses.size())});
+                        std::to_string(addr_payload.identifiers_.size())});
         }
     }
 }

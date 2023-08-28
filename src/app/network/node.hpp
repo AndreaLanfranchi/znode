@@ -91,7 +91,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \return The unique identifier of the node
     [[nodiscard]] int id() const noexcept { return node_id_; }
 
-    //! \brief Whether the node is inbound or outbound
+    //! \brief Whether this node instance is inbound or outbound
     [[nodiscard]] NodeConnectionMode mode() const noexcept { return connection_mode_; }
 
     //! \brief Returns a reference to the underlying socket
@@ -125,7 +125,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the remote node supports the specified service
     [[nodiscard]] bool has_service(NodeServicesType service) const noexcept {
-        return (fully_connected() && (((local_version_.services & static_cast<uint64_t>(service)) != 0)));
+        return (fully_connected() && (((local_version_.services_ & static_cast<uint64_t>(service)) != 0)));
     }
 
     //! \brief Returns the average ping latency in milliseconds
@@ -134,6 +134,9 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Returns whether the node (i.e. the remote) has been inactive/unresponsive beyond the amounts
     //! of time specified in network settings
     [[nodiscard]] NodeIdleResult is_idle() const noexcept;
+
+    //! \brief Returns whether the node as advertised himself as a relayer (Version message)
+    [[nodiscard]] bool is_relayer() const noexcept { return (fully_connected() && local_version_.relay_); }
 
     //! \brief Returns the total number of bytes read from the socket
     [[nodiscard]] size_t bytes_received() const noexcept { return bytes_received_.load(); }
