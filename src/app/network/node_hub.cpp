@@ -177,7 +177,7 @@ bool NodeHub::stop(bool wait) noexcept {
 bool NodeHub::connect(const NodeIdentifier& address, const NodeConnectionMode mode) {
     if (is_stopping()) return false;
 
-    const std::string remote{network::to_string(address.to_endpoint())};
+    const std::string remote{network::to_string(address.get_endpoint())};
 
     log::Info("Service", {"name", "Node Hub", "action", "connect", "remote", remote});
     if (current_active_connections_ >= app_settings_.network.max_active_connections) {
@@ -197,7 +197,7 @@ bool NodeHub::connect(const NodeIdentifier& address, const NodeConnectionMode mo
     // Create the socket and try connect
     boost::asio::ip::tcp::socket socket{asio_context_};
     try {
-        socket.connect(address.to_endpoint());
+        socket.connect(address.get_endpoint());
         set_common_socket_options(socket);
     } catch (const boost::system::system_error& ex) {
         log::Error("Service", {"name", "Node Hub", "action", "connect", "remote", remote, "error", ex.what()});

@@ -10,11 +10,61 @@
 
 namespace zenpp {
 
-TEST_CASE("Network Address Serialization", "[serialization]") {
-    NodeIdentifier address{};
+TEST_CASE("Node Identifier Parsing", "[serialization]") {
+    NodeIdentifier identifier("127.0.0.1");
+    CHECK(identifier.ip_address_.is_v4());
+    CHECK(identifier.port_number_ == 0);
+    CHECK(identifier.is_address_loopback());
+    CHECK(!identifier.is_address_multicast());
+    CHECK(!identifier.is_address_any());
+    CHECK(!identifier.is_address_reserved());
+
+    identifier = NodeIdentifier("::1");
+    CHECK(identifier.ip_address_.is_v6());
+    CHECK(identifier.port_number_ == 0);
+    CHECK(identifier.is_address_loopback());
+    CHECK(!identifier.is_address_multicast());
+    CHECK(!identifier.is_address_any());
+    CHECK(!identifier.is_address_reserved());
+
+    identifier = NodeIdentifier("8.8.8.8");
+    CHECK(identifier.ip_address_.is_v4());
+    CHECK(identifier.port_number_ == 0);
+    CHECK(!identifier.is_address_loopback());
+    CHECK(!identifier.is_address_multicast());
+    CHECK(!identifier.is_address_any());
+    CHECK(!identifier.is_address_reserved());
+
+    identifier = NodeIdentifier("2001::8888");
+    CHECK(identifier.ip_address_.is_v6());
+    CHECK(identifier.port_number_ == 0);
+    CHECK(!identifier.is_address_loopback());
+    CHECK(!identifier.is_address_multicast());
+    CHECK(!identifier.is_address_any());
+    CHECK(identifier.address_reservation() == AddressReservationType::kRFC4380);
+
+    identifier = NodeIdentifier("2001::8888:9999");
+    CHECK(identifier.ip_address_.is_v6());
+    CHECK(identifier.port_number_ == 0);
+
+    identifier = NodeIdentifier("[2001::8888]:9999");
+    CHECK(identifier.ip_address_.is_v6());
+    CHECK(identifier.port_number_ == 9999);
+
+    identifier = NodeIdentifier("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca");
+    CHECK(identifier.ip_address_.is_v6());
+    CHECK(identifier.port_number_ == 0);
+    CHECK(identifier.address_reservation() == AddressReservationType::kNotReserved);
+
+    identifier = NodeIdentifier("2001::hgt:9999");
+    CHECK(identifier.is_address_unspecified());
+    CHECK(identifier.port_number_ == 0);
+
+}
+
+TEST_CASE("Node Identifier Serialization", "[serialization]") {
+    NodeIdentifier address("10.0.0.1:8333");
     address.services_ = static_cast<decltype(NodeIdentifier::services_)>(NodeServicesType::kNodeNetwork);
-    address.ip_address_ = boost::asio::ip::make_address("10.0.0.1");
-    address.port_number_ = 8333;
 
     serialization::SDataStream stream(serialization::Scope::kNetwork, 0);
     CHECK(address.serialized_size(stream) == 30);
@@ -22,7 +72,7 @@ TEST_CASE("Network Address Serialization", "[serialization]") {
     REQUIRE(address.serialize(stream) == serialization::Error::kSuccess);
 
     // See https://en.bitcoin.it/wiki/Protocol_documentation#Network_address
-    std::string expected_hex_dump(
+    const std::string expected_hex_dump(
         "00000000"
         "0100000000000000"
         "0000000000000000"

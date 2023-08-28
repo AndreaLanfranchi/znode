@@ -41,7 +41,7 @@ namespace zenpp {
 //! \brief Parses a string representing an unsigned integer
 template <typename T>
 requires std::unsigned_integral<T>
-bool parse_uint(std::string_view input, int base, T& output) noexcept {
+bool try_parse_uint(std::string_view input, int base, T& output) noexcept {
     size_t pos{0};
     if (input.empty()) return false;
     auto input_str{std::string(input)};
@@ -60,8 +60,7 @@ bool parse_uint(std::string_view input, int base, T& output) noexcept {
 //! - ipv4_address:port
 //! - ipv4_address
 //! - [ipv6_address]
-//! - "localhost" literal can be used in place of ipv4_address
-bool parse_ip_address_and_port(std::string_view endpoint, boost::asio::ip::address& address, uint16_t& port) noexcept;
+bool try_parse_ip_address_and_port(std::string_view input, boost::asio::ip::address& address, uint16_t& port) noexcept;
 
 //! \brief Generates a random value of type T in a provided (min, max) range
 template <typename T>

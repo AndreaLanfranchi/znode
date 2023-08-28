@@ -12,6 +12,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/format.hpp>
+#include <gsl/gsl_util>
 
 #include <core/common/misc.hpp>
 
@@ -130,25 +131,25 @@ size_t count_duplicate_data_chunks(ByteView data, const size_t chunk_size, const
     return count;
 }
 
-bool parse_ip_address_and_port(std::string_view endpoint, boost::asio::ip::address& address, uint16_t& port) noexcept {
-    if (endpoint.empty()) return false;
+bool try_parse_ip_address_and_port(std::string_view input, boost::asio::ip::address& address, uint16_t& port) noexcept {
+    if (input.empty()) return false;
 
-    boost::system::error_code ec;
-    const auto colon_pos{endpoint.rfind(':')};
-    if (colon_pos != std::string_view::npos && colon_pos > 1 && (colon_pos + 1) < endpoint.length()) {
-        if (!parse_uint(endpoint.substr(colon_pos + 1), 10, port) || !port) return false;
-        if (endpoint[0] == '[' && endpoint[colon_pos - 1] == ']') {
-            // Square brackets notation - IPv6
-            address = boost::asio::ip::make_address_v6(endpoint.substr(1, colon_pos - 2), ec);
-        } else {
-            address = boost::asio::ip::make_address_v4(endpoint.substr(0, colon_pos), ec);
-        }
-        return !ec;
+    static const std::regex ipv4_pattern(R"((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?)");
+    static const std::regex ipv6_pattern(R"(\[?([0-9a-fA-F:]+)\]?(?::(\d+))?)");
+
+    std::smatch matches;
+    boost::system::error_code error_code;
+    const std::string input_str{input};
+    if (std::regex_match(input_str, matches, ipv4_pattern)) {
+        address = boost::asio::ip::make_address_v4(matches[1].str(), error_code);
+        port = matches[2].matched ? gsl::narrow_cast<uint16_t>(std::stoul(matches[2].str())) : port;
+        return !error_code;
     }
-
-    address = boost::asio::ip::make_address(endpoint, ec);
-    if (ec) return false;
-    port = 0;
-    return true;
+    if (std::regex_match(input_str, matches, ipv6_pattern)) {
+        address = boost::asio::ip::make_address_v6(matches[1].str(), error_code);
+        port = matches[2].matched ? gsl::narrow_cast<uint16_t>(std::stoul(matches[2].str())) : port;
+        return !error_code;
+    }
+    return false;
 }
 }  // namespace zenpp

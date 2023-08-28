@@ -504,8 +504,8 @@ serialization::Error Node::process_inbound_message() {
                     "services", std::to_string(remote_version_.services_),
                     "relay",    (remote_version_.relay_ ? "true" : "false"),
                     "block",    std::to_string(remote_version_.last_block_height_),
-                    "him",      network::to_string(remote_version_.addr_from_.to_endpoint()),
-                    "me",       network::to_string(remote_version_.addr_recv_.to_endpoint())};
+                    "him",      network::to_string(remote_version_.addr_from_.get_endpoint()),
+                    "me",       network::to_string(remote_version_.addr_recv_.get_endpoint())};
                 if (remote_version_.nonce_ != local_version_.nonce_) {
                     print_log(log::Level::kInfo, log_params);
                     err = push_message(abi::NetMessageType::kVerack);

@@ -192,7 +192,7 @@ IPEndPointValidator::IPEndPointValidator(bool allow_empty, uint16_t default_port
         boost::asio::ip::address address;
         uint16_t port{0};
 
-        if (!parse_ip_address_and_port(value, address, port)) {
+        if (!try_parse_ip_address_and_port(value, address, port)) {
             return "Value \"" + value + "\" is not a valid endpoint";
         }
         if (!port) {

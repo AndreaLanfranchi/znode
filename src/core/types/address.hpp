@@ -29,6 +29,23 @@ enum class NodeServicesType : uint64_t {
                       kNodeNetworkLimited,
 };
 
+enum class AddressReservationType {
+    kNotReserved = 0,
+    kRFC1918 = 1,   // IPV4 Reservation : Allocation for Private Internets
+    kRFC2544 = 2,   // IPV4 Reservation : inter-network communications (192.18.0.0/15)
+    kRFC6598 = 3,   // IPV4 Reservation : Shared Address Space
+    kRFC5737 = 4,   // IPV4 Reservation : Documentation Address Blocks
+    kRFC3927 = 5,   // IPV4 Reservation : Dynamic Configuration of IPv4 Link-Local Addresses
+    kRFC3849 = 6,   // IPV6 Reservation : Documentation Address Blocks
+    kRFC3964 = 7,   // IPV6 Reservation : IPv6 Prefix for Overlay Routable Cryptographic Hash Identifiers (ORCHID)
+    kRFC4193 = 8,   // IPV6 Reservation : Unique Local IPv6 Unicast Addresses
+    kRFC4380 = 9,   // IPV6 Reservation : Teredo IPv6 tunneling
+    kRFC4843 = 10,  // IPV6 Reservation : An IPv6 Prefix for Overlay Routable Cryptographic Hash Identifiers (ORCHID)
+    kRFC4862 = 11,  // IPV6 Reservation : IPv6 Stateless Address Autoconfiguration
+    kRFC6052 = 12,  // IPV6 Reservation : IPv6 Addressing of IPv4/IPv6 Translators
+    kRFC6145 = 13,  // IPV6 Reservation : IP/ICMP Translation Algorithm
+};
+
 class NodeIdentifier : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
@@ -44,20 +61,23 @@ class NodeIdentifier : public serialization::Serializable {
     boost::asio::ip::address ip_address_{boost::asio::ip::address_v4()};
     uint16_t port_number_{0};
 
-    [[nodiscard]] boost::asio::ip::tcp::endpoint to_endpoint() const;
+    [[nodiscard]] boost::asio::ip::tcp::endpoint get_endpoint() const;
 
     [[nodiscard]] bool is_address_loopback() const;
     [[nodiscard]] bool is_address_multicast() const;
+    [[nodiscard]] bool is_address_any() const;
+    [[nodiscard]] bool is_address_unspecified() const;
+    [[nodiscard]] bool is_address_reserved() const;
+    [[nodiscard]] bool is_address_valid() const;
 
-    [[nodiscard]] bool is_rfc1918() const;  // Address Allocation for Private Internets
-    [[nodiscard]] bool is_rfc2544() const;  // Benchmarking Methodology for Network Interconnect Devices
-    [[nodiscard]] bool is_rfc3927() const;  // Dynamic Configuration of IPv4 Link-Local Addresses
-    [[nodiscard]] bool is_rfc3849() const;  // IPv6 Address Prefix Reserved for Documentation
-    [[nodiscard]] bool is_rfc6145() const;
+    [[nodiscard]] AddressReservationType address_reservation() const;
 
   private:
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+
+    [[nodiscard]] AddressReservationType address_v4_reservation() const;
+    [[nodiscard]] AddressReservationType address_v6_reservation() const;
 };
 
 //! \brief VersionNodeIdentifier subclasses NodeIdentifier only to customize serialization
