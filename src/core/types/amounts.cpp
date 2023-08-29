@@ -9,6 +9,7 @@
 #include <iostream>
 #include <regex>
 
+#include <absl/strings/str_cat.h>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -26,7 +27,7 @@ Amount& Amount::operator=(int64_t value) noexcept {
 }
 
 std::string Amount::to_string() const {
-    if (!value_) return std::string("0 ").append(kCurrency);
+    if (not value_) return std::string("0 ").append(kCurrency);
 
     std::string sign;
     auto div{std::div(value_, kCoin)};
@@ -98,15 +99,15 @@ tl::expected<Amount, DecodingError> Amount::parse(const std::string& input) {
     const auto fract{fract_part.empty() ? 0L : boost::lexical_cast<int64_t>(fract_part)};
     const auto value{whole * kCoin + fract};
     Amount ret(value);
-    if (!ret.valid_money()) return tl::unexpected{DecodingError::kInvalidAmountRange};
+    if (not ret.valid_money()) return tl::unexpected{DecodingError::kInvalidAmountRange};
     return ret;
 }
 
-std::string FeeRate::to_string() const { return Amount::to_string() + "/K"; }
+std::string FeeRate::to_string() const { return absl::StrCat(Amount::to_string(), "/K"); }
 
 Amount FeeRate::fee(size_t bytes_size) const {
     const auto ret{this->operator*() * static_cast<int64_t>(bytes_size) / static_cast<int64_t>(1_KB)};
-    if (!ret) return *this;
+    if (not ret) return *this;
     return Amount(ret);
 }
 }  // namespace zenpp

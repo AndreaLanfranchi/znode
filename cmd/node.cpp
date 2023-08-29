@@ -13,7 +13,6 @@
 #include <openssl/ssl.h>
 
 #include <core/common/memory.hpp>
-#include <core/types/address.hpp>
 
 #include <app/common/stopwatch.hpp>
 #include <app/concurrency/ossignals.hpp>
@@ -126,7 +125,7 @@ int main(int argc, char* argv[]) {
                 log::Trace("Service", {"name", thread_name, "status", "stopped"});
             });
         }
-        auto stop_asio{gsl::finally([&asio_context, &asio_guard, &asio_threads]() {
+        [[maybe_unused]] const auto stop_asio{gsl::finally([&asio_context, &asio_guard, &asio_threads]() {
             asio_context.stop();
             asio_guard.reset();
             for (auto& t : asio_threads) {

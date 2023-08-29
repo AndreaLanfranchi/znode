@@ -21,14 +21,14 @@ namespace zenpp::serialization {
 //! MacOS/Xcode bundles
 template <class T>
     requires std::is_arithmetic_v<T>
-inline uint32_t ser_sizeof(T obj) {
+inline uint32_t ser_sizeof([[maybe_unused]] T obj) {
     return sizeof(obj);
 }
 
 //! \brief Returns the serialized size of arithmetic types
 //! \remarks Specialization for bool which is stored in at least 1 byte
 template <>
-inline uint32_t ser_sizeof(bool) {
+inline uint32_t ser_sizeof([[maybe_unused]] bool obj) {
     return sizeof(char);
 }
 
@@ -36,13 +36,10 @@ inline uint32_t ser_sizeof(bool) {
 //! \remarks Mostly used in P2P messages to prepend a list of elements with the count of items to be expected.
 //! \attention Not to be confused with varint
 inline constexpr uint32_t ser_compact_sizeof(uint64_t value) {
-    if (value < 253)
-        return 1;  // One byte only
-    else if (value <= 0xffff)
-        return 3;  // One byte prefix + 2 bytes of uint16_t
-    else if (value <= 0xffffffff)
-        return 5;  // One byte prefix + 4 bytes of uint32_t
-    return 9;      // One byte prefix + 8 bytes of uint64_t
+    if (value < 253) return 1;          // One byte only
+    if (value <= 0xffff) return 3;      // One byte prefix + 2 bytes of uint16_t
+    if (value <= 0xffffffff) return 5;  // One byte prefix + 4 bytes of uint32_t
+    return 9;                           // One byte prefix + 8 bytes of uint64_t
 }
 
 //! \brief Lowest level serialization for integral arithmetic types

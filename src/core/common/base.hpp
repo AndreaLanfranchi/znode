@@ -45,16 +45,16 @@ template <class T>
 concept SignedIntegral = std::signed_integral<T>;
 
 template <class T>
-concept Integral = UnsignedIntegral<T> || SignedIntegral<T>;
+concept Integral = UnsignedIntegral<T> or SignedIntegral<T>;
 
 template <class T>
-concept UnsignedIntegralEx = UnsignedIntegral<T> || std::same_as<T, intx::uint128> || std::same_as<T, intx::uint256> ||
-    std::same_as<T, intx::uint512>;
+concept UnsignedIntegralEx = UnsignedIntegral<T> or std::same_as<T, intx::uint128> or std::same_as<T, intx::uint256> or
+                             std::same_as<T, intx::uint512>;
 
 //! \brief Used to allow passing string literals as template arguments
 template <size_t N>
 struct StringLiteral {
-    constexpr StringLiteral(const char (&str)[N]) { std::copy_n(str, N, value); }
+    constexpr StringLiteral(const char (&str)[N]) { std::copy_n(str, N, value); }  // NOLINT(*-explicit-constructor)
     char value[N]{};
 };
 
@@ -73,22 +73,33 @@ using Bytes = std::basic_string<uint8_t>;
 
 class ByteView : public std::basic_string_view<uint8_t> {
   public:
-    constexpr ByteView() noexcept : std::basic_string_view<uint8_t>{} {};
+    constexpr ByteView() noexcept : std::basic_string_view<uint8_t> {}
+    {};
 
-    constexpr ByteView(const std::basic_string_view<uint8_t>& other) noexcept
-        : std::basic_string_view<uint8_t>{other.data(), other.length()} {}
+    constexpr ByteView(const std::basic_string_view<uint8_t>& other) noexcept : std::basic_string_view<uint8_t> {
+        other.data(), other.length()
+    }
+    {}
 
-    constexpr ByteView(const Bytes& str) noexcept : std::basic_string_view<uint8_t>{str.data(), str.length()} {}
+    constexpr ByteView(const Bytes& str) noexcept : std::basic_string_view<uint8_t> { str.data(), str.length() }
+    {}
 
-    constexpr ByteView(const uint8_t* data, size_type length) noexcept
-        : std::basic_string_view<uint8_t>{data, length} {}
+    constexpr ByteView(const uint8_t* data, size_type length) noexcept : std::basic_string_view<uint8_t> {
+        data, length
+    }
+    {}
 
     template <std::size_t N>
-    constexpr ByteView(const uint8_t (&array)[N]) noexcept : std::basic_string_view<uint8_t>{array, N} {}
+    constexpr ByteView(const uint8_t (&array)[N]) noexcept : std::basic_string_view<uint8_t> {
+        array, N
+    }
+    {}
 
     template <std::size_t N>
-    constexpr ByteView(const std::array<uint8_t, N>& array) noexcept
-        : std::basic_string_view<uint8_t>{array.data(), N} {}
+    constexpr ByteView(const std::array<uint8_t, N>& array) noexcept : std::basic_string_view<uint8_t> {
+        array.data(), N
+    }
+    {}
 
     [[nodiscard]] bool is_null() const noexcept { return data() == nullptr; }
 };
@@ -106,16 +117,16 @@ static constexpr uint64_t kGiB{kMiB << 10};  // 2^{30} bytes
 static constexpr uint64_t kTiB{kGiB << 10};  // 2^{40} bytes
 
 // Literals for sizes base 10
-constexpr uint64_t operator"" _KB(unsigned long long x) { return x * kKB; }
-constexpr uint64_t operator"" _MB(unsigned long long x) { return x * kMB; }
-constexpr uint64_t operator"" _GB(unsigned long long x) { return x * kGB; }
-constexpr uint64_t operator"" _TB(unsigned long long x) { return x * kTB; }
+constexpr uint64_t operator"" _KB(unsigned long long value) { return value * kKB; }
+constexpr uint64_t operator"" _MB(unsigned long long value) { return value * kMB; }
+constexpr uint64_t operator"" _GB(unsigned long long value) { return value * kGB; }
+constexpr uint64_t operator"" _TB(unsigned long long value) { return value * kTB; }
 
 // Literals for sizes base 2
-constexpr uint64_t operator"" _KiB(unsigned long long x) { return x * kKiB; }
-constexpr uint64_t operator"" _MiB(unsigned long long x) { return x * kMiB; }
-constexpr uint64_t operator"" _GiB(unsigned long long x) { return x * kGiB; }
-constexpr uint64_t operator"" _TiB(unsigned long long x) { return x * kTiB; }
+constexpr uint64_t operator"" _KiB(unsigned long long value) { return value * kKiB; }
+constexpr uint64_t operator"" _MiB(unsigned long long value) { return value * kMiB; }
+constexpr uint64_t operator"" _GiB(unsigned long long value) { return value * kGiB; }
+constexpr uint64_t operator"" _TiB(unsigned long long value) { return value * kTiB; }
 
 static constexpr int64_t kCoinMaxDecimals{8};         // Max number of denomination decimals
 static constexpr int64_t kCoin{100'000'000};          // As many zeroes as kCoinMaxDecimals

@@ -65,8 +65,8 @@ $ cmake [-DCMAKE_BUILD_TYPE="[Debug|Release|RelWithDebInfo|MinSizeRel]"] ..
 
 Additional CMAKE options (specify with `-D<OPTION_NAME[:type]>=<value>`):
 
-| OPTION_NAME          | Description                                        | Default |
-|:---------------------|:---------------------------------------------------|:-------:|
+| OPTION_NAME            | Description                                        | Default |
+|:-----------------------|:---------------------------------------------------|:-------:|
 | `BUILD_CORE_ONLY`      | Only build ZEN Core components                     |   OFF   |
 | `BUILD_CLANG_COVERAGE` | **Clang** (only) instrumentation for code coverage |   OFF   |
 | `BUILD_SANITIZE`       | Build instrumentation for sanitizers               |   OFF   |

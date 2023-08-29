@@ -31,6 +31,7 @@ endif ()
 set(PUBLIC_LIBS
         ${BUILDINFO_LIB}
         third-party-includes
+        absl::strings
         intx::intx
         Microsoft.GSL::GSL
         nlohmann_json

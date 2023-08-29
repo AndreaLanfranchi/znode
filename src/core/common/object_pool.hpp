@@ -28,9 +28,9 @@ class ObjectPool : private boost::noncopyable {
   public:
     explicit ObjectPool(bool thread_safe = false) : thread_safe_{thread_safe} {}
 
-    void add(gsl::owner<T*> t) {
+    void add(gsl::owner<T*> ptr) {
         ZEN_DETAIL_OBJECT_POOL_GUARD
-        pool_.push({t, TDtor()});
+        pool_.push({ptr, TDtor()});
     }
 
     gsl::owner<T*> acquire() noexcept {

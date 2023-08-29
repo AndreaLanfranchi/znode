@@ -6,9 +6,8 @@
 
 #pragma once
 
-#include <stdint.h>
-
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string_view>
