@@ -6,6 +6,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 ]]
 
+hunter_add_package(abseil)
 hunter_add_package(Catch)
 hunter_add_package(intx)
 hunter_add_package(Microsoft.GSL)
