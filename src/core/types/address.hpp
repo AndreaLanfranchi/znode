@@ -46,45 +46,95 @@ enum class AddressReservationType {
     kRFC6145 = 13,  // IPV6 Reservation : IP/ICMP Translation Algorithm
 };
 
-class NodeIdentifier : public serialization::Serializable {
+enum class AddressType : uint8_t {
+    kUnroutable = 0,
+    kIPv4 = 1,
+    kIPv6 = 2
+};
+
+class NetAddress : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
-    NodeIdentifier(std::string_view address, uint16_t port_num);
-    NodeIdentifier(boost::asio::ip::address address, uint16_t port_num);
-    explicit NodeIdentifier(std::string_view endpoint);
-    explicit NodeIdentifier(boost::asio::ip::tcp::endpoint& endpoint);
+    explicit NetAddress(std::string_view str);
+    explicit NetAddress(boost::asio::ip::address address);
+    ~NetAddress() override = default;
 
-    NodeIdentifier(const NodeIdentifier& other) = default;
+    boost::asio::ip::address operator*() const noexcept { return value_; };
+    boost::asio::ip::address* operator->() noexcept { return &value_; };
+    const boost::asio::ip::address* operator->() const noexcept {
+        return const_cast<const boost::asio::ip::address*>(&value_);
+    };
 
-    uint32_t time_{0};      // unix timestamp
-    uint64_t services_{0};  // services mask (OR'ed from NetworkServicesType)
-    boost::asio::ip::address ip_address_{boost::asio::ip::address_v4()};
-    uint16_t port_number_{0};
+    [[nodiscard]] bool is_loopback() const noexcept;
+    [[nodiscard]] bool is_multicast() const noexcept;
+    [[nodiscard]] bool is_any() const noexcept;
+    [[nodiscard]] bool is_unspecified() const noexcept;
+    [[nodiscard]] bool is_reserved() const noexcept;
+    [[nodiscard]] bool is_valid() const noexcept;
+    [[nodiscard]] bool is_routable() const noexcept;
 
-    [[nodiscard]] boost::asio::ip::tcp::endpoint get_endpoint() const;
+    [[nodiscard]] AddressType get_type() const noexcept;
+    [[nodiscard]] AddressReservationType address_reservation() const noexcept;
 
-    [[nodiscard]] bool is_address_loopback() const;
-    [[nodiscard]] bool is_address_multicast() const;
-    [[nodiscard]] bool is_address_any() const;
-    [[nodiscard]] bool is_address_unspecified() const;
-    [[nodiscard]] bool is_address_reserved() const;
-    [[nodiscard]] bool is_address_valid() const;
+  private:
+    boost::asio::ip::address value_{boost::asio::ip::address_v4()};
+    friend class serialization::SDataStream;
+    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    [[nodiscard]] AddressReservationType address_v4_reservation() const noexcept;
+    [[nodiscard]] AddressReservationType address_v6_reservation() const noexcept;
+};
 
-    [[nodiscard]] AddressReservationType address_reservation() const;
+class NetEndpoint : public serialization::Serializable {
+  public:
+    using serialization::Serializable::Serializable;
+    explicit NetEndpoint(std::string_view str);
+    explicit NetEndpoint(const boost::asio::ip::tcp::endpoint& endpoint);
+    NetEndpoint(std::string_view str, uint16_t port_num);
+    NetEndpoint(boost::asio::ip::address address, uint16_t port_num);
+    ~NetEndpoint() override = default;
+
+    [[nodiscard]] std::string to_string() const noexcept;
+    [[nodiscard]] boost::asio::ip::tcp::endpoint to_endpoint() const noexcept;
+    [[nodiscard]] bool is_valid() const noexcept;
+    [[nodiscard]] bool is_routable() const noexcept;
+
+    NetAddress address_{};
+    uint16_t port_{0};
 
   private:
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
-
-    [[nodiscard]] AddressReservationType address_v4_reservation() const;
-    [[nodiscard]] AddressReservationType address_v6_reservation() const;
 };
 
-//! \brief VersionNodeIdentifier subclasses NodeIdentifier only to customize serialization
-//! in Version message where it is required to be serialized/deserialized **without** the time field.
-class VersionNodeIdentifier : public NodeIdentifier {
+class NetService : public serialization::Serializable {
   public:
-    using NodeIdentifier::NodeIdentifier;
+    using serialization::Serializable::Serializable;
+    explicit NetService(std::string_view str);
+    explicit NetService(boost::asio::ip::tcp::endpoint& endpoint);
+    explicit NetService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint);
+    NetService(std::string_view str, uint64_t services);
+    NetService(std::string_view address, uint16_t port_num);
+    NetService(boost::asio::ip::address address, uint16_t port_num);
+    ~NetService() override = default;
+
+    // Copy constructor
+    NetService(const NetService& other) = default;
+
+    uint32_t time_{0};        // unix timestamp
+    uint64_t services_{0};    // services mask (OR'ed from NetworkServicesType)
+    NetEndpoint endpoint_{};  // ipv4/ipv6 address and port
+
+  private:
+    friend class serialization::SDataStream;
+    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+};
+
+//! \brief VersionNetService subclasses NetService only to customize serialization
+//! in Version message where it is required to be serialized/deserialized **without** the time field.
+class VersionNetService : public NetService {
+  public:
+    using NetService::NetService;
+    ~VersionNetService() override = default;
 
   private:
     friend class serialization::SDataStream;

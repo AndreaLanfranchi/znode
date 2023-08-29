@@ -14,84 +14,75 @@ namespace zenpp {
 
 using namespace serialization;
 
-NodeIdentifier::NodeIdentifier(std::string_view endpoint) {
-    if (endpoint.empty()) return;
-    std::ignore = try_parse_ip_address_and_port(endpoint, ip_address_, port_number_);
+NetAddress::NetAddress(std::string_view str) {
+    if (str.empty()) return;
+    uint16_t port_num{0};  // Only to ignore it
+    std::ignore = try_parse_ip_address_and_port(str, value_, port_num);
+    std::ignore = port_num;
 }
 
-NodeIdentifier::NodeIdentifier(std::string_view address, uint16_t port_num) {
-    if (address.empty()) return;
-    if (try_parse_ip_address_and_port(address, ip_address_, port_number_)) {
-        port_number_ = port_num;
+NetAddress::NetAddress(boost::asio::ip::address address) : value_(std::move(address)) {}
+
+bool NetAddress::is_loopback() const noexcept {
+    return value_.is_v4() ? value_.to_v4().is_loopback() : value_.to_v6().is_loopback();
+}
+
+bool NetAddress::is_multicast() const noexcept {
+    return value_.is_v4() ? value_.to_v4().is_multicast() : value_.to_v6().is_multicast();
+}
+
+bool NetAddress::is_any() const noexcept {
+    return value_.is_v4() ? value_.to_v4() == boost::asio::ip::address_v4::any()
+                          : value_.to_v6() == boost::asio::ip::address_v6::any();
+}
+
+bool NetAddress::is_unspecified() const noexcept {
+    return value_.is_v4() ? value_.to_v4().is_unspecified() : value_.to_v6().is_unspecified();
+}
+
+bool NetAddress::is_valid() const noexcept { return not(is_any() || is_unspecified()); }
+
+bool NetAddress::is_routable() const noexcept {
+    if (not is_valid() || is_loopback()) return false;
+
+    switch (address_reservation()) {
+        using enum AddressReservationType;
+        case kRFC1918:
+        case kRFC2544:
+        case kRFC3927:
+        case kRFC4862:
+        case kRFC6598:
+        case kRFC5737:
+        case kRFC4193:
+        case kRFC4843:
+        case kRFC3849:
+            return false;
+        default:
+            return true;
     }
 }
 
-NodeIdentifier::NodeIdentifier(boost::asio::ip::address address, uint16_t port_num)
-    : ip_address_(std::move(address)), port_number_(port_num) {}
-
-NodeIdentifier::NodeIdentifier(boost::asio::ip::tcp::endpoint& endpoint)
-    : ip_address_(endpoint.address()), port_number_(endpoint.port()) {}
-
-Error NodeIdentifier::serialization(SDataStream& stream, Action action) {
-    using enum Error;
-    Error ret{kSuccess};
-
-    if (!ret) ret = stream.bind(time_, action);
-    if (!ret) ret = stream.bind(services_, action);
-    // These two guys are big endian address is already BE by boost for port we need to swap bytes
-    if (!ret) ret = stream.bind(ip_address_, action);
-    port_number_ = bswap_16(port_number_);
-    if (!ret) ret = stream.bind(port_number_, action);
-    port_number_ = bswap_16(port_number_);
-
-    return ret;
-}
-
-boost::asio::ip::tcp::endpoint NodeIdentifier::get_endpoint() const { return {ip_address_, port_number_}; }
-
-bool NodeIdentifier::is_address_loopback() const {
-    return ip_address_.is_v4() ? ip_address_.to_v4().is_loopback() : ip_address_.to_v6().is_loopback();
-}
-
-bool NodeIdentifier::is_address_multicast() const {
-    return ip_address_.is_v4() ? ip_address_.to_v4().is_multicast() : ip_address_.to_v6().is_multicast();
-}
-
-bool NodeIdentifier::is_address_any() const {
-    if (ip_address_.is_v4()) {
-        return ip_address_.to_v4() == boost::asio::ip::address_v4::any();
-    }
-    return ip_address_.to_v6() == boost::asio::ip::address_v6::any();
-}
-
-bool NodeIdentifier::is_address_unspecified() const {
-    if (ip_address_.is_v4()) {
-        return ip_address_.to_v4().is_unspecified();
-    }
-    return ip_address_.to_v6().is_unspecified();
-}
-
-bool NodeIdentifier::is_address_valid() const { return !(is_address_any() || is_address_unspecified()); }
-
-bool NodeIdentifier::is_address_reserved() const {
+bool NetAddress::is_reserved() const noexcept {
     using enum AddressReservationType;
-    return address_reservation() != kNotReserved;
+    return address_reservation() not_eq kNotReserved;
 }
 
-AddressReservationType NodeIdentifier::address_reservation() const {
-    if (is_address_unspecified()) return AddressReservationType::kNotReserved;
-    if (ip_address_.is_v4()) {
-        return address_v4_reservation();
-    }
-    return address_v6_reservation();
+AddressType NetAddress::get_type() const noexcept {
+    if (not is_routable() or is_any()) return AddressType::kUnroutable;
+    return value_.is_v4() ? AddressType::kIPv4 : AddressType::kIPv6;
 }
 
-AddressReservationType NodeIdentifier::address_v4_reservation() const {
+AddressReservationType NetAddress::address_reservation() const noexcept {
+    if (is_unspecified()) return AddressReservationType::kNotReserved;
+    return value_.is_v4() ? address_v4_reservation() : address_v6_reservation();
+}
+
+AddressReservationType NetAddress::address_v4_reservation() const noexcept {
     using enum AddressReservationType;
     AddressReservationType ret{kNotReserved};
-    if (!ip_address_.is_v4()) return ret;
+    if (!value_.is_v4()) return ret;
 
-    const auto addr_bytes = ip_address_.to_v4().to_bytes();
+    const auto addr_bytes = value_.to_v4().to_bytes();
 
     // Private networks
     if ((addr_bytes[0] == 10) || (addr_bytes[0] == 172 && addr_bytes[1] >= 16 && addr_bytes[1] <= 31) ||
@@ -124,15 +115,15 @@ AddressReservationType NodeIdentifier::address_v4_reservation() const {
     return ret;
 }
 
-AddressReservationType NodeIdentifier::address_v6_reservation() const {
+AddressReservationType NetAddress::address_v6_reservation() const noexcept {
     using enum AddressReservationType;
     AddressReservationType ret{kNotReserved};
-    if (!ip_address_.is_v6()) return ret;
+    if (!value_.is_v6()) return ret;
 
-    const auto addr_bytes = ip_address_.to_v6().to_bytes();
+    const auto addr_bytes = value_.to_v6().to_bytes();
 
     // Documentation Address Blocks
-    if (addr_bytes[15] == 0x20 && addr_bytes[14] == 0x01 && addr_bytes[13] == 0x0D && addr_bytes[12] == 0xB8) {
+    if (addr_bytes[0] == 0x20 && addr_bytes[1] == 0x01 && addr_bytes[2] == 0x0D && addr_bytes[3] == 0xB8) {
         ret = kRFC3849;
     }
 
@@ -162,7 +153,7 @@ AddressReservationType NodeIdentifier::address_v6_reservation() const {
     }
 
     // IPv6 Addressing of IPv4/IPv6 Translators
-    if (addr_bytes[0] == 0x64 && addr_bytes[1] == 0xFF && addr_bytes[2] == 0x9B && addr_bytes[3] == 0x00) {
+    if (addr_bytes[0] == 0x00 && addr_bytes[1] == 0x64 && addr_bytes[2] == 0xFF && addr_bytes[3] == 0x9B) {
         ret = kRFC6052;
     }
 
@@ -177,18 +168,85 @@ AddressReservationType NodeIdentifier::address_v6_reservation() const {
     return ret;
 }
 
-Error VersionNodeIdentifier::serialization(SDataStream& stream, Action action) {
-    using enum Error;
-    Error ret{kSuccess};
+serialization::Error NetAddress::serialization(SDataStream& stream, serialization::Action action) {
+    return stream.bind(value_, action);
+}
 
-    if (!ret) ret = stream.bind(services_, action);
-    // These two guys are big endian address is already BE by boost for port we need to swap bytes
-    if (!ret) ret = stream.bind(ip_address_, action);
-    port_number_ = bswap_16(port_number_);
-    if (!ret) ret = stream.bind(port_number_, action);
-    port_number_ = bswap_16(port_number_);
+NetEndpoint::NetEndpoint(std::string_view str) {
+    if (str.empty()) return;
+    boost::asio::ip::address address;
+    if (try_parse_ip_address_and_port(str, address, port_)) {
+        address_ = NetAddress{address};
+    }
+}
 
+NetEndpoint::NetEndpoint(std::string_view str, uint16_t port_num) {
+    if (str.empty()) return;
+    boost::asio::ip::address address;
+    std::ignore = try_parse_ip_address_and_port(str, address, port_);
+    port_ = port_num;
+}
+
+NetEndpoint::NetEndpoint(boost::asio::ip::address address, uint16_t port_num)
+    : address_{std::move(address)}, port_{port_num} {}
+
+std::string NetEndpoint::to_string() const noexcept {
+    std::string ret;
+    if (address_->is_v6() and port_ not_eq 0) ret += '[';
+    ret += address_->to_string();
+    if (address_->is_v6() and port_ not_eq 0) ret += ']';
+    if (port_ not_eq 0) ret += ':' + std::to_string(port_);
     return ret;
 }
 
+serialization::Error NetEndpoint::serialization(SDataStream& stream, serialization::Action action) {
+    using enum Error;
+    Error ret{kSuccess};
+    if (not ret) ret = stream.bind(address_, action);
+    if (not ret) {
+        port_ = bswap_16(port_);
+        ret = stream.bind(port_, action);
+        port_ = bswap_16(port_);
+    }
+    return ret;
+}
+
+boost::asio::ip::tcp::endpoint NetEndpoint::to_endpoint() const noexcept { return {*address_, port_}; }
+
+NetEndpoint::NetEndpoint(const boost::asio::ip::tcp::endpoint& endpoint)
+    : address_{endpoint.address()}, port_(endpoint.port()) {}
+
+bool NetEndpoint::is_valid() const noexcept { return ((port_ > 1 and port_ < 65535) and address_.is_valid()); }
+
+bool NetEndpoint::is_routable() const noexcept { return address_.is_routable() and (port_ > 1 and port_ < 65535); }
+
+NetService::NetService(std::string_view str) : endpoint_{str} {}
+
+NetService::NetService(std::string_view str, uint64_t services) : endpoint_{str}, services_{services} {}
+
+NetService::NetService(std::string_view address, uint16_t port_num) : endpoint_(address, port_num) {}
+
+NetService::NetService(boost::asio::ip::address address, uint16_t port_num) : endpoint_(std::move(address), port_num) {}
+
+NetService::NetService(boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(endpoint) {}
+
+Error NetService::serialization(SDataStream& stream, Action action) {
+    using enum Error;
+    Error ret{kSuccess};
+    if (not ret) ret = stream.bind(time_, action);
+    if (not ret) ret = stream.bind(services_, action);
+    if (not ret) ret = stream.bind(endpoint_, action);
+    return ret;
+}
+
+NetService::NetService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint)
+    : endpoint_{endpoint.address(), endpoint.port()} {}
+
+Error VersionNetService::serialization(SDataStream& stream, Action action) {
+    using enum Error;
+    Error ret{kSuccess};
+    if (not ret) ret = stream.bind(services_, action);
+    if (not ret) ret = stream.bind(endpoint_, action);
+    return ret;
+}
 }  // namespace zenpp

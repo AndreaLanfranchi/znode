@@ -35,8 +35,8 @@ class MsgVersionPayload : public serialization::Serializable {
     int32_t protocol_version_{0};
     uint64_t services_{static_cast<uint64_t>(NodeServicesType::kNone)};
     int64_t timestamp_{0};
-    VersionNodeIdentifier addr_recv_{};
-    VersionNodeIdentifier addr_from_{};
+    VersionNetService addr_recv_{};
+    VersionNetService addr_from_{};
     uint64_t nonce_{0};
     std::string user_agent_{};
     int32_t last_block_height_{0};
@@ -78,7 +78,7 @@ class MsgAddrPayload : public serialization::Serializable {
     using serialization::Serializable::Serializable;
     ~MsgAddrPayload() override = default;
 
-    std::vector<NodeIdentifier> identifiers_{};
+    std::vector<NetService> identifiers_{};
 
   private:
     friend class serialization::SDataStream;
