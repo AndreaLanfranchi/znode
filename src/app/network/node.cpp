@@ -7,8 +7,8 @@
 #include <list>
 
 #include <absl/strings/str_cat.h>
-#include <absl/time/time.h>
 #include <absl/time/clock.h>
+#include <absl/time/time.h>
 #include <magic_enum.hpp>
 
 #include <core/common/assert.hpp>
@@ -53,7 +53,7 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
 }
 
 void Node::start() {
-    if (bool expected{false}; !is_started_.compare_exchange_strong(expected, true)) {
+    if (bool expected{false}; not is_started_.compare_exchange_strong(expected, true)) {
         return;  // Already started
     }
 
@@ -71,8 +71,6 @@ void Node::start() {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
         std::ignore = push_message(abi::NetMessageType::kVersion, local_version_);
     }
-
-    start_ping_timer();
 }
 
 bool Node::stop(bool wait) noexcept {
@@ -605,8 +603,11 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
 
 void Node::on_fully_connected() {
     if (is_stopping()) return;
-    // Ask the peer to send its known addresses
-    std::ignore = push_message(abi::NetMessageType::kGetaddr);
+
+    const boost::system::error_code error_code;
+    std::ignore = handle_ping_timer(error_code);                // Sends out a ping so we can measure latency
+    std::ignore = push_message(abi::NetMessageType::kGetaddr);  // Ask the peer to send its known addresses
+    start_ping_timer();
 }
 
 void Node::clean_up(gsl::owner<Node*> ptr) noexcept {
