@@ -32,6 +32,7 @@ set(PUBLIC_LIBS
         ${BUILDINFO_LIB}
         third-party-includes
         absl::strings
+        absl::time
         intx::intx
         Microsoft.GSL::GSL
         nlohmann_json

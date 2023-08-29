@@ -8,10 +8,12 @@
 
 #include <string_view>
 
+#include <absl/time/clock.h>
+#include <absl/time/time.h>
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <gsl/gsl_util>
 
-#include <core/common/time.hpp>
 #include <core/serialization/serializable.hpp>
 
 namespace zenpp {
@@ -120,7 +122,7 @@ class NetService : public serialization::Serializable {
     // Copy constructor
     NetService(const NetService& other) = default;
 
-    uint32_t time_{0};        // unix timestamp
+    uint32_t time_{gsl::narrow_cast<uint32_t>(ToUnixSeconds(absl::Now()))};  // unix timestamp
     uint64_t services_{0};    // services mask (OR'ed from NetworkServicesType)
     NetEndpoint endpoint_{};  // ipv4/ipv6 address and port
 

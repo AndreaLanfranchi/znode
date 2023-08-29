@@ -7,11 +7,12 @@
 #include <list>
 
 #include <absl/strings/str_cat.h>
+#include <absl/time/time.h>
+#include <absl/time/clock.h>
 #include <magic_enum.hpp>
 
 #include <core/common/assert.hpp>
 #include <core/common/misc.hpp>
-#include <core/common/time.hpp>
 
 #include <app/common/log.hpp>
 #include <app/network/node.hpp>
@@ -41,7 +42,7 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     // TODO Set version's services according to settings
     local_version_.protocol_version_ = kDefaultProtocolVersion;
     local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
-    local_version_.timestamp_ = time::unix_now();
+    local_version_.timestamp_ = ToUnixSeconds(absl::Now());
     local_version_.addr_recv_ = VersionNetService(socket_.remote_endpoint());
     local_version_.addr_from_ = VersionNetService(socket_.local_endpoint());
     local_version_.addr_from_.endpoint_.port_ = 9033;  // TODO Set this value to the current listening port
