@@ -6,6 +6,7 @@
 
 #include <list>
 
+#include <absl/strings/str_cat.h>
 #include <magic_enum.hpp>
 
 #include <core/common/assert.hpp>
@@ -62,7 +63,7 @@ void Node::start() {
     last_message_sent_time_.store(now);      // We don't want to disconnect immediately
     connected_time_.store(now);
 
-    if (ssl_context_ != nullptr) {
+    if (ssl_context_ not_eq nullptr) {
         ssl_stream_ = std::make_unique<asio::ssl::stream<tcp::socket&>>(socket_, *ssl_context_);
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_ssl_handshake(); });
     } else {
@@ -81,7 +82,7 @@ bool Node::stop(bool wait) noexcept {
         ping_timer_.cancel();
 
         boost::system::error_code error_code;
-        if (ssl_stream_ != nullptr) {
+        if (ssl_stream_ not_eq nullptr) {
             std::ignore = ssl_stream_->shutdown(error_code);
             std::ignore = ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
             std::ignore = ssl_stream_->lowest_layer().close(error_code);
@@ -119,13 +120,13 @@ void Node::start_ping_timer() {
 
 bool Node::handle_ping_timer(const boost::system::error_code& error_code) {
     if (error_code == boost::asio::error::operation_aborted) return false;
-    if (ping_nonce_.load() != 0U) return !is_stopping();  // Wait for response to return
+    if (ping_nonce_.load() not_eq 0U) return !is_stopping();  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
     ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
     abi::MsgPingPongPayload pong_payload{};
     pong_payload.nonce_ = ping_nonce_.load();
     const auto ret{push_message(abi::NetMessageType::kPing, pong_payload)};
-    if (ret != serialization::Error::kSuccess) {
+    if (ret not_eq serialization::Error::kSuccess) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", std::string(magic_enum::enum_name(ret))};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
@@ -138,25 +139,25 @@ bool Node::handle_ping_timer(const boost::system::error_code& error_code) {
 void Node::process_ping_latency(const uint64_t latency_ms) {
     if (is_stopping()) return;
 
-    std::list<std::string> log_params{"action", __func__, "latency", std::to_string(latency_ms) + "ms"};
+    std::list<std::string> log_params{"action", __func__, "latency", absl::StrCat(latency_ms, "ms")};
 
     if (latency_ms > app_settings_.network.ping_timeout_milliseconds) {
         log_params.insert(log_params.end(),
-                          {"max", std::to_string(app_settings_.network.ping_timeout_milliseconds) + "ms"});
+                          {"max", absl::StrCat(app_settings_.network.ping_timeout_milliseconds, "ms")});
         print_log(log::Level::kWarning, log_params, "Timeout! Disconnecting ...");
         asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return;
     }
 
     const auto tmp_min_latency{min_ping_latency_.load()};
-    if (tmp_min_latency != 0U) {
+    if (tmp_min_latency not_eq 0U) {
         min_ping_latency_.store(std::min(tmp_min_latency, latency_ms));
     } else {
         min_ping_latency_.store(latency_ms);
     }
 
     const auto tmp_ema_latency{ema_ping_latency_.load()};
-    if (tmp_ema_latency != 0U) {
+    if (tmp_ema_latency not_eq 0U) {
         // Compute the EMA
         const auto alpha{0.65};  // Newer values are more important
         const auto ema{alpha * static_cast<float>(latency_ms) + (1.0 - alpha) * static_cast<float>(tmp_ema_latency)};
@@ -165,8 +166,8 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
         ema_ping_latency_.store(latency_ms);
     }
 
-    log_params.insert(log_params.end(), {"min", std::to_string(min_ping_latency_.load()) + "ms", "ema",
-                                         std::to_string(ema_ping_latency_.load()) + "ms"});
+    log_params.insert(log_params.end(), {"min", absl::StrCat(min_ping_latency_.load(), "ms"), "ema",
+                                         absl::StrCat(ema_ping_latency_.load(), "ms")});
     print_log(log::Level::kInfo, log_params);
 
     ping_nonce_.store(0);
@@ -174,8 +175,8 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
 }
 
 void Node::start_ssl_handshake() {
-    REQUIRES(ssl_context_ != nullptr);
-    if (!is_connected_.load() || !socket_.is_open()) return;
+    REQUIRES(ssl_context_ not_eq nullptr);
+    if (not is_connected_.load() or not socket_.is_open()) return;
     const asio::ssl::stream_base::handshake_type handshake_type{connection_mode_ == NodeConnectionMode::kInbound
                                                                     ? asio::ssl::stream_base::server
                                                                     : asio::ssl::stream_base::client};
@@ -206,7 +207,7 @@ void Node::start_read() {
         [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
             self->handle_read(error_code, bytes_transferred);
         }};
-    if (ssl_stream_) {
+    if (ssl_stream_ not_eq nullptr) {
         ssl_stream_->async_read_some(receive_buffer_.prepare(kMaxBytesPerIO), read_handler);
     } else {
         socket_.async_read_some(receive_buffer_.prepare(kMaxBytesPerIO), read_handler);
@@ -227,7 +228,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         return;
     }
 
-    if (bytes_transferred != 0) {
+    if (bytes_transferred not_eq 0) {
         receive_buffer_.commit(bytes_transferred);
         bytes_received_ += bytes_transferred;
         on_data_(DataDirectionMode::kInbound, bytes_transferred);
@@ -255,7 +256,7 @@ void Node::start_write() {
     if (outbound_message_ && outbound_message_->data().eof()) {
         // A message has been fully sent
         // Unless it is a ping message we can reset the timer
-        if (outbound_message_->get_type() != abi::NetMessageType::kPing) {
+        if (outbound_message_->get_type() not_eq abi::NetMessageType::kPing) {
             last_message_sent_time_.store(std::chrono::steady_clock::now());
         }
         outbound_message_.reset();
@@ -288,7 +289,7 @@ void Node::start_write() {
 
         auto error{
             validate_message_for_protocol_handshake(DataDirectionMode::kOutbound, outbound_message_->get_type())};
-        if (error != serialization::Error::kSuccess) [[unlikely]] {
+        if (error not_eq serialization::Error::kSuccess) [[unlikely]] {
             if (app_settings_.log.log_verbosity >= log::Level::kError) {
                 // TODO : Should we drop the connection here?
                 // Actually outgoing messages' correct sequence is local responsibility
@@ -320,7 +321,7 @@ void Node::start_write() {
         [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
             self->handle_write(error_code, bytes_transferred);
         }};
-    if (ssl_stream_) {
+    if (ssl_stream_ not_eq nullptr) {
         ssl_stream_->async_write_some(send_buffer_.data(), write_handler);
     } else {
         socket_.async_write_some(send_buffer_.data(), write_handler);
@@ -346,19 +347,19 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
         return;
     }
 
-    if (bytes_transferred > 0) {
+    if (bytes_transferred > 0U) {
         bytes_sent_ += bytes_transferred;
         if (on_data_) on_data_(DataDirectionMode::kOutbound, bytes_transferred);
         send_buffer_.consume(bytes_transferred);
     }
 
     // If we have sent the whole message then we can start sending the next chunk
-    if (send_buffer_.size() != 0U) {
+    if (send_buffer_.size() not_eq 0U) {
         auto write_handler{
             [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
                 self->handle_write(error_code, bytes_transferred);
             }};
-        if (ssl_stream_) {
+        if (ssl_stream_ not_eq nullptr) {
             ssl_stream_->async_write_some(send_buffer_.data(), write_handler);
         } else {
             socket_.async_write_some(send_buffer_.data(), write_handler);
@@ -438,7 +439,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
 
         if (const auto err_handshake =
                 validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type());
-            err_handshake != kSuccess) {
+            err_handshake not_eq kSuccess) {
             err = err_handshake;
             break;
         }
@@ -449,11 +450,11 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
             break;
         }
 
-        if (err = process_inbound_message(); err != kSuccess) break;
+        if (err = process_inbound_message(); err not_eq kSuccess) break;
         end_inbound_message();
     }
     receive_buffer_.consume(bytes_transferred);
-    if (!is_fatal_error(err) && messages_parsed != 0) {
+    if (!is_fatal_error(err) && messages_parsed not_eq 0) {
         last_message_received_time_.store(std::chrono::steady_clock::now());
     }
     return err;
@@ -464,7 +465,7 @@ serialization::Error Node::process_inbound_message() {
     using enum Error;
     Error err{kSuccess};
 
-    REQUIRES(inbound_message_ != nullptr);
+    REQUIRES(inbound_message_ not_eq nullptr);
 
     if (app_settings_.log.log_verbosity == log::Level::kTrace) [[unlikely]] {
         const std::list<std::string> log_params{
@@ -477,8 +478,8 @@ serialization::Error Node::process_inbound_message() {
     switch (inbound_message_->get_type()) {
         using enum abi::NetMessageType;
         case kVersion:
-            if (err = remote_version_.deserialize(inbound_message_->data()); err != kSuccess) break;
-            if (remote_version_.protocol_version_ < kMinSupportedProtocolVersion ||
+            if (err = remote_version_.deserialize(inbound_message_->data()); err not_eq kSuccess) break;
+            if (remote_version_.protocol_version_ < kMinSupportedProtocolVersion or
                 remote_version_.protocol_version_ > kMaxSupportedProtocolVersion) {
                 err = kInvalidProtocolVersion;
                 const std::list<std::string> log_params{
@@ -487,10 +488,9 @@ serialization::Error Node::process_inbound_message() {
                     "size",    to_human_bytes(inbound_message_->size()),
                     "status",  "failure",
                     "reason",  std::string(magic_enum::enum_name(err))};
-                const std::string extended_reason{"got " + std::to_string(remote_version_.protocol_version_) +
-                                                  " but supported versions are " +
-                                                  std::to_string(kMinSupportedProtocolVersion) + " to " +
-                                                  std::to_string(kMaxSupportedProtocolVersion)};
+                const auto extended_reason{absl::StrCat("got ", remote_version_.protocol_version_,
+                                                        " but supported versions are ", kMinSupportedProtocolVersion,
+                                                        " to ", kMaxSupportedProtocolVersion)};
                 print_log(log::Level::kTrace, log_params, extended_reason);
                 break;
             }
@@ -504,7 +504,7 @@ serialization::Error Node::process_inbound_message() {
                                                         "block",    std::to_string(remote_version_.last_block_height_),
                                                         "him",      remote_version_.addr_from_.endpoint_.to_string(),
                                                         "me",       remote_version_.addr_recv_.endpoint_.to_string()};
-                if (remote_version_.nonce_ != local_version_.nonce_) {
+                if (remote_version_.nonce_ not_eq local_version_.nonce_) {
                     print_log(log::Level::kInfo, log_params);
                     err = push_message(abi::NetMessageType::kVerack);
                 } else {
@@ -519,14 +519,14 @@ serialization::Error Node::process_inbound_message() {
             break;
         case kPing: {
             abi::MsgPingPongPayload ping_pong{};
-            if (err = ping_pong.deserialize(inbound_message_->data()); err != kSuccess) {
+            if (err = ping_pong.deserialize(inbound_message_->data()); err not_eq kSuccess) {
                 err = push_message(abi::NetMessageType::kPong, ping_pong);
             }
         } break;
         case kPong: {
             abi::MsgPingPongPayload ping_pong{};
             if (err = ping_pong.deserialize(inbound_message_->data()); err == kSuccess) {
-                if (ping_pong.nonce_ != ping_nonce_.load()) {
+                if (ping_pong.nonce_ not_eq ping_nonce_.load()) {
                     err = kMismatchingPingPongNonce;
                     const std::list<std::string> log_params{
                         "action",  __func__,
@@ -572,7 +572,7 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
                 return kDuplicateProtocolHandShake;
             break;  // Continue with validation
         default:
-            if (protocol_handshake_status_ != ProtocolHandShakeStatus::kCompleted) [[likely]]
+            if (protocol_handshake_status_ not_eq ProtocolHandShakeStatus::kCompleted) [[likely]]
                 return kInvalidProtocolHandShake;
             return kSuccess;
     }
@@ -609,7 +609,7 @@ void Node::on_fully_connected() {
 }
 
 void Node::clean_up(gsl::owner<Node*> ptr) noexcept {
-    if (ptr != nullptr) {
+    if (ptr not_eq nullptr) {
         ptr->stop(true);
         delete ptr;
     }
@@ -623,56 +623,56 @@ NodeIdleResult Node::is_idle() const noexcept {
     const auto now{steady_clock::now()};
 
     // Check whether we're waiting for a ping response
-    if (ping_nonce_.load() != 0) {
+    if (ping_nonce_.load() not_eq 0) {
         const auto ping_duration{duration_cast<milliseconds>(now - last_ping_sent_time_.load()).count()};
         if (ping_duration > app_settings_.network.ping_timeout_milliseconds) {
             const std::list<std::string> log_params{
                 "action",  __func__,
                 "status",  "ping timeout",
-                "latency", std::to_string(ping_duration) + "ms",
-                "max",     std::to_string(app_settings_.network.ping_timeout_milliseconds) + "ms"};
+                "latency", absl::StrCat(ping_duration, "ms"),
+                "max",     absl::StrCat(app_settings_.network.ping_timeout_milliseconds, "ms")};
             print_log(log::Level::kDebug, log_params, "Disconnecting ...");
             return kPingTimeout;
         }
     }
 
     // Check we've at least completed protocol handshake in a reasonable time
-    if (protocol_handshake_status_.load() != ProtocolHandShakeStatus::kCompleted) {
+    if (protocol_handshake_status_.load() not_eq ProtocolHandShakeStatus::kCompleted) {
         const auto handshake_duration{duration_cast<seconds>(now - connected_time_.load()).count()};
         if (handshake_duration > app_settings_.network.protocol_handshake_timeout_seconds) {
             const std::list<std::string> log_params{
                 "action",   __func__,
                 "status",   "handshake timeout",
-                "duration", std::to_string(handshake_duration) + "s",
-                "max",      std::to_string(app_settings_.network.protocol_handshake_timeout_seconds) + "s"};
+                "duration", absl::StrCat(handshake_duration, "s"),
+                "max",      absl::StrCat(app_settings_.network.protocol_handshake_timeout_seconds, "s")};
             print_log(log::Level::kDebug, log_params, "Disconnecting ...");
             return kProtocolHandshakeTimeout;
         }
     }
 
     // Check whether there's an inbound message in progress
-    if (const auto value{inbound_message_start_time_.load()}; value != steady_clock::time_point::min()) {
+    if (const auto value{inbound_message_start_time_.load()}; value not_eq steady_clock::time_point::min()) {
         const auto inbound_message_duration{duration_cast<seconds>(now - value).count()};
         if (inbound_message_duration > app_settings_.network.inbound_timeout_seconds) {
             const std::list<std::string> log_params{
                 "action",   __func__,
                 "status",   "inbound timeout",
-                "duration", std::to_string(inbound_message_duration) + "s",
-                "max",      std::to_string(app_settings_.network.inbound_timeout_seconds) + "s"};
+                "duration", absl::StrCat(inbound_message_duration, "s"),
+                "max",      absl::StrCat(app_settings_.network.inbound_timeout_seconds, "s")};
             print_log(log::Level::kDebug, log_params, "Disconnecting ...");
             return kInboundTimeout;
         }
     }
 
     // Check whether there's an outbound message in progress
-    if (const auto value{outbound_message_start_time_.load()}; value != steady_clock::time_point::min()) {
+    if (const auto value{outbound_message_start_time_.load()}; value not_eq steady_clock::time_point::min()) {
         const auto outbound_message_duration{duration_cast<seconds>(now - value).count()};
         if (outbound_message_duration > app_settings_.network.outbound_timeout_seconds) {
             const std::list<std::string> log_params{
                 "action",   __func__,
                 "status",   "outbound timeout",
-                "duration", std::to_string(outbound_message_duration) + "s",
-                "max",      std::to_string(app_settings_.network.outbound_timeout_seconds) + "s"};
+                "duration", absl::StrCat(outbound_message_duration, "s"),
+                "max",      absl::StrCat(app_settings_.network.outbound_timeout_seconds, "s")};
             print_log(log::Level::kDebug, log_params, "Disconnecting ...");
             return kOutboundTimeout;
         }
@@ -685,8 +685,8 @@ NodeIdleResult Node::is_idle() const noexcept {
         const std::list<std::string> log_params{
             "action",   __func__,
             "status",   "inactivity timeout",
-            "duration", std::to_string(idle_seconds) + "s",
-            "max",      std::to_string(app_settings_.network.idle_timeout_seconds) + "s"};
+            "duration", absl::StrCat(idle_seconds, "s"),
+            "max",      absl::StrCat(app_settings_.network.idle_timeout_seconds, "s")};
         print_log(log::Level::kDebug, log_params, "Disconnecting ...");
         return kGlobalTimeout;
     }

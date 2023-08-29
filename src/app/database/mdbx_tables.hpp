@@ -7,6 +7,7 @@
 #pragma once
 
 #include <array>
+#include <ranges>
 
 #include <app/common/version.hpp>
 #include <app/database/mdbx.hpp>
@@ -56,10 +57,9 @@ void deploy_tables(mdbx::txn& txn, const std::array<db::MapConfig, N> tables) {
     if (txn.is_readonly()) [[unlikely]]
         throw std::invalid_argument("Can't deploy tables on RO transaction");
 
-    for (const auto& table : tables) {
-        if (!has_map(txn, table.name)) [[unlikely]]
-            std::ignore = txn.create_map(table.name, table.key_mode, table.value_mode);
-    }
+    std::ranges::for_each(tables, [&txn](const auto& table) {
+        if (has_map(txn, table.name)) return;
+        std::ignore = txn.create_map(table.name, table.key_mode, table.value_mode);
+    });
 }
-
 }  // namespace zenpp::db::tables

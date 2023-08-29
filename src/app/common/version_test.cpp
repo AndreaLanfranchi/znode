@@ -11,8 +11,8 @@
 
 namespace zenpp {
 TEST_CASE("Versions", "[misc]") {
-    Version ver0{};
-    Version ver1{0, 0, 1};
+    const Version ver0{};
+    const Version ver1{0, 0, 1};
     REQUIRE(ver0 < ver1);
     REQUIRE(ver1 > ver0);
     REQUIRE(ver0.to_string() == "0.0.0");

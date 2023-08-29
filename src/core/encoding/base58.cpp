@@ -82,8 +82,8 @@ tl::expected<std::string, EncodingError> encode_check(ByteView input) noexcept {
     crypto::Sha256 digest(buffer);
     const auto hash{digest.finalize()};
     buffer.append(hash.data(), kCheckSumLength);
-    auto ret{encode(buffer)};
-    if (!ret) return tl::unexpected(ret.error());
+    const auto ret{encode(buffer)};
+    if (not ret) return tl::unexpected(ret.error());
     return *ret;
 }
 
@@ -121,7 +121,7 @@ tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
     const auto number_of_divisions{intx::count_significant_bytes(value)};
     Bytes decoded(number_of_divisions + skipped_leading_ones_count, 0);
     Bytes::size_type index(decoded.size() - 1);
-    while (value != 0) {
+    while (value not_eq 0) {
         auto b{static_cast<uint8_t>(value & 0xff)};
         decoded[index--] = b;
         value >>= 8;
@@ -131,7 +131,7 @@ tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
 
 tl::expected<Bytes, DecodingError> decode_check(std::string_view input) noexcept {
     const auto decoded{decode(input)};
-    if (!decoded) return tl::unexpected(decoded.error());
+    if (not decoded) return tl::unexpected(decoded.error());
     if (decoded.value().size() < kCheckSumLength) return tl::unexpected(DecodingError::kInputTooShort);
 
     // Split decoded into original value and its checksum
@@ -140,10 +140,9 @@ tl::expected<Bytes, DecodingError> decode_check(std::string_view input) noexcept
     const ByteView checksum(&decoded_value[decoded_value.size() - kCheckSumLength], kCheckSumLength);
 
     // Recompute Digest256 from original and check it starts with checksum
-    if (crypto::Sha256 digest{original}; !digest.finalize().starts_with(checksum)) {
+    if (crypto::Sha256 digest{original}; not digest.finalize().starts_with(checksum)) {
         return tl::unexpected(DecodingError::kInvalidBase58Checksum);
     }
     return Bytes(original);
 }
-
 }  // namespace zenpp::base58

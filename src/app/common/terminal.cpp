@@ -27,7 +27,7 @@ void init_terminal() {
     HANDLE output_handle = GetStdHandle(STD_OUTPUT_HANDLE);
     if (output_handle != INVALID_HANDLE_VALUE) {
         DWORD mode = 0;
-        if (GetConsoleMode(output_handle, &mode)) {
+        if (GetConsoleMode(output_handle, &mode) not_eq 0) {
             mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
             SetConsoleMode(output_handle, mode);
         }
@@ -35,7 +35,7 @@ void init_terminal() {
 #endif
 }
 bool ask_user_confirmation(const std::string message) {
-    static std::regex pattern{"^([yY])?([nN])?$"};
+    static const std::regex pattern{"^([yY])?([nN])?$"};
     std::smatch matches;
     std::string answer;
     do {

@@ -53,13 +53,14 @@ void Worker::start(bool kicked, bool wait) noexcept {
     }
 }
 bool Worker::stop(bool wait) noexcept {
-    bool already_requested{!Stoppable::stop(wait)};
-    if (!already_requested) kick();
-    if (wait && thread_) {
+    const bool already_requested{!Stoppable::stop(wait)};
+    if (not already_requested) kick();
+    if (wait and thread_ not_eq nullptr and thread_->joinable() and
+        thread_->get_id() not_eq std::this_thread::get_id()) {
         thread_->join();
         thread_.reset();
     }
-    return !already_requested && wait;
+    return not already_requested and wait;
 }
 
 void Worker::kick() {
@@ -69,7 +70,7 @@ void Worker::kick() {
 
 bool Worker::wait_for_kick(uint32_t timeout_milliseconds) {
     bool expected_kicked_value{true};
-    while (!kicked_.compare_exchange_strong(expected_kicked_value, false)) {
+    while (not kicked_.compare_exchange_strong(expected_kicked_value, false)) {
         // We've NOT been kicked yet hence either
         // 1) We're stopping therefore we stop waiting and immediately return false
         // 2) We change the state in kKickWaiting and begin to wait
@@ -120,5 +121,4 @@ void Worker::rethrow() const {
         std::rethrow_exception(exception_ptr_);
     }
 }
-
 }  // namespace zenpp

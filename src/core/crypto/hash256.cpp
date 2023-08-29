@@ -39,7 +39,7 @@ void Hash256::update(std::string_view data) noexcept {
 }
 
 Bytes Hash256::finalize() noexcept {
-    if (!ingested_size_) return kEmptyHash();
+    if (ingested_size_ == 0U) return kEmptyHash();
     Bytes data{hasher_.finalize()};
     if (data.empty()) return data;  // Some error occurred
     hasher_.init(data);             // 2nd pass

@@ -11,21 +11,14 @@ namespace zenpp {
 
 StopWatch::TimePoint StopWatch::start(bool with_reset) noexcept {
     using namespace std::chrono_literals;
-    if (with_reset) {
-        reset();
-    }
-
-    if (started_) {
-        return start_time_;
-    }
+    if (with_reset) reset();
+    if (started_) return start_time_;
 
     started_ = true;
-    if (start_time_ == TimePoint()) {
-        start_time_ = TimeClock::now();
-    }
-    if (!laps_.empty()) {
-        const auto& [t, d] = laps_.back();
-        laps_.emplace_back(start_time_, std::chrono::duration_cast<Duration>(start_time_ - t));
+    if (start_time_ == TimePoint()) start_time_ = TimeClock::now();
+    if (not laps_.empty()) {
+        const auto& [time_point, duration] = laps_.back();
+        laps_.emplace_back(start_time_, std::chrono::duration_cast<Duration>(start_time_ - time_point));
     } else {
         laps_.emplace_back(start_time_, std::chrono::duration_cast<Duration>(0s));
     }
@@ -33,12 +26,10 @@ StopWatch::TimePoint StopWatch::start(bool with_reset) noexcept {
 }
 
 std::pair<StopWatch::TimePoint, StopWatch::Duration> StopWatch::lap() noexcept {
-    if (!started_ || laps_.empty()) {
-        return {};
-    }
+    if (not started_ or laps_.empty()) return {};
     const auto lap_time{TimeClock::now()};
-    const auto& [t, d] = laps_.back();
-    laps_.emplace_back(lap_time, std::chrono::duration_cast<Duration>(lap_time - t));
+    const auto& [time_point, duration] = laps_.back();
+    laps_.emplace_back(lap_time, std::chrono::duration_cast<Duration>(lap_time - time_point));
     return laps_.back();
 }
 
@@ -61,9 +52,9 @@ std::pair<StopWatch::TimePoint, StopWatch::Duration> StopWatch::stop() noexcept 
 }
 
 void StopWatch::reset() noexcept {
-    (void)stop();
+    std::ignore = stop();
     start_time_ = TimePoint();
-    if (!laps_.empty()) {
+    if (not laps_.empty()) {
         std::vector<std::pair<TimePoint, Duration>>().swap(laps_);
     }
 }
@@ -72,56 +63,56 @@ std::string StopWatch::format(Duration duration) noexcept {
     using namespace std::chrono_literals;
     using days = std::chrono::duration<int, std::ratio<86400>>;
 
-    std::ostringstream os;
-    char fill = os.fill('0');
+    std::ostringstream ostream;
+    const char fill = ostream.fill('0');
 
     if (duration >= 60s) {
         bool need_space{false};
-        if (auto d = std::chrono::duration_cast<days>(duration); d.count()) {
-            os << d.count() << "d";
+        if (auto d = std::chrono::duration_cast<days>(duration); d.count() not_eq 0) {
+            ostream << d.count() << "d";
             duration -= d;
             need_space = true;
         }
-        if (auto h = std::chrono::duration_cast<std::chrono::hours>(duration); h.count()) {
-            os << (need_space ? " " : "") << h.count() << "h";
+        if (auto h = std::chrono::duration_cast<std::chrono::hours>(duration); h.count() not_eq 0) {
+            ostream << (need_space ? " " : "") << h.count() << "h";
             duration -= h;
             need_space = true;
         }
-        if (auto m = std::chrono::duration_cast<std::chrono::minutes>(duration); m.count()) {
-            os << (need_space ? " " : "") << m.count() << "m";
+        if (auto m = std::chrono::duration_cast<std::chrono::minutes>(duration); m.count() not_eq 0) {
+            ostream << (need_space ? " " : "") << m.count() << "m";
             duration -= m;
             need_space = true;
         }
-        if (auto s = std::chrono::duration_cast<std::chrono::seconds>(duration); s.count()) {
-            os << (need_space ? " " : "") << s.count() << "s";
+        if (auto s = std::chrono::duration_cast<std::chrono::seconds>(duration); s.count() not_eq 0) {
+            ostream << (need_space ? " " : "") << s.count() << "s";
         }
     } else {
         if (duration >= 1s) {
             auto s = std::chrono::duration_cast<std::chrono::seconds>(duration);
             duration -= s;
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
-            os << s.count();
-            if (ms.count()) {
-                os << "." << std::setw(3) << ms.count();
+            ostream << s.count();
+            if (ms.count() not_eq 0) {
+                ostream << "." << std::setw(3) << ms.count();
             }
-            os << "s";
+            ostream << "s";
         } else if (duration >= 1ms) {
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration);
             duration -= ms;
             auto us = std::chrono::duration_cast<std::chrono::microseconds>(duration);
-            os << ms.count();
-            if (us.count()) {
-                os << "." << std::setw(3) << us.count();
+            ostream << ms.count();
+            if (us.count() not_eq 0) {
+                ostream << "." << std::setw(3) << us.count();
             }
-            os << "ms";
+            ostream << "ms";
         } else if (duration >= 1us) {
             auto us = std::chrono::duration_cast<std::chrono::microseconds>(duration);
-            os << us.count() << "us";
+            ostream << us.count() << "us";
         }
     }
 
-    os.fill(fill);
-    return os.str();
+    ostream.fill(fill);
+    return ostream.str();
 }
 
 }  // namespace zenpp

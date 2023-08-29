@@ -5,7 +5,6 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <array>
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
@@ -17,72 +16,74 @@
 
 namespace zenpp {
 
-static const char* sig_name(int sig_code) {
-    switch (sig_code) {
-        case SIGSEGV:
-            return "SIGSEGV";
+namespace {
+    const char* sig_name(int sig_code) {
+        switch (sig_code) {
+            case SIGSEGV:
+                return "SIGSEGV";
 #if defined(__linux__) || defined(__APPLE__)
-        case SIGBUS:
-            return "SIGBUS";
-        case SIGSYS:
-            return "SIGSYS";
+            case SIGBUS:
+                return "SIGBUS";
+            case SIGSYS:
+                return "SIGSYS";
 #endif
-        case SIGFPE:
-            return "SIGFPE";
-        case SIGILL:
-            return "SIGILL";
+            case SIGFPE:
+                return "SIGFPE";
+            case SIGILL:
+                return "SIGILL";
 #if defined(__linux__) || defined(__APPLE__)
-        case SIGTRAP:
-            return "SIGTRAP";
+            case SIGTRAP:
+                return "SIGTRAP";
 #endif
 #if defined(SIGBREAK)
-        case SIGBREAK:
-            return "SIGBREAK";
+            case SIGBREAK:
+                return "SIGBREAK";
 #endif
 #if defined(__linux__) || defined(__APPLE__)
-        case SIGQUIT:
-            return "SIGQUIT";
+            case SIGQUIT:
+                return "SIGQUIT";
 #if defined(SIGSTP)
-        case SIGSTP:
-            return "SIGSTP";
+            case SIGSTP:
+                return "SIGSTP";
 #endif
-        case SIGSTOP:
-            return "SIGSTOP";
-        case SIGKILL:
-            return "SIGKILL";
+            case SIGSTOP:
+                return "SIGSTOP";
+            case SIGKILL:
+                return "SIGKILL";
 #endif
-        case SIGABRT:
-            return "SIGABRT";
+            case SIGABRT:
+                return "SIGABRT";
 #if defined(SIGABRT_COMPAT)
-        case SIGABRT_COMPAT:
-            return "SIGABRT_COMPAT";
+            case SIGABRT_COMPAT:
+                return "SIGABRT_COMPAT";
 #endif
-        case SIGINT:
-            return "SIGINT";
-        case SIGTERM:
-            return "SIGTERM";
+            case SIGINT:
+                return "SIGINT";
+            case SIGTERM:
+                return "SIGTERM";
 #if defined(__linux__) || defined(__APPLE__)
-        case SIGVTALRM:
-            return "SIGVTALRM";
-        case SIGXFSZ:
-            return "SIGXFZS";
-        case SIGXCPU:
-            return "SIGXCPU";
-        case SIGHUP:
-            return "SIGHUP";
-        case SIGALRM:
-            return "SIGALRM";
-        case SIGUSR1:
-            return "SIGUSR1";
-        case SIGUSR2:
-            return "SIGUSR2";
+            case SIGVTALRM:
+                return "SIGVTALRM";
+            case SIGXFSZ:
+                return "SIGXFZS";
+            case SIGXCPU:
+                return "SIGXCPU";
+            case SIGHUP:
+                return "SIGHUP";
+            case SIGALRM:
+                return "SIGALRM";
+            case SIGUSR1:
+                return "SIGUSR1";
+            case SIGUSR2:
+                return "SIGUSR2";
 #endif
-        default:
-            return "Unknown";
+            default:
+                return "Unknown";
+        }
     }
-}
+}  // namespace
 
-constexpr int kHandleableCodes[] {
+constexpr int kHandleableCodes[] {  // NOLINT(*-avoid-c-arrays)
 #if defined(SIGBREAK)
     SIGBREAK,  // Windows keyboard CTRL+Break
 #endif

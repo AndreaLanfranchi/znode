@@ -13,36 +13,39 @@
 
 namespace zenpp::db {
 
-//! \brief Returns data of current cursor position or moves it to the beginning or the end of the table based on
-//! provided direction if the cursor is not positioned.
-//! \param [in] c : A reference to an open cursor
-//! \param [in] d : Direction cursor should have \return ::mdbx::cursor::move_result
-static inline ::mdbx::cursor::move_result adjust_cursor_position_if_unpositioned(::mdbx::cursor& c,
-                                                                                 CursorMoveDirection d) {
-    // Warning: eof() is not exactly what we need here since it returns true not only for cursors
-    // that are not positioned, but also for those pointing to the end of data.
-    // Unfortunately, there's no MDBX API to differentiate the two.
-    if (c.eof()) {
-        return (d == CursorMoveDirection::Forward) ? c.to_first(/*throw_notfound=*/false)
-                                                   : c.to_last(/*throw_notfound=*/false);
+namespace {
+    //! \brief Returns data of current cursor position or moves it to the beginning or the end of the table based on
+    //! provided direction if the cursor is not positioned.
+    //! \param [in] cursor : A reference to an open cursor
+    //! \param [in] direction : Direction cursor should have \return mdbx::cursor::move_result
+    mdbx::cursor::move_result adjust_cursor_position_if_unpositioned(mdbx::cursor& cursor,
+                                                                     CursorMoveDirection direction) {
+        // Warning: eof() is not exactly what we need here since it returns true not only for cursors
+        // that are not positioned, but also for those pointing to the end of data.
+        // Unfortunately, there's no MDBX API to differentiate the two.
+        if (cursor.eof()) {
+            return (direction == CursorMoveDirection::Forward) ? cursor.to_first(/*throw_notfound=*/false)
+                                                               : cursor.to_last(/*throw_notfound=*/false);
+        }
+        return cursor.current(/*throw_notfound=*/false);
     }
-    return c.current(/*throw_notfound=*/false);
-}
 
-// Last entry whose key is strictly less than the given key
-static inline mdbx::cursor::move_result strict_lower_bound(mdbx::cursor& cursor, const ByteView key) {
-    if (!cursor.lower_bound(key, /*throw_notfound=*/false)) {
-        // all DB keys are less than the given key
-        return cursor.to_last(/*throw_notfound=*/false);
+    //! \brief Move cursor to last entry whose key is strictly less than the given key
+    mdbx::cursor::move_result strict_lower_bound(mdbx::cursor& cursor, const ByteView key) {
+        if (not cursor.lower_bound(key, /*throw_notfound=*/false)) {
+            // all DB keys are less than the given key
+            return cursor.to_last(/*throw_notfound=*/false);
+        }
+        // return lower_bound - 1
+        return cursor.to_previous(/*throw_notfound=*/false);
     }
-    // return lower_bound - 1
-    return cursor.to_previous(/*throw_notfound=*/false);
-}
 
-static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection direction) {
-    return direction == CursorMoveDirection::Forward ? mdbx::cursor::move_operation::next
-                                                     : mdbx::cursor::move_operation::previous;
-}
+    mdbx::cursor::move_operation move_operation(CursorMoveDirection direction) {
+        return direction == CursorMoveDirection::Forward ? mdbx::cursor::move_operation::next
+                                                         : mdbx::cursor::move_operation::previous;
+    }
+
+}  // namespace
 
 ::mdbx::env_managed open_env(const EnvConfig& config) {
     namespace fs = std::filesystem;
@@ -62,10 +65,9 @@ static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection di
         throw std::invalid_argument("Invalid argument : path " + db_path.string() + " is not a valid directory");
     }
 
-    fs::path db_file{db::get_datafile_path(db_path)};
+    const fs::path db_file{db::get_datafile_path(db_path)};
     const size_t db_ondisk_file_size{fs::exists(db_file) ? fs::file_size(db_file) : 0};
-
-    if (!config.create && !db_ondisk_file_size) {
+    if (db_ondisk_file_size == 0U and not config.create) {
         throw std::runtime_error("Unable to locate " + db_file.string() + ", which is required to exist");
     }
 
@@ -113,27 +115,27 @@ static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection di
         const auto growth_size{static_cast<intptr_t>(config.inmemory ? 8_MiB : config.growth_size)};
         cp.geometry.make_dynamic(::mdbx::env::geometry::default_value, max_map_size);
         cp.geometry.growth_step = growth_size;
-        if (!db_ondisk_file_size && config.page_size) {
+        if (db_ondisk_file_size == 0U and config.page_size not_eq 0U) {
             // If file already exists we can't change the value
             cp.geometry.pagesize = static_cast<intptr_t>(config.page_size);
         }
     }
 
     using OP = ::mdbx::env::operate_parameters;
-    OP op{};  // Operational parameters
-    op.mode = OP::mode_from_flags(static_cast<MDBX_env_flags_t>(flags));
-    op.options = op.options_from_flags(static_cast<MDBX_env_flags_t>(flags));
-    op.durability = OP::durability_from_flags(static_cast<MDBX_env_flags_t>(flags));
-    op.max_maps = config.max_tables;
-    op.max_readers = config.max_readers;
+    OP op_params{};  // Operational parameters
+    op_params.mode = OP::mode_from_flags(static_cast<MDBX_env_flags_t>(flags));
+    op_params.options = op_params.options_from_flags(static_cast<MDBX_env_flags_t>(flags));
+    op_params.durability = OP::durability_from_flags(static_cast<MDBX_env_flags_t>(flags));
+    op_params.max_maps = config.max_tables;
+    op_params.max_readers = config.max_readers;
 
     // Try open the environment
-    ::mdbx::env_managed ret{db_path.native(), cp, op, config.shared};
+    ::mdbx::env_managed ret{db_path.native(), cp, op_params, config.shared};
 
     // Check requested page_size matches the one already configured
-    if (db_ondisk_file_size && config.page_size) {
+    if (db_ondisk_file_size not_eq 0U and config.page_size not_eq 0U) {
         const size_t db_page_size{ret.get_pagesize()};
-        if (db_page_size != config.page_size) {
+        if (db_page_size not_eq config.page_size) {
             ret.close();
             throw std::length_error(
                 "Incompatible page size. "
@@ -165,15 +167,15 @@ static inline mdbx::cursor::move_operation move_operation(CursorMoveDirection di
     return ret;
 }
 
-::mdbx::map_handle open_map(::mdbx::txn& tx, const MapConfig& config) {
-    if (tx.is_readonly()) {
-        return tx.open_map(config.name, config.key_mode, config.value_mode);
+::mdbx::map_handle open_map(::mdbx::txn& txn, const MapConfig& config) {
+    if (txn.is_readonly()) {
+        return txn.open_map(config.name, config.key_mode, config.value_mode);
     }
-    return tx.create_map(config.name, config.key_mode, config.value_mode);
+    return txn.create_map(config.name, config.key_mode, config.value_mode);
 }
 
-::mdbx::cursor_managed open_cursor(::mdbx::txn& tx, const MapConfig& config) {
-    return tx.open_cursor(open_map(tx, config));
+::mdbx::cursor_managed open_cursor(::mdbx::txn& txn, const MapConfig& config) {
+    return txn.open_cursor(open_map(txn, config));
 }
 
 size_t max_value_size_for_leaf_page(const size_t page_size, const size_t key_size) {
@@ -227,15 +229,15 @@ Cursor& Cursor::operator=(Cursor&& other) noexcept {
 }
 
 Cursor::~Cursor() {
-    if (handle_) {
+    if (handle_ not_eq nullptr) {
         handles_pool_.add(handle_);
     }
 }
 
-void Cursor::bind(::mdbx::txn& txn, const MapConfig& config) {
-    if (!handle_) throw std::runtime_error("Can't bind a closed cursor");
+void Cursor::bind(mdbx::txn& txn, const MapConfig& config) {
+    if (handle_ == nullptr) throw std::runtime_error("Can't bind a closed cursor");
     // Check cursor is bound to a live transaction
-    if (auto cm_tx{mdbx_cursor_txn(handle_)}; cm_tx && txn.id() != mdbx_txn_id(cm_tx)) {
+    if (auto* cm_tx{mdbx_cursor_txn(handle_)}; cm_tx not_eq nullptr and txn.id() not_eq mdbx_txn_id(cm_tx)) {
         close();
         handle_ = ::mdbx_cursor_create(nullptr);
     }
@@ -248,20 +250,20 @@ void Cursor::close() {
     handle_ = nullptr;
 }
 MDBX_stat Cursor::get_map_stat() const {
-    if (!handle_) {
+    if (handle_ == nullptr) {
         mdbx::error::success_or_throw(EINVAL);
     }
     return txn().get_map_stat(map());
 }
 
 MDBX_db_flags_t Cursor::get_map_flags() const {
-    if (!handle_) {
+    if (handle_ == nullptr) {
         mdbx::error::success_or_throw(EINVAL);
     }
     return txn().get_handle_info(map()).flags;
 }
 
-bool Cursor::is_multi_value() const { return get_map_flags() & MDBX_DUPSORT; }
+bool Cursor::is_multi_value() const { return (get_map_flags() bitand MDBX_DUPSORT) not_eq 0; }
 
 bool Cursor::is_dangling() const { return eof() && !on_last(); }
 
@@ -269,10 +271,10 @@ size_t Cursor::size() const { return get_map_stat().ms_entries; }
 
 bool Cursor::empty() const { return size() == 0; }
 
-bool has_map(::mdbx::txn& tx, const char* map_name) {
+bool has_map(::mdbx::txn& txn, const char* map_name) {
     try {
-        ::mdbx::map_handle main_map{1};
-        auto main_crs{tx.open_cursor(main_map)};
+        const mdbx::map_handle main_map{1};
+        auto main_crs{txn.open_cursor(main_map)};
         auto found{main_crs.seek(::mdbx::slice(map_name))};
         return found;
     } catch (const mdbx::exception&) {
@@ -295,10 +297,7 @@ size_t cursor_for_prefix(::mdbx::cursor& cursor, const ByteView prefix, WalkFunc
                          CursorMoveDirection direction) {
     size_t ret{0};
     auto data{cursor.lower_bound(prefix, false)};
-    while (data) {
-        if (!data.key.starts_with(prefix)) {
-            break;
-        }
+    while (data and data.key.starts_with(prefix)) {
         ++ret;
         walker(from_slice(data.key), from_slice(data.value));
         data = cursor.move(move_operation(direction), /*throw_notfound=*/false);
@@ -309,10 +308,7 @@ size_t cursor_for_prefix(::mdbx::cursor& cursor, const ByteView prefix, WalkFunc
 size_t cursor_erase_prefix(::mdbx::cursor& cursor, const ByteView prefix) {
     size_t ret{0};
     auto data{cursor.lower_bound(prefix, /*throw_notfound=*/false)};
-    while (data) {
-        if (!data.key.starts_with(prefix)) {
-            break;
-        }
+    while (data and data.key.starts_with(prefix)) {
         ++ret;
         cursor.erase();
         data = cursor.to_next(/*throw_notfound=*/false);
@@ -323,7 +319,7 @@ size_t cursor_erase_prefix(::mdbx::cursor& cursor, const ByteView prefix) {
 size_t cursor_for_count(::mdbx::cursor& cursor, WalkFuncRef walker, size_t count, const CursorMoveDirection direction) {
     size_t ret{0};
     auto data{adjust_cursor_position_if_unpositioned(cursor, direction)};
-    while (count && data) {
+    while (data and count not_eq 0U) {
         ++ret;
         --count;
         walker(from_slice(data.key), from_slice(data.value));
@@ -339,11 +335,9 @@ size_t cursor_erase(mdbx::cursor& cursor, const ByteView set_key, const CursorMo
 
     size_t ret{0};
     while (data) {
-        ++ret;
-        cursor.erase();
+        ret += static_cast<size_t>(cursor.erase());
         data = cursor.move(move_operation(direction), /*throw_notfound=*/false);
     }
     return ret;
 }
-
 }  // namespace zenpp::db

@@ -37,9 +37,9 @@ std::filesystem::path get_process_absolute_full_path() {
 }
 
 std::filesystem::path get_unique_temporary_path(std::optional<std::filesystem::path> base_path) {
-    if (!base_path) base_path.emplace(get_os_temporary_path());
-    if (!base_path->is_absolute()) base_path = std::filesystem::absolute(*base_path);
-    if (!std::filesystem::exists(*base_path) || !std::filesystem::is_directory(*base_path)) {
+    if (not base_path) base_path.emplace(get_os_temporary_path());
+    if (not base_path->is_absolute()) base_path = std::filesystem::absolute(*base_path);
+    if (not std::filesystem::exists(*base_path) or not std::filesystem::is_directory(*base_path)) {
         throw std::invalid_argument("Path " + base_path->string() + " does not exist or is not a directory");
     }
 
@@ -60,12 +60,12 @@ std::filesystem::path get_os_default_storage_path() {
     std::string base_path_str{};
     auto environment{boost::this_process::environment()};
 
-    if (auto env_value{environment["XDG_DATA_HOME"]}; !env_value.empty()) {
+    if (auto env_value{environment["XDG_DATA_HOME"]}; not env_value.empty()) {
         // Got storage path from docker
         base_path_str.assign(env_value.to_string());
     } else {
 #ifdef _WIN32
-        std::string env_name{"LOCALAPPDATA"};
+        std::string const env_name{"LOCALAPPDATA"};
 #else
         std::string env_name{"HOME"};
 #endif
@@ -142,7 +142,7 @@ void Directory::create() const {
     }
 }
 Directory Directory::operator[](const std::filesystem::path& path) const {
-    if (path.empty() || path.is_absolute() || !path.has_filename()) throw std::invalid_argument("Invalid Path");
+    if (path.empty() or path.is_absolute() or not path.has_filename()) throw std::invalid_argument("Invalid Path");
     const auto target{path_ / path};
     if (!std::filesystem::exists(target) && !std::filesystem::create_directories(target)) {
         throw std::filesystem::filesystem_error("Unable to create directory " + target.string(), target,
@@ -155,7 +155,7 @@ bool Directory::is_writable() const noexcept {
     while (std::filesystem::exists(path_ / test_file_name)) {
         test_file_name = get_random_alpha_string(8);
     }
-    std::filesystem::path test_file_path{path_ / test_file_name};
+    std::filesystem::path const test_file_path{path_ / test_file_name};
     std::ofstream test_file{test_file_path.string()};
     if (!test_file.is_open()) return false;
     test_file << "test";

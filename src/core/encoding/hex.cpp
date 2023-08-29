@@ -152,5 +152,4 @@ tl::expected<unsigned, DecodingError> decode_digit(const char input) noexcept {
     if (value == 0xff) return tl::unexpected{DecodingError::kInvalidHexDigit};
     return value;
 }
-
 }  // namespace zenpp::hex

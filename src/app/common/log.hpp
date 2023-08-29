@@ -82,7 +82,7 @@ class BufferBase {
     // Accumulators
     template <class T>
     inline void append(T const& t) {
-        if (should_print_) ss_ << t;
+        if (should_print_) sstream_ << t;
     }
     template <class T>
     BufferBase& operator<<(T const& t) {
@@ -93,7 +93,7 @@ class BufferBase {
   protected:
     void flush() const;
     const bool should_print_;
-    std::stringstream ss_;
+    std::stringstream sstream_;
 };
 
 template <Level level>

@@ -17,7 +17,7 @@ namespace zenpp::log {
 template <Level level>
 class TestLogBuffer : public LogBuffer<level> {
   public:
-    [[nodiscard]] std::string content() const { return LogBuffer<level>::ss_.str(); }
+    [[nodiscard]] std::string content() const { return LogBuffer<level>::sstream_.str(); }
 };
 
 // Utility test function enforcing that log buffered content is empty (or not) as expected

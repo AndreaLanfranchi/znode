@@ -23,10 +23,6 @@ class StopWatch {
     using TimePoint = std::chrono::time_point<TimeClock>;
     using Duration = std::chrono::nanoseconds;
 
-    static inline bool kStart = true;
-    static inline bool kNostart = false;
-    static inline bool kReset = true;
-
     //! \brief Creates a new instance
     explicit StopWatch(bool auto_start = false) {
         if (auto_start) start();

@@ -95,18 +95,18 @@ class MessageDigest {
     //! it's recycled by init() or reset(). In case of any error the returned digest will be zero length
     [[nodiscard]] Bytes finalize(bool compress = false) noexcept {
         Bytes ret(digest_size_, 0);
-        if (!compress) [[likely]] {
+        if (not compress) [[likely]] {
             if (EVP_DigestFinal_ex(digest_context_.get(), ret.data(), nullptr) == 0 /* zero is failure not success */) {
                 ret.clear();
             }
         } else {
             // Only for Sha256 in Merkle tree composition
-            if (digest_name() == "SHA256" && ingested_size_ == block_size_) {
+            if (digest_name() == "SHA256" and ingested_size_ == block_size_) {
                 // See the structure of SHA256 which access is deprecated in OpenSSL 3.0.1
                 // We need only first 8 integers
                 // TODO: Seems OpenSSL 3.1.0 always returns nullptr
                 const auto ctx{EVP_MD_CTX_get0_md_data(digest_context_.get())};
-                if (ctx != nullptr) {
+                if (ctx not_eq nullptr) {
                     const auto* ctx_data{reinterpret_cast<const uint32_t*>(ctx)};
                     for (size_t i{0}; i < 8; ++i) {
                         endian::store_big_u32(&ret[i << 2], ctx_data[i]);

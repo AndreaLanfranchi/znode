@@ -167,16 +167,16 @@ struct MapConfig {
 ::mdbx::env_managed open_env(const EnvConfig& config);
 
 //! \brief Opens an mdbx "map" (aka table)
-//! \param [in] tx : a reference to a valid mdbx transaction
+//! \param [in] txn : a reference to a valid mdbx transaction
 //! \param [in] config : the configuration settings for the map
 //! \return A handle to the opened map
-::mdbx::map_handle open_map(::mdbx::txn& tx, const MapConfig& config);
+::mdbx::map_handle open_map(::mdbx::txn& txn, const MapConfig& config);
 
 //! \brief Opens a cursor to an mdbx "map" (aka table)
-//! \param [in] tx : a reference to a valid mdbx transaction
+//! \param [in] txn : a reference to a valid mdbx transaction
 //! \param [in] config : the configuration settings for the underlying map
 //! \return A handle to the opened cursor
-::mdbx::cursor_managed open_cursor(::mdbx::txn& tx, const MapConfig& config);
+::mdbx::cursor_managed open_cursor(::mdbx::txn& txn, const MapConfig& config);
 
 //! \brief Computes the max size of value data to fit in a leaf data page
 //! \param [in] page_size : the actually configured MDBX's page size
@@ -239,10 +239,10 @@ class Cursor : public ::mdbx::cursor {
 };
 
 //! \brief Checks whether a provided map name exists in database
-//! \param [in] tx : a reference to a valid mdbx transaction
+//! \param [in] txn : a reference to a valid mdbx transaction
 //! \param [in] map_name : the name of the map to check for
 //! \return True / False
-bool has_map(::mdbx::txn& tx, const char* map_name);
+bool has_map(::mdbx::txn& txn, const char* map_name);
 
 //! \brief Builds the full path to mdbx datafile provided a directory
 //! \param [in] base_path : a reference to the directory holding the data file

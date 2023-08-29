@@ -18,7 +18,7 @@ std::optional<Version> read_schema_version(mdbx::txn& txn) {
     }
     auto data{config.current()};
     ASSERT(data.value.length() == sizeof(Version));
-    const auto data_ptr = static_cast<uint8_t*>(data.value.data());
+    const auto* data_ptr = static_cast<uint8_t*>(data.value.data());
     Version ret{};
     ret.Major = endian::load_big_u32(&data_ptr[0]);
     ret.Minor = endian::load_big_u32(&data_ptr[4]);
@@ -33,7 +33,7 @@ void write_schema_version(mdbx::txn& txn, const Version& version) {
         throw std::invalid_argument("New version LT previous version");
     }
     Bytes value(sizeof(version), '\0');
-    endian::store_big_u32(&value[0], version.Major);
+    endian::store_big_u32(value.data(), version.Major);
     endian::store_big_u32(&value[4], version.Minor);
     endian::store_big_u32(&value[8], version.Patch);
 
