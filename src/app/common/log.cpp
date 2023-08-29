@@ -13,6 +13,7 @@
 #include <thread>
 
 #include <absl/time/clock.h>
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/format.hpp>
 
 #include <app/common/log.hpp>
@@ -24,7 +25,7 @@ namespace {
     std::mutex out_mtx{};
     std::unique_ptr<std::fstream> file_{nullptr};
 
-    inline std::pair<const char*, const char*> get_level_settings(Level level) {
+    std::pair<const char*, const char*> get_level_settings(Level level) {
         switch (level) {
             using enum zenpp::log::Level;
             case kTrace:
@@ -43,6 +44,19 @@ namespace {
                 return {"     ", kColorReset};
         }
     }
+
+    absl::TimeZone get_time_zone() {
+        if (settings_.log_timezone.empty() or boost::iequals(settings_.log_timezone, "UTC")) {
+            return absl::UTCTimeZone();
+        }
+        absl::TimeZone ret;
+        if (not absl::LoadTimeZone(settings_.log_timezone, &ret)) {
+            std::cerr << "Could not load time zone [" << settings_.log_timezone << "] defaulting to UTC" << std::endl;
+            ret = absl::UTCTimeZone();
+        }
+        return ret;
+    }
+
 }  // namespace
 
 thread_local std::string thread_name_{};
@@ -110,7 +124,7 @@ BufferBase::BufferBase(Level level) : should_print_(level <= settings_.log_verbo
     sstream_ << kColorReset << " " << color << prefix << kColorReset << " ";
 
     // TimeStamp
-    static const absl::TimeZone time_zone{settings_.log_utc ? absl::LocalTimeZone() : absl::UTCTimeZone()};
+    thread_local const absl::TimeZone time_zone{get_time_zone()};
     const absl::Time now{absl::Now()};
     sstream_ << kColorCyan << absl::FormatTime("[%m-%d|%H:%M:%E3S] ", now, time_zone) << kColorReset;
 

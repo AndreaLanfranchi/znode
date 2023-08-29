@@ -28,7 +28,7 @@ enum class Level {
 //! \brief Holds logging configuration
 struct Settings {
     bool log_std_out{false};            // Whether console logging goes to std::cout or std::cerr (default)
-    bool log_utc{false};                // Whether timestamps should be in UTC or imbue local timezone
+    std::string log_timezone{"UTC"};    // UTC or a valid IANA time zone
     bool log_nocolor{false};            // Whether to disable colorized output
     bool log_threads{false};            // Whether to print thread ids in log lines
     Level log_verbosity{Level::kInfo};  // Log verbosity level

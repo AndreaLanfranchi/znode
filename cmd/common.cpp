@@ -12,6 +12,7 @@
 #include <string>
 #include <thread>
 
+#include <absl/time/time.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio/ip/address.hpp>
 
@@ -166,7 +167,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
 
 void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
     using enum log::Level;
-    std::map<std::string, log::Level, std::less<>> level_mapping{
+    const std::map<std::string, log::Level, std::less<>> level_mapping{
         {"critical", kCritical}, {"error", kError}, {"warning", kWarning},
         {"info", kInfo},         {"debug", kDebug}, {"trace", kTrace},
     };
@@ -176,11 +177,29 @@ void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
         ->check(CLI::Range(kCritical, kTrace))
         ->transform(CLI::Transformer(level_mapping, CLI::ignore_case))
         ->default_val(log_settings.log_verbosity);
+
+/* TODO implement timezones
+    log_opts.add_option("--log.timezone", log_settings.log_timezone, "Sets log timezone. If not specified UTC is used")
+        ->capture_default_str()
+        ->check(TimeZoneValidator(*/
+/*allow_empty=*//*
+false))
+        ->default_val(log_settings.log_timezone);
+*/
+
     log_opts.add_flag("--log.stdout", log_settings.log_std_out, "Outputs to std::out instead of std::err");
     log_opts.add_flag("--log.nocolor", log_settings.log_nocolor, "Disable colors on log lines");
-    log_opts.add_flag("--log.utc", log_settings.log_utc, "Prints log timings in UTC");
     log_opts.add_flag("--log.threads", log_settings.log_threads, "Prints thread ids");
     log_opts.add_option("--log.file", log_settings.log_file, "Tee all log lines to given file name");
+}
+
+TimeZoneValidator::TimeZoneValidator(bool allow_empty) {
+    description("a valid IANA timezone");
+    func_ = [allow_empty](std::string& value) -> std::string {
+        if (value.empty() and allow_empty) return {};
+        if (value.empty()) value = "a value MUST be specified";
+        return {};
+    };
 }
 
 IPEndPointValidator::IPEndPointValidator(bool allow_empty, uint16_t default_port) {
@@ -203,4 +222,5 @@ IPEndPointValidator::IPEndPointValidator(bool allow_empty, uint16_t default_port
         return {};
     };
 }
+
 }  // namespace zenpp::cmd
