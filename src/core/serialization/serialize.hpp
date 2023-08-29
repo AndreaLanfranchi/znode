@@ -20,8 +20,10 @@ namespace zenpp::serialization {
 //! \remarks Do not define serializable classes members as size_t as it might lead to wrong results on
 //! MacOS/Xcode bundles
 template <class T>
-requires std::is_arithmetic_v<T>
-inline uint32_t ser_sizeof(T obj) { return sizeof(obj); }
+    requires std::is_arithmetic_v<T>
+inline uint32_t ser_sizeof(T obj) {
+    return sizeof(obj);
+}
 
 //! \brief Returns the serialized size of arithmetic types
 //! \remarks Specialization for bool which is stored in at least 1 byte
@@ -102,7 +104,8 @@ inline void write_compact(Stream& stream, uint64_t obj) {
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Stream>
-requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) inline Error read_data(Stream& stream, T& object) {
+    requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>)
+inline Error read_data(Stream& stream, T& object) {
     const uint32_t count{ser_sizeof(object)};
     const auto read_result{stream.read(count)};
     if (!read_result) return read_result.error();
@@ -112,7 +115,7 @@ requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) inline Error read_
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Stream>
-requires std::is_arithmetic_v<T>
+    requires std::is_arithmetic_v<T>
 inline tl::expected<T, Error> read_data(Stream& stream) {
     T ret{0};
     auto result{read_data(stream, ret)};
@@ -124,7 +127,7 @@ inline tl::expected<T, Error> read_data(Stream& stream) {
 
 //! \brief Lowest level deserialization for bool
 template <typename T, class Stream>
-requires std::is_same_v<T, bool>
+    requires std::is_same_v<T, bool>
 inline Error read_data(Stream& stream, T& object) {
     const auto read_result{stream.read(1)};
     if (!read_result) return read_result.error();
@@ -138,7 +141,7 @@ inline Error read_data(Stream& stream, T& object) {
 template <class Stream>
 inline tl::expected<uint64_t, Error> read_compact(Stream& stream, bool range_check = true) {
     const auto size{read_data<uint8_t>(stream)};
-    if (!size) return tl::unexpected(size.error());
+    if (not size) return tl::unexpected(size.error());
 
     uint64_t ret{0};
 
@@ -146,21 +149,21 @@ inline tl::expected<uint64_t, Error> read_compact(Stream& stream, bool range_che
         ret = *size;
     } else if (*size == 253) {
         const auto value{read_data<uint16_t>(stream)};
-        if (!value) return tl::unexpected(value.error());
+        if (not value) return tl::unexpected(value.error());
         if (*value < 253) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
     } else if (*size == 254) {
         const auto value{read_data<uint32_t>(stream)};
-        if (!value) return tl::unexpected(value.error());
+        if (not value) return tl::unexpected(value.error());
         if (*value < 0x10000UL) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
     } else if (*size == 255) {
         const auto value{read_data<uint64_t>(stream)};
-        if (!value) return tl::unexpected(value.error());
+        if (not value) return tl::unexpected(value.error());
         if (*value < 0x100000000ULL) return tl::unexpected(Error::kNonCanonicalCompactSize);
         ret = *value;
     }
-    if (range_check && ret > kMaxSerializedCompactSize) return tl::unexpected(Error::kCompactSizeTooBig);
+    if (range_check and ret > kMaxSerializedCompactSize) return tl::unexpected(Error::kCompactSizeTooBig);
     return ret;
 }
 }  // namespace zenpp::serialization

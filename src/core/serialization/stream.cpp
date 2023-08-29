@@ -29,10 +29,9 @@ void DataStream::reserve(size_type count) { buffer_.reserve(count); }
 void DataStream::resize(size_type new_size, value_type item) { buffer_.resize(new_size, item); }
 
 Error DataStream::write(ByteView data) {
-    auto next_size(safe_add(buffer_.size(), data.size()));
-    if (!next_size.has_value()) {
-        return Error::kOverflow;
-    }
+    const auto next_size(safe_add(buffer_.size(), data.size()));
+    if (not next_size.has_value()) return Error::kOverflow;
+
     buffer_.append(data);
     return Error::kSuccess;
 }
@@ -42,7 +41,7 @@ Error DataStream::write(const uint8_t* const ptr, DataStream::size_type count) {
 DataStream::iterator DataStream::begin() { return buffer_.begin() + static_cast<difference_type>(read_position_); }
 
 void DataStream::rewind(std::optional<size_type> count) noexcept {
-    if (!count.has_value()) {
+    if (not count.has_value()) {
         read_position_ = 0;
     } else if (count.value() <= read_position_) {
         read_position_ -= count.value();
@@ -54,25 +53,23 @@ DataStream::iterator DataStream::end() { return buffer_.end(); }
 void DataStream::insert(iterator where, value_type item) { buffer_.insert(std::move(where), item); }
 
 void DataStream::erase(iterator where) {
-    if (where == end()) {
-        return;
-    }
+    if (where == end()) return;
+
     const auto pos(static_cast<size_type>(std::distance(buffer_.begin(), where)));
     buffer_.erase(std::move(where));
-    if (read_position_ && read_position_ > pos) {
+    if (read_position_ > 0U and read_position_ > pos) {
         --read_position_;
     }
     read_position_ = std::min(read_position_, buffer_.size());
 }
 
 void DataStream::erase(const size_type pos, std::optional<size_type> count) {
-    if ((count.has_value() && *count == 0) || pos >= buffer_.size()) {
-        return;
-    }
+    if ((count.has_value() and *count == 0) or pos >= buffer_.size()) return;
+
     const auto max_count{buffer_.size() - pos};
     count = std::min(count.value_or(std::numeric_limits<size_type>::max()), max_count);
     buffer_.erase(pos, *count);
-    if (read_position_ && read_position_ > pos) {
+    if (read_position_ > 0U && read_position_ > pos) {
         auto move_back_count{std::min(read_position_ - pos, *count)};
         read_position_ -= move_back_count;
     }
@@ -81,32 +78,31 @@ void DataStream::erase(const size_type pos, std::optional<size_type> count) {
 void DataStream::push_back(uint8_t byte) { buffer_.push_back(byte); }
 
 tl::expected<ByteView, Error> DataStream::read(std::optional<size_t> count) noexcept {
-    if (!count.has_value()) {
-        count = avail();
-    }
-    auto next_read_position{safe_add(read_position_, *count)};
-    if (!next_read_position || *next_read_position > buffer_.length()) {
+    if (not count.has_value()) count = avail();
+
+    const auto next_read_position{safe_add(read_position_, *count)};
+    if (not next_read_position or *next_read_position > buffer_.length()) {
         return tl::unexpected(Error::kReadBeyondData);
     }
     ByteView ret(&buffer_[read_position_], *count);
-    std::swap(read_position_, *next_read_position);
+    read_position_ = *next_read_position;
     return ret;
 }
 
 void DataStream::ignore(size_type count) noexcept {
     const auto pos(safe_add(read_position_, count));
-    if (!pos.has_value() || pos.value() > buffer_.size()) {
+    if (not pos.has_value() or pos.value() > buffer_.size()) {
         read_position_ = buffer_.size();
     }
-    read_position_ = pos.value();
+    read_position_ = *pos;
 }
 
 bool DataStream::eof() const noexcept { return read_position_ >= buffer_.size(); }
 
 DataStream::size_type DataStream::tellg() const noexcept { return read_position_; }
 
-DataStream::size_type DataStream::seekg(size_type p) noexcept {
-    read_position_ = std::min(p, buffer_.size());
+DataStream::size_type DataStream::seekg(size_type position) noexcept {
+    read_position_ = std::min(position, buffer_.size());
     return read_position_;
 }
 
@@ -148,5 +144,4 @@ void SDataStream::clear() noexcept {
     DataStream::clear();
     computed_size_ = 0;
 }
-
 }  // namespace zenpp::serialization
