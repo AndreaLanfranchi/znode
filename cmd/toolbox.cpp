@@ -10,7 +10,6 @@
 
 #include <CLI/CLI.hpp>
 #include <absl/container/btree_map.h>
-#include <boost/bind/bind.hpp>
 #include <boost/format.hpp>
 #include <magic_enum.hpp>
 
@@ -24,7 +23,7 @@
 
 namespace fs = std::filesystem;
 using namespace zenpp;
-using namespace boost::placeholders;
+using namespace std::placeholders;
 
 struct dbTableEntry {
     MDBX_dbi id{0};
@@ -64,7 +63,7 @@ dbFreeInfo get_freeInfo(::mdbx::txn& txn) {
     const ::mdbx::map_handle free_map{0};
     auto page_size{txn.get_map_stat(free_map).ms_psize};
 
-    const auto& collect_func{[&ret, &page_size](ByteView key, ByteView value) {
+    const auto collect_func{[&ret, &page_size](ByteView key, ByteView value) {
         size_t txId;
         std::memcpy(&txId, key.data(), sizeof(size_t));
         uint32_t pagesCount;
@@ -91,7 +90,7 @@ dbTablesInfo get_tablesInfo(::mdbx::txn& txn) {
     const mdbx::map_handle free_map{0};
     auto stat = txn.get_map_stat(free_map);
     auto info = txn.get_handle_info(free_map);
-    table = std::make_unique<dbTableEntry>(free_map.dbi, "FREE_DBI", stat, info);
+    table.reset(new dbTableEntry{free_map.dbi, "FREE_DBI", stat, info});
     ret.pageSize += table->stat.ms_psize;
     ret.pages += table->pages();
     ret.size += table->size();
@@ -101,7 +100,7 @@ dbTablesInfo get_tablesInfo(::mdbx::txn& txn) {
     const mdbx::map_handle main_map{1};
     stat = txn.get_map_stat(main_map);
     info = txn.get_handle_info(main_map);
-    table = std::make_unique<dbTableEntry>(main_map.dbi, "MAIN_DBI", stat, info);
+    table.reset(new dbTableEntry{main_map.dbi, "MAIN_DBI", stat, info});
     ret.pageSize += table->stat.ms_psize;
     ret.pages += table->pages();
     ret.size += table->size();
@@ -183,8 +182,8 @@ int main(int argc, char* argv[]) {
     Ossignals::init();
     CLI::App app_main("Zenn db tool");
     app_main.get_formatter()->column_width(50);
-    app_main.require_subcommand(1);  // At least 1 subcommand is required
-    log::Settings log_settings{};    // Holds logging settings
+    app_main.require_subcommand(1);      // At least 1 subcommand is required
+    const log::Settings log_settings{};  // Holds logging settings
 
     /*
      * Database options (path required)
