@@ -50,6 +50,7 @@ bool Worker::start() noexcept {
             break;
         }
     }
+    return true;
 }
 bool Worker::stop(bool wait) noexcept {
     const bool already_requested{!Stoppable::stop(wait)};
@@ -58,6 +59,7 @@ bool Worker::stop(bool wait) noexcept {
         thread_->get_id() not_eq std::this_thread::get_id()) {
         thread_->join();
         thread_.reset();
+        Stoppable::set_stopped();
     }
     return not already_requested and wait;
 }

@@ -45,7 +45,7 @@ class Worker : public Stoppable, private boost::noncopyable {
 
     //! \brief Returns the id of this worker (is the thread id)
     size_t id() const {
-        if (!thread_) return 0;
+        if (thread_ == nullptr) return 0;
         return std::hash<std::thread::id>{}(thread_->get_id());
     }
 
@@ -53,7 +53,7 @@ class Worker : public Stoppable, private boost::noncopyable {
     State state() const noexcept { return state_.load(std::memory_order_relaxed); }
 
     //! \brief Whether this worker/thread has encountered an exception
-    bool has_exception() const noexcept { return exception_ptr_ != nullptr; }
+    bool has_exception() const noexcept { return exception_ptr_ not_eq nullptr; }
 
     //! \brief Returns the message of captured exception (if any)
     std::string what() const noexcept;

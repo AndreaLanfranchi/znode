@@ -46,13 +46,13 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
     using namespace std::placeholders;
     using enum Worker::State;
 
-    log::SetLogVerbosityGuard log_guard(log::Level::kTrace);
+    const log::SetLogVerbosityGuard log_guard(log::Level::kTrace);
 
     SECTION("No throw") {
         TestWorker worker(false);
         auto connection = worker.signal_worker_state_changed.connect(std::bind(&trace_worker_state_changes, _1));
         CHECK(worker.state() == kStopped);
-        worker.start(false, true);
+        worker.start();
 
         {
             std::unique_lock l(kick_mtx);
@@ -82,7 +82,7 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
     SECTION("Throw") {
         TestWorker worker(true);
         CHECK(worker.state() == kStopped);
-        worker.start(true, true);
+        worker.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.state() == kStopped);
         CHECK(worker.has_exception() == true);
@@ -92,10 +92,10 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
     SECTION("Stop when already exited") {
         TestWorker worker(true);
         CHECK(worker.state() == kStopped);
-        worker.start(true, true);
+        worker.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.state() == kStopped);  // likely
-        worker.stop(true);
+        CHECK(worker.stop(true) == false);
         CHECK(worker.state() == kStopped);
     }
 }

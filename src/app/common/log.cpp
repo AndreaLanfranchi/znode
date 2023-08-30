@@ -97,9 +97,8 @@ uint64_t get_thread_id() {
 
 std::string get_thread_name() {
     if (thread_name_.empty()) {
-        std::stringstream sstream;
-        sstream << std::this_thread::get_id();
-        thread_name_ = sstream.str();
+        const auto tid{std::hash<std::thread::id>{}(std::this_thread::get_id())};
+        thread_name_.assign(std::to_string(tid));
     }
     return thread_name_;
 }
