@@ -52,10 +52,8 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     local_version_.relay_ = true;           // TODO
 }
 
-void Node::start() {
-    if (bool expected{false}; not is_started_.compare_exchange_strong(expected, true)) {
-        return;  // Already started
-    }
+bool Node::start() noexcept {
+    if (not Stoppable::start()) return false;
 
     local_endpoint_ = NetEndpoint(socket_.local_endpoint());
     remote_endpoint_ = NetEndpoint(socket_.remote_endpoint());
@@ -71,6 +69,7 @@ void Node::start() {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
         std::ignore = push_message(abi::NetMessageType::kVersion, local_version_);
     }
+    return true;
 }
 
 bool Node::stop(bool wait) noexcept {
@@ -91,9 +90,8 @@ bool Node::stop(bool wait) noexcept {
             std::ignore = socket_.shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
             std::ignore = socket_.close(error_code);
         }
-        if (bool expected{true}; is_started_.compare_exchange_strong(expected, false)) {
-            asio::post(io_strand_, [self{shared_from_this()}]() { self->on_disconnect_(self); });
-        }
+
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->on_disconnect_(self); });
     }
     return ret;
 }
@@ -132,7 +130,7 @@ bool Node::handle_ping_timer(const boost::system::error_code& error_code) {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return false;
     }
-    return !is_stopping();
+    return not is_stopping();
 }
 
 void Node::process_ping_latency(const uint64_t latency_ms) {

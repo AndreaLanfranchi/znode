@@ -10,11 +10,23 @@
 
 namespace zenpp {
 
+bool Stoppable::start() noexcept {
+    bool expected{false};
+    return started_.compare_exchange_strong(expected, true);
+}
+
 bool Stoppable::stop([[maybe_unused]] /*in non-threaded components we don't need this*/ bool wait) noexcept {
     bool expected{false};
     return stop_requested_.compare_exchange_strong(expected, true);
 }
 
 bool Stoppable::is_stopping() const noexcept { return stop_requested_ || Ossignals::signalled(); }
+
+bool Stoppable::is_running() const noexcept { return started_ and not stop_requested_; }
+
+void Stoppable::set_stopped() noexcept {
+    started_.store(false);
+    stop_requested_.store(false);
+}
 
 }  // namespace zenpp

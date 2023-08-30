@@ -52,7 +52,7 @@ class NodeHub : public Stoppable {
     [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
     [[nodiscard]] size_t active_connections_count() const noexcept { return current_active_connections_.load(); }
 
-    bool start();                            // Begins accepting connections
+    bool start() noexcept override;          // Begins accepting connections
     bool stop(bool wait) noexcept override;  // Stops accepting connections and stops all nodes
     [[nodiscard]] bool connect(
         const NetEndpoint& endpoint,
@@ -81,7 +81,6 @@ class NodeHub : public Stoppable {
     AppSettings& app_settings_;              // Reference to global application settings
     boost::asio::io_context& asio_context_;  // Reference to global asio context
 
-    std::atomic_bool is_started_{false};              // Guards against multiple starts
     boost::asio::io_context::strand asio_strand_;     // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
     boost::asio::steady_timer service_timer_;         // Service scheduler for this instance

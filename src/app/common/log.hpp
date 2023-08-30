@@ -28,7 +28,7 @@ enum class Level {
 //! \brief Holds logging configuration
 struct Settings {
     bool log_std_out{false};            // Whether console logging goes to std::cout or std::cerr (default)
-    std::string log_timezone{"UTC"};    // UTC or a valid IANA time zone
+    std::string log_timezone{"UTC"};    // UTC or a valid IANA time zone (e.g. Europe/Rome) WIP
     bool log_nocolor{false};            // Whether to disable colorized output
     bool log_threads{false};            // Whether to print thread ids in log lines
     Level log_verbosity{Level::kInfo};  // Log verbosity level
@@ -81,12 +81,12 @@ class BufferBase {
 
     // Accumulators
     template <class T>
-    inline void append(T const& t) {
-        if (should_print_) sstream_ << t;
+    inline void append(T const& obj) {
+        if (should_print_) sstream_ << obj;
     }
     template <class T>
-    BufferBase& operator<<(T const& t) {
-        append(t);
+    BufferBase& operator<<(T const& obj) {
+        append(obj);
         return *this;
     }
 

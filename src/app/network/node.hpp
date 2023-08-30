@@ -69,7 +69,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     ~Node() override = default;
 
     //! \brief Start the asynchronous read/write operations
-    void start();
+    bool start() noexcept override;
 
     //! \brief Stops the asynchronous read/write operations and disconnects
     bool stop(bool wait) noexcept override;
@@ -204,7 +204,6 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<ProtocolHandShakeStatus> protocol_handshake_status_{
         ProtocolHandShakeStatus::kNotInitiated};                         // Status of protocol handshake
     std::atomic_int version_{kDefaultProtocolVersion};                   // Protocol version negotiated during handshake
-    std::atomic_bool is_started_{false};                                 // Guards against multiple calls to start()
     std::atomic_bool is_connected_{true};                                // Status of socket connection
     std::atomic<std::chrono::steady_clock::time_point> connected_time_;  // Time of connection
     std::atomic<std::chrono::steady_clock::time_point> last_message_received_time_;  // Last fully "in" message tstamp

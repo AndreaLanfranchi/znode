@@ -22,10 +22,8 @@ namespace zenpp::network {
 using namespace boost;
 using asio::ip::tcp;
 
-bool NodeHub::start() {
-    if (bool expected{false}; !is_started_.compare_exchange_strong(expected, true)) {
-        return false;
-    }
+bool NodeHub::start() noexcept {
+    if (not Stoppable::start()) return false;  // Already started
 
     if (app_settings_.network.use_tls) {
         const auto ssl_data{(*app_settings_.data_directory)[DataDirectory::kSSLCert].path()};
@@ -37,7 +35,7 @@ bool NodeHub::start() {
         tls_server_context_ = std::make_unique<asio::ssl::context>(ctx);
         ctx = generate_tls_context(TLSContextType::kClient, ssl_data, app_settings_.network.tls_password);
         if (ctx == nullptr) {
-            log::Error("NodeHub", {"action", "start", "error", "failed to generate TLS server context"});
+            log::Error("NodeHub", {"action", "start", "error", "failed to generate TLS client context"});
             return false;
         }
         tls_client_context_ = std::make_unique<asio::ssl::context>(ctx);
