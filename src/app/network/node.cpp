@@ -509,11 +509,13 @@ serialization::Error Node::process_inbound_message() {
             }
             // Calculate ping response time in milliseconds
             const auto now{std::chrono::steady_clock::now()};
-            const auto ping_response_time{now - last_ping_sent_time_.load()};
+            const auto ping_response_duration{now - last_ping_sent_time_.load()};
+            const auto ping_response_time{
+                std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_duration)};
 
             // If the response time in milliseconds is greater than settings' threshold
             // this won't reset the timers and the nonce and let idle checks do their tasks
-            process_ping_latency((std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_time)).count());
+            process_ping_latency(static_cast<uint64_t>(ping_response_time.count()));
 
         } break;
         default:

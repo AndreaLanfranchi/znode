@@ -52,6 +52,7 @@ bool Worker::start() noexcept {
     }
     return true;
 }
+
 bool Worker::stop(bool wait) noexcept {
     const bool already_requested{!Stoppable::stop(wait)};
     if (not already_requested) kick();
