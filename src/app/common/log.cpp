@@ -136,7 +136,7 @@ BufferBase::BufferBase(Level level) : should_print_(level <= settings_.log_verbo
 
 BufferBase::BufferBase(Level level, std::string_view msg, const std::vector<std::string>& args) : BufferBase(level) {
     if (not should_print_) return;
-    sstream_ << boost::format("%-35s") % msg;
+    sstream_ << boost::format("%-25s") % msg;
     bool left{true};
     for (const auto& arg : args) {
         sstream_ << (left ? kColorGreen : kColorWhiteHigh) << arg << kColorReset << (left ? "=" : " ") << kColorReset;

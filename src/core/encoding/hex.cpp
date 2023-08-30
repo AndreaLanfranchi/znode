@@ -81,8 +81,8 @@ ByteView zeroless_view(ByteView data) {
 std::string encode(ByteView bytes, bool with_prefix) noexcept {
     static const char kHexDigits[]{"0123456789abcdef"};
     std::string out(bytes.length() * 2 + (with_prefix ? 2 : 0), 0x0);
-    auto dest{out.data()};
-    auto src{bytes.data()};
+    auto* dest{out.data()};
+    auto* src{bytes.data()};
     if (with_prefix) {
         *dest++ = '0';
         *dest++ = 'x';
@@ -104,11 +104,11 @@ tl::expected<Bytes, DecodingError> decode(std::string_view source) noexcept {
 
     const size_t pos(source.length() & 1);  // "[0x]1" is legit and has to be treated as "[0x]01"
     Bytes out((source.length() + pos) / 2, '\0');
-    auto dst{out.data()};
+    auto* dst{out.data()};
     const auto* src{source.data()};
     const auto* last = src + source.length();
 
-    if (pos) {
+    if (pos not_eq 0U) {
         const auto b{kUnhexTable[static_cast<uint8_t>(*src++)]};
         if (b == 0xff) {
             return tl::unexpected{DecodingError::kInvalidHexDigit};

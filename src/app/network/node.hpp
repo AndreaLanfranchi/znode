@@ -23,7 +23,7 @@
 #include <core/types/address.hpp>
 
 #include <app/common/settings.hpp>
-#include <app/concurrency/stoppable.hpp>
+#include <app/concurrency/asio_timer.hpp>
 #include <app/network/protocol.hpp>
 
 namespace zenpp::network {

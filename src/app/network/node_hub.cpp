@@ -6,6 +6,7 @@
 
 #include <utility>
 
+#include <absl/strings/str_cat.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/lexical_cast.hpp>
@@ -394,24 +395,31 @@ void NodeHub::on_node_received_message(const std::shared_ptr<Node>& node, std::u
     using namespace serialization;
     using enum Error;
 
+    std::string error{};
+
     REQUIRES(message not_eq nullptr);
 
     // This function behaves as a collector of messages from nodes
     if (message->get_type() == abi::NetMessageType::kAddr) {
         abi::MsgAddrPayload addr_payload{};
-        if (const auto ret{addr_payload.deserialize(message->data())}; ret not_eq Error::kSuccess) {
-            log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote",
-                                   node->to_string(), "error", std::string(magic_enum::enum_name(ret))})
-                << "Disconnecting ...";
-            std::ignore = node->stop(false);
-            return;
+        const auto ret{addr_payload.deserialize(message->data())};
+        if (not ret) {
+            // TODO Pass it to the address manager
+        } else {
+            error = absl::StrCat("error ", magic_enum::enum_name(ret));
         }
-        if (app_settings_.log.log_verbosity == log::Level::kTrace) [[unlikely]] {
-            log::Trace("Service",
-                       {"name", "Node Hub", "action", "on_node_received_message[addr]", "remote", node->to_string(),
-                        "message", std::string(magic_enum::enum_name(message->get_type())), "count",
-                        std::to_string(addr_payload.identifiers_.size())});
-        }
+    }
+
+    if (not error.empty() or app_settings_.log.log_verbosity >= log::Level::kTrace) [[unlikely]] {
+        const std::vector<std::string> log_params{
+            "name",    "Node Hub",
+            "action",  __func__,
+            "command", std::string{magic_enum::enum_name(message->header().get_type())},
+            "remote",  node->to_string(),
+            "status",  error.empty() ? "success" : error};
+        log::BufferBase((error.empty() ? log::Level::kTrace : log::Level::kError), "Service", log_params)
+            << (error.empty() ? "" : "Disconnecting ...");
+        if (not error.empty()) node->stop(false);
     }
 }
 

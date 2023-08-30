@@ -6,6 +6,7 @@
 */
 
 #include <filesystem>
+#include <memory>
 
 #include <CLI/CLI.hpp>
 #include <absl/container/btree_map.h>
@@ -20,7 +21,6 @@
 #include <app/common/log.hpp>
 #include <app/concurrency/ossignals.hpp>
 #include <app/database/mdbx.hpp>
-
 
 namespace fs = std::filesystem;
 using namespace zenpp;
@@ -61,7 +61,7 @@ struct dbFreeInfo {
 dbFreeInfo get_freeInfo(::mdbx::txn& txn) {
     dbFreeInfo ret{};
 
-    ::mdbx::map_handle free_map{0};
+    const ::mdbx::map_handle free_map{0};
     auto page_size{txn.get_map_stat(free_map).ms_psize};
 
     const auto& collect_func{[&ret, &page_size](ByteView key, ByteView value) {
@@ -69,7 +69,7 @@ dbFreeInfo get_freeInfo(::mdbx::txn& txn) {
         std::memcpy(&txId, key.data(), sizeof(size_t));
         uint32_t pagesCount;
         std::memcpy(&pagesCount, value.data(), sizeof(uint32_t));
-        size_t pagesSize = pagesCount * page_size;
+        const size_t pagesSize = pagesCount * page_size;
         ret.pages += pagesCount;
         ret.size += pagesSize;
         ret.entries.push_back(dbFreeEntry{txId, pagesCount, pagesSize});
@@ -83,25 +83,25 @@ dbFreeInfo get_freeInfo(::mdbx::txn& txn) {
 
 dbTablesInfo get_tablesInfo(::mdbx::txn& txn) {
     dbTablesInfo ret{};
-    dbTableEntry* table;
+    std::unique_ptr<dbTableEntry> table;
 
     ret.filesize = txn.env().get_info().mi_geo.current;
 
     // Get info from the free database
-    ::mdbx::map_handle free_map{0};
+    const mdbx::map_handle free_map{0};
     auto stat = txn.get_map_stat(free_map);
     auto info = txn.get_handle_info(free_map);
-    table = new dbTableEntry{free_map.dbi, "FREE_DBI", stat, info};
+    table = std::make_unique<dbTableEntry>(free_map.dbi, "FREE_DBI", stat, info);
     ret.pageSize += table->stat.ms_psize;
     ret.pages += table->pages();
     ret.size += table->size();
     ret.tables.push_back(*table);
 
     // Get info from the unnamed database
-    ::mdbx::map_handle main_map{1};
+    const mdbx::map_handle main_map{1};
     stat = txn.get_map_stat(main_map);
     info = txn.get_handle_info(main_map);
-    table = new dbTableEntry{main_map.dbi, "MAIN_DBI", stat, info};
+    table = std::make_unique<dbTableEntry>(main_map.dbi, "MAIN_DBI", stat, info);
     ret.pageSize += table->stat.ms_psize;
     ret.pages += table->pages();
     ret.size += table->size();
@@ -127,8 +127,8 @@ dbTablesInfo get_tablesInfo(::mdbx::txn& txn) {
 }
 
 void do_tables(const db::EnvConfig& config) {
-    static std::string fmt_hdr{" %3s %-24s %10s %2s %10s %10s %10s %12s %10s %10s"};
-    static std::string fmt_row{" %3i %-24s %10u %2u %10u %10u %10u %12s %10s %10s"};
+    static const std::string fmt_hdr{" %3s %-24s %10s %2s %10s %10s %10s %12s %10s %10s"};
+    static const std::string fmt_row{" %3i %-24s %10u %2u %10u %10u %10u %12s %10s %10s"};
 
     auto env{db::open_env(config)};
     auto txn{env.start_read()};
@@ -189,14 +189,14 @@ int main(int argc, char* argv[]) {
     /*
      * Database options (path required)
      */
-    auto db_opts = app_main.add_option_group("Db", "Database options");
+    auto* db_opts = app_main.add_option_group("Db", "Database options");
     db_opts->get_formatter()->column_width(35);
-    auto db_path = db_opts->add_option("--db", "Path to database")
-                       ->capture_default_str()
-                       ->default_str((get_os_default_storage_path() / DataDirectory::kChainDataName).string())
-                       ->check(CLI::ExistingDirectory);
-    auto shared_opt = db_opts->add_flag("--shared", "Open database in shared mode");
-    auto exclusive_opt = db_opts->add_flag("--exclusive", "Open database in exclusive mode")->excludes(shared_opt);
+    auto* db_path = db_opts->add_option("--db", "Path to database")
+                        ->capture_default_str()
+                        ->default_str((get_os_default_storage_path() / DataDirectory::kChainDataName).string())
+                        ->check(CLI::ExistingDirectory);
+    auto* shared_opt = db_opts->add_flag("--shared", "Open database in shared mode");
+    auto* exclusive_opt = db_opts->add_flag("--exclusive", "Open database in exclusive mode")->excludes(shared_opt);
 
     /*
      * Common opts and flags
@@ -210,7 +210,7 @@ int main(int argc, char* argv[]) {
      */
 
     // List tables and gives info about storage
-    auto cmd_tables = app_main.add_subcommand("tables", "List db and tables info");
+    auto* cmd_tables = app_main.add_subcommand("tables", "List db and tables info");
     // auto cmd_tables_scan_opt = cmd_tables->add_flag("--scan", "Scan real data size (long)");
 
     /*
@@ -219,7 +219,7 @@ int main(int argc, char* argv[]) {
     CLI11_PARSE(app_main, argc, argv)
 
     try {
-        Directory db_dir(fs::path(db_path->as<std::string>()));
+        const Directory db_dir(fs::path(db_path->as<std::string>()));
         db::EnvConfig src_config{db_dir.path().string()};
         src_config.create = false;  // Database must exist
         src_config.shared = static_cast<bool>(*shared_opt);

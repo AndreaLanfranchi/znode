@@ -83,6 +83,6 @@ inline constexpr const char* kColorTealUnderline = "\x1b[4;36m";    // Cyan
 void init_terminal();
 
 //! \brief Prompt user for a confirmation
-bool ask_user_confirmation(const std::string message = "Confirm action ?");
+bool ask_user_confirmation(std::string message = "Confirm action ?");
 
 }  // namespace zenpp

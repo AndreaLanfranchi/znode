@@ -101,12 +101,8 @@ void Node::start_ping_timer() {
 
     // It would be boring to send out pings on a costant basis
     // So we randomize the interval a bit using a +/- 15% factor
-    static const auto ping_interval_seconds{app_settings_.network.ping_interval_seconds};
-    const auto ping_interval_seconds_min{ping_interval_seconds - ping_interval_seconds / 7};
-    const auto ping_interval_seconds_max{ping_interval_seconds + ping_interval_seconds / 7};
     const auto ping_interval_seconds_randomized{
-        randomize<uint32_t>(ping_interval_seconds_min, ping_interval_seconds_max)};
-
+        randomize<uint32_t>(app_settings_.network.ping_interval_seconds, /*percentage=*/0.15F)};
     ping_timer_.expires_after(std::chrono::seconds(ping_interval_seconds_randomized));
     ping_timer_.async_wait([self{shared_from_this()}](const boost::system::error_code& error_code) {
         if (self->handle_ping_timer(error_code)) {
@@ -188,12 +184,12 @@ void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
     if (error_code) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", error_code.message()};
-        print_log(log::Level::kError, log_params, "Disconnecting ...");
+        print_log(log::Level::kWarning, log_params, "Disconnecting ...");
         stop(true);
         return;
     }
     const std::list<std::string> log_params{"action", __func__, "status", "success"};
-    print_log(log::Level::kInfo, log_params);
+    print_log(log::Level::kTrace, log_params);
     start_read();
     push_message(abi::NetMessageType::kVersion, local_version_);
 }
@@ -216,7 +212,6 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
     // and the socket has been closed. In this case we should do nothing as the payload received (if any)
     // is not relevant anymore.
     if (is_stopping()) return;
-
     if (error_code) [[unlikely]] {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", error_code.message()};
@@ -232,9 +227,9 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
 
         const auto parse_result{parse_messages(bytes_transferred)};
         if (serialization::is_fatal_error(parse_result)) {
-            const std::list<std::string> log_params{
-                "action", __func__, "status", "failure", "reason", std::string(magic_enum::enum_name(parse_result))};
-            print_log(log::Level::kError, log_params, "Disconnecting ...");
+            const std::list<std::string> log_params{"action", __func__, "status",
+                                                    std::string(magic_enum::enum_name(parse_result))};
+            print_log(log::Level::kError, log_params, " Disconnecting ...");
             stop(false);
             return;
         }
@@ -345,9 +340,9 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     }
 
     if (bytes_transferred > 0U) {
-        bytes_sent_ += bytes_transferred;
-        if (on_data_) on_data_(DataDirectionMode::kOutbound, bytes_transferred);
         send_buffer_.consume(bytes_transferred);
+        bytes_sent_ += bytes_transferred;
+        on_data_(DataDirectionMode::kOutbound, bytes_transferred);
     }
 
     // If we have sent the whole message then we can start sending the next chunk
@@ -371,9 +366,9 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type, 
     using namespace serialization;
     using enum Error;
 
-    auto new_message = std::make_unique<abi::NetMessage>(version_);
+    auto new_message{std::make_unique<abi::NetMessage>(version_)};
     auto err{new_message->push(message_type, payload, app_settings_.network.magic_bytes)};
-    if (!!err) {
+    if (err not_eq kSuccess) {
         if (app_settings_.log.log_verbosity >= log::Level::kError) {
             const std::list<std::string> log_params{"action",  __func__, "status",
                                                     "failure", "reason", std::string{magic_enum::enum_name(err)}};
@@ -385,8 +380,7 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type, 
     outbound_messages_.emplace_back(new_message.release());
     lock.unlock();
 
-    auto self{shared_from_this()};
-    boost::asio::post(io_strand_, [self]() { self->start_write(); });
+    boost::asio::post(io_strand_, [self{shared_from_this()}]() { self->start_write(); });
     return kSuccess;
 }
 
@@ -413,7 +407,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
     size_t messages_parsed{0};
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
     while (!data.empty()) {
-        if (!inbound_message_) begin_inbound_message();
+        if (inbound_message_ == nullptr) begin_inbound_message();
         err = inbound_message_->parse(data, app_settings_.network.magic_bytes);  // Consumes data
         if (err == kMessageHeaderIncomplete) break;
         if (is_fatal_error(err)) {
@@ -422,10 +416,9 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
                 switch (err) {
                     using enum Error;
                     case kMessageHeaderUnknownCommand:
-                        print_log(
-                            log::Level::kDebug,
-                            {"action", __func__, "unknown command",
-                             std::string(reinterpret_cast<char*>(inbound_message_->header().command.data()), 12)});
+                        print_log(log::Level::kDebug,
+                                  {"action", __func__, "status", std::string(magic_enum::enum_name(err))},
+                                  std::string(reinterpret_cast<char*>(inbound_message_->header().command.data()), 12));
                         break;
                     default:
                         break;
@@ -451,7 +444,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
         end_inbound_message();
     }
     receive_buffer_.consume(bytes_transferred);
-    if (!is_fatal_error(err) && messages_parsed not_eq 0) {
+    if (not is_fatal_error(err) and messages_parsed not_eq 0U) {
         last_message_received_time_.store(std::chrono::steady_clock::now());
     }
     return err;
@@ -461,17 +454,10 @@ serialization::Error Node::process_inbound_message() {
     using namespace serialization;
     using enum Error;
     Error err{kSuccess};
+    std::string err_extended_reason{};
+    bool notify_node_hub{false};
 
     REQUIRES(inbound_message_ not_eq nullptr);
-
-    if (app_settings_.log.log_verbosity == log::Level::kTrace) [[unlikely]] {
-        const std::list<std::string> log_params{
-            "action",  __func__,
-            "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
-            "size",    to_human_bytes(inbound_message_->size())};
-        print_log(log::Level::kTrace, log_params);
-    }
-
     switch (inbound_message_->get_type()) {
         using enum abi::NetMessageType;
         case kVersion:
@@ -479,16 +465,9 @@ serialization::Error Node::process_inbound_message() {
             if (remote_version_.protocol_version_ < kMinSupportedProtocolVersion or
                 remote_version_.protocol_version_ > kMaxSupportedProtocolVersion) {
                 err = kInvalidProtocolVersion;
-                const std::list<std::string> log_params{
-                    "action",  __func__,
-                    "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
-                    "size",    to_human_bytes(inbound_message_->size()),
-                    "status",  "failure",
-                    "reason",  std::string(magic_enum::enum_name(err))};
-                const auto extended_reason{absl::StrCat("got ", remote_version_.protocol_version_,
-                                                        " but supported versions are ", kMinSupportedProtocolVersion,
-                                                        " to ", kMaxSupportedProtocolVersion)};
-                print_log(log::Level::kTrace, log_params, extended_reason);
+                err_extended_reason =
+                    absl::StrCat("Expected in range [", kMinSupportedProtocolVersion, ", ",
+                                 kMaxSupportedProtocolVersion, "] got", remote_version_.protocol_version_, ".");
                 break;
             }
             {
@@ -505,8 +484,8 @@ serialization::Error Node::process_inbound_message() {
                     print_log(log::Level::kInfo, log_params);
                     err = push_message(abi::NetMessageType::kVerack);
                 } else {
-                    print_log(log::Level::kWarning, log_params, "Connected to self. Disconnecting ...");
-                    asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+                    err = kInvalidMessageState;
+                    err_extended_reason = "Connected to self.";
                 }
             }
             break;
@@ -516,41 +495,46 @@ serialization::Error Node::process_inbound_message() {
             break;
         case kPing: {
             abi::MsgPingPongPayload ping_pong{};
-            if (err = ping_pong.deserialize(inbound_message_->data()); err not_eq kSuccess) {
+            if (err = ping_pong.deserialize(inbound_message_->data()); err == kSuccess) {
                 err = push_message(abi::NetMessageType::kPong, ping_pong);
             }
         } break;
         case kPong: {
             abi::MsgPingPongPayload ping_pong{};
-            if (err = ping_pong.deserialize(inbound_message_->data()); err == kSuccess) {
-                if (ping_pong.nonce_ not_eq ping_nonce_.load()) {
-                    err = kMismatchingPingPongNonce;
-                    const std::list<std::string> log_params{
-                        "action",  __func__,
-                        "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
-                        "size",    to_human_bytes(inbound_message_->size()),
-                        "status",  "failure",
-                        "reason",  std::string(magic_enum::enum_name(err))};
-                    print_log(log::Level::kTrace, log_params);
-                    break;
-                }
-                // Calculate ping response time in milliseconds
-                const auto now{std::chrono::steady_clock::now()};
-                const auto ping_response_time{now - last_ping_sent_time_.load()};
-
-                // If the response time in milliseconds is greater than settings' threshold
-                // this won't reset the timers and the nonce and let idle checks do their tasks
-                process_ping_latency(
-                    (std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_time)).count());
+            if (err = ping_pong.deserialize(inbound_message_->data()); err not_eq kSuccess) break;
+            if (ping_pong.nonce_ not_eq ping_nonce_.load()) {
+                err = kMismatchingPingPongNonce;
+                err_extended_reason = absl::StrCat("Expected ", ping_nonce_.load(), " got ", ping_pong.nonce_, ".");
+                break;
             }
+            // Calculate ping response time in milliseconds
+            const auto now{std::chrono::steady_clock::now()};
+            const auto ping_response_time{now - last_ping_sent_time_.load()};
+
+            // If the response time in milliseconds is greater than settings' threshold
+            // this won't reset the timers and the nonce and let idle checks do their tasks
+            process_ping_latency((std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_time)).count());
+
         } break;
         default:
             // Notify node-hub of the inbound message which will eventually take ownership of it
             // As a result we can safely reset it which is done after this function returns
-            on_message_(shared_from_this(), inbound_message_);
+            notify_node_hub = true;
             break;
     }
 
+    const bool is_fatal{is_fatal_error(err)};
+    if (is_fatal or app_settings_.log.log_verbosity >= log::Level::kTrace) {
+        const std::list<std::string> log_params{
+            "action",  __func__,
+            "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
+            "size",    to_human_bytes(inbound_message_->size()),
+            "status",  std::string(magic_enum::enum_name(err))};
+        print_log(is_fatal ? log::Level::kWarning : log::Level::kTrace, log_params, err_extended_reason);
+    }
+    if (not is_fatal and notify_node_hub) {
+        on_message_(shared_from_this(), inbound_message_);
+    }
     return err;
 }
 
