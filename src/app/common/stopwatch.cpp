@@ -5,6 +5,8 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include <tuple>
+
 #include <app/common/stopwatch.hpp>
 
 namespace zenpp {

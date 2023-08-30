@@ -12,14 +12,13 @@ namespace zenpp {
 
 Worker::~Worker() { Worker::stop(/*wait=*/true); }
 
-void Worker::start(bool kicked, bool wait) noexcept {
-    if (State expected_state{State::kStopped}; !state_.compare_exchange_strong(expected_state, State::kStarting)) {
-        return;
-    }
+bool Worker::start() noexcept {
+    const bool already_requested{!Stoppable::start()};
+    if (already_requested) return false;
+    state_.store(State::kStarting);
     signal_worker_state_changed(this);
 
     exception_ptr_ = nullptr;
-    kicked_.store(kicked);
     id_.store(0);
 
     thread_ = std::make_unique<std::thread>([this]() {
@@ -45,7 +44,7 @@ void Worker::start(bool kicked, bool wait) noexcept {
         id_.store(0);
     });
 
-    while (wait) {
+    while (true) {
         std::unique_lock lock(kick_mtx_);
         if (thread_started_cv_.wait_for(lock, std::chrono::milliseconds(100)) == std::cv_status::no_timeout) {
             break;

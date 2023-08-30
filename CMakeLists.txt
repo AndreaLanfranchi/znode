@@ -17,9 +17,9 @@ if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/cmake/cable/.git)
     message(FATAL_ERROR "Git submodules not initialized, execute:\n$ git submodule update --init --recursive")
 endif ()
 
-if("${CMAKE_BINARY_DIR}" STREQUAL "${CMAKE_HOME_DIRECTORY}")
+if ("${CMAKE_BINARY_DIR}" STREQUAL "${CMAKE_HOME_DIRECTORY}")
     message(FATAL_ERROR "In-source builds are not allowed. Create a separate directory (eg build/) for build files.")
-endif()
+endif ()
 
 get_directory_property(PROJECT_HAS_PARENT PARENT_DIRECTORY)
 
@@ -97,11 +97,11 @@ endif ()
 include(CableBuildInfo)
 
 cable_add_buildinfo_library(PROJECT_NAME ${PROJECT_NAME})
-if(NOT TARGET ${PROJECT_NAME}-buildinfo)
+if (NOT TARGET ${PROJECT_NAME}-buildinfo)
     message(FATAL_ERROR "Build info library not found")
-else()
+else ()
     set(BUILDINFO_LIB ${PROJECT_NAME}-buildinfo)
-endif()
+endif ()
 
 option(BUILD_CORE_ONLY "Only build ${PROJECT_NAME} Core" OFF)
 option(BUILD_CLANG_COVERAGE "Clang instrumentation for code coverage reports" OFF)
@@ -199,7 +199,7 @@ target_include_directories(third-party-includes INTERFACE
         ${CMAKE_CURRENT_SOURCE_DIR}/third-party/expected/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third-party/indicators/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third-party/magic_enum/include
-        )
+)
 
 
 # Compiler enforcements on ${PROJECT_NAME}
@@ -209,6 +209,7 @@ if (NOT MSVC)
     add_compile_options(-Wshadow -Wimplicit-fallthrough -Wsign-conversion)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wold-style-cast>)
     add_compile_options(-Wno-missing-field-initializers -Wnon-virtual-dtor)
+    add_compile_options(-Wno-unknown-pragmas) # Ignore unknown pragmas (especially for clang-tidy)
 
     if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         add_compile_options(-Wno-attributes)

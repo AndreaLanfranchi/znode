@@ -36,10 +36,7 @@ class Worker : public Stoppable, private boost::noncopyable {
 
     ~Worker() override;
 
-    virtual void start(bool kicked,
-                       bool wait) noexcept;  // Start worker thread with provided kicked state (optionally waits
-                                             // for thread started)
-
+    bool start() noexcept override;          // Start worker thread with provided kicked state
     bool stop(bool wait) noexcept override;  // Stops worker thread (optionally wait for join)
     void kick();                             // Kicks worker thread if in waiting state
 

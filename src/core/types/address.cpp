@@ -222,7 +222,7 @@ bool NetEndpoint::is_routable() const noexcept { return address_.is_routable() a
 
 NetService::NetService(std::string_view str) : endpoint_{str} {}
 
-NetService::NetService(std::string_view str, uint64_t services) : endpoint_{str}, services_{services} {}
+NetService::NetService(std::string_view str, uint64_t services) : services_{services}, endpoint_{str} {}
 
 NetService::NetService(std::string_view address, uint16_t port_num) : endpoint_(address, port_num) {}
 
