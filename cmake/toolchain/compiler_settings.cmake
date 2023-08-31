@@ -13,7 +13,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
                 "\n============================================\n"
                 " Required MSVC version >= 1928 (2019 16.9.2)"
                 "\n============================================\n"
-                )
+        )
     endif ()
 
 
@@ -73,7 +73,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
                 "\n===================================\n"
                 " Required GCC version >= 12"
                 "\n===================================\n"
-                )
+        )
     endif ()
 
     if (BUILD_SANITIZE)
@@ -94,7 +94,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES ".*Clang$")
                 "\n===================================\n"
                 " Required Clang version >= 12"
                 "\n===================================\n"
-                )
+        )
     endif ()
 
     if (BUILD_CLANG_COVERAGE)

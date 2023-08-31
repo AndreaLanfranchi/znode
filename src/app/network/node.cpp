@@ -143,20 +143,20 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
     }
 
     const auto tmp_min_latency{min_ping_latency_.load()};
-    if (tmp_min_latency not_eq 0U) {
-        min_ping_latency_.store(std::min(tmp_min_latency, latency_ms));
-    } else {
+    if (tmp_min_latency == 0U) [[unlikely]] {
         min_ping_latency_.store(latency_ms);
+    } else {
+        min_ping_latency_.store(std::min(tmp_min_latency, latency_ms));
     }
 
     const auto tmp_ema_latency{ema_ping_latency_.load()};
-    if (tmp_ema_latency not_eq 0U) {
-        // Compute the EMA
-        const auto alpha{0.65};  // Newer values are more important
-        const auto ema{alpha * static_cast<float>(latency_ms) + (1.0 - alpha) * static_cast<float>(tmp_ema_latency)};
-        ema_ping_latency_.store(static_cast<uint64_t>(ema));
-    } else {
+    if (tmp_ema_latency == 0U) [[unlikely]] {
         ema_ping_latency_.store(latency_ms);
+    } else {
+        // Compute the EMA
+        const auto alpha{0.65F};  // Newer values are more important
+        const auto ema{alpha * static_cast<float>(latency_ms) + (1.0F - alpha) * static_cast<float>(tmp_ema_latency)};
+        ema_ping_latency_.store(static_cast<uint64_t>(ema));
     }
 
     log_params.insert(log_params.end(), {"min", absl::StrCat(min_ping_latency_.load(), "ms"), "ema",
@@ -182,14 +182,18 @@ void Node::start_ssl_handshake() {
 
 void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
     if (error_code) {
-        const std::list<std::string> log_params{"action",  __func__, "status",
-                                                "failure", "reason", error_code.message()};
-        print_log(log::Level::kWarning, log_params, "Disconnecting ...");
+        if (log::test_verbosity(log::Level::kWarning)) {
+            const std::list<std::string> log_params{"action",  __func__, "status",
+                                                    "failure", "reason", error_code.message()};
+            print_log(log::Level::kWarning, log_params, "Disconnecting ...");
+        }
         stop(true);
         return;
     }
-    const std::list<std::string> log_params{"action", __func__, "status", "success"};
-    print_log(log::Level::kTrace, log_params);
+    if (log::test_verbosity(log::Level::kTrace)) {
+        const std::list<std::string> log_params{"action", __func__, "status", "success"};
+        print_log(log::Level::kTrace, log_params);
+    }
     start_read();
     push_message(abi::NetMessageType::kVersion, local_version_);
 }
@@ -241,11 +245,11 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
 
 void Node::start_write() {
     if (is_stopping()) return;
-    if (bool expected{false}; !is_writing_.compare_exchange_strong(expected, true)) {
+    if (bool expected{false}; not is_writing_.compare_exchange_strong(expected, true)) {
         return;  // Already writing - the queue will cause this to re-enter automatically
     }
 
-    if (outbound_message_ && outbound_message_->data().eof()) {
+    if (outbound_message_ not_eq nullptr and outbound_message_->data().eof()) {
         // A message has been fully sent
         // Unless it is a ping message we can reset the timer
         if (outbound_message_->get_type() not_eq abi::NetMessageType::kPing) {
@@ -255,7 +259,7 @@ void Node::start_write() {
         outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
     }
 
-    if (!outbound_message_) {
+    if (outbound_message_ == nullptr) {
         // Try to get a new message from the queue
         const std::scoped_lock lock{outbound_messages_mutex_};
         if (outbound_messages_.empty()) {

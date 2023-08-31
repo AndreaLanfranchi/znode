@@ -9,12 +9,13 @@ The way `zenpp` nodes communicate with each other is based on the Bitcoin protoc
 The protocol is a set of rules that define how nodes communicate with each other. 
 The protocol is based on TCP/IP and uses a peer-to-peer network to broadcast transactions and blocks.
 The protocol is also used to synchronize the blockchain between nodes. Unlike the bitcoin major node implementations
-zend++ makes use of [Boost::Asio] to handle the network layer: this allow us to leverage the power of asynchronous I/O increasing
+`zenpp` makes use of [Boost::Asio] to handle, amongst other components, the networking layer: this allow us to leverage the power of asynchronous I/O increasing
 parallelism and performance.
 
 The major components of the networking layer are:
 - [node-hub] The node-hub is the main entry point for the networking layer. It is responsible for managing the connections to other nodes and for dispatching messages to the appropriate handlers.
-- [node] The node class is the representation of a remote node. It is responsible for managing the connection to a remote node and for dispatching messages to the appropriate handlers.
+- [node] The node class is the representation of the connection to a remote node. It is responsible for the proper message flow and to read and write from and to the underlying socket. Each node has its own strand of execution: this means each node's conversation is serialized within the scope
+of its session while allowing other nodes to run concurrently. The concurrency level is function of the number of cores available on the running host. In any case the performances are unmatched.
 
 ## Node-hub
 The node-hub is the main network component of the `zenpp` instance. It handles the connections with all nodes whether inbound or outbound.

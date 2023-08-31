@@ -211,6 +211,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     std::atomic<std::chrono::steady_clock::time_point> last_ping_sent_time_;  // Last outgoing ping tstamp
     std::atomic_uint64_t ping_nonce_{0};                                      // Last ping nonce sent
+    std::atomic_uint32_t ping_samples_count_{0};                              // Number of ping samples
     std::atomic_uint64_t min_ping_latency_{0};                                // Minimum ping latency
     std::atomic_uint64_t ema_ping_latency_{0};  // Exponential moving average of ping latency
 

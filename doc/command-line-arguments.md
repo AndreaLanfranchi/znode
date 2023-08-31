@@ -9,6 +9,13 @@
   - [--chaindata.maxsize](#--chaindatamaxsize)
   - [--chaindata.growthsize](#--chaindatagrowthsize)
   - [--chaindata.pagesize](#--chaindatapagesize)
+- [Network arguments](#network)
+  - [--network.maxactiveconnections](#--networkmaxactiveconnections)
+  - [--network.maxconnectionsperip](#--networkmaxconnectionsperip)
+  - [--network.idletimeout](#--networkidletimeout)
+  - [--network.pinginterval](#--networkpinginterval)
+  - [--network.pingtimeout](#--networkpingtimeout)
+  - [--network.connect](#--networkconnect)
 - [--etl.buffersize](#--etlbuffersize)
 - [Syncloop arguments](#syncloop)
   - [--syncloop.batchsize](#--syncloopbatchsize)
@@ -68,7 +75,7 @@ By default the value of datadir is OS dependent and is determined in this way:
 - Mac: `$HOME/Library/Application Support/.zenpp`
 The structure of the zen directory is the following:
 ```
-root (usually ~/.local/share/.zenpp)
+<root> (usually ~/.local/share/.zenpp)
 ├── chaindata    // where the blockchain data (in MDBX format) is stored
 ├── etl-tmp      // where temporary ETL files are stored
 ├── nodes        // where the nodes information (in MDBX format) is stored
@@ -194,4 +201,4 @@ If you are sure that the parameters files you have are not corrupted you can ski
 ```bash
 $ ./zenpp --zk.nochecksums
 ```
-**Note. If the files are missing or they don't match the expected size they get downloaded anyway and the checksums verifications is mandatorily applied after each download.**
+**Note. If the files are missing, or they don't match the expected size, they get downloaded anyway and the checksums verifications is mandatory applied after each download.**

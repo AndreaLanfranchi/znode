@@ -59,12 +59,12 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
     cli.add_option("--syncloop.throttle", settings.sync_loop_throttle_seconds,
                    "Sets the minimum delay between sync loop starts (in seconds)")
         ->capture_default_str()
-        ->check(CLI::Range(1u, 7200u));
+        ->check(CLI::Range(1U, 7200U));
 
     cli.add_option("--syncloop.loginterval", settings.sync_loop_log_interval_seconds,
                    "Sets the interval between sync loop INFO logs (in seconds)")
         ->capture_default_str()
-        ->check(CLI::Range(10u, 600u));
+        ->check(CLI::Range(10U, 600U));
 
     cli.add_flag("--fakepow", settings.fake_pow, "Disables proof-of-work verification");
     cli.add_flag("--zk.nochecksums", settings.no_zk_checksums,
@@ -85,7 +85,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         ->check(IPEndPointValidator(/*allow_empty=*/true,
                                     /*default_port=*/9033));  // TODO the port will be on behalf of network
 
-    auto notls_flag = network_opts.add_flag("--network.notls", "Disable TLS secure communications");
+    auto* notls_flag = network_opts.add_flag("--network.notls", "Disable TLS secure communications");
 
     network_opts.add_option("--network.pkpwd", network_settings.tls_password, "Private key password")
         ->capture_default_str()
@@ -151,7 +151,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
     settings.chaindata_env_config.max_size = *parsed_size_value;
 
     parsed_size_value = parse_human_bytes(chaindata_growth_size_str);
-    if (*parsed_size_value > (mdbx_max_size_hard_limit / /* two increments ?*/ 2u)) {
+    if (*parsed_size_value > (mdbx_max_size_hard_limit / /* two increments ?*/ 2U)) {
         throw std::invalid_argument("--chaindata.growthsize max value > " +
                                     to_human_bytes(mdbx_max_size_hard_limit / 2, /*binary=*/true));
     }
@@ -214,7 +214,7 @@ IPEndPointValidator::IPEndPointValidator(bool allow_empty, uint16_t default_port
         if (!try_parse_ip_address_and_port(value, address, port)) {
             return "Value \"" + value + "\" is not a valid endpoint";
         }
-        if (!port) {
+        if (port == 0U) {
             port = static_cast<uint16_t>(default_port);
         }
 

@@ -130,16 +130,20 @@ We adhere to [Google's C++ Style Guide] with the following differences:
 - `C++20` rather than `C++17`
 - `snake_case` for source and header file names (ISO) 
 - `snake_case()` for function and variable names (ISO)
-- `member_variable_` names must have underscore suffix
+- `member_variable_` names **MUST** have underscore suffix
 - prefixing variable names with initial abbreviation of underlying type (e.g `vector<char> vChar{}`) is highly discouraged
-- classes and struct names must be in Pascal Case (`class FancyFoo`)
+- classes and struct names **MUST** be in Pascal Case (`class FancyFoo`)
 - prefer `using` instead of `typedef`
 - `.cpp/.hpp` file extensions for C++ : `.c/.h` are reserved for C
-- `using namespace foo` is allowed into source files (`.cpp`) but not inside headers unless limited in a reduced scope (i.e. inside a templatized class)
+- `using namespace foo` is allowed into source files but not inside headers unless limited in a reduced scope (i.e. inside a template class or function)
 - Exceptions are allowed **only outside** the `core` library
 - User-defined literals are allowed
 - Maximum line length is 120, indentation is 4 spaces - see [.clang-format](.clang-format)
 - Use `#pragma once` in the headers instead of the classic `#ifndef` guards.
-- Comments MUST adhere to Doxygen formats (excluding inline ones)
+- Comments **MUST** adhere to Doxygen formats (excluding inline ones)
+- Avoid implicit conversions (e.g. `int` to `bool`)
+- Avoid `auto` when the type is not immediately obvious
+- Prefer `if(ptr == nullptr)` over `if(!ptr)` for immediate clarity
+- Prefer usage of monadic return values over simple `bool` (e.g. `std::optional<T>`, `std::variant<T, E>`, `std::expected<T, E>`)
 
 Developers willing to contribute are strongly encouraged to take a thorough read of [this best practices about naming and layout](https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#nl-naming-and-layout-suggestions)
