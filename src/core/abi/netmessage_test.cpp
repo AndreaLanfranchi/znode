@@ -141,7 +141,7 @@ TEST_CASE("NetMessage", "[abi]") {
         CHECK(test::parse_hexed_data_into_stream(hexed_header_data, payload));
         CHECK(magic_enum::enum_name(header.deserialize(payload)) == "kSuccess");
         CHECK(magic_enum::enum_name(header.validate()) == "kSuccess");
-        CHECK(magic_enum::enum_name(header.get_type()) == "kVerack");
+        CHECK(magic_enum::enum_name(header.get_type()) == "kVerAck");
         CHECK(header.payload_length == 0);
         payload.clear();
         header.reset();

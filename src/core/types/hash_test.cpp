@@ -13,11 +13,11 @@ namespace zenpp {
 const std::array<uint8_t, h256::size()> R1Array{0x9c, 0x52, 0x4a, 0xdb, 0xcf, 0x56, 0x11, 0x12, 0x2b, 0x29, 0x12,
                                                 0x5e, 0x5d, 0x35, 0xd2, 0xd2, 0x22, 0x81, 0xaa, 0xb5, 0x33, 0xf0,
                                                 0x08, 0x32, 0xd5, 0x56, 0xb1, 0xf9, 0xea, 0xe5, 0x1d, 0x7d};
-const h256 R1L{{&R1Array[0], h256::size()}};
-const h160 R1S{{&R1Array[0], h160::size()}};
+const h256 R1L{{R1Array.data(), h256::size()}};
+const h160 R1S{{R1Array.data(), h160::size()}};
 
 TEST_CASE("Hash", "[types]") {
-    h256 hash;
+    const h256 hash;
     CHECK_FALSE(hash);  // Is empty
 
     // Empty hash hex
@@ -29,8 +29,8 @@ TEST_CASE("Hash", "[types]") {
     std::string input_hex{"0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"};
     auto parsed_hash = h256::from_hex(input_hex);
     CHECK(parsed_hash);
-    CHECK(parsed_hash->data()[0] == 0x70);
-    out_hex = parsed_hash->to_hex(/* with_prefix=*/true);
+    CHECK(parsed_hash->data()[0] == 0xc5);
+    out_hex = parsed_hash->to_hex(/* reverse=*/false, /* with_prefix=*/true);
     CHECK(input_hex == out_hex);
 
     // Exact length invalid hex
@@ -48,9 +48,9 @@ TEST_CASE("Hash", "[types]") {
     input_hex = "0x460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
     parsed_hash = h256::from_hex(input_hex);
     CHECK(parsed_hash);
-    out_hex = parsed_hash->to_hex(/*with_prefix=*/true);
+    out_hex = parsed_hash->to_hex(/* reverse=*/false, /*with_prefix=*/true);
     CHECK(input_hex != out_hex);
-    expected_hex = "0x460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a4700000";
+    expected_hex = "0x0000460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
     CHECK(out_hex == expected_hex);
 
     // Comparison
@@ -71,8 +71,8 @@ TEST_CASE("Hash to jenkins hash", "[types]") {
     std::array<uint32_t, buffer_size> r1lbuf{0};
     std::memcpy(&r1lbuf, R1L.data(), h256::size());
 
-    uint64_t hash1{R1L.hash(*salt)};
-    uint64_t hash2{crypto::Jenkins::Hash(&r1lbuf[0], buffer_size, &saltbuf[0])};
+    const uint64_t hash1{R1L.hash(*salt)};
+    const uint64_t hash2{crypto::Jenkins::Hash(r1lbuf.data(), buffer_size, saltbuf.data())};
     CHECK(hash1 == hash2);
 }
 }  // namespace zenpp
