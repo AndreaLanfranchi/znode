@@ -8,8 +8,8 @@
 #include <cstdint>
 
 #include <core/abi/netmessage.hpp>
-#include <core/types/address.hpp>
 #include <core/types/hash.hpp>
+#include <core/types/network.hpp>
 
 namespace zenpp::abi {
 

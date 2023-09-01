@@ -8,7 +8,7 @@
 #include <utility>
 
 #include <core/common/misc.hpp>
-#include <core/types/address.hpp>
+#include <core/types/network.hpp>
 
 namespace zenpp {
 

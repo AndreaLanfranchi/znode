@@ -13,7 +13,7 @@
 #include <boost/asio/spawn.hpp>
 
 #include <core/common/misc.hpp>
-#include <core/types/address.hpp>
+#include <core/types/network.hpp>
 
 #include <app/common/settings.hpp>
 #include <app/common/stopwatch.hpp>

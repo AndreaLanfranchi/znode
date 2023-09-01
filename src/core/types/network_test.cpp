@@ -7,7 +7,7 @@
 #include <catch2/catch.hpp>
 
 #include <core/encoding/hex.hpp>
-#include <core/types/address.hpp>
+#include <core/types/network.hpp>
 
 #include "magic_enum.hpp"
 
