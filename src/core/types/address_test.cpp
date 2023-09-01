@@ -14,7 +14,7 @@
 namespace zenpp {
 
 TEST_CASE("Network address Parsing", "[types]") {
-    NetAddress address("127.0.0.1");
+    IPAddress address("127.0.0.1");
     CHECK(address->is_v4());
     CHECK(address.is_loopback());
     CHECK(!address.is_multicast());
@@ -22,14 +22,14 @@ TEST_CASE("Network address Parsing", "[types]") {
     CHECK(!address.is_reserved());
     CHECK(address.get_type() == AddressType::kIPv4);
 
-    address = NetAddress("::1");
+    address = IPAddress("::1");
     CHECK(address->is_v6());
     CHECK(address.is_loopback());
     CHECK(!address.is_multicast());
     CHECK(!address.is_any());
     CHECK(!address.is_reserved());
 
-    address = NetAddress("8.8.8.8");
+    address = IPAddress("8.8.8.8");
     CHECK(address->is_v4());
     CHECK(!address.is_loopback());
     CHECK(!address.is_multicast());
@@ -37,44 +37,44 @@ TEST_CASE("Network address Parsing", "[types]") {
     CHECK(!address.is_reserved());
     CHECK(address.get_type() == AddressType::kIPv6);
 
-    address = NetAddress("2001::8888");
+    address = IPAddress("2001::8888");
     CHECK(address->is_v6());
     CHECK(!address.is_loopback());
     CHECK(!address.is_multicast());
     CHECK(!address.is_any());
     CHECK(address.address_reservation() == AddressReservationType::kRFC4380);
 
-    address = NetAddress("2001::8888:9999");
+    address = IPAddress("2001::8888:9999");
     CHECK(address->is_v6());
 
-    address = NetAddress("[2001::8888]:9999");
+    address = IPAddress("[2001::8888]:9999");
     CHECK(address->is_v6());
 
-    address = NetAddress("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca");
+    address = IPAddress("FD87:D87E:EB43:edb1:8e4:3588:e546:35ca");
     CHECK(address->is_v6());
 
-    address = NetAddress("2001::hgt:9999");
+    address = IPAddress("2001::hgt:9999");
     CHECK(address.is_unspecified());
 
-    address = NetAddress("2001::8888:9999:9999");
+    address = IPAddress("2001::8888:9999:9999");
     CHECK(!address.is_unspecified());
 
-    address = NetAddress("::FFFF:192.168.1.1");
-    CHECK(!address.is_unspecified());
-    CHECK(address->is_v4());
-    CHECK(address.address_reservation() == AddressReservationType::kRFC1918);
-
-    address = NetAddress("192.168.1.1:10");
+    address = IPAddress("::FFFF:192.168.1.1");
     CHECK(!address.is_unspecified());
     CHECK(address->is_v4());
     CHECK(address.address_reservation() == AddressReservationType::kRFC1918);
 
-    address = NetAddress("10.0.0.1:10");
+    address = IPAddress("192.168.1.1:10");
     CHECK(!address.is_unspecified());
     CHECK(address->is_v4());
     CHECK(address.address_reservation() == AddressReservationType::kRFC1918);
 
-    address = NetAddress("172.31.255.255");
+    address = IPAddress("10.0.0.1:10");
+    CHECK(!address.is_unspecified());
+    CHECK(address->is_v4());
+    CHECK(address.address_reservation() == AddressReservationType::kRFC1918);
+
+    address = IPAddress("172.31.255.255");
     CHECK(!address.is_unspecified());
     CHECK(address->is_v4());
     CHECK(address.address_reservation() == AddressReservationType::kRFC1918);
@@ -112,7 +112,7 @@ TEST_CASE("Network Address Reservations", "[types]") {
     };
 
     for (const auto& [input, reservation] : test_cases) {
-        const NetAddress address{input};
+        const IPAddress address{input};
         CHECK(not address.is_unspecified());
 
         std::string address_hexed{};
@@ -129,25 +129,25 @@ TEST_CASE("Network Address Reservations", "[types]") {
 }
 
 TEST_CASE("Network Endpoint Parsing", "[types]") {
-    NetEndpoint endpoint("8.8.8.4:8333");
+    IPEndpoint endpoint("8.8.8.4:8333");
     CHECK(endpoint.address_->is_v4());
     CHECK(endpoint.address_->to_v4().to_string() == "8.8.8.4:8333");
     CHECK(endpoint.port_ == 8333);
 
-    endpoint = NetEndpoint("::1:8333");
+    endpoint = IPEndpoint("::1:8333");
     CHECK(endpoint.address_->is_v6());
     CHECK(endpoint.port_ == 0);
     CHECK(endpoint.to_string() == "::1:8333");
 
-    endpoint = NetEndpoint("[::1]:8333");
+    endpoint = IPEndpoint("[::1]:8333");
     CHECK(endpoint.address_->is_v6());
     CHECK(endpoint.port_ == 8333);
     CHECK(endpoint.to_string() == "[::1]:8333");
 }
 
 TEST_CASE("Network Service Serialization", "[serialization]") {
-    NetService service("10.0.0.1:8333");
-    service.services_ = static_cast<decltype(NetService::services_)>(NodeServicesType::kNodeNetwork);
+    NodeService service("10.0.0.1:8333");
+    service.services_ = static_cast<decltype(NodeService::services_)>(NodeServicesType::kNodeNetwork);
 
     serialization::SDataStream stream(serialization::Scope::kNetwork, 0);
     CHECK(service.serialized_size(stream) == 30);
@@ -163,7 +163,7 @@ TEST_CASE("Network Service Serialization", "[serialization]") {
         "208d");
     CHECK(stream.to_string() == expected_hex_dump);
 
-    NetService service2{};
+    NodeService service2{};
     REQUIRE(service2.deserialize(stream) == serialization::Error::kSuccess);
     CHECK(service2.services_ == service.services_);
     CHECK(service2.endpoint_ == service.endpoint_);

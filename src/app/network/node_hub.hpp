@@ -55,7 +55,7 @@ class NodeHub : public Stoppable {
     bool start() noexcept override;          // Begins accepting connections
     bool stop(bool wait) noexcept override;  // Stops accepting connections and stops all nodes
     [[nodiscard]] bool connect(
-        const NetEndpoint& endpoint,
+        const IPEndpoint& endpoint,
         NodeConnectionMode mode = NodeConnectionMode::kOutbound);  // Connects to a remote endpoint
 
   private:

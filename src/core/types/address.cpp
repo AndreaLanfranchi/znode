@@ -14,35 +14,35 @@ namespace zenpp {
 
 using namespace serialization;
 
-NetAddress::NetAddress(std::string_view str) {
+IPAddress::IPAddress(std::string_view str) {
     if (str.empty()) return;
     uint16_t port_num{0};  // Only to ignore it
     std::ignore = try_parse_ip_address_and_port(str, value_, port_num);
     std::ignore = port_num;
 }
 
-NetAddress::NetAddress(boost::asio::ip::address address) : value_(std::move(address)) {}
+IPAddress::IPAddress(boost::asio::ip::address address) : value_(std::move(address)) {}
 
-bool NetAddress::is_loopback() const noexcept {
+bool IPAddress::is_loopback() const noexcept {
     return value_.is_v4() ? value_.to_v4().is_loopback() : value_.to_v6().is_loopback();
 }
 
-bool NetAddress::is_multicast() const noexcept {
+bool IPAddress::is_multicast() const noexcept {
     return value_.is_v4() ? value_.to_v4().is_multicast() : value_.to_v6().is_multicast();
 }
 
-bool NetAddress::is_any() const noexcept {
+bool IPAddress::is_any() const noexcept {
     return value_.is_v4() ? value_.to_v4() == boost::asio::ip::address_v4::any()
                           : value_.to_v6() == boost::asio::ip::address_v6::any();
 }
 
-bool NetAddress::is_unspecified() const noexcept {
+bool IPAddress::is_unspecified() const noexcept {
     return value_.is_v4() ? value_.to_v4().is_unspecified() : value_.to_v6().is_unspecified();
 }
 
-bool NetAddress::is_valid() const noexcept { return not(is_any() || is_unspecified()); }
+bool IPAddress::is_valid() const noexcept { return not(is_any() || is_unspecified()); }
 
-bool NetAddress::is_routable() const noexcept {
+bool IPAddress::is_routable() const noexcept {
     if (not is_valid() || is_loopback()) return false;
 
     switch (address_reservation()) {
@@ -62,22 +62,22 @@ bool NetAddress::is_routable() const noexcept {
     }
 }
 
-bool NetAddress::is_reserved() const noexcept {
+bool IPAddress::is_reserved() const noexcept {
     using enum AddressReservationType;
     return address_reservation() not_eq kNotReserved;
 }
 
-AddressType NetAddress::get_type() const noexcept {
+AddressType IPAddress::get_type() const noexcept {
     if (not is_routable() or is_any()) return AddressType::kUnroutable;
     return value_.is_v4() ? AddressType::kIPv4 : AddressType::kIPv6;
 }
 
-AddressReservationType NetAddress::address_reservation() const noexcept {
+AddressReservationType IPAddress::address_reservation() const noexcept {
     if (is_unspecified()) return AddressReservationType::kNotReserved;
     return value_.is_v4() ? address_v4_reservation() : address_v6_reservation();
 }
 
-AddressReservationType NetAddress::address_v4_reservation() const noexcept {
+AddressReservationType IPAddress::address_v4_reservation() const noexcept {
     using enum AddressReservationType;
     AddressReservationType ret{kNotReserved};
     if (!value_.is_v4()) return ret;
@@ -115,7 +115,7 @@ AddressReservationType NetAddress::address_v4_reservation() const noexcept {
     return ret;
 }
 
-AddressReservationType NetAddress::address_v6_reservation() const noexcept {
+AddressReservationType IPAddress::address_v6_reservation() const noexcept {
     using enum AddressReservationType;
     AddressReservationType ret{kNotReserved};
     if (!value_.is_v6()) return ret;
@@ -168,29 +168,29 @@ AddressReservationType NetAddress::address_v6_reservation() const noexcept {
     return ret;
 }
 
-serialization::Error NetAddress::serialization(SDataStream& stream, serialization::Action action) {
+serialization::Error IPAddress::serialization(SDataStream& stream, serialization::Action action) {
     return stream.bind(value_, action);
 }
 
-NetEndpoint::NetEndpoint(std::string_view str) {
+IPEndpoint::IPEndpoint(std::string_view str) {
     if (str.empty()) return;
     boost::asio::ip::address address;
     if (try_parse_ip_address_and_port(str, address, port_)) {
-        address_ = NetAddress{address};
+        address_ = IPAddress{address};
     }
 }
 
-NetEndpoint::NetEndpoint(std::string_view str, uint16_t port_num) {
+IPEndpoint::IPEndpoint(std::string_view str, uint16_t port_num) {
     if (str.empty()) return;
     boost::asio::ip::address address;
     std::ignore = try_parse_ip_address_and_port(str, address, port_);
     port_ = port_num;
 }
 
-NetEndpoint::NetEndpoint(boost::asio::ip::address address, uint16_t port_num)
+IPEndpoint::IPEndpoint(boost::asio::ip::address address, uint16_t port_num)
     : address_{std::move(address)}, port_{port_num} {}
 
-std::string NetEndpoint::to_string() const noexcept {
+std::string IPEndpoint::to_string() const noexcept {
     std::string ret;
     if (address_->is_v6() and port_ not_eq 0) ret += '[';
     ret += address_->to_string();
@@ -199,7 +199,7 @@ std::string NetEndpoint::to_string() const noexcept {
     return ret;
 }
 
-serialization::Error NetEndpoint::serialization(SDataStream& stream, serialization::Action action) {
+serialization::Error IPEndpoint::serialization(SDataStream& stream, serialization::Action action) {
     using enum Error;
     Error ret{kSuccess};
     if (not ret) ret = stream.bind(address_, action);
@@ -211,26 +211,26 @@ serialization::Error NetEndpoint::serialization(SDataStream& stream, serializati
     return ret;
 }
 
-boost::asio::ip::tcp::endpoint NetEndpoint::to_endpoint() const noexcept { return {*address_, port_}; }
+boost::asio::ip::tcp::endpoint IPEndpoint::to_endpoint() const noexcept { return {*address_, port_}; }
 
-NetEndpoint::NetEndpoint(const boost::asio::ip::tcp::endpoint& endpoint)
+IPEndpoint::IPEndpoint(const boost::asio::ip::tcp::endpoint& endpoint)
     : address_{endpoint.address()}, port_(endpoint.port()) {}
 
-bool NetEndpoint::is_valid() const noexcept { return ((port_ > 1 and port_ < 65535) and address_.is_valid()); }
+bool IPEndpoint::is_valid() const noexcept { return ((port_ > 1 and port_ < 65535) and address_.is_valid()); }
 
-bool NetEndpoint::is_routable() const noexcept { return address_.is_routable() and (port_ > 1 and port_ < 65535); }
+bool IPEndpoint::is_routable() const noexcept { return address_.is_routable() and (port_ > 1 and port_ < 65535); }
 
-NetService::NetService(std::string_view str) : endpoint_{str} {}
+NodeService::NodeService(std::string_view str) : endpoint_{str} {}
 
-NetService::NetService(std::string_view str, uint64_t services) : services_{services}, endpoint_{str} {}
+NodeService::NodeService(std::string_view str, uint64_t services) : services_{services}, endpoint_{str} {}
 
-NetService::NetService(std::string_view address, uint16_t port_num) : endpoint_(address, port_num) {}
+NodeService::NodeService(std::string_view address, uint16_t port_num) : endpoint_(address, port_num) {}
 
-NetService::NetService(boost::asio::ip::address address, uint16_t port_num) : endpoint_(std::move(address), port_num) {}
+NodeService::NodeService(boost::asio::ip::address address, uint16_t port_num) : endpoint_(std::move(address), port_num) {}
 
-NetService::NetService(boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(endpoint) {}
+NodeService::NodeService(boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(endpoint) {}
 
-Error NetService::serialization(SDataStream& stream, Action action) {
+Error NodeService::serialization(SDataStream& stream, Action action) {
     using enum Error;
     Error ret{kSuccess};
     if (not ret) ret = stream.bind(time_, action);
@@ -239,7 +239,7 @@ Error NetService::serialization(SDataStream& stream, Action action) {
     return ret;
 }
 
-NetService::NetService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint)
+NodeService::NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint)
     : endpoint_{endpoint.address(), endpoint.port()} {}
 
 Error VersionNetService::serialization(SDataStream& stream, Action action) {

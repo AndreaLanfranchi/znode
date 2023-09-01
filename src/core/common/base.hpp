@@ -47,7 +47,7 @@ concept Integral = UnsignedIntegral<T> or SignedIntegral<T>;
 
 template <class T>
 concept UnsignedIntegralEx = UnsignedIntegral<T> or std::same_as<T, intx::uint128> or std::same_as<T, intx::uint256> or
-                             std::same_as<T, intx::uint512>;
+    std::same_as<T, intx::uint512>;
 
 //! \brief Used to allow passing string literals as template arguments
 template <size_t N>
@@ -71,33 +71,22 @@ using Bytes = std::basic_string<uint8_t>;
 
 class ByteView : public std::basic_string_view<uint8_t> {
   public:
-    constexpr ByteView() noexcept : std::basic_string_view<uint8_t> {}
-    {};
+    constexpr ByteView() noexcept : std::basic_string_view<uint8_t>{} {};
 
-    constexpr ByteView(const std::basic_string_view<uint8_t>& other) noexcept : std::basic_string_view<uint8_t> {
-        other.data(), other.length()
-    }
-    {}
+    constexpr ByteView(const std::basic_string_view<uint8_t>& other) noexcept
+        : std::basic_string_view<uint8_t>{other.data(), other.length()} {}
 
-    constexpr ByteView(const Bytes& str) noexcept : std::basic_string_view<uint8_t> { str.data(), str.length() }
-    {}
+    constexpr ByteView(const Bytes& str) noexcept : std::basic_string_view<uint8_t>{str.data(), str.length()} {}
 
-    constexpr ByteView(const uint8_t* data, size_type length) noexcept : std::basic_string_view<uint8_t> {
-        data, length
-    }
-    {}
+    constexpr ByteView(const uint8_t* data, size_type length) noexcept
+        : std::basic_string_view<uint8_t>{data, length} {}
 
     template <std::size_t N>
-    constexpr ByteView(const uint8_t (&array)[N]) noexcept : std::basic_string_view<uint8_t> {
-        array, N
-    }
-    {}
+    constexpr ByteView(const uint8_t (&array)[N]) noexcept : std::basic_string_view<uint8_t>{array, N} {}
 
     template <std::size_t N>
-    constexpr ByteView(const std::array<uint8_t, N>& array) noexcept : std::basic_string_view<uint8_t> {
-        array.data(), N
-    }
-    {}
+    constexpr ByteView(const std::array<uint8_t, N>& array) noexcept
+        : std::basic_string_view<uint8_t>{array.data(), N} {}
 
     [[nodiscard]] bool is_null() const noexcept { return data() == nullptr; }
 };

@@ -78,7 +78,7 @@ class MsgAddrPayload : public serialization::Serializable {
     using serialization::Serializable::Serializable;
     ~MsgAddrPayload() override = default;
 
-    std::vector<NetService> identifiers_{};
+    std::vector<NodeService> identifiers_{};
 
   private:
     friend class serialization::SDataStream;

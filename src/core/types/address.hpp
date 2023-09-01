@@ -54,12 +54,12 @@ enum class AddressType : uint8_t {
     kIPv6 = 2
 };
 
-class NetAddress : public serialization::Serializable {
+class IPAddress : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
-    explicit NetAddress(std::string_view str);
-    explicit NetAddress(boost::asio::ip::address address);
-    ~NetAddress() override = default;
+    explicit IPAddress(std::string_view str);
+    explicit IPAddress(boost::asio::ip::address address);
+    ~IPAddress() override = default;
 
     boost::asio::ip::address operator*() const noexcept { return value_; };
     boost::asio::ip::address* operator->() noexcept { return &value_; };
@@ -86,21 +86,21 @@ class NetAddress : public serialization::Serializable {
     [[nodiscard]] AddressReservationType address_v6_reservation() const noexcept;
 };
 
-class NetEndpoint : public serialization::Serializable {
+class IPEndpoint : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
-    explicit NetEndpoint(std::string_view str);
-    explicit NetEndpoint(const boost::asio::ip::tcp::endpoint& endpoint);
-    NetEndpoint(std::string_view str, uint16_t port_num);
-    NetEndpoint(boost::asio::ip::address address, uint16_t port_num);
-    ~NetEndpoint() override = default;
+    explicit IPEndpoint(std::string_view str);
+    explicit IPEndpoint(const boost::asio::ip::tcp::endpoint& endpoint);
+    IPEndpoint(std::string_view str, uint16_t port_num);
+    IPEndpoint(boost::asio::ip::address address, uint16_t port_num);
+    ~IPEndpoint() override = default;
 
     [[nodiscard]] std::string to_string() const noexcept;
     [[nodiscard]] boost::asio::ip::tcp::endpoint to_endpoint() const noexcept;
     [[nodiscard]] bool is_valid() const noexcept;
     [[nodiscard]] bool is_routable() const noexcept;
 
-    NetAddress address_{};
+    IPAddress address_{};
     uint16_t port_{0};
 
   private:
@@ -108,23 +108,23 @@ class NetEndpoint : public serialization::Serializable {
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 
-class NetService : public serialization::Serializable {
+class NodeService : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
-    explicit NetService(std::string_view str);
-    explicit NetService(boost::asio::ip::tcp::endpoint& endpoint);
-    explicit NetService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint);
-    NetService(std::string_view str, uint64_t services);
-    NetService(std::string_view address, uint16_t port_num);
-    NetService(boost::asio::ip::address address, uint16_t port_num);
-    ~NetService() override = default;
+    explicit NodeService(std::string_view str);
+    explicit NodeService(boost::asio::ip::tcp::endpoint& endpoint);
+    explicit NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint);
+    NodeService(std::string_view str, uint64_t services);
+    NodeService(std::string_view address, uint16_t port_num);
+    NodeService(boost::asio::ip::address address, uint16_t port_num);
+    ~NodeService() override = default;
 
     // Copy constructor
-    NetService(const NetService& other) = default;
+    NodeService(const NodeService& other) = default;
 
-    uint32_t time_{gsl::narrow_cast<uint32_t>(ToUnixSeconds(absl::Now()))};  // unix timestamp
-    uint64_t services_{0};    // services mask (OR'ed from NetworkServicesType)
-    NetEndpoint endpoint_{};  // ipv4/ipv6 address and port
+    uint32_t time_{0};       // unix timestamp
+    uint64_t services_{0};   // services mask (OR'ed from NetworkServicesType)
+    IPEndpoint endpoint_{};  // ipv4/ipv6 address and port
 
   private:
     friend class serialization::SDataStream;
@@ -133,9 +133,9 @@ class NetService : public serialization::Serializable {
 
 //! \brief VersionNetService subclasses NetService only to customize serialization
 //! in Version message where it is required to be serialized/deserialized **without** the time field.
-class VersionNetService : public NetService {
+class VersionNetService : public NodeService {
   public:
-    using NetService::NetService;
+    using NodeService::NodeService;
     ~VersionNetService() override = default;
 
   private:

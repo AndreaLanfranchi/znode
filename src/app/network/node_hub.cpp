@@ -55,7 +55,7 @@ void NodeHub::start_connecting() {
     if (!app_settings_.network.connect_nodes.empty()) {
         for (auto const& str : app_settings_.network.connect_nodes) {
             if (is_stopping()) return;
-            const NetEndpoint endpoint{str};
+            const IPEndpoint endpoint{str};
             std::ignore = connect(endpoint, NodeConnectionMode::kManualOutbound);
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -84,7 +84,7 @@ void NodeHub::start_connecting() {
         for (const auto& result : results) {
             if (is_stopping()) return;
             if (!result.endpoint().address().is_v4()) continue;
-            const NetEndpoint endpoint{result.endpoint().address(), 9033 /*TODO: Get from chain params*/};
+            const IPEndpoint endpoint{result.endpoint().address(), 9033 /*TODO: Get from chain params*/};
             std::ignore = connect(endpoint);
         }
     }
@@ -172,7 +172,7 @@ bool NodeHub::stop(bool wait) noexcept {
     return ret;
 }
 
-bool NodeHub::connect(const NetEndpoint& endpoint, const NodeConnectionMode mode) {
+bool NodeHub::connect(const IPEndpoint& endpoint, const NodeConnectionMode mode) {
     if (is_stopping()) return false;
 
     const std::string remote{endpoint.to_string()};
@@ -288,8 +288,8 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
     }
 
     set_common_socket_options(socket);
-    const NetEndpoint remote{socket.remote_endpoint()};
-    const NetEndpoint local{socket.local_endpoint()};
+    const IPEndpoint remote{socket.remote_endpoint()};
+    const IPEndpoint local{socket.local_endpoint()};
     const std::shared_ptr<Node> new_node(
         new Node(
             app_settings_, NodeConnectionMode::kInbound, asio_context_, std::move(socket), tls_server_context_.get(),

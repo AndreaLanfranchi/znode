@@ -103,10 +103,10 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] bool is_connected() const noexcept { return !is_stopping() && is_connected_.load(); }
 
     //! \brief Returns the remote endpoint
-    [[nodiscard]] NetEndpoint remote_endpoint() const noexcept { return remote_endpoint_; }
+    [[nodiscard]] IPEndpoint remote_endpoint() const noexcept { return remote_endpoint_; }
 
     //! \brief Returns the local endpoint
-    [[nodiscard]] NetEndpoint local_endpoint() const noexcept { return local_endpoint_; }
+    [[nodiscard]] IPEndpoint local_endpoint() const noexcept { return local_endpoint_; }
 
     //! \brief The actual status of the protocol handshake
     [[nodiscard]] ProtocolHandShakeStatus get_protocol_handshake_status() const noexcept {
@@ -195,8 +195,8 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
     boost::asio::steady_timer ping_timer_;       // To periodically send ping messages
     boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
-    NetEndpoint remote_endpoint_;                // Remote endpoint
-    NetEndpoint local_endpoint_;                 // Local endpoint
+    IPEndpoint remote_endpoint_;                 // Remote endpoint
+    IPEndpoint local_endpoint_;                  // Local endpoint
 
     boost::asio::ssl::context* ssl_context_;
     std::unique_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> ssl_stream_;  // SSL stream

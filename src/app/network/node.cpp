@@ -55,8 +55,8 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
 bool Node::start() noexcept {
     if (not Stoppable::start()) return false;
 
-    local_endpoint_ = NetEndpoint(socket_.local_endpoint());
-    remote_endpoint_ = NetEndpoint(socket_.remote_endpoint());
+    local_endpoint_ = IPEndpoint(socket_.local_endpoint());
+    remote_endpoint_ = IPEndpoint(socket_.remote_endpoint());
     const auto now{std::chrono::steady_clock::now()};
     last_message_received_time_.store(now);  // We don't want to disconnect immediately
     last_message_sent_time_.store(now);      // We don't want to disconnect immediately
