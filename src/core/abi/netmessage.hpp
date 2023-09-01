@@ -22,20 +22,22 @@ namespace zenpp::abi {
 static constexpr size_t kMaxProtocolMessageLength{static_cast<size_t>(4_MiB)};  // Maximum length of a protocol message
 static constexpr size_t kMessageHeaderLength{24};                               // Length of a protocol message header
 static constexpr size_t kMaxInvItems{50'000};                                   // Maximum number of inventory items
-static constexpr size_t kInvItemSize{36};      // Size of an inventory item (type + hash)
-static constexpr size_t kMaxAddrItems{1'000};  // Maximum number of items in an addr message
-static constexpr size_t kAddrItemSize{30};     // Size of an address item (time + services + ip + port)
+static constexpr size_t kInvItemSize{36};            // Size of an inventory item (type + hash)
+static constexpr size_t kMaxAddrItems{1'000};        // Maximum number of items in an addr message
+static constexpr size_t kAddrItemSize{30};           // Size of an address item (time + services + ip + port)
+static constexpr size_t kMaxGetHeadersItems{2'000};  // Maximum number of block headers in a getheaders message
+static constexpr size_t kMaxHeadersItems{160};       // Maximum number of block headers in a headers message
 
 enum class NetMessageType : uint32_t {
     kVersion,           // Dial-out nodes send their version first
-    kVerack,            // Reply by dial-in nodes to version message
+    kVerAck,            // Reply by dial-in nodes to version message
     kInv,               // Inventory message to advertise the knowledge of hashes of blocks or transactions
     kAddr,              // Address message to advertise the knowledge of addresses of other nodes
     kPing,              // Ping message to measure the latency of a connection
     kPong,              // Pong message to reply to a ping message
-    kGetheaders,        // Getheaders message to request/send a list of block headers
+    kGetHeaders,        // Getheaders message to request/send a list of block headers
     kHeaders,           // Headers message to send a list of block
-    kGetaddr,           // Getaddr message to request a list of known active peers
+    kGetAddr,           // Getaddr message to request a list of known active peers
     kMemPool,           // MemPool message to request/send a list of transactions in the mempool
     kMissingOrUnknown,  // This must be the last entry
 };
@@ -64,7 +66,7 @@ inline constexpr MessageDefinition kMessageVersion{
 
 inline constexpr MessageDefinition kMessageVerack{
     "verack",                 //
-    NetMessageType::kVerack,  //
+    NetMessageType::kVerAck,  //
     false,
     std::nullopt,  //
     std::nullopt,  //
@@ -113,20 +115,21 @@ inline constexpr MessageDefinition kMessagePong{
 };
 
 inline constexpr MessageDefinition kMessageGetheaders{
-    "getheaders",                                                     //
-    NetMessageType::kGetheaders,                                      //
-    true,                                                             // vectorized
-    size_t{2000},                                                     // max vector items
-    size_t{32},                                                       // vector item size
-    size_t{4 + 1 + 32 + 32},                                          // min payload length
-    size_t{4 + serialization::ser_compact_sizeof(2000) + 32 * 2001},  // max payload length
+    "getheaders",                                                               //
+    NetMessageType::kGetHeaders,                                                //
+    true,                                                                       // vectorized
+    size_t{kMaxGetHeadersItems},                                                // max vector items
+    size_t{h256::size()},                                                       // vector item size
+    size_t{/*version*/ 4 + /*count*/ 1 + h256::size() * /* known + stop */ 2},  // min payload length
+    size_t{/*version*/ 4 + /*version*/ serialization::ser_compact_sizeof(kMaxGetHeadersItems) +
+           h256::size() * (/* known + stop */ kMaxGetHeadersItems + 1)},  // max payload length
 };
 
 inline constexpr MessageDefinition kMessageHeaders{
     "headers",                 //
     NetMessageType::kHeaders,  //
     true,                      // vectorized
-    size_t{160},               // max vector items
+    size_t{kMaxHeadersItems},  // max vector items
     std::nullopt,              // vector item size
     size_t{1 + 140},           // min payload length
     std::nullopt,              // max payload length
@@ -134,7 +137,7 @@ inline constexpr MessageDefinition kMessageHeaders{
 
 inline constexpr MessageDefinition kMessageGetAddr{
     "getaddr",                 //
-    NetMessageType::kGetaddr,  //
+    NetMessageType::kGetAddr,  //
     false,                     // vectorized
     std::nullopt,              // max vector items
     std::nullopt,              // vector item size

@@ -486,14 +486,14 @@ serialization::Error Node::process_inbound_message() {
                                                         "me",       remote_version_.addr_recv_.endpoint_.to_string()};
                 if (remote_version_.nonce_ not_eq local_version_.nonce_) {
                     print_log(log::Level::kInfo, log_params);
-                    err = push_message(abi::NetMessageType::kVerack);
+                    err = push_message(abi::NetMessageType::kVerAck);
                 } else {
                     err = kInvalidMessageState;
                     err_extended_reason = "Connected to self.";
                 }
             }
             break;
-        case kVerack:
+        case kVerAck:
             // This actually requires no action. Handshake flags already set
             // and we don't need to forward the message elsewhere
             break;
@@ -554,13 +554,11 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
     switch (message_type) {
         using enum NetMessageType;
         case kVersion:
-        case kVerack:
-            if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) [[likely]]
-                return kDuplicateProtocolHandShake;
+        case kVerAck:
+            if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) return kDuplicateProtocolHandShake;
             break;  // Continue with validation
         default:
-            if (protocol_handshake_status_ not_eq ProtocolHandShakeStatus::kCompleted) [[likely]]
-                return kInvalidProtocolHandShake;
+            if (protocol_handshake_status_ not_eq ProtocolHandShakeStatus::kCompleted) return kInvalidProtocolHandShake;
             return kSuccess;
     }
 
@@ -591,11 +589,11 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
 
 void Node::on_fully_connected() {
     if (is_stopping()) return;
-
     const boost::system::error_code error_code;
-    std::ignore = handle_ping_timer(error_code);                // Sends out a ping so we can measure latency
-    std::ignore = push_message(abi::NetMessageType::kGetaddr);  // Ask the peer to send its known addresses
-    start_ping_timer();
+    if (handle_ping_timer(error_code)) {                            // Sends out a ping so we can measure latency
+        std::ignore = push_message(abi::NetMessageType::kGetAddr);  // Ask the peer to send its known addresses
+        start_ping_timer();                                         // Start pinging on cadence
+    }
 }
 
 void Node::clean_up(gsl::owner<Node*> ptr) noexcept {

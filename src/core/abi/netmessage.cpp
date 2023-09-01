@@ -135,7 +135,7 @@ serialization::Error NetMessage::validate() noexcept {
 
     // Message `getheaders` payload does not start with the number of items
     // rather with version. We need to skip it (4 bytes)
-    if (message_definition.message_type == NetMessageType::kGetheaders) {
+    if (message_definition.message_type == NetMessageType::kGetHeaders) {
         ser_stream_.ignore(4);
     }
 
@@ -146,7 +146,7 @@ serialization::Error NetMessage::validate() noexcept {
         return kMessagePayloadOversizedVector;
     if (message_definition.vector_item_size.has_value()) {
         // Message `getheaders` has an extra item of 32 bytes (the stop hash)
-        const uint64_t extra_item{message_definition.message_type == NetMessageType::kGetheaders ? 1U : 0U};
+        const uint64_t extra_item{message_definition.message_type == NetMessageType::kGetHeaders ? 1U : 0U};
         const auto expected_vector_data_size{(*expected_vector_size + extra_item) *
                                              *message_definition.vector_item_size};
 
