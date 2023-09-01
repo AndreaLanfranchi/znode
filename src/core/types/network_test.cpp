@@ -4,23 +4,23 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <catch2/catch.hpp>
+#include <magic_enum.hpp>
 
 #include <core/encoding/hex.hpp>
 #include <core/types/network.hpp>
 
-#include "magic_enum.hpp"
-
 namespace zenpp {
 
-TEST_CASE("Network address Parsing", "[types]") {
+TEST_CASE("IPAddress Parsing", "[types]") {
     IPAddress address("127.0.0.1");
     CHECK(address->is_v4());
     CHECK(address.is_loopback());
     CHECK(!address.is_multicast());
     CHECK(!address.is_any());
     CHECK(!address.is_reserved());
-    CHECK(address.get_type() == IPAddressType::kIPv4);
+    CHECK(address.get_type() == IPAddressType::kUnroutable);
 
     address = IPAddress("::1");
     CHECK(address->is_v6());
@@ -28,6 +28,7 @@ TEST_CASE("Network address Parsing", "[types]") {
     CHECK(!address.is_multicast());
     CHECK(!address.is_any());
     CHECK(!address.is_reserved());
+    CHECK(address.get_type() == IPAddressType::kUnroutable);
 
     address = IPAddress("8.8.8.8");
     CHECK(address->is_v4());
@@ -35,13 +36,14 @@ TEST_CASE("Network address Parsing", "[types]") {
     CHECK(!address.is_multicast());
     CHECK(!address.is_any());
     CHECK(!address.is_reserved());
-    CHECK(address.get_type() == IPAddressType::kIPv6);
+    CHECK(address.get_type() == IPAddressType::kIPv4);
 
     address = IPAddress("2001::8888");
     CHECK(address->is_v6());
     CHECK(!address.is_loopback());
     CHECK(!address.is_multicast());
     CHECK(!address.is_any());
+    CHECK(address.get_type() == IPAddressType::kIPv6);
     CHECK(address.address_reservation() == IPAddressReservationType::kRFC4380);
 
     address = IPAddress("2001::8888:9999");
@@ -81,7 +83,7 @@ TEST_CASE("Network address Parsing", "[types]") {
     CHECK(address.get_type() == IPAddressType::kUnroutable);
 }
 
-TEST_CASE("Network Address Reservations", "[types]") {
+TEST_CASE("IPAddress Reservations", "[types]") {
     using enum IPAddressReservationType;
     const std::vector<std::pair<std::string_view, IPAddressReservationType>> test_cases{
         {"192.168.1.1", kRFC1918},
@@ -128,16 +130,77 @@ TEST_CASE("Network Address Reservations", "[types]") {
     }
 }
 
+TEST_CASE("IPSubNet parsing", "[types]") {
+    IPSubNet subnet("192.168.1.0/24");
+    CHECK(subnet.base_address_->is_v4());
+    CHECK(subnet.prefix_length_ == uint8_t(24U));
+    CHECK(subnet.is_valid());
+
+    subnet = IPSubNet("192.168.1.1/24");
+    CHECK(subnet.base_address_->is_v4());
+    CHECK(subnet.prefix_length_ == uint8_t(24U));
+    CHECK(subnet.to_string() == "192.168.1.0/24");
+    CHECK(subnet.is_valid());
+
+    subnet = IPSubNet("192.168.1.1/255.255.255.0");
+    CHECK(subnet.base_address_->is_v4());
+    CHECK(subnet.prefix_length_ == 24);
+    CHECK(subnet.is_valid());
+
+    subnet = IPSubNet("192.168.1.1/255.255.13.0");
+    CHECK_FALSE(subnet.is_valid());
+    subnet = IPSubNet("192.168.1.1/255.255.0.128");
+    CHECK_FALSE(subnet.is_valid());
+    subnet = IPSubNet("192.168.1.1/46");
+    CHECK_FALSE(subnet.is_valid());
+    subnet = IPSubNet("64:FF9B::/148");
+    CHECK_FALSE(subnet.base_address_.is_valid());
+    CHECK_FALSE(subnet.is_valid());
+    subnet = IPSubNet("64:FF9B::/128");
+    CHECK(subnet.base_address_.is_valid());
+    CHECK(subnet.is_valid());
+    CHECK(boost::iequals(subnet.to_string(), "64:FF9B::/128"));
+}
+
+TEST_CASE("IPSubNet contains", "[types]") {
+    struct TestCase {
+        std::string_view subnet;
+        std::string_view address;
+        bool expected;
+    };
+
+    const std::vector<TestCase> test_cases{
+        {"192.168.1.0/24", "192.168.1.10", true},
+        {"192.168.1.0/24", "192.168.2.10", false},
+        {"192.168.0.0/255.255.0.0", "192.168.1.10", true},
+        {"192.168.0.0/255.255.0.0", "192.168.2.10", true},
+        {"192.168.0.0/255.255.0.0", "192.169.2.10", false},
+        {"10.0.0.0/8", "10.0.0.5", true},
+        {"203.0.113.0/24", "203.0.113.50", true},
+        {"2001:0db8:85a3::/48", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", true},
+        {"2001:0db8:85a3::/64", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", true},
+        {"2001:0db8:85a3:0000:0000:8a2e:0370:7000/80", "2001:0db8:85a3:0000:0010:8a2e:0370:7335", false},
+    };
+
+    for (const auto& [subnet, address, expected] : test_cases) {
+        const IPSubNet subnet_obj{subnet};
+        CHECK(subnet_obj.is_valid());
+        const IPAddress address_obj{address};
+        CHECK(address_obj.is_valid());
+        CHECK(subnet_obj.contains(address_obj) == expected);
+    }
+}
+
 TEST_CASE("Network Endpoint Parsing", "[types]") {
     IPEndpoint endpoint("8.8.8.4:8333");
     CHECK(endpoint.address_->is_v4());
-    CHECK(endpoint.address_->to_v4().to_string() == "8.8.8.4:8333");
+    CHECK(endpoint.to_string() == "8.8.8.4:8333");
     CHECK(endpoint.port_ == 8333);
 
     endpoint = IPEndpoint("::1:8333");
     CHECK(endpoint.address_->is_v6());
     CHECK(endpoint.port_ == 0);
-    CHECK(endpoint.to_string() == "::1:8333");
+    CHECK_FALSE(endpoint.to_string() == "::1:8333");  // Is actually parsed as [::0.1.131.51]:0
 
     endpoint = IPEndpoint("[::1]:8333");
     CHECK(endpoint.address_->is_v6());

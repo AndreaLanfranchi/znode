@@ -8,11 +8,10 @@
 
 #include <string_view>
 
-#include <absl/time/clock.h>
-#include <absl/time/time.h>
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <gsl/gsl_util>
+#include <tl/expected.hpp>
 
 #include <core/serialization/serializable.hpp>
 
@@ -78,6 +77,9 @@ class IPAddress : public serialization::Serializable {
     [[nodiscard]] IPAddressType get_type() const noexcept;
     [[nodiscard]] IPAddressReservationType address_reservation() const noexcept;
 
+    //! \brief Overrides boost's to_string methods so we always have IPv6 addresses enclosed in square brackets
+    [[nodiscard]] std::string to_string() const noexcept;
+
   private:
     boost::asio::ip::address value_{boost::asio::ip::address_v4()};
     friend class serialization::SDataStream;
@@ -106,6 +108,48 @@ class IPEndpoint : public serialization::Serializable {
   private:
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+};
+class IPSubNet {
+  public:
+    IPSubNet() = default;
+    //! \brief Parses a string representing an IP subnet
+    //! \details The following formats are supported:
+    //! - ipv4_address/prefix_length (CIDR notation)
+    //! - ipv4_address/subnet_mask (dotted decimal notation)
+    //! - ipv4_address (defaults to /32 CIDR notation)
+    //! - ipv6_address/prefix_length (CIDR notation)
+    //! - ipv6_address/subnet_mask (dotted decimal notation)
+    //! - ipv6_address (defaults to /128)
+    explicit IPSubNet(std::string_view value);
+
+    ~IPSubNet() = default;
+
+    [[nodiscard]] bool is_valid() const noexcept;
+
+    //! \brief Returns wehther the provided address is part of this subnet
+    //! \remarks This method will return always false if the subnet is not valid
+    //! \returns True if the address is part of this subnet, false otherwise
+    [[nodiscard]] bool contains(const boost::asio::ip::address& address) const noexcept;
+    [[nodiscard]] bool contains(const IPAddress& address) const noexcept;
+
+    //! \brief Returns the string representation of this subnet
+    //! \details The returned string will be in CIDR notation and IPv6 addresses will be enclosed in square brackets
+    [[nodiscard]] std::string to_string() const noexcept;
+
+    //! \brief Returns the prefix length of a given subnet mask
+    //! \details The subnet mask must be a valid dotted decimal notation (for IPv4) or CIDR notation (for IPv4 / IPv6)
+    //! \returns An unsigned integer on success or an error string on failure
+    [[nodiscard]] static tl::expected<unsigned, std::string> parse_prefix_length(const std::string& value) noexcept;
+
+    //! \brief Calculates the base subnet address from a given address and prefix length
+    //! \returns An IPAddress on success or an error string on failure
+    [[nodiscard]] static tl::expected<boost::asio::ip::address, std::string> calculate_subnet_base_address(
+        const boost::asio::ip::address& address, unsigned prefix_length) noexcept;
+
+    IPAddress base_address_{};
+    uint8_t prefix_length_{0};
+
+  private:
 };
 
 class NodeService : public serialization::Serializable {
