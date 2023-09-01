@@ -20,7 +20,7 @@ TEST_CASE("Network address Parsing", "[types]") {
     CHECK(!address.is_multicast());
     CHECK(!address.is_any());
     CHECK(!address.is_reserved());
-    CHECK(address.get_type() == AddressType::kIPv4);
+    CHECK(address.get_type() == IPAddressType::kIPv4);
 
     address = IPAddress("::1");
     CHECK(address->is_v6());
@@ -35,14 +35,14 @@ TEST_CASE("Network address Parsing", "[types]") {
     CHECK(!address.is_multicast());
     CHECK(!address.is_any());
     CHECK(!address.is_reserved());
-    CHECK(address.get_type() == AddressType::kIPv6);
+    CHECK(address.get_type() == IPAddressType::kIPv6);
 
     address = IPAddress("2001::8888");
     CHECK(address->is_v6());
     CHECK(!address.is_loopback());
     CHECK(!address.is_multicast());
     CHECK(!address.is_any());
-    CHECK(address.address_reservation() == AddressReservationType::kRFC4380);
+    CHECK(address.address_reservation() == IPAddressReservationType::kRFC4380);
 
     address = IPAddress("2001::8888:9999");
     CHECK(address->is_v6());
@@ -62,28 +62,28 @@ TEST_CASE("Network address Parsing", "[types]") {
     address = IPAddress("::FFFF:192.168.1.1");
     CHECK(!address.is_unspecified());
     CHECK(address->is_v4());
-    CHECK(address.address_reservation() == AddressReservationType::kRFC1918);
+    CHECK(address.address_reservation() == IPAddressReservationType::kRFC1918);
 
     address = IPAddress("192.168.1.1:10");
     CHECK(!address.is_unspecified());
     CHECK(address->is_v4());
-    CHECK(address.address_reservation() == AddressReservationType::kRFC1918);
+    CHECK(address.address_reservation() == IPAddressReservationType::kRFC1918);
 
     address = IPAddress("10.0.0.1:10");
     CHECK(!address.is_unspecified());
     CHECK(address->is_v4());
-    CHECK(address.address_reservation() == AddressReservationType::kRFC1918);
+    CHECK(address.address_reservation() == IPAddressReservationType::kRFC1918);
 
     address = IPAddress("172.31.255.255");
     CHECK(!address.is_unspecified());
     CHECK(address->is_v4());
-    CHECK(address.address_reservation() == AddressReservationType::kRFC1918);
-    CHECK(address.get_type() == AddressType::kUnroutable);
+    CHECK(address.address_reservation() == IPAddressReservationType::kRFC1918);
+    CHECK(address.get_type() == IPAddressType::kUnroutable);
 }
 
 TEST_CASE("Network Address Reservations", "[types]") {
-    using enum AddressReservationType;
-    const std::vector<std::pair<std::string_view, AddressReservationType>> test_cases{
+    using enum IPAddressReservationType;
+    const std::vector<std::pair<std::string_view, IPAddressReservationType>> test_cases{
         {"192.168.1.1", kRFC1918},
         {"10.0.0.1", kRFC1918},
         {"10.0.2.5", kRFC1918},

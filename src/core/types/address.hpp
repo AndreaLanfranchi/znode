@@ -31,7 +31,7 @@ enum class NodeServicesType : uint64_t {
                       kNodeNetworkLimited,
 };
 
-enum class AddressReservationType {
+enum class IPAddressReservationType {
     kNotReserved = 0,
     kRFC1918 = 1,   // IPV4 Reservation : Allocation for Private Internets
     kRFC2544 = 2,   // IPV4 Reservation : inter-network communications (192.18.0.0/15)
@@ -48,7 +48,7 @@ enum class AddressReservationType {
     kRFC6145 = 13,  // IPV6 Reservation : IP/ICMP Translation Algorithm
 };
 
-enum class AddressType : uint8_t {
+enum class IPAddressType : uint8_t {
     kUnroutable = 0,
     kIPv4 = 1,
     kIPv6 = 2
@@ -75,15 +75,15 @@ class IPAddress : public serialization::Serializable {
     [[nodiscard]] bool is_valid() const noexcept;
     [[nodiscard]] bool is_routable() const noexcept;
 
-    [[nodiscard]] AddressType get_type() const noexcept;
-    [[nodiscard]] AddressReservationType address_reservation() const noexcept;
+    [[nodiscard]] IPAddressType get_type() const noexcept;
+    [[nodiscard]] IPAddressReservationType address_reservation() const noexcept;
 
   private:
     boost::asio::ip::address value_{boost::asio::ip::address_v4()};
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
-    [[nodiscard]] AddressReservationType address_v4_reservation() const noexcept;
-    [[nodiscard]] AddressReservationType address_v6_reservation() const noexcept;
+    [[nodiscard]] IPAddressReservationType address_v4_reservation() const noexcept;
+    [[nodiscard]] IPAddressReservationType address_v6_reservation() const noexcept;
 };
 
 class IPEndpoint : public serialization::Serializable {

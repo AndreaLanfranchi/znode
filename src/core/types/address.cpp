@@ -46,7 +46,7 @@ bool IPAddress::is_routable() const noexcept {
     if (not is_valid() || is_loopback()) return false;
 
     switch (address_reservation()) {
-        using enum AddressReservationType;
+        using enum IPAddressReservationType;
         case kRFC1918:
         case kRFC2544:
         case kRFC3927:
@@ -63,23 +63,23 @@ bool IPAddress::is_routable() const noexcept {
 }
 
 bool IPAddress::is_reserved() const noexcept {
-    using enum AddressReservationType;
+    using enum IPAddressReservationType;
     return address_reservation() not_eq kNotReserved;
 }
 
-AddressType IPAddress::get_type() const noexcept {
-    if (not is_routable() or is_any()) return AddressType::kUnroutable;
-    return value_.is_v4() ? AddressType::kIPv4 : AddressType::kIPv6;
+IPAddressType IPAddress::get_type() const noexcept {
+    if (not is_routable() or is_any()) return IPAddressType::kUnroutable;
+    return value_.is_v4() ? IPAddressType::kIPv4 : IPAddressType::kIPv6;
 }
 
-AddressReservationType IPAddress::address_reservation() const noexcept {
-    if (is_unspecified()) return AddressReservationType::kNotReserved;
+IPAddressReservationType IPAddress::address_reservation() const noexcept {
+    if (is_unspecified()) return IPAddressReservationType::kNotReserved;
     return value_.is_v4() ? address_v4_reservation() : address_v6_reservation();
 }
 
-AddressReservationType IPAddress::address_v4_reservation() const noexcept {
-    using enum AddressReservationType;
-    AddressReservationType ret{kNotReserved};
+IPAddressReservationType IPAddress::address_v4_reservation() const noexcept {
+    using enum IPAddressReservationType;
+    IPAddressReservationType ret{kNotReserved};
     if (!value_.is_v4()) return ret;
 
     const auto addr_bytes = value_.to_v4().to_bytes();
@@ -115,9 +115,9 @@ AddressReservationType IPAddress::address_v4_reservation() const noexcept {
     return ret;
 }
 
-AddressReservationType IPAddress::address_v6_reservation() const noexcept {
-    using enum AddressReservationType;
-    AddressReservationType ret{kNotReserved};
+IPAddressReservationType IPAddress::address_v6_reservation() const noexcept {
+    using enum IPAddressReservationType;
+    IPAddressReservationType ret{kNotReserved};
     if (!value_.is_v6()) return ret;
 
     const auto addr_bytes = value_.to_v6().to_bytes();
@@ -226,7 +226,8 @@ NodeService::NodeService(std::string_view str, uint64_t services) : services_{se
 
 NodeService::NodeService(std::string_view address, uint16_t port_num) : endpoint_(address, port_num) {}
 
-NodeService::NodeService(boost::asio::ip::address address, uint16_t port_num) : endpoint_(std::move(address), port_num) {}
+NodeService::NodeService(boost::asio::ip::address address, uint16_t port_num)
+    : endpoint_(std::move(address), port_num) {}
 
 NodeService::NodeService(boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(endpoint) {}
 
