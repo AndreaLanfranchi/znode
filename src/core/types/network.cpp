@@ -263,7 +263,7 @@ bool IPSubNet::contains(const boost::asio::ip::address& address) const noexcept 
 
     if (not address.is_v6()) return false;
     std::array<uint8_t, 16U> mask{0};
-    for (unsigned i{0}, end{static_cast<unsigned>(static_cast<int>(prefix_length_) / unsigned(CHAR_BIT))}; i < end;
+    for (unsigned i{0}, end{static_cast<unsigned>(static_cast<unsigned>(prefix_length_) / unsigned(CHAR_BIT))}; i < end;
          ++i) {
         mask[i] = 0xFFU;
     }
@@ -332,7 +332,7 @@ tl::expected<unsigned, std::string> IPSubNet::parse_prefix_length(const std::str
     }
 
     if (std::regex_match(value, matches, cidr_notation_pattern)) {
-        ret = std::stoul(value);
+        ret = gsl::narrow_cast<decltype(ret)>(std::stoul(value));
         if (ret > 128U) return tl::unexpected("invalid_prefix_length");
         return ret;
     }
