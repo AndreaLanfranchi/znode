@@ -175,12 +175,12 @@ class NodeService : public serialization::Serializable {
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 
-//! \brief VersionNetService subclasses NetService only to customize serialization
+//! \brief VersionNodeService subclasses NodeService only to customize serialization
 //! in Version message where it is required to be serialized/deserialized **without** the time field.
-class VersionNetService : public NodeService {
+class VersionNodeService : public NodeService {
   public:
     using NodeService::NodeService;
-    ~VersionNetService() override = default;
+    ~VersionNodeService() override = default;
 
   private:
     friend class serialization::SDataStream;

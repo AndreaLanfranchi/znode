@@ -43,8 +43,8 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     local_version_.protocol_version_ = kDefaultProtocolVersion;
     local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
     local_version_.timestamp_ = ToUnixSeconds(absl::Now());
-    local_version_.addr_recv_ = VersionNetService(socket_.remote_endpoint());
-    local_version_.addr_from_ = VersionNetService(socket_.local_endpoint());
+    local_version_.addr_recv_ = VersionNodeService(socket_.remote_endpoint());
+    local_version_.addr_from_ = VersionNodeService(socket_.local_endpoint());
     local_version_.addr_from_.endpoint_.port_ = 9033;  // TODO Set this value to the current listening port
     local_version_.nonce_ = app_settings_.network.nonce;
     local_version_.user_agent_ = get_buildinfo_string();
@@ -366,7 +366,7 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     }
 }
 
-serialization::Error Node::push_message(const abi::NetMessageType message_type, serialization::Serializable& payload) {
+serialization::Error Node::push_message(const abi::NetMessageType message_type, abi::NetMessagePayload& payload) {
     using namespace serialization;
     using enum Error;
 

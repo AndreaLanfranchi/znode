@@ -7,15 +7,29 @@
 #pragma once
 #include <cstdint>
 
-#include <core/abi/netmessage.hpp>
+#include <core/abi/message_defs.hpp>
+#include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 #include <core/types/network.hpp>
 
 namespace zenpp::abi {
 
-class MsgNullPayload : public serialization::Serializable {
+//! \brief This class represents the payload of a NetMessage.
+//! \details Is basically an abstract placeholder type to make semantically evident in function signatures
+//! that a NetMessage payload is expected.
+class NetMessagePayload : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
+    ~NetMessagePayload() override = default;
+
+  private:
+    friend class serialization::SDataStream;
+    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override = 0;
+};
+
+class MsgNullPayload : public NetMessagePayload {
+  public:
+    using NetMessagePayload::NetMessagePayload;
     ~MsgNullPayload() override = default;
 
   private:
@@ -27,16 +41,16 @@ class MsgNullPayload : public serialization::Serializable {
     };
 };
 
-class MsgVersionPayload : public serialization::Serializable {
+class MsgVersionPayload : public NetMessagePayload {
   public:
-    using serialization::Serializable::Serializable;
+    using NetMessagePayload::NetMessagePayload;
     ~MsgVersionPayload() override = default;
 
     int32_t protocol_version_{0};
     uint64_t services_{static_cast<uint64_t>(NodeServicesType::kNone)};
     int64_t timestamp_{0};
-    VersionNetService addr_recv_{};
-    VersionNetService addr_from_{};
+    VersionNodeService addr_recv_{};
+    VersionNodeService addr_from_{};
     uint64_t nonce_{0};
     std::string user_agent_{};
     int32_t last_block_height_{0};
@@ -47,9 +61,9 @@ class MsgVersionPayload : public serialization::Serializable {
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 
-class MsgPingPongPayload : public serialization::Serializable {
+class MsgPingPongPayload : public NetMessagePayload {
   public:
-    using serialization::Serializable::Serializable;
+    using NetMessagePayload::NetMessagePayload;
     ~MsgPingPongPayload() override = default;
 
     uint64_t nonce_{0};
@@ -59,9 +73,9 @@ class MsgPingPongPayload : public serialization::Serializable {
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 
-class MsgGetHeadersPayload : public serialization::Serializable {
+class MsgGetHeadersPayload : public NetMessagePayload {
   public:
-    using serialization::Serializable::Serializable;
+    using NetMessagePayload::NetMessagePayload;
     ~MsgGetHeadersPayload() override = default;
 
     uint32_t protocol_version_{0};
@@ -73,9 +87,9 @@ class MsgGetHeadersPayload : public serialization::Serializable {
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 
-class MsgAddrPayload : public serialization::Serializable {
+class MsgAddrPayload : public NetMessagePayload {
   public:
-    using serialization::Serializable::Serializable;
+    using NetMessagePayload::NetMessagePayload;
     ~MsgAddrPayload() override = default;
 
     std::vector<NodeService> identifiers_{};

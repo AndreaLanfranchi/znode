@@ -234,7 +234,7 @@ void NetMessage::set_version(int version) noexcept { ser_stream_.set_version(ver
 
 int NetMessage::get_version() const noexcept { return ser_stream_.get_version(); }
 
-serialization::Error NetMessage::push(const NetMessageType message_type, serialization::Serializable& payload,
+serialization::Error NetMessage::push(const NetMessageType message_type, NetMessagePayload& payload,
                                       ByteView magic) noexcept {
     using namespace serialization;
     using enum Error;
@@ -268,11 +268,5 @@ serialization::Error NetMessage::push(const NetMessageType message_type, seriali
     memcpy(&ser_stream_[20], &header_.payload_checksum, sizeof(header_.payload_checksum));
 
     return validate();  // Ensure the message is valid also when we push it
-}
-
-serialization::Error NetMessage::push(NetMessageType message_type, serialization::Serializable& payload,
-                                      std::array<uint8_t, 4>& magic) noexcept {
-    const ByteView magic_view{magic.data(), magic.size()};
-    return push(message_type, payload, magic_view);
 }
 }  // namespace zenpp::abi

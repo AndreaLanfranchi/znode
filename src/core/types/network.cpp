@@ -395,7 +395,7 @@ Error NodeService::serialization(SDataStream& stream, Action action) {
 NodeService::NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint)
     : endpoint_{endpoint.address(), endpoint.port()} {}
 
-Error VersionNetService::serialization(SDataStream& stream, Action action) {
+Error VersionNodeService::serialization(SDataStream& stream, Action action) {
     using enum Error;
     Error ret{kSuccess};
     if (not ret) ret = stream.bind(services_, action);

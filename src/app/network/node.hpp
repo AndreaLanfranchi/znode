@@ -150,7 +150,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] static int next_node_id() noexcept { return next_node_id_.fetch_add(1); }
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
-    serialization::Error push_message(abi::NetMessageType message_type, serialization::Serializable& payload);
+    serialization::Error push_message(abi::NetMessageType message_type, abi::NetMessagePayload& payload);
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
     //! \remarks This a handy overload used to send messages with a null payload

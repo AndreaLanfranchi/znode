@@ -10,6 +10,9 @@
 #include <bit>
 #include <type_traits>
 
+#include <tl/expected.hpp>
+
+#include <core/common/assert.hpp>
 #include <core/common/base.hpp>
 #include <core/serialization/base.hpp>
 
