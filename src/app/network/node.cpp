@@ -29,7 +29,7 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
            boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
            std::function<void(std::shared_ptr<Node>)> on_disconnect,
            std::function<void(DataDirectionMode, size_t)> on_data,
-           std::function<void(std::shared_ptr<Node>, std::unique_ptr<abi::NetMessage>&)> on_message)
+           std::function<void(std::shared_ptr<Node>, std::shared_ptr<abi::NetMessage>)> on_message)
     : app_settings_(app_settings),
       connection_mode_(connection_mode),
       io_strand_(io_context),
@@ -539,7 +539,7 @@ serialization::Error Node::process_inbound_message() {
         print_log(is_fatal ? log::Level::kWarning : log::Level::kTrace, log_params, err_extended_reason);
     }
     if (not is_fatal and notify_node_hub) {
-        on_message_(shared_from_this(), inbound_message_);
+        on_message_(shared_from_this(), std::move(inbound_message_));
     }
     return err;
 }

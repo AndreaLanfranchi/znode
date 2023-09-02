@@ -108,14 +108,14 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& error_code) 
         return false;
     }
     print_info();  // Print info every 5 seconds
-    const std::scoped_lock lock{nodes_mutex_};
-    for (auto& [node_id, node_ptr] : nodes_) {
+    const std::unique_lock lock{nodes_mutex_};
+    for (auto /*copy !!*/ [node_id, node_ptr] : nodes_) {
         if (const auto result{node_ptr->is_idle()}; result not_eq NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "node",
                                      std::to_string(node_id), "remote", node_ptr->to_string(), "reason", reason})
                 << "Disconnecting ...";
-            std::ignore = node_ptr->stop(false);
+            asio::post(asio_strand_, [node_ptr]() { std::ignore = node_ptr->stop(false); });
         }
     }
     return !is_stopping();  // Required to resubmit the timer
@@ -214,7 +214,7 @@ bool NodeHub::connect(const IPEndpoint& endpoint, const NodeConnectionMode mode)
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
             },
-            [this](const std::shared_ptr<Node>& node, std::unique_ptr<abi::NetMessage>& message) {
+            [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
                 on_node_received_message(node, message);
             }),
         Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
@@ -297,7 +297,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
             },
-            [this](const std::shared_ptr<Node>& node, std::unique_ptr<abi::NetMessage>& message) {
+            [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
                 on_node_received_message(node, message);
             }),
         Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
@@ -340,7 +340,7 @@ void NodeHub::initialize_acceptor() {
 }
 
 void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
-    std::scoped_lock const lock(nodes_mutex_);
+    const std::unique_lock lock(nodes_mutex_);
 
     if (auto item{connected_addresses_.find(*node->remote_endpoint().address_)};
         item not_eq connected_addresses_.end()) {
@@ -391,7 +391,7 @@ void NodeHub::on_node_data(network::DataDirectionMode direction, const size_t by
     }
 }
 
-void NodeHub::on_node_received_message(const std::shared_ptr<Node>& node, std::unique_ptr<abi::NetMessage>& message) {
+void NodeHub::on_node_received_message(std::shared_ptr<Node>& node, std::shared_ptr<abi::NetMessage> message) {
     using namespace serialization;
     using enum Error;
 
@@ -424,7 +424,7 @@ void NodeHub::on_node_received_message(const std::shared_ptr<Node>& node, std::u
 }
 
 std::shared_ptr<Node> NodeHub::operator[](int node_id) const {
-    const std::scoped_lock lock(nodes_mutex_);
+    const std::unique_lock lock(nodes_mutex_);
     if (nodes_.contains(node_id)) {
         return nodes_.at(node_id);
     }
@@ -432,17 +432,17 @@ std::shared_ptr<Node> NodeHub::operator[](int node_id) const {
 }
 
 bool NodeHub::contains(int node_id) const {
-    const std::scoped_lock lock(nodes_mutex_);
+    const std::unique_lock lock(nodes_mutex_);
     return nodes_.contains(node_id);
 }
 
 size_t NodeHub::size() const {
-    const std::scoped_lock lock(nodes_mutex_);
+    const std::unique_lock lock(nodes_mutex_);
     return nodes_.size();
 }
 
 std::vector<std::shared_ptr<Node>> NodeHub::get_nodes() const {
-    const std::scoped_lock lock(nodes_mutex_);
+    const std::unique_lock lock(nodes_mutex_);
     std::vector<std::shared_ptr<Node>> nodes;
     for (const auto& [id, node] : nodes_) {
         nodes.emplace_back(node);
