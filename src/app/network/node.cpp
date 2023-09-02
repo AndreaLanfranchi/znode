@@ -270,6 +270,8 @@ void Node::start_write() {
         outbound_message_->data().seekg(0);
         outbound_messages_.erase(outbound_messages_.begin());
         outbound_message_start_time_.store(std::chrono::steady_clock::now());
+        outbound_message_metrics_[outbound_message_->get_type()].count_++;
+        outbound_message_metrics_[outbound_message_->get_type()].bytes_ += outbound_message_->data().size();
     }
 
     // If message has been just loaded into the barrel then we must check its validity
@@ -462,6 +464,9 @@ serialization::Error Node::process_inbound_message() {
     bool notify_node_hub{false};
 
     REQUIRES(inbound_message_ not_eq nullptr);
+    inbound_message_metrics_[inbound_message_->get_type()].count_++;
+    inbound_message_metrics_[inbound_message_->get_type()].bytes_ += inbound_message_->data().size();
+
     switch (inbound_message_->get_type()) {
         using enum abi::NetMessageType;
         case kVersion:
@@ -503,6 +508,14 @@ serialization::Error Node::process_inbound_message() {
                 err = push_message(abi::NetMessageType::kPong, ping_pong);
             }
         } break;
+        case kGetAddr:
+            if (connection_mode_ == NodeConnectionMode::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
+                // Ignore the message to avoid fingerprinting
+                err_extended_reason = "Ignoring duplicate 'getaddr' message to avoid fingerprinting.";
+                break;
+            }
+            notify_node_hub = true;
+            break;
         case kPong: {
             abi::MsgPingPongPayload ping_pong{};
             if (err = ping_pong.deserialize(inbound_message_->data()); err not_eq kSuccess) break;

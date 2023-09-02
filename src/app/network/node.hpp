@@ -9,6 +9,7 @@
 #include <atomic>
 #include <functional>
 #include <list>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -238,5 +239,13 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     abi::MsgVersionPayload local_version_{};   // Local protocol version
     abi::MsgVersionPayload remote_version_{};  // Remote protocol version
+
+    struct MessageMetrics {
+        std::atomic_uint32_t count_{0};
+        std::atomic<size_t> bytes_{0};
+    };
+
+    std::map<abi::NetMessageType, MessageMetrics> inbound_message_metrics_{};   // Stats for each message type
+    std::map<abi::NetMessageType, MessageMetrics> outbound_message_metrics_{};  // Stats for each message type
 };
 }  // namespace zenpp::network
