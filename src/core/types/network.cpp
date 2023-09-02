@@ -321,7 +321,7 @@ tl::expected<unsigned, std::string> IPSubNet::parse_prefix_length(const std::str
                 case 254:
                 case 255:
                     if (zero_found) return tl::unexpected("invalid_network_mask");
-                    ret += std::popcount(match_value);
+                    ret += static_cast<decltype(ret)>(std::popcount(match_value));
                     break;
                     /* valid octets << */
                 default:
