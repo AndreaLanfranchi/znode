@@ -102,7 +102,7 @@ void Node::start_ping_timer() {
     // It would be boring to send out pings on a costant basis
     // So we randomize the interval a bit using a +/- 15% factor
     const auto ping_interval_seconds_randomized{
-        randomize<uint32_t>(app_settings_.network.ping_interval_seconds, /*percentage=*/0.15F)};
+        randomize<uint32_t>(app_settings_.network.ping_interval_seconds, /*percentage=*/0.30F)};
     ping_timer_.expires_after(std::chrono::seconds(ping_interval_seconds_randomized));
     ping_timer_.async_wait([self{shared_from_this()}](const boost::system::error_code& error_code) {
         if (self->handle_ping_timer(error_code)) {
@@ -113,7 +113,7 @@ void Node::start_ping_timer() {
 
 bool Node::handle_ping_timer(const boost::system::error_code& error_code) {
     if (error_code == boost::asio::error::operation_aborted) return false;
-    if (ping_nonce_.load() not_eq 0U) return !is_stopping();  // Wait for response to return
+    if (ping_nonce_.load() not_eq 0U) return not is_stopping();  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
     ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
     abi::MsgPingPongPayload pong_payload{};
@@ -251,10 +251,7 @@ void Node::start_write() {
 
     if (outbound_message_ not_eq nullptr and outbound_message_->data().eof()) {
         // A message has been fully sent
-        // Unless it is a ping message we can reset the timer
-        if (outbound_message_->get_type() not_eq abi::NetMessageType::kPing) {
-            last_message_sent_time_.store(std::chrono::steady_clock::now());
-        }
+        last_message_sent_time_.store(std::chrono::steady_clock::now());
         outbound_message_.reset();
         outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
     }
@@ -269,11 +266,6 @@ void Node::start_write() {
         outbound_message_ = std::move(outbound_messages_.front());
         outbound_message_->data().seekg(0);
         outbound_messages_.erase(outbound_messages_.begin());
-
-        // We don't want to send another ping if still waiting for a pong response
-        if (outbound_message_->get_type() == abi::NetMessageType::kPing and ping_nonce_.load() not_eq 0U) {
-            outbound_message_.reset();
-        }
     }
 
     // If message has been just loaded into the barrel then we must check its validity
