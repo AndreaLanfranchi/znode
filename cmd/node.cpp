@@ -69,7 +69,7 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
 }
 
 int main(int argc, char* argv[]) {
-    const auto build_info(get_buildinfo());
+    const auto* build_info(get_buildinfo());
 
     CLI::App cli(std::string(build_info->project_name).append(" node"));
     cli.get_formatter()->column_width(50);
@@ -118,7 +118,7 @@ int main(int argc, char* argv[]) {
         std::vector<std::thread> asio_threads;
         for (size_t i{0}; i < settings.asio_concurrency; ++i) {
             asio_threads.emplace_back([&asio_context, i]() {
-                std::string thread_name{"asio-" + std::to_string(i)};
+                const std::string thread_name{"asio-" + std::to_string(i)};
                 log::set_thread_name(thread_name);
                 log::Trace("Service", {"name", thread_name, "status", "starting"});
                 asio_context.run();
