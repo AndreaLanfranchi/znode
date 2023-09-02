@@ -259,7 +259,7 @@ void Node::start_write() {
         outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
     }
 
-    if (outbound_message_ == nullptr) {
+    while (outbound_message_ == nullptr) {
         // Try to get a new message from the queue
         const std::scoped_lock lock{outbound_messages_mutex_};
         if (outbound_messages_.empty()) {
@@ -269,9 +269,11 @@ void Node::start_write() {
         outbound_message_ = std::move(outbound_messages_.front());
         outbound_message_->data().seekg(0);
         outbound_messages_.erase(outbound_messages_.begin());
-        outbound_message_start_time_.store(std::chrono::steady_clock::now());
-        outbound_message_metrics_[outbound_message_->get_type()].count_++;
-        outbound_message_metrics_[outbound_message_->get_type()].bytes_ += outbound_message_->data().size();
+
+        // We don't want to send another ping if still waiting for a pong response
+        if (outbound_message_->get_type() == abi::NetMessageType::kPing and ping_nonce_.load() not_eq 0U) {
+            outbound_message_.reset();
+        }
     }
 
     // If message has been just loaded into the barrel then we must check its validity
@@ -303,9 +305,19 @@ void Node::start_write() {
             return;
         }
 
-        // Should this be a ping message start timing the response
-        if (outbound_message_->get_type() == abi::NetMessageType::kPing) {
-            last_ping_sent_time_.store(std::chrono::steady_clock::now());
+        // Post actions to take on begin of outgoing message
+        const auto now{std::chrono::steady_clock::now()};
+        const auto msg_type{outbound_message_->get_type()};
+        outbound_message_start_time_.store(now);
+        outbound_message_metrics_[msg_type].count_++;
+        outbound_message_metrics_[msg_type].bytes_ += outbound_message_->data().size();
+        switch (msg_type) {
+            using enum abi::NetMessageType;
+            case abi::NetMessageType::kPing:
+                last_ping_sent_time_.store(std::chrono::steady_clock::now());
+                break;
+            default:
+                break;
         }
     }
 
