@@ -43,9 +43,9 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     local_version_.protocol_version_ = kDefaultProtocolVersion;
     local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
     local_version_.timestamp_ = ToUnixSeconds(absl::Now());
-    local_version_.addr_recv_ = VersionNodeService(socket_.remote_endpoint());
-    local_version_.addr_from_ = VersionNodeService(socket_.local_endpoint());
-    local_version_.addr_from_.endpoint_.port_ = 9033;  // TODO Set this value to the current listening port
+    local_version_.recipient_service_ = VersionNodeService(socket_.remote_endpoint());
+    local_version_.sender_service_ = VersionNodeService(socket_.local_endpoint());
+    local_version_.sender_service_.endpoint_.port_ = 9033;  // TODO Set this value to the current listening port
     local_version_.nonce_ = app_settings_.network.nonce;
     local_version_.user_agent_ = get_buildinfo_string();
     local_version_.last_block_height_ = 0;  // TODO Set this value to the current blockchain height
@@ -485,14 +485,15 @@ serialization::Error Node::process_inbound_message() {
             }
             {
                 version_.store(std::min(local_version_.protocol_version_, remote_version_.protocol_version_));
-                const std::list<std::string> log_params{"agent",    remote_version_.user_agent_,
-                                                        "version",  std::to_string(remote_version_.protocol_version_),
-                                                        "nonce",    std::to_string(remote_version_.nonce_),
-                                                        "services", std::to_string(remote_version_.services_),
-                                                        "relay",    (remote_version_.relay_ ? "true" : "false"),
-                                                        "block",    std::to_string(remote_version_.last_block_height_),
-                                                        "him",      remote_version_.addr_from_.endpoint_.to_string(),
-                                                        "me",       remote_version_.addr_recv_.endpoint_.to_string()};
+                const std::list<std::string> log_params{
+                    "agent",    remote_version_.user_agent_,
+                    "version",  std::to_string(remote_version_.protocol_version_),
+                    "nonce",    std::to_string(remote_version_.nonce_),
+                    "services", std::to_string(remote_version_.services_),
+                    "relay",    (remote_version_.relay_ ? "true" : "false"),
+                    "block",    std::to_string(remote_version_.last_block_height_),
+                    "him",      remote_version_.sender_service_.endpoint_.to_string(),
+                    "me",       remote_version_.recipient_service_.endpoint_.to_string()};
                 if (remote_version_.nonce_ not_eq local_version_.nonce_) {
                     print_log(log::Level::kInfo, log_params);
                     err = push_message(abi::NetMessageType::kVerAck);
@@ -515,22 +516,28 @@ serialization::Error Node::process_inbound_message() {
         case kGetAddr:
             if (connection_mode_ == NodeConnectionMode::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
                 // Ignore the message to avoid fingerprinting
-                err_extended_reason = "Ignoring duplicate 'getaddr' message to avoid fingerprinting.";
+                err_extended_reason = "Ignoring duplicate 'getaddr' message on inbound connection.";
                 break;
             }
             notify_node_hub = true;
             break;
         case kPong: {
+            const auto expected_nonce{ping_nonce_.load()};
+            if (expected_nonce == 0U) {
+                err = kInvalidMessageState;
+                err_extended_reason = "Received an unrequested `pong` message.";
+                break;
+            }
             abi::MsgPingPongPayload ping_pong{};
             if (err = ping_pong.deserialize(inbound_message_->data()); err not_eq kSuccess) break;
-            if (ping_pong.nonce_ not_eq ping_nonce_.load()) {
+            if (ping_pong.nonce_ not_eq expected_nonce) {
                 err = kMismatchingPingPongNonce;
-                err_extended_reason = absl::StrCat("Expected ", ping_nonce_.load(), " got ", ping_pong.nonce_, ".");
+                err_extended_reason = absl::StrCat("Expected ", expected_nonce, " got ", ping_pong.nonce_, ".");
                 break;
             }
             // Calculate ping response time in milliseconds
-            const auto now{std::chrono::steady_clock::now()};
-            const auto ping_response_duration{now - last_ping_sent_time_.load()};
+            const auto time_now{std::chrono::steady_clock::now()};
+            const auto ping_response_duration{time_now - last_ping_sent_time_.load()};
             const auto ping_response_time{
                 std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_duration)};
 

@@ -49,8 +49,8 @@ class MsgVersionPayload : public NetMessagePayload {
     int32_t protocol_version_{0};
     uint64_t services_{static_cast<uint64_t>(NodeServicesType::kNone)};
     int64_t timestamp_{0};
-    VersionNodeService addr_recv_{};
-    VersionNodeService addr_from_{};
+    VersionNodeService recipient_service_{};
+    VersionNodeService sender_service_{};
     uint64_t nonce_{0};
     std::string user_agent_{};
     int32_t last_block_height_{0};

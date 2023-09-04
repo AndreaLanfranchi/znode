@@ -16,8 +16,8 @@ Error MsgVersionPayload::serialization(SDataStream& stream, Action action) {
     if (!ret) ret = stream.bind(protocol_version_, action);
     if (!ret) ret = stream.bind(services_, action);
     if (!ret) ret = stream.bind(timestamp_, action);
-    if (!ret) ret = stream.bind(addr_recv_, action);
-    if (!ret) ret = stream.bind(addr_from_, action);
+    if (!ret) ret = stream.bind(recipient_service_, action);
+    if (!ret) ret = stream.bind(sender_service_, action);
     if (!ret) ret = stream.bind(nonce_, action);
     if (!ret) ret = stream.bind(user_agent_, action);
     if (!ret) ret = stream.bind(last_block_height_, action);

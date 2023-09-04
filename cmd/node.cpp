@@ -28,7 +28,7 @@ using namespace std::chrono;
 
 //! \brief Ensures database is ready and consistent with command line arguments
 void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool init_if_not_configured = true) {
-    bool chaindata_exclusive{node_settings.chaindata_env_config.exclusive};  // save setting
+    const bool chaindata_exclusive{node_settings.chaindata_env_config.exclusive};  // save setting
     {
         auto& config = node_settings.chaindata_env_config;
         config.path = (*node_settings.data_directory)[DataDirectory::kChainDataName].path().string();
@@ -39,30 +39,30 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
     // Open chaindata environment and check tables
     log::Message("Opening database", {"path", node_settings.chaindata_env_config.path});
     auto chaindata_env{db::open_env(node_settings.chaindata_env_config)};
-    db::RWTxn tx(chaindata_env);
-    if (!chaindata_env.is_pristine()) {
+    db::RWTxn txn(chaindata_env);
+    if (not chaindata_env.is_pristine()) {
         // We have already initialized with schema
-        const auto detected_schema_version{db::read_schema_version(*tx)};
-        if (!detected_schema_version.has_value()) {
+        const auto detected_schema_version{db::read_schema_version(*txn)};
+        if (not detected_schema_version.has_value()) {
             throw db::Exception("Unable to detect schema version");
         }
         log::Message("Database schema", {"version", detected_schema_version->to_string()});
         if (*detected_schema_version < db::tables::kRequiredSchemaVersion) {
             // TODO Run migrations and update schema version
             // for the moment an exception is thrown
-            std::string what{"Incompatible schema version:"};
-            what.append(" expected " + db::tables::kRequiredSchemaVersion.to_string());
-            what.append(" got " + detected_schema_version->to_string());
+            const std::string what{absl::StrCat("Incomplete schema version: expected ",
+                                                db::tables::kRequiredSchemaVersion.to_string(), " got ",
+                                                detected_schema_version->to_string())};
             chaindata_env.close(/*dont_sync=*/true);
             throw std::filesystem::filesystem_error(what, std::make_error_code(std::errc::not_supported));
         }
     } else {
-        db::tables::deploy_tables(*tx, db::tables::kChainDataTables);
-        db::write_schema_version(*tx, db::tables::kRequiredSchemaVersion);
-        tx.commit(/*renew=*/true);
+        db::tables::deploy_tables(*txn, db::tables::kChainDataTables);
+        db::write_schema_version(*txn, db::tables::kRequiredSchemaVersion);
+        txn.commit(/*renew=*/true);
     }
 
-    tx.commit(/*renew=*/false);
+    txn.commit(/*renew=*/false);
     chaindata_env.close();
     node_settings.chaindata_env_config.exclusive = chaindata_exclusive;  // Restore from CLI
     node_settings.chaindata_env_config.create = false;                   // Already created
@@ -125,12 +125,14 @@ int main(int argc, char* argv[]) {
                 log::Trace("Service", {"name", thread_name, "status", "stopped"});
             });
         }
+
+        // clang-tidy offers no way to suppress this warning
         [[maybe_unused]] const auto stop_asio{gsl::finally([&asio_context, &asio_guard, &asio_threads]() {
             asio_context.stop();
             asio_guard.reset();
-            for (auto& t : asio_threads) {
-                if (t.joinable()) t.join();
-            }
+            std::ranges::for_each(asio_threads, [](auto& thread) {
+                if (thread.joinable()) thread.join();
+            });
         })};
 
         // Let some time to allow threads to properly start
@@ -139,21 +141,21 @@ int main(int argc, char* argv[]) {
         // Check required certificate and key file are present to initialize SSL context
         if (network_settings.use_tls) {
             auto const ssl_data{(*settings.data_directory)[DataDirectory::kSSLCert].path()};
-            if (!network::validate_tls_requirements(ssl_data, network_settings.tls_password)) {
+            if (not network::validate_tls_requirements(ssl_data, network_settings.tls_password)) {
                 throw std::filesystem::filesystem_error("Invalid SSL certificate or key file",
                                                         std::make_error_code(std::errc::no_such_file_or_directory));
             }
         }
 
         // Validate mandatory zk params
-        StopWatch sw(true);
-        auto zk_params_path{(*settings.data_directory)[DataDirectory::kZkParamsName].path()};
+        StopWatch stop_watch(true);
+        const auto zk_params_path{(*settings.data_directory)[DataDirectory::kZkParamsName].path()};
         log::Message("Validating ZK params", {"directory", zk_params_path.string()});
         if (!zk::validate_param_files(asio_context, zk_params_path, settings.no_zk_checksums)) {
             throw std::filesystem::filesystem_error("Invalid ZK file params",
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }
-        log::Message("Validated  ZK params", {"elapsed", StopWatch::format(sw.since_start())});
+        log::Message("Validated  ZK params", {"elapsed", StopWatch::format(stop_watch.since_start())});
 
         // 1) Instantiate and start a new NodeHub
         network::NodeHub node_hub{settings, asio_context};
@@ -164,7 +166,7 @@ int main(int argc, char* argv[]) {
 
         // Keep waiting till sync_loop stops
         // Signals are handled in sync_loop and below
-        auto t1{start_time};
+        auto loop_time1{start_time};
         const auto chaindata_dir{(*settings.data_directory)[DataDirectory::kChainDataName]};
         const auto etltmp_dir{(*settings.data_directory)[DataDirectory::kEtlTmpName]};
         const auto nodes_dir{(*settings.data_directory)[DataDirectory::kNodesName]};
@@ -176,14 +178,13 @@ int main(int argc, char* argv[]) {
         // TODO while (sync_loop.get_state() != Worker::State::kStopped) {
         while (true) {
             std::this_thread::sleep_for(500ms);
-            if (node_hub.active_connections_count() == 0) {
-                if (node_hub_idle_sw.since_start() > 5min /* TODO settings.node_hub_idle_timeout*/) {
-                    log::Warning("Service", {"name", "node_hub", "status", "idle", "elapsed", "5min"})
-                        << "Shutting down ...";
-                    break;
-                }
-            } else {
+
+            if (node_hub.active_connections_count() not_eq 0) {
                 node_hub_idle_sw.start(true);  // Restart the timer
+            } else if (node_hub_idle_sw.since_start() > 5min /* TODO settings.node_hub_idle_timeout*/) {
+                log::Warning("Service", {"name", "node_hub", "status", "idle", "elapsed", "5min"})
+                    << "Shutting down ...";
+                break;
             }
 
             // Check signals
@@ -193,11 +194,11 @@ int main(int argc, char* argv[]) {
                 break;
             }
 
-            auto t2{std::chrono::steady_clock::now()};
-            if ((t2 - t1) > std::chrono::seconds(30)) {
-                std::swap(t1, t2);
+            auto loop_time2{std::chrono::steady_clock::now()};
+            if ((loop_time2 - loop_time1) > 30s) {
+                std::swap(loop_time1, loop_time2);
 
-                const auto total_duration{t1 - start_time};
+                const auto total_duration{loop_time1 - start_time};
                 const auto mem_usage{get_memory_usage(true)};
                 const auto vmem_usage{get_memory_usage(false)};
                 const auto chaindata_usage{chaindata_dir.size(true)};
@@ -223,14 +224,12 @@ int main(int argc, char* argv[]) {
 
         node_hub.stop(true);  // 1) Stop networking server
 
-        if (settings.data_directory) {
-            log::Message("Closing database", {"path", (*settings.data_directory)["chaindata"].path().string()});
-            chaindata_env.close();
-            // sync_loop.rethrow();  // Eventually throws the exception which caused the stop
-        }
+        log::Message("Closing database", {"path", chaindata_dir.path().string()});
+        chaindata_env.close();
+        // sync_loop.rethrow();  // Eventually throws the exception which caused the stop
 
-        t1 = std::chrono::steady_clock::now();
-        const auto total_duration{t1 - start_time};
+        loop_time1 = std::chrono::steady_clock::now();
+        const auto total_duration{loop_time1 - start_time};
         log::Info("All done", {"uptime", StopWatch::format(total_duration)});
 
         return 0;
