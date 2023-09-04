@@ -33,7 +33,7 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     : app_settings_(app_settings),
       connection_mode_(connection_mode),
       io_strand_(io_context),
-      ping_timer_(io_context),
+      ping_timer_(io_context, "Node_ping_timer"),
       socket_(std::move(socket)),
       ssl_context_(ssl_context),
       on_disconnect_(std::move(on_disconnect)),
@@ -77,7 +77,7 @@ bool Node::stop(bool wait) noexcept {
     if (ret) /* not already stopped */ {
         is_connected_.store(false);
         is_writing_.store(false);
-        ping_timer_.cancel();
+        ping_timer_.stop(false);
 
         boost::system::error_code error_code;
         if (ssl_stream_ not_eq nullptr) {
@@ -96,24 +96,8 @@ bool Node::stop(bool wait) noexcept {
     return ret;
 }
 
-void Node::start_ping_timer() {
-    if (is_stopping()) return;
-
-    // It would be boring to send out pings on a costant basis
-    // So we randomize the interval a bit using a +/- 15% factor
-    const auto ping_interval_seconds_randomized{
-        randomize<uint32_t>(app_settings_.network.ping_interval_seconds, /*percentage=*/0.30F)};
-    ping_timer_.expires_after(std::chrono::seconds(ping_interval_seconds_randomized));
-    ping_timer_.async_wait([self{shared_from_this()}](const boost::system::error_code& error_code) {
-        if (self->handle_ping_timer(error_code)) {
-            self->start_ping_timer();
-        }
-    });
-}
-
-bool Node::handle_ping_timer(const boost::system::error_code& error_code) {
-    if (error_code == boost::asio::error::operation_aborted) return false;
-    if (ping_nonce_.load() not_eq 0U) return not is_stopping();  // Wait for response to return
+uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
+    if (ping_nonce_.load() not_eq 0U) return interval_milliseconds;  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
     ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
     abi::MsgPingPongPayload pong_payload{};
@@ -124,9 +108,9 @@ bool Node::handle_ping_timer(const boost::system::error_code& error_code) {
                                                 "failure", "reason", std::string(magic_enum::enum_name(ret))};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
         asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
-        return false;
+        return 0U;
     }
-    return not is_stopping();
+    return (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U);
 }
 
 void Node::process_ping_latency(const uint64_t latency_ms) {
@@ -613,11 +597,13 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
 
 void Node::on_fully_connected() {
     if (is_stopping()) return;
-    const boost::system::error_code error_code;
-    if (handle_ping_timer(error_code)) {                            // Sends out a ping so we can measure latency
-        std::ignore = push_message(abi::NetMessageType::kGetAddr);  // Ask the peer to send its known addresses
-        start_ping_timer();                                         // Start pinging on cadence
-    }
+
+    // Lets' send out a ping immediately and start the timer
+    // for subsequent pings
+    const auto ping_interval_ms{randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U};
+    std::ignore = on_ping_timer_expired(ping_interval_ms);
+    ping_timer_.set_autoreset(true);
+    ping_timer_.start(ping_interval_ms, [this](uint32_t interval_ms) { return on_ping_timer_expired(interval_ms); });
 }
 
 void Node::clean_up(gsl::owner<Node*> ptr) noexcept {

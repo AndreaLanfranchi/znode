@@ -164,8 +164,13 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     void begin_inbound_message();
     void end_inbound_message();
 
-    void start_ping_timer();
-    bool handle_ping_timer(const boost::system::error_code& error_code);
+    //! \brief Sends a ping to the remote peer on cadence
+    //! \remark The interval is randomly chosen on setting's ping interval +/- 30%
+    uint32_t on_ping_timer_expired(uint32_t interval_milliseconds) noexcept;
+
+    //! \brief Computes the ping latency and updates the EMA
+    //! \details Ping latency is the interval between the sending of a ping message and the reception of the
+    //! corresponding pong message
     void process_ping_latency(uint64_t latency_ms);
 
     void start_read();
@@ -194,7 +199,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     const int node_id_{next_node_id()};          // Unique node id
     const NodeConnectionMode connection_mode_;   // Whether inbound or outbound
     boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
-    boost::asio::steady_timer ping_timer_;       // To periodically send ping messages
+    AsioTimer ping_timer_;                       // To periodically send ping messages
     boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
     IPEndpoint remote_endpoint_;                 // Remote endpoint
     IPEndpoint local_endpoint_;                  // Local endpoint
