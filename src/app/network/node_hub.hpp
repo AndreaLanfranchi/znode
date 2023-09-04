@@ -17,7 +17,7 @@
 
 #include <app/common/settings.hpp>
 #include <app/common/stopwatch.hpp>
-#include <app/concurrency/stoppable.hpp>
+#include <app/concurrency/asio_timer.hpp>
 #include <app/network/node.hpp>
 #include <app/network/secure.hpp>
 
@@ -30,7 +30,7 @@ class NodeHub : public Stoppable {
           asio_context_{io_context},
           asio_strand_{io_context},
           socket_acceptor_{io_context},
-          service_timer_{io_context} {
+          service_timer_{io_context, "NodeHub_service"} {
         if (app_settings_.network.nonce == 0U) {
             app_settings_.network.nonce = randomize<uint64_t>(uint64_t(/*min=*/1));
         }
@@ -72,9 +72,8 @@ class NodeHub : public Stoppable {
 
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options
 
-    void start_service_timer();                                              // Starts the majordomo timer
-    bool handle_service_timer(const boost::system::error_code& error_code);  // Majordomo to serve connections
-    void print_info();                                                       // Prints some stats about network usage
+    unsigned on_service_timer_expired(unsigned interval);  // Executes one maintenance cycle over all connected nodes
+    void print_info();                                     // Prints some stats about network usage
 
     void start_connecting();  // Starts the initial dial-out connection process
 
@@ -83,7 +82,7 @@ class NodeHub : public Stoppable {
 
     boost::asio::io_context::strand asio_strand_;     // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
-    boost::asio::steady_timer service_timer_;         // Service scheduler for this instance
+    AsioTimer service_timer_;                         // Triggers a maintenance cycle
     const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_
 
     std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure connections

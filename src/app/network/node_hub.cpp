@@ -44,10 +44,33 @@ bool NodeHub::start() noexcept {
 
     initialize_acceptor();
     info_stopwatch_.start(true);
-    start_service_timer();
+    service_timer_.set_autoreset(true);
+    service_timer_.start(kServiceTimerIntervalSeconds_ * 1'000U,
+                         [this](unsigned interval) -> unsigned { return on_service_timer_expired(interval); });
     start_accept();
     asio::post(asio_strand_, [this]() { start_connecting(); });
     return true;
+}
+
+bool NodeHub::stop(bool wait) noexcept {
+    const auto ret{Stoppable::stop(wait)};
+    if (ret) /* not already stopping */ {
+        service_timer_.stop(false);
+        socket_acceptor_.close();
+        std::unique_lock lock(nodes_mutex_);
+        // Stop all nodes
+        for (auto [node_id, node_ptr] : nodes_) {
+            node_ptr->stop(false);
+        }
+        lock.unlock();
+        // Wait for all nodes to stop - active_connections get to zero
+        while (wait && current_active_connections_.load() > 0) {
+            log::Info("Service", {"name", "Node Hub", "action", "stop", "pending connections",
+                                  std::to_string(current_active_connections_.load())});
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+    }
+    return ret;
 }
 
 void NodeHub::start_connecting() {
@@ -90,23 +113,7 @@ void NodeHub::start_connecting() {
     }
 }
 
-void NodeHub::start_service_timer() {
-    service_timer_.expires_after(std::chrono::seconds(kServiceTimerIntervalSeconds_));
-    service_timer_.async_wait([this](const boost::system::error_code& error_code) {
-        if (handle_service_timer(error_code)) {
-            start_service_timer();
-        }
-    });
-}
-
-bool NodeHub::handle_service_timer(const boost::system::error_code& error_code) {
-    if (error_code) {
-        if (error_code not_eq boost::asio::error::operation_aborted) {
-            log::Error("Service",
-                       {"name", "Node Hub", "action", "handle_service_timer", "error", error_code.message()});
-        }
-        return false;
-    }
+unsigned NodeHub::on_service_timer_expired(unsigned interval) {
     print_info();  // Print info every 5 seconds
     const std::unique_lock lock{nodes_mutex_};
     for (auto /*copy !!*/ [node_id, node_ptr] : nodes_) {
@@ -118,7 +125,7 @@ bool NodeHub::handle_service_timer(const boost::system::error_code& error_code) 
             asio::post(asio_strand_, [node_ptr]() { std::ignore = node_ptr->stop(false); });
         }
     }
-    return !is_stopping();  // Required to resubmit the timer
+    return is_stopping() ? 0U : interval;
 }
 
 void NodeHub::print_info() {
@@ -149,27 +156,6 @@ void NodeHub::print_info() {
 
     log::Info("Network usage", info_data);
     info_stopwatch_.start(true);
-}
-
-bool NodeHub::stop(bool wait) noexcept {
-    const auto ret{Stoppable::stop(wait)};
-    if (ret) /* not already stopping */ {
-        service_timer_.cancel();
-        socket_acceptor_.close();
-        std::unique_lock lock(nodes_mutex_);
-        // Stop all nodes
-        for (auto [node_id, node_ptr] : nodes_) {
-            node_ptr->stop(false);
-        }
-        lock.unlock();
-        // Wait for all nodes to stop - active_connections get to zero
-        while (wait && current_active_connections_.load() > 0) {
-            log::Info("Service", {"name", "Node Hub", "action", "stop", "pending connections",
-                                  std::to_string(current_active_connections_.load())});
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-    }
-    return ret;
 }
 
 bool NodeHub::connect(const IPEndpoint& endpoint, const NodeConnectionMode mode) {
@@ -215,7 +201,7 @@ bool NodeHub::connect(const IPEndpoint& endpoint, const NodeConnectionMode mode)
                 on_node_data(direction, bytes_transferred);
             },
             [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
-                on_node_received_message(node, message);
+                on_node_received_message(node, std::move(message));
             }),
         Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
@@ -298,7 +284,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
                 on_node_data(direction, bytes_transferred);
             },
             [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
-                on_node_received_message(node, message);
+                on_node_received_message(node, std::move(message));
             }),
         Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
     log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local.to_string(), "remote",
