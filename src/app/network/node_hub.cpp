@@ -122,7 +122,15 @@ unsigned NodeHub::on_service_timer_expired(unsigned interval) {
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "node",
                                      std::to_string(node_id), "remote", node_ptr->to_string(), "reason", reason})
                 << "Disconnecting ...";
+
+#if defined(__clang__) and __clang_major__ <= 15
+            // Workaround for clang <=15 bug
+            // cause structured bindings are allowed by C++20 to be captured in lambdas
+            auto node_ptr_copy{node_ptr};
+            asio::post(asio_strand_, [node_ptr_copy]() { std::ignore = node_ptr_copy->stop(false); });
+#else
             asio::post(asio_strand_, [node_ptr]() { std::ignore = node_ptr->stop(false); });
+#endif
         }
     }
     return is_stopping() ? 0U : interval;
