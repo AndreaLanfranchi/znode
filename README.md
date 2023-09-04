@@ -6,9 +6,10 @@ C++ Implementation of ZEN node based on Thorax Architecture
 
 - [About Moria](#about-moria)
 - [Obtaining source code](#obtaining-source-code)
-- [Building on Linux & MacOS](#building-on-linux--macos)
+- [Building on Linux & macOS](#building-on-linux--macos)
 - [Building on Windows](#building-on-windows)
 - [Style Guide](#style-guide)
+- [Don't reinvent the wheel !](#dont-reinvent-the-wheel-)
 - [Detailed Documentation](./doc)
 
 [CMake]: http://cmake.org
@@ -37,7 +38,7 @@ We use some git [submodules] (which may eventually have their own submodules) : 
 ```shell
 $ git submodule update --init --recursive
 ```
-## Building on Linux & MacOS
+## Building on Linux & macOS
 
 Ensure you have the following requirements installed :
 - C++20 compatible compiler and its support libraries: [GCC](https://www.gnu.org/software/gcc/) >= 12 or [Clang](https://clang.llvm.org/) >= 13 (see [here](https://en.cppreference.com/w/cpp/compiler_support) the compatibility matrix)
@@ -67,10 +68,10 @@ Additional CMAKE options (specify with `-D<OPTION_NAME[:type]>=<value>`):
 
 | OPTION_NAME            | Description                                        | Default |
 |:-----------------------|:---------------------------------------------------|:-------:|
-| `BUILD_CORE_ONLY`      | Only build ZEN Core components                     |   OFF   |
-| `BUILD_CLANG_COVERAGE` | **Clang** (only) instrumentation for code coverage |   OFF   |
-| `BUILD_SANITIZE`       | Build instrumentation for sanitizers               |   OFF   |
-| `BUILD_TESTS`          | Build unit / consensus tests                       |   ON    |
+| `BUILD_CORE_ONLY`      | Only build ZEN Core components                     |  `OFF`  |
+| `BUILD_CLANG_COVERAGE` | **Clang** (only) instrumentation for code coverage |  `OFF`  |
+| `BUILD_SANITIZE`       | Build instrumentation for sanitizers               |  `OFF`  |
+| `BUILD_TESTS`          | Build unit / consensus tests                       |  `ON`   |
 
 Then run the build itself
 ```shell
@@ -82,7 +83,7 @@ small amount of RAM. To work around this, either specify `-jn` where `n` is the 
 remove `-j` completely. Typically, for Moria each compiler job requires up to 4GB of RAM. So if, for example, your total RAM is 16GB
 then `-j4` should be OK, while `-j8` is probably not. It also means that you need a machine with at least 4GB RAM to compile Moria._
 
-Now you can run the unit tests (if you have chosen to build them. There's one for `core` and one for `node`.
+Now you can run the unit tests (if you have chosen to build them). There's one for `core` and one for `node`.
 ```shell
 $ ./cmd/test/zenpp-core-test
 $ ./cmd/test/zenpp-main-test
@@ -104,7 +105,7 @@ To be able to build on Windows you have to ensure the following requirements are
 If you're willing to use [Visual Studio] (Community Edition is fine) as your primary IDE then the build tools are already included in the setup package (still you have to ensure the required components are installed).
 Alternatively you can use [VSCode] or [CLion]
 
-For Visual Studio setups follow this instructions:
+For Visual Studio setups follow these instructions:
 - Ensure you've cloned the project just as described [here](#obtaining-source-code)
 - Open Visual Studio and select File -> Open -> Cmake...
 - Browse the folder where you have cloned this repository and select the file CMakeLists.txt
@@ -147,3 +148,15 @@ We adhere to [Google's C++ Style Guide] with the following differences:
 - Prefer usage of monadic return values over simple `bool` (e.g. `std::optional<T>`, `std::variant<T, E>`, `std::expected<T, E>`)
 
 Developers willing to contribute are strongly encouraged to take a thorough read of [this best practices about naming and layout](https://github.com/isocpp/CppCoreGuidelines/blob/master/CppCoreGuidelines.md#nl-naming-and-layout-suggestions)
+
+## Don't reinvent the wheel !
+While it is often tempting to write your own implementation of a well known algorithm or data structure, we strongly encourage you to use the ones provided by the standard library or by one of the following well-known and widely used libraries:
+- [Boost](https://www.boost.org/).
+- [Google's Abseil](https://abseil.io/).
+- [Microsoft's GSL](https:://github.com/microsoft/GSL).
+- [OpenSSL](https://www.openssl.org/).
+
+If you can't find what you need there, maybe a quick search on [GitHub](https://github.com) might help finding a good library which already has everything you need.
+A good starting point might be this [awesome list of C++ libraries](https://gtihub.com/fffaraz/awesome-cpp).
+
+Consider writing your own implementation as last resort and only if you can't find anything suitable.
