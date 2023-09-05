@@ -77,7 +77,7 @@ Accepted suffixes are:
 
 - `KiB`, `MiB`, `GiB`, `TiB` for [binary multiples](https://en.wikipedia.org/wiki/Binary_prefix) of bytes. (i.e. 5
   KiB == (5*2**10) == 5'120 bytes)
-- `KB`, `MB`, `GB`, `TB` for decimal multiples of bytes. (i.e. 5 KB == (5*10**3) 1'000 bytes)
+- `KB`, `MB`, `GB`, `TB` for decimal multiples of bytes. (i.e. 5 KB == (5*10**3) 5'000 bytes)
 
 It goes without saying that the suffixed form is more readable and recommended.
 
