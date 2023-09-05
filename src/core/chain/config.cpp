@@ -36,6 +36,7 @@ nlohmann::json ChainConfig::to_json() const noexcept {
     consensus_object[consensus_name] = nlohmann::json::object();
 
     ret["consensus"] = consensus_object;
+    return ret;
 }
 
 std::optional<ChainConfig> ChainConfig::from_json(const nlohmann::json& json) noexcept {
@@ -59,6 +60,8 @@ std::optional<ChainConfig> ChainConfig::from_json(const nlohmann::json& json) no
             }
         }
     }
+
+    return config;
 }
 
 std::ostream& operator<<(std::ostream& out, const ChainConfig& obj) { return out << obj.to_json(); }
@@ -88,6 +91,12 @@ std::optional<std::pair<const std::string, const ChainConfig*>> lookup_known_cha
     return std::pair(*iterator);
 }
 
+std::string lookup_known_chain_name(uint32_t identifier) noexcept {
+    const auto chain{lookup_known_chain(identifier)};
+    if (not chain.has_value()) return "unknown";
+    return chain.value().first;
+}
+
 std::map<std::string, uint32_t> get_known_chains_map() noexcept {
     std::map<std::string, uint32_t> ret;
     std::ranges::for_each(kKnownChainConfigs, [&ret](const std::pair<std::string, const ChainConfig*>& pair) -> void {
@@ -95,4 +104,5 @@ std::map<std::string, uint32_t> get_known_chains_map() noexcept {
     });
     return ret;
 }
+
 }  // namespace zenpp

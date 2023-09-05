@@ -41,4 +41,21 @@ void write_schema_version(mdbx::txn& txn, const Version& version) {
     config.upsert(to_slice(tables::kDbSchemaVersionKey), to_slice(value));
 }
 
+std::optional<ChainConfig> read_chain_config(mdbx::txn& txn) {
+    Cursor src(txn, db::tables::kConfig);
+    const auto data{src.find(to_slice(tables::kConfigChainKey), /*throw_notfound*/ false)};
+    if (not data) return std::nullopt;
+
+    // https://github.com/nlohmann/json/issues/2204
+    const auto json = nlohmann::json::parse(data.value.as_string(), nullptr, false);
+    return ChainConfig::from_json(json);
+}
+
+void write_chain_config(mdbx::txn& txn, const ChainConfig& config) {
+    if (txn.is_readonly()) return;
+    const auto json{config.to_json()};
+    const auto json_str{json.dump()};
+    Cursor config_cursor(txn, db::tables::kConfig);
+    config_cursor.upsert(to_slice(tables::kConfigChainKey), to_slice(json_str));
+}
 }  // namespace zenpp::db

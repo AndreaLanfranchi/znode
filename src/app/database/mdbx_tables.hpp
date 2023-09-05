@@ -27,6 +27,8 @@ inline constexpr Version kRequiredSchemaVersion{1, 0, 0};  // We're compatible w
 //!   value : value of configuration value
 //! \endverbatim
 inline constexpr db::MapConfig kConfig{"Config"};
+inline constexpr std::string_view kConfigChainKey{"chain"};
+
 
 //! \details Stores Block headers information
 //! \struct

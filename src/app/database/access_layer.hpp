@@ -10,6 +10,7 @@
 #include <optional>
 #include <utility>
 
+#include <core/chain/config.hpp>
 #include <core/common/cast.hpp>
 #include <core/common/endian.hpp>
 
@@ -33,5 +34,11 @@ std::optional<Version> read_schema_version(mdbx::txn& txn);
 //! \brief Upserts database schema version into Config table
 //! \remarks Should new version be LT previous version an exception is thrown
 void write_schema_version(mdbx::txn& txn, const Version& version);
+
+//! \brief Pulls chain config from Config table (if any)
+std::optional<ChainConfig> read_chain_config(mdbx::txn& txn);
+
+//! \brief Upserts chain config into Config table
+void write_chain_config(mdbx::txn& txn, const ChainConfig& config);
 
 }  // namespace zenpp::db

@@ -57,10 +57,14 @@ inline constexpr ChainConfig kRegTestConfig{.identifier_ = 3U,
                                             .seal_engine_type_ = SealEngineType::kEquihash};
 
 //! \brief Looks up a known chain config provided its chain ID
-std::optional<std::pair<const std::string, const ChainConfig*>> lookup_known_chain(uint32_t pair) noexcept;
+std::optional<std::pair<const std::string, const ChainConfig*>> lookup_known_chain(uint32_t identifier) noexcept;
+
+//! \brief Looks up a known chain name provided its chain ID
+//! \remark Should the provided chain ID not be known, the constant "unknown" is returned
+std::string lookup_known_chain_name(uint32_t identifier) noexcept;
 
 //! \brief Looks up a known chain config provided its chain identifier (eg. "mainnet")
-std::optional<std::pair<const std::string, const ChainConfig*>> lookup_known_chain(std::string_view pair) noexcept;
+std::optional<std::pair<const std::string, const ChainConfig*>> lookup_known_chain(std::string_view identifier) noexcept;
 
 //! \brief Returns a map known chains names mapped to their respective chain ids
 std::map<std::string, uint32_t> get_known_chains_map() noexcept;

@@ -28,6 +28,7 @@ using namespace std::chrono;
 
 //! \brief Ensures database is ready and consistent with command line arguments
 void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool init_if_not_configured = true) {
+    node_settings.data_directory->deploy();
     const bool chaindata_exclusive{node_settings.chaindata_env_config.exclusive};  // save setting
     {
         auto& config = node_settings.chaindata_env_config;
@@ -40,6 +41,7 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
     log::Message("Opening database", {"path", node_settings.chaindata_env_config.path});
     auto chaindata_env{db::open_env(node_settings.chaindata_env_config)};
     db::RWTxn txn(chaindata_env);
+
     if (not chaindata_env.is_pristine()) {
         // We have already initialized with schema
         const auto detected_schema_version{db::read_schema_version(*txn)};
@@ -61,6 +63,26 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
         db::write_schema_version(*txn, db::tables::kRequiredSchemaVersion);
         txn.commit(/*renew=*/true);
     }
+
+    // Check db is initialized with chain config
+    node_settings.chain_config = db::read_chain_config(*txn);
+    if (not node_settings.chain_config.has_value() && init_if_not_configured) {
+        const auto chain_config{lookup_known_chain(node_settings.network_id)};
+        if (not chain_config.has_value()) throw std::runtime_error("Unknown chain");
+        const auto json_config{chain_config->second->to_json()};
+        db::write_chain_config(*txn, *chain_config->second);
+        txn.commit(/*renew=*/true);
+        node_settings.chain_config = db::read_chain_config(*txn);
+    }
+    if (not node_settings.chain_config.has_value()) throw std::runtime_error("Unable to read chain config");
+    if (node_settings.chain_config->identifier_ != node_settings.network_id) {
+        const std::string what{absl::StrCat("Incompatible chain config: requested '",
+                                            lookup_known_chain_name(node_settings.network_id), "' have '",
+                                            lookup_known_chain_name(node_settings.chain_config->identifier_),
+                                            "'. You might want to specify a different data directory.")};
+        throw std::runtime_error(what);
+    }
+    log::Message("Chain", {"config", to_string(node_settings.chain_config->to_json())});
 
     txn.commit(/*renew=*/false);
     chaindata_env.close();

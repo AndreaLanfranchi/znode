@@ -32,6 +32,10 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
     cli.add_option("--datadir", data_dir_path, "Path to data directory")
         ->default_val(get_os_default_storage_path().string());
 
+    cli.add_option("--chain", settings.network_id, "Name or ID of the network to join (default \"mainnet\")")
+        ->capture_default_str()
+        ->transform(CLI::Transformer(get_known_chains_map(), CLI::ignore_case));
+
     cli.add_flag("--chaindata.exclusive", settings.chaindata_env_config.exclusive,
                  "Chaindata database opened in exclusive mode");
     cli.add_flag("--chaindata.readahead", settings.chaindata_env_config.read_ahead,
@@ -104,8 +108,9 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         ->check(CLI::Range(size_t(1), size_t(16)));
 
     network_opts
-        .add_option("--network.handshaketimeout", network_settings.protocol_handshake_timeout_seconds,
-                    "Number of seconds to wait for a protocol handshake to complete once a TCP connection is established")
+        .add_option(
+            "--network.handshaketimeout", network_settings.protocol_handshake_timeout_seconds,
+            "Number of seconds to wait for a protocol handshake to complete once a TCP connection is established")
         ->capture_default_str()
         ->check(CLI::Range(uint32_t(5), uint32_t(30)));
 
@@ -114,7 +119,6 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
                     "Max number of seconds an inbound message can take to be fully received")
         ->capture_default_str()
         ->check(CLI::Range(uint32_t(5), uint32_t(30)));
-
 
     network_opts
         .add_option("--network.idletimeout", network_settings.idle_timeout_seconds,
