@@ -94,7 +94,7 @@ This argument specifies the directory where the node will store all the data and
 found.
 By default the value of datadir is OS dependent and is determined in this way:
 
-- Windows: `%LOCALAPPDATA%\Roaming\.zenpp`
+- Windows: `%LOCALAPPDATA%\.zenpp` (aka `%APPDATA%\Local\.zenpp`)
 - Linux: `$HOME/.local/share/.zenpp`
 - Mac: `$HOME/Library/Application Support/.zenpp`
   The structure of the zen directory is the following:
