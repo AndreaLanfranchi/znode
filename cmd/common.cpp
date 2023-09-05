@@ -93,7 +93,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
 
     network_opts
         .add_option("--network.maxactiveconnections", network_settings.max_active_connections,
-                    "Maximum number of actively connected nodes")
+                    "Maximum number of concurrent connected nodes")
         ->capture_default_str()
         ->check(CLI::Range(size_t(32), size_t(256)));
 
@@ -101,7 +101,20 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         .add_option("--network.maxconnectionsperip", network_settings.max_active_connections_per_ip,
                     "Maximum number of connections allowed from a single IP address")
         ->capture_default_str()
-        ->check(CLI::Range(size_t(1), size_t(256)));
+        ->check(CLI::Range(size_t(1), size_t(16)));
+
+    network_opts
+        .add_option("--network.handshaketimeout", network_settings.protocol_handshake_timeout_seconds,
+                    "Number of seconds to wait for a protocol handshake to complete once a TCP connection is established")
+        ->capture_default_str()
+        ->check(CLI::Range(uint32_t(5), uint32_t(30)));
+
+    network_opts
+        .add_option("--network.inboundtimeout", network_settings.inbound_timeout_seconds,
+                    "Max number of seconds an inbound message can take to be fully received")
+        ->capture_default_str()
+        ->check(CLI::Range(uint32_t(5), uint32_t(30)));
+
 
     network_opts
         .add_option("--network.idletimeout", network_settings.idle_timeout_seconds,
@@ -111,7 +124,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
 
     network_opts
         .add_option("--network.pinginterval", network_settings.ping_interval_seconds,
-                    "Interval (in seconds) amongst outgoing pings (eventually randomized in a +/- 15% range)")
+                    "Interval (in seconds) amongst outgoing pings (eventually randomized in a +/- 30% range)")
         ->capture_default_str()
         ->check(CLI::Range(size_t(30), size_t(3600)));
 
@@ -178,14 +191,15 @@ void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
         ->transform(CLI::Transformer(level_mapping, CLI::ignore_case))
         ->default_val(log_settings.log_verbosity);
 
-/* TODO implement timezones
-    log_opts.add_option("--log.timezone", log_settings.log_timezone, "Sets log timezone. If not specified UTC is used")
-        ->capture_default_str()
-        ->check(TimeZoneValidator(*/
-/*allow_empty=*//*
-false))
-        ->default_val(log_settings.log_timezone);
-*/
+    /* TODO implement timezones
+        log_opts.add_option("--log.timezone", log_settings.log_timezone, "Sets log timezone. If not specified UTC is
+       used")
+            ->capture_default_str()
+            ->check(TimeZoneValidator(*/
+    /*allow_empty=*//*
+    false))
+            ->default_val(log_settings.log_timezone);
+    */
 
     log_opts.add_flag("--log.stdout", log_settings.log_std_out, "Outputs to std::out instead of std::err");
     log_opts.add_flag("--log.nocolor", log_settings.log_nocolor, "Disable colors on log lines");

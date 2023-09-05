@@ -69,8 +69,8 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
 }
 
 int main(int argc, char* argv[]) {
+    const auto start_time{std::chrono::steady_clock::now()};
     const auto* build_info(get_buildinfo());
-
     CLI::App cli(std::string(build_info->project_name).append(" node"));
     cli.get_formatter()->column_width(50);
 
@@ -127,7 +127,8 @@ int main(int argc, char* argv[]) {
         }
 
         // clang-tidy offers no way to suppress this warning
-        [[maybe_unused]] const auto stop_asio{gsl::finally([&asio_context, &asio_guard, &asio_threads]() {
+        auto stop_asio{gsl::finally([&asio_context, &asio_guard, &asio_threads]() {
+            log::Info("Service", {"name", "asio", "status", "stopping threads"});
             asio_context.stop();
             asio_guard.reset();
             std::ranges::for_each(asio_threads, [](auto& thread) {
@@ -136,7 +137,7 @@ int main(int argc, char* argv[]) {
         })};
 
         // Let some time to allow threads to properly start
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Check required certificate and key file are present to initialize SSL context
         if (network_settings.use_tls) {
@@ -160,9 +161,6 @@ int main(int argc, char* argv[]) {
         // 1) Instantiate and start a new NodeHub
         network::NodeHub node_hub{settings, asio_context};
         node_hub.start();
-
-        // Start sync loop
-        const auto start_time{std::chrono::steady_clock::now()};
 
         // Keep waiting till sync_loop stops
         // Signals are handled in sync_loop and below
@@ -222,17 +220,11 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        node_hub.stop(true);  // 1) Stop networking server
+        node_hub.stop(/*wait=*/true);  // 1) Stop networking server
 
         log::Message("Closing database", {"path", chaindata_dir.path().string()});
         chaindata_env.close();
         // sync_loop.rethrow();  // Eventually throws the exception which caused the stop
-
-        loop_time1 = std::chrono::steady_clock::now();
-        const auto total_duration{loop_time1 - start_time};
-        log::Info("All done", {"uptime", StopWatch::format(total_duration)});
-
-        return 0;
 
     } catch (const CLI::ParseError& ex) {
         return cli.exit(ex);
@@ -258,4 +250,8 @@ int main(int argc, char* argv[]) {
         LOG_ERROR << "Unexpected undefined error";
         return -99;
     }
+
+    const auto total_duration{std::chrono::steady_clock::now() - start_time};
+    log::Info("All done", {"uptime", StopWatch::format(total_duration)});
+    return 0;
 }

@@ -23,7 +23,7 @@ namespace zenpp {
 struct NetworkSettings {
     std::string local_endpoint{"0.0.0.0:9033"};       // Local node listen address
     uint32_t max_active_connections{256};             // Maximum allowed number of connected nodes
-    uint32_t max_active_connections_per_ip{2};        // Maximum allowed number of connected nodes per single IP address
+    uint32_t max_active_connections_per_ip{1};        // Maximum allowed number of connected nodes per single IP address
     uint32_t protocol_handshake_timeout_seconds{10};  // Number of seconds to wait for protocol handshake completion
     uint32_t inbound_timeout_seconds{10};   // Number of seconds to wait for the completion of an inbound message
     uint32_t outbound_timeout_seconds{10};  // Number of seconds to wait for the completion of an outbound message

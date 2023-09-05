@@ -234,10 +234,14 @@ void Node::start_write() {
     }
 
     if (outbound_message_ not_eq nullptr and outbound_message_->data().eof()) {
-        // A message has been fully sent
-        last_message_sent_time_.store(std::chrono::steady_clock::now());
+        // A message has been fully sent - Exclude kPing and kPong
+        const bool is_ping_pong{outbound_message_->get_type() == abi::NetMessageType::kPing or
+                                outbound_message_->get_type() == abi::NetMessageType::kPong};
+        if (not is_ping_pong) {
+            last_message_sent_time_.store(std::chrono::steady_clock::now());
+            outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
+        }
         outbound_message_.reset();
-        outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
     }
 
     while (outbound_message_ == nullptr) {
@@ -284,15 +288,17 @@ void Node::start_write() {
         // Post actions to take on begin of outgoing message
         const auto now{std::chrono::steady_clock::now()};
         const auto msg_type{outbound_message_->get_type()};
-        outbound_message_start_time_.store(now);
         outbound_message_metrics_[msg_type].count_++;
         outbound_message_metrics_[msg_type].bytes_ += outbound_message_->data().size();
         switch (msg_type) {
             using enum abi::NetMessageType;
-            case abi::NetMessageType::kPing:
+            case kPing:
                 last_ping_sent_time_.store(std::chrono::steady_clock::now());
+                [[fallthrough]];
+            case kPong:
                 break;
             default:
+                outbound_message_start_time_.store(now);
                 break;
         }
     }
@@ -383,10 +389,7 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type) 
     return push_message(message_type, null_payload);
 }
 
-void Node::begin_inbound_message() {
-    inbound_message_ = std::make_unique<abi::NetMessage>(version_);
-    inbound_message_start_time_.store(std::chrono::steady_clock::now());
-}
+void Node::begin_inbound_message() { inbound_message_ = std::make_unique<abi::NetMessage>(version_); }
 
 void Node::end_inbound_message() {
     inbound_message_.reset();
@@ -421,11 +424,20 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
             break;
         }
 
-        if (const auto err_handshake =
-                validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type());
-            err_handshake not_eq kSuccess) {
-            err = err_handshake;
+        if (err = validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type());
+            is_fatal_error(err)) {
             break;
+        }
+
+        // We've got the header begin timing
+        switch (inbound_message_->get_type()) {
+            using enum abi::NetMessageType;
+            case kPing:
+            case kPong:
+                break;
+            default:
+                inbound_message_start_time_.store(std::chrono::steady_clock::now());
+                break;
         }
 
         if (err == kMessageBodyIncomplete) break;  // Can't do anything but read other data
@@ -438,9 +450,6 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
         end_inbound_message();
     }
     receive_buffer_.consume(bytes_transferred);
-    if (not is_fatal_error(err) and messages_parsed not_eq 0U) {
-        last_message_received_time_.store(std::chrono::steady_clock::now());
-    }
     return err;
 }
 
@@ -547,6 +556,10 @@ serialization::Error Node::process_inbound_message() {
         print_log(is_fatal ? log::Level::kWarning : log::Level::kTrace, log_params, err_extended_reason);
     }
     if (not is_fatal and notify_node_hub) {
+        if (inbound_message_->get_type() not_eq abi::NetMessageType::kPing and
+            inbound_message_->get_type() not_eq abi::NetMessageType::kPong) {
+            last_message_received_time_.store(std::chrono::steady_clock::now());
+        }
         on_message_(shared_from_this(), std::move(inbound_message_));
     }
     return err;

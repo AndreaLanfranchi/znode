@@ -88,7 +88,7 @@ class AsioTimer : public Stoppable {
     void start_internal();
 
     //! \brief Executes the callback function
-    bool do_call_back(boost::system::error_code error_code);
+    bool do_call_back();
 
     boost::asio::steady_timer timer_;                // The timer itself
     std::atomic_uint32_t interval_milliseconds_{0};  // Interval (in milliseconds) between triggered events

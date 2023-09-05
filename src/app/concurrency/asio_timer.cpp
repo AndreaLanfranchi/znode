@@ -39,12 +39,22 @@ bool AsioTimer::stop(bool wait) noexcept {
 }
 
 void AsioTimer::start_internal() {
-    is_ticking_.store(true);
+    bool expected{false};
+    if (not is_ticking_.compare_exchange_strong(expected, true)) return;
+
     timer_.expires_after(std::chrono::milliseconds(interval_milliseconds_.load()));
     timer_.async_wait([this](const boost::system::error_code& error_code) {
         is_ticking_.store(false);
-        const auto call_back_result{do_call_back(error_code)};
-        if (call_back_result and autoreset()) {
+        if (error_code) {
+            auto severity{error_code == boost::asio::error::operation_aborted ? log::Level::kTrace
+                                                                              : log::Level::kError};
+            log::BufferBase(severity, absl::StrCat("AsioTimer[", name_, "]"),
+                            {"action", "async_wait", "error", error_code.message()});
+            set_stopped();
+            return;
+        };
+        const auto call_back_result{do_call_back()};
+        if (not is_stopping() and call_back_result and autoreset()) {
             start_internal();
         } else {
             set_stopped();
@@ -52,20 +62,16 @@ void AsioTimer::start_internal() {
     });
 }
 
-bool AsioTimer::do_call_back(boost::system::error_code error_code) {
-    bool result{error_code not_eq boost::asio::error::operation_aborted and not is_stopping()};
-    if (result) {
-        try {
-            if (error_code) throw std::runtime_error(error_code.what());
-            const auto new_interval{call_back_(interval_milliseconds_.load())};
-            interval_milliseconds_.store(new_interval);
-            result or_eq (new_interval == 0U);
-        } catch (const std::exception& ex) {
-            log::Error(absl::StrCat("AsioTimer[", name_, "]"), {"action", "call_back", "error", ex.what()});
-            result = false;
-        }
+bool AsioTimer::do_call_back() {
+    bool result{true};
+    try {
+        const auto new_interval{call_back_(interval_milliseconds_.load())};
+        interval_milliseconds_.store(new_interval);
+        result or_eq (new_interval == 0U);
+    } catch (const std::exception& ex) {
+        log::Error(absl::StrCat("AsioTimer[", name_, "]"), {"action", "call_back", "error", ex.what()});
+        result = false;
     }
-    result or_eq is_stopping();
     return result;
 }
 }  // namespace zenpp

@@ -60,11 +60,18 @@ bool NodeHub::stop(bool wait) noexcept {
         std::unique_lock lock(nodes_mutex_);
         // Stop all nodes
         for (auto [node_id, node_ptr] : nodes_) {
-            node_ptr->stop(false);
+#if defined(__clang__) and __clang_major__ <= 15
+            // Workaround for clang <=15 bug
+            // cause structured bindings are allowed by C++20 to be captured in lambdas
+            auto node_ptr_copy{node_ptr};
+            asio::post(asio_strand_, [node_ptr_copy]() { std::ignore = node_ptr_copy->stop(false); });
+#else
+            asio::post(asio_strand_, [node_ptr]() { std::ignore = node_ptr->stop(false); });
+#endif
         }
         lock.unlock();
         // Wait for all nodes to stop - active_connections get to zero
-        while (wait && current_active_connections_.load() > 0) {
+        while (wait and current_active_connections_.load() > 0) {
             log::Info("Service", {"name", "Node Hub", "action", "stop", "pending connections",
                                   std::to_string(current_active_connections_.load())});
             std::this_thread::sleep_for(std::chrono::seconds(1));
