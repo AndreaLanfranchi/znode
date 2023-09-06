@@ -45,7 +45,13 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     local_version_.timestamp_ = ToUnixSeconds(absl::Now());
     local_version_.recipient_service_ = VersionNodeService(socket_.remote_endpoint());
     local_version_.sender_service_ = VersionNodeService(socket_.local_endpoint());
-    local_version_.sender_service_.endpoint_.port_ = 9033;  // TODO Set this value to the current listening port
+
+    // We use the same port declared in the settings or the one from the configured chain
+    // if the former is not set
+    const IPEndpoint local_endpoint{app_settings_.network.local_endpoint};
+    local_version_.sender_service_.endpoint_.port_ = local_endpoint.port_ == 0U ? app_settings_.chain_config->default_port_
+                                                                                : local_endpoint.port_;
+
     local_version_.nonce_ = app_settings_.network.nonce;
     local_version_.user_agent_ = get_buildinfo_string();
     local_version_.last_block_height_ = 0;  // TODO Set this value to the current blockchain height
@@ -367,7 +373,7 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type, 
     using enum Error;
 
     auto new_message{std::make_unique<abi::NetMessage>(version_)};
-    auto err{new_message->push(message_type, payload, app_settings_.network.magic_bytes)};
+    auto err{new_message->push(message_type, payload, app_settings_.chain_config->magic_)};
     if (err not_eq kSuccess) {
         if (app_settings_.log.log_verbosity >= log::Level::kError) {
             const std::list<std::string> log_params{"action",  __func__, "status",
@@ -405,7 +411,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
     while (!data.empty()) {
         if (inbound_message_ == nullptr) begin_inbound_message();
-        err = inbound_message_->parse(data, app_settings_.network.magic_bytes);  // Consumes data
+        err = inbound_message_->parse(data, app_settings_.chain_config->magic_);  // Consumes data
         if (err == kMessageHeaderIncomplete) break;
         if (is_fatal_error(err)) {
             // Some debugging before exiting for fatal

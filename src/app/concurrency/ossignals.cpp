@@ -10,7 +10,7 @@
 #include <iostream>
 #include <utility>
 
-#include <boost/format.hpp>  // TODO(C++20/23) Replace with std::format when compiler supports
+#include <absl/strings/str_cat.h>
 
 #include <app/concurrency/ossignals.hpp>
 
@@ -110,14 +110,14 @@ void Ossignals::init(std::function<void(int)> custom_handler) {
 void Ossignals::handle(int sig_code) {
     if (bool expected{false}; signalled_.compare_exchange_strong(expected, true)) {
         sig_code_ = sig_code;
-        std::cerr << boost::format("\nCaught OS signal %s, shutting down ...\n") % sig_name(sig_code) << std::endl;
+        std::cerr << absl::StrCat("\nCaught OS signal ", sig_name(sig_code_), ", shutting down ...\n") << std::endl;
     }
     const uint32_t sig_count = ++sig_count_;
     if (sig_count >= 10) {
         std::abort();
     }
     if (sig_count > 1) {
-        std::cerr << boost::format("Already shutting down. Interrupt other %u times to panic.") % (10 - sig_count)
+        std::cerr << absl::StrCat("Already shutting down. Interrupt other ", (10 - sig_count), " times to panic.")
                   << std::endl;
     }
 
@@ -139,6 +139,6 @@ void Ossignals::throw_if_signalled() {
 }
 
 os_signal_exception::os_signal_exception(int code)
-    : sig_code_{code}, message_{boost::str(boost::format("Caught OS signal %s") % sig_name(sig_code_))} {}
+    : sig_code_{code}, message_{absl::StrCat("Caught OS signal ", sig_name(code))} {}
 const char* os_signal_exception::what() const noexcept { return message_.c_str(); }
 }  // namespace zenpp

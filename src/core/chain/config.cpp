@@ -34,6 +34,8 @@ nlohmann::json ChainConfig::to_json() const noexcept {
     auto consensus_name{std::string(magic_enum::enum_name(seal_engine_type_))};
     consensus_name.erase(consensus_name.find('k'), 1);
     consensus_object[consensus_name] = nlohmann::json::object();
+    consensus_object[consensus_name]["K"] = 200U;  // TODO: this is not constant
+    consensus_object[consensus_name]["N"] = 9U;    // TODO: this is not constant
 
     ret["consensus"] = consensus_object;
     return ret;
@@ -47,7 +49,7 @@ std::optional<ChainConfig> ChainConfig::from_json(const nlohmann::json& json) no
     ChainConfig config{};
     config.identifier_ = json["chainId"].get<uint32_t>();
     config.magic_ = json["chainMagic"].get<std::array<uint8_t, 4>>();
-    config.default_port_ = json["defaultPort"].get<uint32_t>();
+    config.default_port_ = json["defaultPort"].get<uint16_t>();
 
     if (json.contains("consensus")) {
         auto consensus_object{json["consensus"].get<nlohmann::json>()};

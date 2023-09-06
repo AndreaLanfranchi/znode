@@ -7,11 +7,11 @@
 #include <utility>
 
 #include <absl/strings/str_cat.h>
-#include <boost/algorithm/string.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/lexical_cast.hpp>
 #include <gsl/gsl_util>
 
+#include <core/chain/seeds.hpp>
 #include <core/common/assert.hpp>
 #include <core/common/misc.hpp>
 
@@ -97,11 +97,9 @@ void NodeHub::start_connecting() {
         return;
     }
 
-    // TODO: Seeding nodes
-    // TODO: Get them from chain configuration parameters
-    const std::vector<std::string> seeds{"mainnet.horizen.global", "mainnet.zensystem.io", "node1.zenchain.info"};
-
     boost::asio::ip::tcp::resolver resolver{asio_context_};
+    const auto seeds{get_chain_seeds(*app_settings_.chain_config)};
+
     for (const auto& host : seeds) {
         if (is_stopping()) return;
         // Syncronous resolve
@@ -113,8 +111,9 @@ void NodeHub::start_connecting() {
         }
         for (const auto& result : results) {
             if (is_stopping()) return;
-            if (!result.endpoint().address().is_v4()) continue;
-            const IPEndpoint endpoint{result.endpoint().address(), 9033 /*TODO: Get from chain params*/};
+            if (not result.endpoint().address().is_v4()) continue;
+            const IPEndpoint endpoint{result.endpoint().address(),
+                                      gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_)};
             std::ignore = connect(endpoint);
         }
     }
@@ -318,14 +317,9 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
 }
 
 void NodeHub::initialize_acceptor() {
-    std::vector<std::string> address_parts;
-    boost::split(address_parts, app_settings_.network.local_endpoint, boost::is_any_of(":"));
-    if (address_parts.size() not_eq 2U) {
-        throw std::invalid_argument("Invalid local endpoint: " + app_settings_.network.local_endpoint);
-    }
-
-    auto port{boost::lexical_cast<uint16_t>(address_parts[1])};
-    const auto local_endpoint{tcp::endpoint(boost::asio::ip::make_address(address_parts[0]), port)};
+    IPEndpoint local_endpoint{app_settings_.network.local_endpoint};
+    if (local_endpoint.port_ == 0)
+        local_endpoint.port_ = gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_);
 
     socket_acceptor_.open(tcp::v4());
     socket_acceptor_.set_option(tcp::acceptor::reuse_address(true));
@@ -333,11 +327,11 @@ void NodeHub::initialize_acceptor() {
     socket_acceptor_.set_option(boost::asio::socket_base::keep_alive(true));
     socket_acceptor_.set_option(boost::asio::socket_base::receive_buffer_size(gsl::narrow_cast<int>(64_KiB)));
     socket_acceptor_.set_option(boost::asio::socket_base::send_buffer_size(gsl::narrow_cast<int>(64_KiB)));
-    socket_acceptor_.bind(local_endpoint);
+    socket_acceptor_.bind(local_endpoint.to_endpoint());
     socket_acceptor_.listen();
 
     log::Info("Service", {"name", "Node Hub", "secure", (app_settings_.network.use_tls ? "yes" : "no"), "bound to",
-                          to_string(local_endpoint)});
+                          local_endpoint.to_string()});
 }
 
 void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {

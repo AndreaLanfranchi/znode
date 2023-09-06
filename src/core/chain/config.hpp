@@ -28,7 +28,7 @@ class ChainConfig {
   public:
     uint32_t identifier_{0};           // A numeric identifier for the chain (lately mapped to a string)
     std::array<uint8_t, 4> magic_{0};  // The magic bytes to identify the chain on messages
-    uint32_t default_port_{0};         // The default port to use for peer-to-peer communication
+    uint16_t default_port_{0};         // The default port to use for peer-to-peer communication
     SealEngineType seal_engine_type_{SealEngineType::kNoProof};  // The type of seal engine used by the chain
 
     //! \brief Returns the JSON representation of the chain configuration
@@ -64,7 +64,8 @@ std::optional<std::pair<const std::string, const ChainConfig*>> lookup_known_cha
 std::string lookup_known_chain_name(uint32_t identifier) noexcept;
 
 //! \brief Looks up a known chain config provided its chain identifier (eg. "mainnet")
-std::optional<std::pair<const std::string, const ChainConfig*>> lookup_known_chain(std::string_view identifier) noexcept;
+std::optional<std::pair<const std::string, const ChainConfig*>> lookup_known_chain(
+    std::string_view identifier) noexcept;
 
 //! \brief Returns a map known chains names mapped to their respective chain ids
 std::map<std::string, uint32_t> get_known_chains_map() noexcept;

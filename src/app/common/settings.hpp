@@ -26,16 +26,15 @@ struct NetworkSettings {
     uint32_t max_active_connections{256};             // Maximum allowed number of connected nodes
     uint32_t max_active_connections_per_ip{1};        // Maximum allowed number of connected nodes per single IP address
     uint32_t protocol_handshake_timeout_seconds{10};  // Number of seconds to wait for protocol handshake completion
-    uint32_t inbound_timeout_seconds{10};   // Number of seconds to wait for the completion of an inbound message
-    uint32_t outbound_timeout_seconds{10};  // Number of seconds to wait for the completion of an outbound message
-    uint32_t idle_timeout_seconds{300};     // Number of seconds after which an inactive node is disconnected
-    bool use_tls{true};                     // Whether to enforce SSL/TLS on network connections
-    std::string tls_password{};             // Password to use to load a private key file
-    std::array<uint8_t, 4> magic_bytes{'c', 'a', 's', 'h'};  // Network magic bytes (ZEN mainnet) // TODO: change this
-    std::vector<std::string> connect_nodes{};                // List of nodes to connect to at startup
-    uint64_t nonce{0};                        // Local nonce (identifies self in network) // TODO: might not be needed
-    uint32_t ping_interval_seconds{120};      // Interval between ping messages
-    uint32_t ping_timeout_milliseconds{500};  // Number of milliseconds to wait for a ping response before timing-out
+    uint32_t inbound_timeout_seconds{10};      // Number of seconds to wait for the completion of an inbound message
+    uint32_t outbound_timeout_seconds{10};     // Number of seconds to wait for the completion of an outbound message
+    uint32_t idle_timeout_seconds{300};        // Number of seconds after which an inactive node is disconnected
+    bool use_tls{true};                        // Whether to enforce SSL/TLS on network connections
+    std::string tls_password{};                // Password to use to load a private key file
+    std::vector<std::string> connect_nodes{};  // List of nodes to connect to at startup
+    uint64_t nonce{0};                         // Local nonce (identifies self in network)
+    uint32_t ping_interval_seconds{120};       // Interval between ping messages
+    uint32_t ping_timeout_milliseconds{500};   // Number of milliseconds to wait for a ping response before timing-out
 };
 
 struct AppSettings {
