@@ -106,7 +106,7 @@ void NodeHub::start_connecting() {
     // the resolver will try IPv4 first and then IPv6. Problem is if an entry does not have an IPv4
     // address, the resolver will return immediately "host not found" without trying IPv6.
     // So we need to resolve the hostname for IPv4 and IPv6 separately.
-    for (int i{0}; i < app_settings_.network.ipv4_only ? 1 : 2; ++i) {
+    for (int i{0}; i < (app_settings_.network.ipv4_only ? 1 : 2); ++i) {
         for (const auto& host : hosts) {
             if (is_stopping()) return;
             boost::system::error_code error_code;
@@ -120,8 +120,8 @@ void NodeHub::start_connecting() {
             // Push all results into the map
             for (const auto& result : dns_entries) {
                 host_to_endpoints[host].emplace_back(result.endpoint().address(), network_port);
-                log::Info("NodeHub",
-                          {"action", "dns_resolve", "host", host, "endpoint", result.endpoint().address().to_string()});
+                log::Trace("NodeHub",
+                           {"action", "dns_resolve", "host", host, "address", result.endpoint().address().to_string()});
             }
         }
     }
