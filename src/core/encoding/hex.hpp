@@ -40,7 +40,7 @@ template <UnsignedIntegralEx T>
 [[nodiscard]] std::string encode(const T value, bool with_prefix = false) noexcept {
     uint8_t bytes[sizeof(T)];
     intx::be::store(bytes, value);
-    std::string hexed{encode(zeroless_view(bytes), with_prefix)};
+    auto hexed{encode(zeroless_view(bytes), with_prefix)};
     if (hexed.length() == (with_prefix ? 2U : 0U)) {
         hexed += "00";
     }
@@ -49,7 +49,7 @@ template <UnsignedIntegralEx T>
 
 //! \brief Returns the bytes string obtained by decoding an hexadecimal ascii input
 // TODO(C++23) switch to std::expected
-tl::expected<Bytes, DecodingError> decode(std::string_view source) noexcept;
+tl::expected<Bytes, DecodingError> decode(std::string_view hex_str) noexcept;
 
 //! \brief Returns the integer value corresponding to the ascii hex digit provided
 tl::expected<unsigned, DecodingError> decode_digit(char input) noexcept;

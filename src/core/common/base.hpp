@@ -7,9 +7,10 @@
 
 #pragma once
 
-// Clang-format off
+// clang-format off
 #include <core/common/preprocessor.hpp>  // Must be first
 // clang-format on
+
 
 #include <compare>
 #include <concepts>
@@ -67,8 +68,10 @@ const buildinfo* get_buildinfo() noexcept;
 //! \brief Returns build information as string
 std::string get_buildinfo_string() noexcept;
 
+//! \brief Stores and manipulates arbitrary long byte sequences
 using Bytes = std::basic_string<uint8_t>;
 
+//! \brief Represents a non-owning view of a byte sequence
 class ByteView : public std::basic_string_view<uint8_t> {
   public:
     constexpr ByteView() noexcept : std::basic_string_view<uint8_t>{} {};
