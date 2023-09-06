@@ -97,23 +97,43 @@ void NodeHub::start_connecting() {
         return;
     }
 
-    boost::asio::ip::tcp::resolver resolver{asio_context_};
-    const auto seeds{get_chain_seeds(*app_settings_.chain_config)};
+    boost::asio::ip::tcp::resolver resolver(asio_context_);
+    const auto hosts{get_chain_seeds(*app_settings_.chain_config)};
+    const auto network_port{gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_)};
+    std::map<std::string, std::vector<IPEndpoint>> host_to_endpoints{};
 
-    for (const auto& host : seeds) {
+    // Lesson learned: when invoking the resolution of a hostname without additional parameters
+    // the resolver will try IPv4 first and then IPv6. Problem is if an entry does not have an IPv4
+    // address, the resolver will return immediately "host not found" without trying IPv6.
+    // So we need to resolve the hostname for IPv4 and IPv6 separately.
+    for (int i{0}; i < app_settings_.network.ipv4_only ? 1 : 2; ++i) {
+        for (const auto& host : hosts) {
+            if (is_stopping()) return;
+            boost::system::error_code error_code;
+            const auto dns_entries{resolver.resolve(i == 0 ? boost::asio::ip::tcp::v4() : boost::asio::ip::tcp::v6(),
+                                                    host, "", error_code)};
+            if (error_code == boost::asio::error::host_not_found or error_code == boost::asio::error::no_data) continue;
+            if (error_code) {
+                log::Error("NodeHub", {"action", "dns_resolve", "host", host, "error", error_code.message()});
+                continue;
+            }
+            // Push all results into the map
+            for (const auto& result : dns_entries) {
+                host_to_endpoints[host].emplace_back(result.endpoint().address(), network_port);
+                log::Info("NodeHub",
+                          {"action", "dns_resolve", "host", host, "endpoint", result.endpoint().address().to_string()});
+            }
+        }
+    }
+
+    for (const auto& [host_name, endpoints] : host_to_endpoints) {
         if (is_stopping()) return;
-        // Syncronous resolve
-        boost::system::error_code error_code;
-        const auto results{resolver.resolve(host, "", error_code)};
-        if (error_code) {
-            log::Error("NodeHub", {"action", "start_connecting", "error", error_code.message()});
+        if (endpoints.empty()) {
+            log::Error("NodeHub", {"action", "start_connecting", "host", host_name, "error",
+                                   "Unable to resolve host or host unknown"});
             continue;
         }
-        for (const auto& result : results) {
-            if (is_stopping()) return;
-            if (not result.endpoint().address().is_v4()) continue;
-            const IPEndpoint endpoint{result.endpoint().address(),
-                                      gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_)};
+        for (const auto& endpoint : endpoints) {
             std::ignore = connect(endpoint);
         }
     }
@@ -199,7 +219,8 @@ bool NodeHub::connect(const IPEndpoint& endpoint, const NodeConnectionMode mode)
         socket.connect(endpoint.to_endpoint());
         set_common_socket_options(socket);
     } catch (const boost::system::system_error& ex) {
-        log::Error("Service", {"name", "Node Hub", "action", "connect", "remote", remote, "error", ex.what()});
+        log::Error("Service",
+                   {"name", "Node Hub", "action", "connect", "remote", remote, "error", ex.code().message()});
         return false;
     }
 

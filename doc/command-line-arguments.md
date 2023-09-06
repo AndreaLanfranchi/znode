@@ -11,6 +11,7 @@
     - [--chaindata.growthsize](#--chaindatagrowthsize)
     - [--chaindata.pagesize](#--chaindatapagesize)
 - [Network arguments](#network)
+    - [--network.ipv4only](#--networkipv4only)
     - [--network.maxactiveconnections](#--networkmaxactiveconnections)
     - [--network.maxconnectionsperip](#--networkmaxconnectionsperip)
     - [--network.handshaketimeout](#--networkhandshaketimeout)
@@ -204,6 +205,15 @@ where `8KiB` is the new page size you're willing to use.
 ## Network
 
 In this section we analyze all the arguments related to the networking parameters.
+
+### `--network.ipv4only`
+
+This argument is a flag. When set the node will limit network activity to IPv4 addresses only.
+To enable the limitation you can pass the argument such as:
+
+```bash
+$ ./zenpp [...] --network.ipv4only
+```
 
 ### `--network.maxactiveconnections`
 

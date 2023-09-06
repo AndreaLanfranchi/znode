@@ -95,6 +95,8 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         ->capture_default_str()
         ->excludes(notls_flag);
 
+    network_opts.add_flag("--network.ipv4only", network_settings.ipv4_only, "Listen/connect on IPv4 addresses only");
+
     network_opts
         .add_option("--network.maxactiveconnections", network_settings.max_active_connections,
                     "Maximum number of concurrent connected nodes")
