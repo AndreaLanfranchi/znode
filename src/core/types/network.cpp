@@ -222,6 +222,10 @@ bool IPEndpoint::is_valid() const noexcept { return ((port_ > 1 and port_ < 6553
 
 bool IPEndpoint::is_routable() const noexcept { return address_.is_routable() and (port_ > 1 and port_ < 65535); }
 
+bool IPEndpoint::operator==(const IPEndpoint& other) const noexcept {
+    return address_ == other.address_ and port_ == other.port_;
+}
+
 IPSubNet::IPSubNet(const std::string_view value) {
     if (value.empty()) return;
 

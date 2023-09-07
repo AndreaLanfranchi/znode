@@ -21,6 +21,8 @@
     - [--network.pinginterval](#--networkpinginterval)
     - [--network.pingtimeout](#--networkpingtimeout)
     - [--network.connect](#--networkconnect)
+    - [--network.connecttimeout](#--networkconnecttimeout)
+    - [--network.forcednsseed](#--networkforcednsseed)
 - [--etl.buffersize](#--etlbuffersize)
 - [Syncloop arguments](#syncloop)
     - [--syncloop.batchsize](#--syncloopbatchsize)
@@ -360,6 +362,32 @@ The syntax to specify an endpoint is flexible and you can use the following form
 - `<ipv6>`: the port will be derived by the network type (mainnet, testnet, regtest)
 - `[<ipv6>]:<port>`: the port will be the one specified. Note that in case of IPv6 when the port is specified the
   address MUST be enclosed in square brackets
+
+### `--network.connecttimeout`
+
+This argument is an option. It specifies the maximum amount of time, in seconds, the node waits for a dial-out
+connection to be successfully established.
+The default value is 2. Acceptable values are in range (1, 5). If you want to change this value you can pass the
+argument such as:
+
+```bash
+$ ./zenpp [...] --network.connecttimeout 3
+```
+
+where `3` is the new maximum amount of time, in seconds, the node waits for a dial-out connection to be successfully
+established.
+Note: This value is used only when the node is trying to connect to a peer and not when a peer is trying to connect to
+the node.
+Note: The connection might time out earlier than this value if the underlying OS decides so.
+
+### `--network.forcednsseed`
+
+This argument is a flag. When set the node will try to get a list of available nodes from a hardcoded list of host seeds
+to be resolved by DNS.
+Note : regardless this flag is set or not, the node will always try to get a list of available nodes from DNS seeds when
+no other nodes addresses are known: this means no manually defined nodes have been specified with `--network.connect`
+and no nodes have been discovered in the previous runs. This condition is always true when the node is started for the
+very first time.
 
 ## `--etl.buffersize`
 

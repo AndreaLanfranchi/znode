@@ -25,13 +25,13 @@ using asio::ip::tcp;
 
 std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 
-Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost::asio::io_context& io_context,
+Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
            boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
            std::function<void(std::shared_ptr<Node>)> on_disconnect,
            std::function<void(DataDirectionMode, size_t)> on_data,
            std::function<void(std::shared_ptr<Node>, std::shared_ptr<abi::NetMessage>)> on_message)
     : app_settings_(app_settings),
-      connection_mode_(connection_mode),
+      connection_(connection),
       io_strand_(io_context),
       ping_timer_(io_context, "Node_ping_timer"),
       socket_(std::move(socket)),
@@ -49,8 +49,8 @@ Node::Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost:
     // We use the same port declared in the settings or the one from the configured chain
     // if the former is not set
     const IPEndpoint local_endpoint{app_settings_.network.local_endpoint};
-    local_version_.sender_service_.endpoint_.port_ = local_endpoint.port_ == 0U ? app_settings_.chain_config->default_port_
-                                                                                : local_endpoint.port_;
+    local_version_.sender_service_.endpoint_.port_ =
+        local_endpoint.port_ == 0U ? app_settings_.chain_config->default_port_ : local_endpoint.port_;
 
     local_version_.nonce_ = app_settings_.network.nonce;
     local_version_.user_agent_ = get_buildinfo_string();
@@ -160,7 +160,7 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
 void Node::start_ssl_handshake() {
     REQUIRES(ssl_context_ not_eq nullptr);
     if (not is_connected_.load() or not socket_.is_open()) return;
-    const asio::ssl::stream_base::handshake_type handshake_type{connection_mode_ == NodeConnectionMode::kInbound
+    const asio::ssl::stream_base::handshake_type handshake_type{connection_.type_ == IPConnectionType::kInbound
                                                                     ? asio::ssl::stream_base::server
                                                                     : asio::ssl::stream_base::client};
     ssl_stream_->set_verify_mode(asio::ssl::verify_none);
@@ -513,7 +513,7 @@ serialization::Error Node::process_inbound_message() {
             }
         } break;
         case kGetAddr:
-            if (connection_mode_ == NodeConnectionMode::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
+            if (connection_.type_ == IPConnectionType::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
                 // Ignore the message to avoid fingerprinting
                 err_extended_reason = "Ignoring duplicate 'getaddr' message on inbound connection.";
                 break;

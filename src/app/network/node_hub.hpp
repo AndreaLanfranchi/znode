@@ -18,6 +18,7 @@
 #include <app/common/settings.hpp>
 #include <app/common/stopwatch.hpp>
 #include <app/concurrency/asio_timer.hpp>
+#include <app/concurrency/unique_queue.hpp>
 #include <app/network/node.hpp>
 #include <app/network/secure.hpp>
 
@@ -30,7 +31,8 @@ class NodeHub : public Stoppable {
           asio_context_{io_context},
           asio_strand_{io_context},
           socket_acceptor_{io_context},
-          service_timer_{io_context, "NodeHub_service"} {
+          service_timer_{io_context, "NodeHub_service"},
+          pending_connections_{/*capacity=*/app_settings_.network.max_active_connections} {
         if (app_settings_.network.nonce == 0U) {
             app_settings_.network.nonce = randomize<uint64_t>(uint64_t(/*min=*/1));
         }
@@ -50,13 +52,9 @@ class NodeHub : public Stoppable {
 
     [[nodiscard]] size_t bytes_sent() const noexcept { return total_bytes_sent_.load(); }
     [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
-    [[nodiscard]] size_t active_connections_count() const noexcept { return current_active_connections_.load(); }
 
     bool start() noexcept override;          // Begins accepting connections
     bool stop(bool wait) noexcept override;  // Stops accepting connections and stops all nodes
-    [[nodiscard]] bool connect(
-        const IPEndpoint& endpoint,
-        NodeConnectionMode mode = NodeConnectionMode::kOutbound);  // Connects to a remote endpoint
 
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
@@ -75,7 +73,12 @@ class NodeHub : public Stoppable {
     unsigned on_service_timer_expired(unsigned interval);  // Executes one maintenance cycle over all connected nodes
     void print_info();                                     // Prints some stats about network usage
 
-    void start_connecting();  // Starts the initial dial-out connection process
+    void feed_connections_from_cli();  // Feed pending_connections_ from command line --network.connect
+    void feed_connections_from_dns();  // Feed pending_connections_ from DNS seeds configured for chain
+    std::map<std::string, std::vector<IPEndpoint>, std::less<>> dns_resolve(const std::vector<std::string>& hosts,
+                                                                            const boost::asio::ip::tcp& version);
+    void async_connect(const IPConnection& connection);  // Connects to a remote endpoint
+    std::atomic_bool async_connecting_{false};           // Whether we are currently connecting to a remote endpoint
 
     AppSettings& app_settings_;              // Reference to global application settings
     boost::asio::io_context& asio_context_;  // Reference to global asio context
@@ -83,12 +86,12 @@ class NodeHub : public Stoppable {
     boost::asio::io_context::strand asio_strand_;     // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
     AsioTimer service_timer_;                         // Triggers a maintenance cycle
-    const uint32_t kServiceTimerIntervalSeconds_{2};  // Delay interval for service_timer_
+    const uint32_t kServiceTimerIntervalSeconds_{1};  // Delay interval for service_timer_
 
-    std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure connections
-    std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure connections
+    std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure server connections
+    std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure client connections
 
-    std::atomic_uint32_t current_active_connections_{0};
+    UniqueQueue<IPConnection> pending_connections_;  // Queue of pending connections to be made (outbound)
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};
 

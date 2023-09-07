@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <functional>
 #include <string_view>
 
 #include <boost/asio/ip/address.hpp>
@@ -51,6 +52,14 @@ enum class IPAddressType : uint8_t {
     kUnroutable = 0,
     kIPv4 = 1,
     kIPv6 = 2
+};
+
+enum class IPConnectionType : uint8_t {
+    kNone = 0U,            // Unspecified
+    kInbound = 1U,         // Dial-in
+    kOutbound = 2U,        // Dial-out
+    kManualOutbound = 3U,  // Dial-out initiated by user via CLI or RPC call
+    kSeedOutbound = 4U,    // Dial-out initiated by process to query seed nodes
 };
 
 class IPAddress : public serialization::Serializable {
@@ -102,6 +111,8 @@ class IPEndpoint : public serialization::Serializable {
     [[nodiscard]] bool is_valid() const noexcept;
     [[nodiscard]] bool is_routable() const noexcept;
 
+    bool operator==(const IPEndpoint& other) const noexcept;
+
     IPAddress address_{};
     uint16_t port_{0};
 
@@ -109,6 +120,7 @@ class IPEndpoint : public serialization::Serializable {
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
+
 class IPSubNet {
   public:
     IPSubNet() = default;
@@ -152,6 +164,21 @@ class IPSubNet {
   private:
 };
 
+class IPConnection {
+  public:
+    IPConnection() = default;
+    ~IPConnection() = default;
+
+    IPConnection(const IPEndpoint& endpoint, IPConnectionType type) noexcept : endpoint_{endpoint}, type_{type} {
+        ASSERT(type_ not_eq IPConnectionType::kNone);
+    };
+
+    bool operator==(const IPConnection& other) const noexcept = default;
+
+    IPEndpoint endpoint_{};
+    IPConnectionType type_{IPConnectionType::kNone};
+};
+
 class NodeService : public serialization::Serializable {
   public:
     using serialization::Serializable::Serializable;
@@ -187,3 +214,29 @@ class VersionNodeService : public NodeService {
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 }  // namespace zenpp
+
+namespace std {
+
+template <>
+struct hash<zenpp::IPAddress> {
+    size_t operator()(const zenpp::IPAddress& address) const noexcept {
+        return hash<boost::asio::ip::address>()(*address);
+    }
+};
+
+template <>
+struct hash<zenpp::IPEndpoint> {
+    size_t operator()(const zenpp::IPEndpoint& endpoint) const noexcept {
+        return hash<zenpp::IPAddress>()(endpoint.address_) ^ hash<uint16_t>()(endpoint.port_);
+    }
+};
+
+template <>
+struct hash<zenpp::IPConnection> {
+    size_t operator()(const zenpp::IPConnection& connection) const noexcept {
+        return hash<zenpp::IPEndpoint>()(connection.endpoint_) ^
+               hash<uint16_t>()(static_cast<uint16_t>(connection.type_));
+    }
+};
+
+}  // namespace std

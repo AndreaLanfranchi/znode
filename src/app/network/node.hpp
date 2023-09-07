@@ -29,11 +29,12 @@
 
 namespace zenpp::network {
 
-enum class NodeConnectionMode {
-    kInbound,        // Node is accepting connections
-    kOutbound,       // Node is connecting to other nodes
-    kManualOutbound  // Forced connection to a specific node
-};
+// enum class NodeConnectionMode {
+//     kInbound,         // Node is accepting connections
+//     kOutbound,        // Node is connecting to other nodes
+//     kManualOutbound,  // Forced connection to a specific node
+//     kSeedOutbound     // Connection to a seed node
+// };
 
 enum class NodeIdleResult {
     kNotIdle,                   // Node is not idle
@@ -57,7 +58,7 @@ static constexpr size_t kMaxBytesPerIO = 64_KiB;
 
 class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
-    Node(AppSettings& app_settings, NodeConnectionMode connection_mode, boost::asio::io_context& io_context,
+    Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
          boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
          std::function<void(std::shared_ptr<Node>)> on_disconnect /* handles disconnections on node-hub */,
          std::function<void(DataDirectionMode, size_t)> on_data /* handles data size accounting on node-hub */,
@@ -92,7 +93,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] int id() const noexcept { return node_id_; }
 
     //! \brief Whether this node instance is inbound or outbound
-    [[nodiscard]] NodeConnectionMode mode() const noexcept { return connection_mode_; }
+    [[nodiscard]] IPConnection connection() const noexcept { return connection_; }
 
     //! \brief Returns a reference to the underlying socket
     [[nodiscard]] boost::asio::ip::tcp::socket& socket() noexcept { return socket_; }
@@ -197,7 +198,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     AppSettings& app_settings_;                  // Reference to global application settings
     static std::atomic_int next_node_id_;        // Used to generate unique node ids
     const int node_id_{next_node_id()};          // Unique node id
-    const NodeConnectionMode connection_mode_;   // Whether inbound or outbound
+    const IPConnection connection_;              // Whether inbound or outbound
     boost::asio::io_context::strand io_strand_;  // Serialized execution of handlers
     AsioTimer ping_timer_;                       // To periodically send ping messages
     boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)

@@ -33,6 +33,8 @@ struct NetworkSettings {
     bool use_tls{true};                        // Whether to enforce SSL/TLS on network connections
     std::string tls_password{};                // Password to use to load a private key file
     std::vector<std::string> connect_nodes{};  // List of nodes to connect to at startup
+    bool force_dns_seeding{false};             // Whether to force DNS seeding
+    uint32_t connect_timeout_seconds{2};       // Number of seconds to wait for a dial-out socket connection
     uint64_t nonce{0};                         // Local nonce (identifies self in network)
     uint32_t ping_interval_seconds{120};       // Interval between ping messages
     uint32_t ping_timeout_milliseconds{500};   // Number of milliseconds to wait for a ping response before timing-out

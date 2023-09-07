@@ -145,7 +145,16 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
                     "Immediately connect to this remote nodes list (space separated)")
         ->capture_default_str()
         ->check(IPEndPointValidator(/*allow_empty=*/true,
-                                    /*default_port=*/13383));  // TODO the port will be on behalf of network
+                                    /*default_port=*/kMainNetConfig.default_port_));
+
+    network_opts
+        .add_option("--network.connecttimeout", network_settings.connect_timeout_seconds,
+                    "Number of seconds to wait for a dial-out socket connection to complete")
+        ->capture_default_str()
+        ->check(CLI::Range(uint32_t(1), uint32_t(5)));
+
+    network_opts.add_flag("--network.forcednsseed", network_settings.force_dns_seeding,
+                          "Force DNS seeding even if connect nodes are specified or loaded from nodes data");
 
     // Logging options
     auto& log_settings = settings.log;

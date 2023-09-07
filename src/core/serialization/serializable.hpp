@@ -28,6 +28,7 @@ namespace zenpp::serialization {
 //! \brief Public interface all serializable objects must implement
 class Serializable {
   public:
+    Serializable() = default;
     virtual ~Serializable() = default;
 
     [[nodiscard]] size_t serialized_size(SDataStream& stream) {

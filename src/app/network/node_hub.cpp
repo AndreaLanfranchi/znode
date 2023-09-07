@@ -26,6 +26,9 @@ using asio::ip::tcp;
 bool NodeHub::start() noexcept {
     if (not Stoppable::start()) return false;  // Already started
 
+    feed_connections_from_cli();
+    feed_connections_from_dns();
+
     if (app_settings_.network.use_tls) {
         const auto ssl_data{(*app_settings_.data_directory)[DataDirectory::kSSLCert].path()};
         auto* ctx{generate_tls_context(TLSContextType::kServer, ssl_data, app_settings_.network.tls_password)};
@@ -46,9 +49,8 @@ bool NodeHub::start() noexcept {
     info_stopwatch_.start(true);
     service_timer_.set_autoreset(true);
     service_timer_.start(kServiceTimerIntervalSeconds_ * 1'000U,
-                         [this](unsigned interval) -> unsigned { return on_service_timer_expired(interval); });
+                         [this](unsigned interval) { return on_service_timer_expired(interval); });
     start_accept();
-    asio::post(asio_strand_, [this]() { start_connecting(); });
     return true;
 }
 
@@ -59,90 +61,39 @@ bool NodeHub::stop(bool wait) noexcept {
         socket_acceptor_.close();
         std::unique_lock lock(nodes_mutex_);
         // Stop all nodes
-        for (auto [node_id, node_ptr] : nodes_) {
+        for (const auto& [node_id, node_ptr] : nodes_) {
 #if defined(__clang__) and __clang_major__ <= 15
             // Workaround for clang <=15 bug
             // cause structured bindings are allowed by C++20 to be captured in lambdas
             auto node_ptr_copy{node_ptr};
             asio::post(asio_strand_, [node_ptr_copy]() { std::ignore = node_ptr_copy->stop(false); });
 #else
-            asio::post(asio_strand_, [node_ptr]() { std::ignore = node_ptr->stop(false); });
+            asio::post(asio_strand_, [node_ptr_copy{node_ptr}]() { std::ignore = node_ptr_copy->stop(false); });
 #endif
         }
         lock.unlock();
         // Wait for all nodes to stop - active_connections get to zero
-        while (wait and current_active_connections_.load() > 0) {
-            log::Info("Service", {"name", "Node Hub", "action", "stop", "pending connections",
-                                  std::to_string(current_active_connections_.load())});
+        while (wait and size() > 0) {
+            log::Info("Service", {"name", "Node Hub", "action", "stop", "pending connections", std::to_string(size())});
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
     return ret;
 }
 
-void NodeHub::start_connecting() {
-    // Connect nodes if required
-    if (!app_settings_.network.connect_nodes.empty()) {
-        for (auto const& str : app_settings_.network.connect_nodes) {
-            if (is_stopping()) return;
-            const IPEndpoint endpoint{str};
-            std::ignore = connect(endpoint, NodeConnectionMode::kManualOutbound);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-
-    if (current_active_connections_.load() not_eq 0U) {
-        // TODO: Or we should continue if force dns seeding is enabled?
-        return;
-    }
-
-    boost::asio::ip::tcp::resolver resolver(asio_context_);
-    const auto hosts{get_chain_seeds(*app_settings_.chain_config)};
-    const auto network_port{gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_)};
-    std::map<std::string, std::vector<IPEndpoint>> host_to_endpoints{};
-
-    // Lesson learned: when invoking the resolution of a hostname without additional parameters
-    // the resolver will try IPv4 first and then IPv6. Problem is if an entry does not have an IPv4
-    // address, the resolver will return immediately "host not found" without trying IPv6.
-    // So we need to resolve the hostname for IPv4 and IPv6 separately.
-    for (int i{0}; i < (app_settings_.network.ipv4_only ? 1 : 2); ++i) {
-        for (const auto& host : hosts) {
-            if (is_stopping()) return;
-            boost::system::error_code error_code;
-            const auto dns_entries{resolver.resolve(i == 0 ? boost::asio::ip::tcp::v4() : boost::asio::ip::tcp::v6(),
-                                                    host, "", error_code)};
-            if (error_code == boost::asio::error::host_not_found or error_code == boost::asio::error::no_data) continue;
-            if (error_code) {
-                log::Error("NodeHub", {"action", "dns_resolve", "host", host, "error", error_code.message()});
-                continue;
-            }
-            // Push all results into the map
-            for (const auto& result : dns_entries) {
-                host_to_endpoints[host].emplace_back(result.endpoint().address(), network_port);
-                log::Trace("NodeHub",
-                           {"action", "dns_resolve", "host", host, "address", result.endpoint().address().to_string()});
-            }
-        }
-    }
-
-    for (const auto& [host_name, endpoints] : host_to_endpoints) {
-        if (is_stopping()) return;
-        if (endpoints.empty()) {
-            log::Error("NodeHub", {"action", "start_connecting", "host", host_name, "error",
-                                   "Unable to resolve host or host unknown"});
-            continue;
-        }
-        for (const auto& endpoint : endpoints) {
-            std::ignore = connect(endpoint);
-        }
-    }
-}
-
 unsigned NodeHub::on_service_timer_expired(unsigned interval) {
     print_info();  // Print info every 5 seconds
     const std::unique_lock lock{nodes_mutex_};
-    for (auto /*copy !!*/ [node_id, node_ptr] : nodes_) {
+
+    // If we have room connect to the pending connection requests
+    if (nodes_.size() < app_settings_.network.max_active_connections and not pending_connections_.empty() and
+        not async_connecting_.load()) {
+        const auto new_connection{pending_connections_.pop()};
+        async_connecting_.store(true);
+        asio::post(asio_strand_, [this, new_connection]() { async_connect(*new_connection); });
+    }
+
+    for (auto& [node_id, node_ptr] : nodes_) {
         if (const auto result{node_ptr->is_idle()}; result not_eq NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "node",
@@ -155,11 +106,11 @@ unsigned NodeHub::on_service_timer_expired(unsigned interval) {
             auto node_ptr_copy{node_ptr};
             asio::post(asio_strand_, [node_ptr_copy]() { std::ignore = node_ptr_copy->stop(false); });
 #else
-            asio::post(asio_strand_, [node_ptr]() { std::ignore = node_ptr->stop(false); });
+            asio::post(asio_strand_, [node_ptr_copy{node_ptr}]() { std::ignore = node_ptr_copy->stop(false); });
 #endif
         }
     }
-    return is_stopping() ? 0U : interval;
+    return interval;
 }
 
 void NodeHub::print_info() {
@@ -174,10 +125,10 @@ void NodeHub::print_info() {
     const auto period_total_bytes_sent{current_total_bytes_sent - last_info_total_bytes_sent_.load()};
 
     std::vector<std::string> info_data;
-    info_data.insert(info_data.end(), {"peers i/o", std::to_string(current_active_inbound_connections_.load()) + "/" +
-                                                        std::to_string(current_active_outbound_connections_.load())});
-    info_data.insert(info_data.end(), {"data i/o", to_human_bytes(current_total_bytes_received, true) + " " +
-                                                       to_human_bytes(current_total_bytes_sent, true)});
+    info_data.insert(info_data.end(), {"peers i/o", absl::StrCat(current_active_inbound_connections_.load(), "/",
+                                                                 current_active_outbound_connections_.load())});
+    info_data.insert(info_data.end(), {"data i/o", absl::StrCat(to_human_bytes(current_total_bytes_received, true), " ",
+                                                                to_human_bytes(current_total_bytes_sent, true))});
 
     auto period_bytes_received_per_second{to_human_bytes(period_total_bytes_received / info_lap_duration, true) + "s"};
     auto period_bytes_sent_per_second{to_human_bytes(period_total_bytes_sent / info_lap_duration, true) + "s"};
@@ -192,45 +143,112 @@ void NodeHub::print_info() {
     info_stopwatch_.start(true);
 }
 
-bool NodeHub::connect(const IPEndpoint& endpoint, const NodeConnectionMode mode) {
-    if (is_stopping()) return false;
+void NodeHub::feed_connections_from_cli() {
+    for (auto const& str : app_settings_.network.connect_nodes) {
+        const IPConnection connection{IPEndpoint(str), IPConnectionType::kManualOutbound};
+        std::ignore = pending_connections_.push(connection);
+    }
+}
 
-    const std::string remote{endpoint.to_string()};
+void NodeHub::feed_connections_from_dns() {
+    if (not app_settings_.network.force_dns_seeding and not pending_connections_.empty()) return;
+    const auto& hosts{get_chain_seeds(*app_settings_.chain_config)};
+    std::map<std::string, std::vector<IPEndpoint>, std::less<>> host_to_endpoints{};
+
+    // Lesson learned: when invoking the resolution of a hostname without additional parameters
+    // the resolver will try IPv4 first and then IPv6. Problem is if an entry does not have an IPv4
+    // address, the resolver will return immediately "host not found" without trying IPv6.
+    // So we need to resolve the hostname for IPv4 and IPv6 separately.
+    for (const auto& version : {boost::asio::ip::tcp::v4(), boost::asio::ip::tcp::v6()}) {
+        if (app_settings_.network.ipv4_only and version == boost::asio::ip::tcp::v6()) break;
+        auto resolved_hosts{dns_resolve(hosts, version)};
+        host_to_endpoints.merge(resolved_hosts);
+    }
+
+    for (const auto& [host_name, endpoints] : host_to_endpoints) {
+        if (is_stopping()) return;
+        if (endpoints.empty()) {
+            log::Error("NodeHub",
+                       {"action", "dns_resolve", "host", host_name, "error", "Unable to resolve host or host unknown"});
+            continue;
+        }
+        log::Info("NodeHub",
+                  {"action", "dns_seeding", "host", host_name, "endpoints", std::to_string(endpoints.size())});
+        for (const auto& endpoint : endpoints) {
+            std::ignore = pending_connections_.push(IPConnection{endpoint, IPConnectionType::kSeedOutbound});
+        }
+    }
+}
+
+std::map<std::string, std::vector<IPEndpoint>, std::less<>> NodeHub::dns_resolve(const std::vector<std::string>& hosts,
+                                                                                 const tcp& version) {
+    std::map<std::string, std::vector<IPEndpoint>, std::less<>> ret{};
+    boost::asio::ip::tcp::resolver resolver(asio_context_);
+    const auto network_port = gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_);
+    for (const auto& host : hosts) {
+        if (is_stopping()) break;
+        boost::system::error_code error_code;
+        const auto dns_entries{resolver.resolve(version, host, "", error_code)};
+        if (error_code == boost::asio::error::host_not_found or error_code == boost::asio::error::no_data) continue;
+        if (error_code) {
+            log::Error("NodeHub", {"action", "dns_resolve", "host", host, "error", error_code.message()});
+            continue;
+        }
+        // Push all results into the map
+        std::ranges::transform(dns_entries, std::back_inserter(ret[host]), [network_port](const auto& result) {
+            return IPEndpoint(result.endpoint().address(), network_port);
+        });
+    }
+    return ret;
+}
+
+void NodeHub::async_connect(const IPConnection& connection) {
+    if (is_stopping()) return;
+    const auto release_connecting_flag{gsl::finally([this]() { async_connecting_.store(false); })};
+
+    const std::string remote{connection.endpoint_.to_string()};
 
     log::Info("Service", {"name", "Node Hub", "action", "connect", "remote", remote});
-    if (current_active_connections_ >= app_settings_.network.max_active_connections) {
+    if (size() >= app_settings_.network.max_active_connections) {
         log::Error("Service", {"name", "Node Hub", "action", "connect", "error", "max active connections reached"});
-        return false;
+        return;
     }
     {
         const std::scoped_lock lock{nodes_mutex_};
-        if (auto item = connected_addresses_.find(*endpoint.address_);
+        if (auto item = connected_addresses_.find(*connection.endpoint_.address_);
             item not_eq connected_addresses_.end() and
             item->second >= app_settings_.network.max_active_connections_per_ip) {
             log::Error("Service",
                        {"name", "Node Hub", "action", "connect", "error", "max active connections per ip reached"});
-            return false;
+            return;
         }
     }
 
-    // Create the socket and try connect
+    // Create the socket and try connect using a timeout
     boost::asio::ip::tcp::socket socket{asio_context_};
-    try {
-        socket.connect(endpoint.to_endpoint());
-        set_common_socket_options(socket);
-    } catch (const boost::system::system_error& ex) {
+    boost::system::error_code socket_error_code;
+    auto connect_future{std::async(std::launch::async, [&socket, &connection, &socket_error_code]() {
+        socket.connect(connection.endpoint_.to_endpoint(), socket_error_code);
+    })};
+    if (connect_future.wait_for(std::chrono::seconds(app_settings_.network.connect_timeout_seconds)) ==
+        std::future_status::timeout) {
+        socket.cancel();
+        log::Error("Service", {"name", "Node Hub", "action", "connect", "remote", remote, "error", "timeout"});
+        return;
+    }
+    if (socket_error_code) {
         log::Error("Service",
-                   {"name", "Node Hub", "action", "connect", "remote", remote, "error", ex.code().message()});
-        return false;
+                   {"name", "Node Hub", "action", "connect", "remote", remote, "error", socket_error_code.message()});
+        return;
     }
 
+    set_common_socket_options(socket);
     ++total_connections_;
-    ++current_active_connections_;
     ++current_active_outbound_connections_;
 
     const std::shared_ptr<Node> new_node(
         new Node(
-            app_settings_, mode, asio_context_, std::move(socket), tls_client_context_.get(),
+            app_settings_, connection, asio_context_, std::move(socket), tls_client_context_.get(),
             [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
@@ -242,15 +260,14 @@ bool NodeHub::connect(const IPEndpoint& endpoint, const NodeConnectionMode mode)
 
     {
         const std::scoped_lock lock(nodes_mutex_);
-        nodes_.emplace(new_node->id(), new_node);
+        nodes_.try_emplace(new_node->id(), new_node);
     }
     new_node->start();
-    return true;
 }
 
 void NodeHub::start_accept() {
     if (is_stopping()) return;
-    if (app_settings_.log.log_verbosity == log::Level::kTrace) [[unlikely]] {
+    if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service", {"name", "Node Hub", "status", "Listening for connections ..."});
     }
     socket_acceptor_.async_accept(
@@ -287,7 +304,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
 
     ++total_connections_;
     // Check we do not exceed the maximum number of connections
-    if (current_active_connections_ >= app_settings_.network.max_active_connections) {
+    if (size() >= app_settings_.network.max_active_connections) {
         ++total_rejected_connections_;
         log::Warning("Service", {"name", "Node Hub", "action", "accept", "error", "max active connections reached"});
         close_socket(socket);
@@ -311,9 +328,11 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
     set_common_socket_options(socket);
     const IPEndpoint remote{socket.remote_endpoint()};
     const IPEndpoint local{socket.local_endpoint()};
+    const IPConnection connection(remote, IPConnectionType::kInbound);
+
     const std::shared_ptr<Node> new_node(
         new Node(
-            app_settings_, NodeConnectionMode::kInbound, asio_context_, std::move(socket), tls_server_context_.get(),
+            app_settings_, connection, asio_context_, std::move(socket), tls_server_context_.get(),
             [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
@@ -325,11 +344,10 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
     log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local.to_string(), "remote",
                           remote.to_string(), "id", std::to_string(new_node->id())});
 
-    ++current_active_connections_;
     ++current_active_inbound_connections_;
     {
         const std::scoped_lock lock(nodes_mutex_);
-        nodes_.emplace(new_node->id(), new_node);
+        nodes_.try_emplace(new_node->id(), new_node);
         connected_addresses_[*new_node->remote_endpoint().address_]++;
     }
 
@@ -368,9 +386,8 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
     if (nodes_.contains(node->id())) {
         nodes_.erase(node->id());
         ++total_disconnections_;
-        current_active_connections_.store(gsl::narrow_cast<uint32_t>(nodes_.size()));
-        switch (node->mode()) {
-            using enum NodeConnectionMode;
+        switch (node->connection().type_) {
+            using enum IPConnectionType;
             case kInbound:
                 if (current_active_inbound_connections_ not_eq 0U) {
                     --current_active_inbound_connections_;
@@ -378,6 +395,7 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
                 break;
             case kOutbound:
             case kManualOutbound:
+            case kSeedOutbound:
                 if (current_active_outbound_connections_ not_eq 0U) {
                     --current_active_outbound_connections_;
                 }
@@ -387,7 +405,7 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
         }
     }
 
-    if (app_settings_.log.log_verbosity == log::Level::kTrace) [[unlikely]] {
+    if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service",
                    {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",
                     std::to_string(total_disconnections_), "rejections", std::to_string(total_rejected_connections_)});
@@ -411,9 +429,11 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node>& node, std::shared_
     using namespace serialization;
     using enum Error;
 
-    std::string error{};
-
     REQUIRES(message not_eq nullptr);
+    REQUIRES(node not_eq nullptr);
+    if (node->is_stopping()) return;
+
+    std::string error{};
 
     // This function behaves as a collector of messages from nodes
     if (message->get_type() == abi::NetMessageType::kAddr) {
@@ -426,7 +446,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node>& node, std::shared_
         }
     }
 
-    if (not error.empty() or app_settings_.log.log_verbosity >= log::Level::kTrace) [[unlikely]] {
+    if (not error.empty() or log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         const std::vector<std::string> log_params{
             "name",    "Node Hub",
             "action",  __func__,
@@ -435,7 +455,9 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node>& node, std::shared_
             "status",  error.empty() ? "success" : error};
         log::BufferBase((error.empty() ? log::Level::kTrace : log::Level::kError), "Service", log_params)
             << (error.empty() ? "" : "Disconnecting ...");
-        if (not error.empty()) node->stop(false);
+        if (not error.empty()) {
+            asio::post(asio_strand_, [node]() { std::ignore = node->stop(false); });
+        }
     }
 }
 

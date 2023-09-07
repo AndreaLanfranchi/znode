@@ -199,7 +199,7 @@ int main(int argc, char* argv[]) {
         while (true) {
             std::this_thread::sleep_for(500ms);
 
-            if (node_hub.active_connections_count() not_eq 0) {
+            if (node_hub.size() not_eq 0) {
                 node_hub_idle_sw.start(true);  // Restart the timer
             } else if (node_hub_idle_sw.since_start() > 5min /* TODO settings.node_hub_idle_timeout*/) {
                 log::Warning("Service", {"name", "node_hub", "status", "idle", "elapsed", "5min"})

@@ -13,7 +13,7 @@
 namespace zenpp {
 
 //! \brief  An STL-like set container capped in size
-//! \details When container reaches capacity every insertion evicts the oldest element
+//! \details When container reaches capacity every insertion evicts the oldest element (FIFO)
 //! \remark Not thread safe
 template <typename T>
 class CappedSet {
