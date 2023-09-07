@@ -59,24 +59,8 @@ bool NodeHub::stop(bool wait) noexcept {
     if (ret) /* not already stopping */ {
         service_timer_.stop(false);
         socket_acceptor_.close();
-        std::unique_lock lock(nodes_mutex_);
-        // Stop all nodes
-        for (const auto& [node_id, node_ptr] : nodes_) {
-#if defined(__clang__) and __clang_major__ <= 15
-            // Workaround for clang <=15 bug
-            // cause structured bindings are allowed by C++20 to be captured in lambdas
-            auto node_ptr_copy{node_ptr};
-            asio::post(asio_strand_, [node_ptr_copy]() { std::ignore = node_ptr_copy->stop(false); });
-#else
-            asio::post(asio_strand_, [node_ptr_copy{node_ptr}]() { std::ignore = node_ptr_copy->stop(false); });
-#endif
-        }
-        lock.unlock();
-        // Wait for all nodes to stop - active_connections get to zero
-        while (wait and size() > 0) {
-            log::Info("Service", {"name", "Node Hub", "action", "stop", "pending connections", std::to_string(size())});
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
+        const auto nodes_copy{get_nodes()};
+        std::ranges::for_each(nodes_copy, [](const auto& node) { std::ignore = node->stop(false); });
     }
     return ret;
 }
@@ -441,6 +425,11 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node>& node, std::shared_
         const auto ret{addr_payload.deserialize(message->data())};
         if (not ret) {
             // TODO Pass it to the address manager
+            for (const auto& service : addr_payload.identifiers_) {
+                if (app_settings_.network.ipv4_only and service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
+                    continue;
+                std::ignore = pending_connections_.push(IPConnection{service.endpoint_, IPConnectionType::kOutbound});
+            }
         } else {
             error = absl::StrCat("error ", magic_enum::enum_name(ret));
         }

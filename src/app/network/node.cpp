@@ -149,9 +149,11 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
         ema_ping_latency_.store(static_cast<uint64_t>(ema));
     }
 
-    log_params.insert(log_params.end(), {"min", absl::StrCat(min_ping_latency_.load(), "ms"), "ema",
-                                         absl::StrCat(ema_ping_latency_.load(), "ms")});
-    print_log(log::Level::kInfo, log_params);
+    if (log::test_verbosity(log::Level::kTrace)) {
+        log_params.insert(log_params.end(), {"min", absl::StrCat(min_ping_latency_.load(), "ms"), "ema",
+                                             absl::StrCat(ema_ping_latency_.load(), "ms")});
+        print_log(log::Level::kTrace, log_params);
+    }
 
     ping_nonce_.store(0);
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
@@ -210,7 +212,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", error_code.message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
-        stop(true);
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return;
     }
 
@@ -224,7 +226,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
             const std::list<std::string> log_params{"action", __func__, "status",
                                                     std::string(magic_enum::enum_name(parse_result))};
             print_log(log::Level::kError, log_params, " Disconnecting ...");
-            stop(false);
+            asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
             return;
         }
     }
@@ -287,7 +289,7 @@ void Node::start_write() {
             }
             outbound_message_.reset();
             is_writing_.store(false);
-            stop(false);
+            asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
             return;
         }
 
@@ -340,8 +342,8 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
                                                     "failure", "reason", error_code.message()};
             print_log(log::Level::kError, log_params, "Disconnecting ...");
         }
-        stop(false);
         is_writing_.store(false);
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return;
     }
 
@@ -415,7 +417,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
         if (err == kMessageHeaderIncomplete) break;
         if (is_fatal_error(err)) {
             // Some debugging before exiting for fatal
-            if (app_settings_.log.log_verbosity >= log::Level::kDebug) {
+            if (log::test_verbosity(log::Level::kDebug)) {
                 switch (err) {
                     using enum Error;
                     case kMessageHeaderUnknownCommand:
@@ -430,8 +432,10 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
             break;
         }
 
-        if (err = validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type());
-            is_fatal_error(err)) {
+        if (const auto protocol_error{
+                validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type())};
+            protocol_error not_eq kSuccess) {
+            err = protocol_error;
             break;
         }
 
@@ -616,6 +620,11 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
 
 void Node::on_fully_connected() {
     if (is_stopping()) return;
+
+    // If this is a seeder node then we should send a `getaddr` message
+    if (connection_.type_ == IPConnectionType::kSeedOutbound) {
+        push_message(abi::NetMessageType::kGetAddr);
+    }
 
     // Lets' send out a ping immediately and start the timer
     // for subsequent pings
