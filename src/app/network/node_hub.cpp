@@ -62,7 +62,7 @@ bool NodeHub::stop(bool wait) noexcept {
         // which points to nowhere. The burden to stop nodes is on the
         // shoulders of the service timer.
         auto pending_nodes{size()};
-        while (pending_nodes not_eq 0U or async_connecting_.load()) {
+        while (pending_nodes not_eq 0U) {
             log::Info("Service", {"name", "Node Hub", "action", "stop", "pending", std::to_string(pending_nodes)});
             std::this_thread::sleep_for(std::chrono::seconds(2));
             pending_nodes = size();
@@ -82,7 +82,7 @@ unsigned NodeHub::on_service_timer_expired(unsigned interval) {
         const std::lock_guard<std::mutex> lock{nodes_mutex_};
         if (not connected_addresses_.contains(*(*new_connection).endpoint_.address_)) {
             bool expected{false};
-            if (async_connecting_.compare_exchange_strong(expected, true)) {
+            if (async_connecting_.compare_exchange_strong(expected, true, std::memory_order_acquire)) {
                 asio::post(asio_strand_, [this, new_connection]() { async_connect(*new_connection); });
             }
         }
@@ -199,6 +199,11 @@ std::map<std::string, std::vector<IPEndpoint>, std::less<>> NodeHub::dns_resolve
 }
 
 void NodeHub::async_connect(const IPConnection& connection) {
+    // Final action: reset the flag
+    auto reset_flag{gsl::finally([this]() {
+        std::atomic_thread_fence(std::memory_order_release);
+        async_connecting_.store(false, std::memory_order_relaxed);
+    })};
     const std::string remote{connection.endpoint_.to_string()};
 
     log::Info("Service", {"name", "Node Hub", "action", "connect", "remote", remote});
@@ -208,7 +213,6 @@ void NodeHub::async_connect(const IPConnection& connection) {
         item->second >= app_settings_.network.max_active_connections_per_ip) {
         log::Error("Service",
                    {"name", "Node Hub", "action", "connect", "error", "max active connections per ip reached"});
-        async_connecting_.store(false, std::memory_order_release);
         return;
     }
     lock.unlock();
@@ -244,7 +248,10 @@ void NodeHub::async_connect(const IPConnection& connection) {
         socket.close(socket_error_code);
         log::Error("Service",
                    {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", exception.what()});
-        async_connecting_.store(false, std::memory_order_release);
+        return;
+    } catch (...) {
+        socket.close(socket_error_code);
+        log::Error("Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", "unknown"});
         return;
     }
 
@@ -267,7 +274,6 @@ void NodeHub::async_connect(const IPConnection& connection) {
     nodes_.try_emplace(new_node->id(), new_node);
     connected_addresses_[*new_node->remote_endpoint().address_]++;
     new_node->start();
-    async_connecting_.store(false, std::memory_order_release);
 }
 
 void NodeHub::start_accept() {

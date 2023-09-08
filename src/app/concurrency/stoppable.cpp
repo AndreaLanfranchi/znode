@@ -19,12 +19,14 @@ bool Stoppable::stop([[maybe_unused]] /*in non-threaded components we don't need
     return stop_requested_.compare_exchange_strong(expected, true);
 }
 
-bool Stoppable::is_stopping() const noexcept { return stop_requested_; }
+bool Stoppable::is_stopping() const noexcept { return stop_requested_.load(std::memory_order_acquire); }
 
-bool Stoppable::is_running() const noexcept { return started_ and not stop_requested_; }
+bool Stoppable::is_running() const noexcept {
+    return started_.load(std::memory_order_acquire) and not stop_requested_.load(std::memory_order_acquire);
+}
 
 void Stoppable::set_stopped() noexcept {
-    started_.store(false);
-    stop_requested_.store(false);
+    started_.store(false, std::memory_order_release);
+    stop_requested_.store(false, std::memory_order_release);
 }
 }  // namespace zenpp
