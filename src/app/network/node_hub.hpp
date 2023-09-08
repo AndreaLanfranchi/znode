@@ -96,7 +96,6 @@ class NodeHub : public Stoppable {
     boost::asio::io_context::strand asio_strand_;     // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
     AsioTimer service_timer_;                         // Triggers a maintenance cycle
-    const uint32_t kServiceTimerIntervalSeconds_{1};  // Delay interval for service_timer_
 
     std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure server connections
     std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure client connections
