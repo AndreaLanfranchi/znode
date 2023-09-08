@@ -45,9 +45,10 @@ class NodeHub : public Stoppable {
     NodeHub& operator=(const NodeHub&& other) = delete;
     ~NodeHub() override = default;
 
+    //! \brief Returns whether the provided identifier is known and connected
     [[nodiscard]] bool contains(int node_id) const;  // Returns whether a node node_id is actually connected
     [[nodiscard]] size_t size() const;               // Returns the number of nodes
-    [[nodiscard]] std::shared_ptr<Node> operator[](int node_id) const;   // Returns a shared_ptr<Node> by node_id
+    [[nodiscard]] std::shared_ptr<Node> operator[](int node_id) const;  // Returns a shared_ptr<Node> by node_id
 
     [[nodiscard]] size_t bytes_sent() const noexcept { return total_bytes_sent_.load(); }
     [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
@@ -61,16 +62,26 @@ class NodeHub : public Stoppable {
     void handle_accept(const boost::system::error_code& error_code,
                        boost::asio::ip::tcp::socket socket);  // Async accept handler
 
-    void on_node_disconnected(const std::shared_ptr<Node> node);  // Handles disconnects from nodes
+    void on_node_disconnected(std::shared_ptr<Node> node);  // Handles disconnects from nodes
     void on_node_data(DataDirectionMode direction,
                       size_t bytes_transferred);  // Handles data size accounting from nodes
-    void on_node_received_message(std::shared_ptr<Node> node,
-                                  std::shared_ptr<abi::NetMessage> message);  // Handles inbound messages from nodes
+
+    //! \brief Handles a message received from a node
+    //! \details This function behaves as a collector of messages from nodes and will route them to the
+    //! appropriate workers/handlers. Messages pertaining to node session itself MUST NOT reach here
+    //! as they SHOULD be handled by the node itself.
+    void on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message);
 
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options
 
-    unsigned on_service_timer_expired(unsigned interval);  // Executes one maintenance cycle over all connected nodes
-    void print_info();                                     // Prints some stats about network usage
+    //! \brief Executes one maintenance cycle over all connected nodes
+    //! \details Is invoked by the triggering of service_timer_ and will perform the following tasks:
+    //! - Check for pending connections requests and attempt to connect to them
+    //! - Check disconnected nodes and remove them from the nodes_ map
+    //! - Check for nodes that have been idle for too long and disconnect them
+    unsigned on_service_timer_expired(unsigned interval);
+
+    void print_network_info();  // Prints some metric data about network usage
 
     void feed_connections_from_cli();  // Feed pending_connections_ from command line --network.connect
     void feed_connections_from_dns();  // Feed pending_connections_ from DNS seeds configured for chain

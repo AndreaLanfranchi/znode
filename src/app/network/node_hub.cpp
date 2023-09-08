@@ -60,36 +60,40 @@ bool NodeHub::stop(bool wait) noexcept {
         socket_acceptor_.close();
         std::unique_lock<std::mutex> lock{nodes_mutex_};
         auto pending_nodes{nodes_.size()};
-        std::ranges::for_each(nodes_, [](const auto& key_value) {
-            if (key_value.second not_eq nullptr) {
-                std::ignore = key_value.second->stop(true);
+        for (auto& [id, node_ptr] : nodes_) {
+            if (node_ptr not_eq nullptr) {
+                std::ignore = node_ptr->stop(true);
             }
-        });
+        }
         lock.unlock();
 
         // We MUST wait for all nodes to stop before returning otherwise
         // this instance falls out of scope and the nodes call a callback
         // which points to nowhere
-        while (pending_nodes not_eq 0U) {
+        while (pending_nodes not_eq 0U or async_connecting_.load()) {
             log::Info("Service", {"name", "Node Hub", "action", "stop", "pending", std::to_string(pending_nodes)});
             std::this_thread::sleep_for(std::chrono::seconds(1));
             pending_nodes = size();
         }
-
         service_timer_.stop(true);
     }
     return ret;
 }
 
 unsigned NodeHub::on_service_timer_expired(unsigned interval) {
-    print_info();  // Print info every 5 seconds
+    print_network_info();  // Print info every 5 seconds
 
     // If we have room connect to the pending connection requests
-    if (not is_stopping() and size() < app_settings_.network.max_active_connections and
+    if (not is_stopping() and size() < 64U /*app_settings_.network.max_active_connections*/ and
         not pending_connections_.empty() and not async_connecting_.load()) {
         const auto new_connection{pending_connections_.pop()};
-        async_connecting_.store(true);
-        asio::post(asio_strand_, [this, new_connection]() { async_connect(*new_connection); });
+        const std::lock_guard<std::mutex> lock{nodes_mutex_};
+        if (not connected_addresses_.contains(*(*new_connection).endpoint_.address_)) {
+            bool expected{false};
+            if (async_connecting_.compare_exchange_strong(expected, true)) {
+                asio::post(asio_strand_, [this, new_connection]() { this->async_connect(*new_connection); });
+            }
+        }
     }
 
     const std::lock_guard<std::mutex> lock{nodes_mutex_};
@@ -108,28 +112,10 @@ unsigned NodeHub::on_service_timer_expired(unsigned interval) {
         }
         ++iterator;
     }
-    //    for (auto& [node_id, node_ptr] : nodes_) {
-    //        if (is_stopping()) break;
-    //        if (const auto result{node_ptr->is_idle()}; result not_eq NodeIdleResult::kNotIdle) {
-    //            const std::string reason{magic_enum::enum_name(result)};
-    //            log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "node",
-    //                                     std::to_string(node_id), "remote", node_ptr->to_string(), "reason", reason})
-    //                << "Disconnecting ...";
-    //
-    // #if defined(__clang__) and __clang_major__ <= 15
-    //            // Workaround for clang <=15 bug
-    //            // cause structured bindings are allowed by C++20 to be captured in lambdas
-    //            auto node_ptr_copy{node_ptr};
-    //            asio::post(asio_strand_, [node_ptr_copy]() { std::ignore = node_ptr_copy->stop(false); });
-    // #else
-    //            asio::post(asio_strand_, [node_ptr_copy{node_ptr}]() { std::ignore = node_ptr_copy->stop(false); });
-    // #endif
-    //        }
-    //    }
     return interval;
 }
 
-void NodeHub::print_info() {
+void NodeHub::print_network_info() {
     // Let each cycle to last at least 5 seconds to have meaningful data and, of course, to avoid division by zero
     const auto info_lap_duration{
         gsl::narrow_cast<uint32_t>(duration_cast<std::chrono::seconds>(info_stopwatch_.since_start()).count())};
@@ -240,23 +226,26 @@ void NodeHub::async_connect(const IPConnection& connection) {
         }
     }
 
-    // Create the socket and try connect using a timeout
+    // Create the socket and try to connect using a timeout
     boost::asio::ip::tcp::socket socket{asio_context_};
     boost::system::error_code socket_error_code;
-    auto connect_future{std::async(std::launch::async, [&socket, &connection, &socket_error_code]() {
+
+    try {
         socket.connect(connection.endpoint_.to_endpoint(), socket_error_code);
-    })};
-    if (connect_future.wait_for(std::chrono::seconds(app_settings_.network.connect_timeout_seconds)) ==
-        std::future_status::timeout) {
+        if (socket_error_code) {
+            throw std::runtime_error(socket_error_code.message());
+        } else if (is_stopping()) {
+            throw std::runtime_error("NodeHub is stopping");
+        }
+    } catch (const std::exception& ex) {
         socket.cancel();
-        socket.close(socket_error_code);
-        log::Error("Service", {"name", "Node Hub", "action", "connect", "remote", remote, "error", "timeout"});
+        socket.close();
+        log::Error("Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", ex.what()});
         return;
-    }
-    if (socket_error_code) {
-        log::Error("Service",
-                   {"name", "Node Hub", "action", "connect", "remote", remote, "error", socket_error_code.message()});
-        socket.close(socket_error_code);
+    } catch (...) {
+        socket.cancel();
+        socket.close();
+        log::Error("Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", "undefined"});
         return;
     }
 
@@ -264,10 +253,10 @@ void NodeHub::async_connect(const IPConnection& connection) {
     ++total_connections_;
     ++current_active_outbound_connections_;
 
-    const std::shared_ptr<Node> new_node(
+    std::shared_ptr<Node> new_node(
         new Node(
             app_settings_, connection, asio_context_, std::move(socket), tls_client_context_.get(),
-            [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
+            [this](const std::shared_ptr<Node> node) { on_node_disconnected(node); },
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
             },
@@ -276,11 +265,9 @@ void NodeHub::async_connect(const IPConnection& connection) {
             }),
         Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
-    {
-        const std::lock_guard<std::mutex> lock(nodes_mutex_);
-        nodes_.try_emplace(new_node->id(), new_node);
-    }
     new_node->start();
+    const std::lock_guard<std::mutex> lock(nodes_mutex_);
+    nodes_.try_emplace(new_node->id(), new_node);
 }
 
 void NodeHub::start_accept() {
@@ -370,7 +357,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
     }
 
     new_node->start();
-    asio::post(asio_strand_, [this]() { start_accept(); });  // Continue listening for new connections
+    asio::post(asio_strand_, [this]() { this->start_accept(); });  // Continue listening for new connections
 }
 
 void NodeHub::initialize_acceptor() {
@@ -453,7 +440,6 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
 
     std::string error{};
 
-    // This function behaves as a collector of messages from nodes
     if (message->get_type() == abi::NetMessageType::kAddr) {
         abi::MsgAddrPayload addr_payload{};
         const auto ret{addr_payload.deserialize(message->data())};
@@ -486,15 +472,17 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
 
 std::shared_ptr<Node> NodeHub::operator[](int node_id) const {
     const std::lock_guard<std::mutex> lock(nodes_mutex_);
-    if (nodes_.contains(node_id)) {
-        return nodes_.at(node_id);
+    const auto iterator{nodes_.find(node_id)};
+    if (iterator not_eq nodes_.end()) {
+        return iterator->second;  // Might
     }
     return nullptr;
 }
 
 bool NodeHub::contains(int node_id) const {
     const std::lock_guard<std::mutex> lock(nodes_mutex_);
-    return nodes_.contains(node_id);
+    const auto iterator{nodes_.find(node_id)};
+    return iterator not_eq nodes_.end() and iterator->second not_eq nullptr;
 }
 
 size_t NodeHub::size() const {

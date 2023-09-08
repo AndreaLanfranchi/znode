@@ -151,8 +151,7 @@ int main(int argc, char* argv[]) {
         // clang-tidy offers no way to suppress this warning
         auto stop_asio{gsl::finally([&asio_context, &asio_guard, &asio_threads]() {
             log::Info("Service", {"name", "asio", "status", "stopping threads"});
-            asio_context.stop();
-            asio_guard.reset();
+            asio_guard.reset();  // Release the work guard - pending tasks will complete gracefully
             std::ranges::for_each(asio_threads, [](auto& thread) {
                 if (thread.joinable()) thread.join();
             });
