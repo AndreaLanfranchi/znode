@@ -116,7 +116,7 @@ uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return 0U;
     }
-    return (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U);
+    return is_stopping() ? 0U : (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U);
 }
 
 void Node::process_ping_latency(const uint64_t latency_ms) {
@@ -502,7 +502,7 @@ serialization::Error Node::process_inbound_message() {
                     err = push_message(abi::NetMessageType::kVerAck);
                 } else {
                     err = kInvalidMessageState;
-                    err_extended_reason = "Connected to self.";
+                    err_extended_reason = "Connected to self ? (same nonce)";
                 }
             }
             break;

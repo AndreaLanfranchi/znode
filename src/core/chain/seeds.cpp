@@ -11,20 +11,27 @@ namespace zenpp {
 
 namespace {
 
-    const std::vector<std::string> kMainNetSeeds{"dnsseed.horizen.global", "dnsseed.zensystem.io",
-                                                 "mainnet.horizen.global", "mainnet.zensystem.io",
-                                                 "node1.zenchain.info"};
+    const std::vector<std::string> kMainNetSeeds{
+        // "dnsseed.horizen.global",  // Dns Seeder - Unreliable
+        // "dnsseed.zensystem.io",    // Dns Seeder - Unreliable
+        "mainnet.horizen.global",  // Fixed IP
+        "mainnet.zensystem.io",    // Fixed IP
+        "node1.zenchain.info"      // Fixed IP
+    };
 
-    const std::vector<std::string> kTestNetSeeds{"dnsseed.testnet.horizen.global", "dnsseed.testnet.zensystem.io",
-                                                 "testnet.horizen.global", "testnet.zensystem.io",
-                                                 "node1.zenchain.info"};
+    const std::vector<std::string> kTestNetSeeds{
+        // "dnsseed.testnet.horizen.global",  // Dns Seeder - Unreliable
+        // "dnsseed.testnet.zensystem.io",    // Dns Seeder - Unreliable
+        "testnet.horizen.global",  // Fixed IP
+        "testnet.zensystem.io",    // Fixed IP
+        "node1.zenchain.info"      // Fixed IP
+    };
 
     const std::vector<std::string> kRegTestSeeds{/* there are no seeders for regtest */};
 
 }  // namespace
 
 const std::vector<std::string>& get_chain_seeds(const ChainConfig& chain_config) {
-
     switch (chain_config.identifier_) {
         case 1:
             return kMainNetSeeds;

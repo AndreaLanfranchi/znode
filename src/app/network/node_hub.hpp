@@ -48,7 +48,6 @@ class NodeHub : public Stoppable {
     [[nodiscard]] bool contains(int node_id) const;  // Returns whether a node node_id is actually connected
     [[nodiscard]] size_t size() const;               // Returns the number of nodes
     [[nodiscard]] std::shared_ptr<Node> operator[](int node_id) const;   // Returns a shared_ptr<Node> by node_id
-    [[nodiscard]] std::vector<std::shared_ptr<Node>> get_nodes() const;  // Returns a vector of all nodes
 
     [[nodiscard]] size_t bytes_sent() const noexcept { return total_bytes_sent_.load(); }
     [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
@@ -62,10 +61,10 @@ class NodeHub : public Stoppable {
     void handle_accept(const boost::system::error_code& error_code,
                        boost::asio::ip::tcp::socket socket);  // Async accept handler
 
-    void on_node_disconnected(const std::shared_ptr<Node>& node);  // Handles disconnects from nodes
+    void on_node_disconnected(const std::shared_ptr<Node> node);  // Handles disconnects from nodes
     void on_node_data(DataDirectionMode direction,
                       size_t bytes_transferred);  // Handles data size accounting from nodes
-    void on_node_received_message(std::shared_ptr<Node>& node,
+    void on_node_received_message(std::shared_ptr<Node> node,
                                   std::shared_ptr<abi::NetMessage> message);  // Handles inbound messages from nodes
 
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options

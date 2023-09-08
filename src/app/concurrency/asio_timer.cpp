@@ -39,6 +39,7 @@ bool AsioTimer::stop(bool wait) noexcept {
 }
 
 void AsioTimer::start_internal() {
+    if (not is_running()) return;
     bool expected{false};
     if (not is_ticking_.compare_exchange_strong(expected, true)) return;
 
@@ -54,7 +55,7 @@ void AsioTimer::start_internal() {
             return;
         };
         const auto call_back_result{do_call_back()};
-        if (not is_stopping() and call_back_result and autoreset()) {
+        if (call_back_result and autoreset()) {
             start_internal();
         } else {
             set_stopped();
@@ -67,9 +68,9 @@ bool AsioTimer::do_call_back() {
     try {
         const auto new_interval{call_back_(interval_milliseconds_.load())};
         interval_milliseconds_.store(new_interval);
-        result or_eq (new_interval == 0U);
+        result = (new_interval not_eq 0U);
     } catch (const std::exception& ex) {
-        log::Error(absl::StrCat("AsioTimer[", name_, "]"), {"action", "call_back", "error", ex.what()});
+        log::Error(absl::StrCat("AsioTimer[", name_, "]"), {"action", __func__ , "error", ex.what()});
         result = false;
     }
     return result;
