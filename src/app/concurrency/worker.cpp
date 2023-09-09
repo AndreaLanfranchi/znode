@@ -12,13 +12,11 @@
 
 namespace zenpp {
 
-Worker::~Worker() { Worker::stop(/*wait=*/true); }
+Worker::~Worker() { Worker::stop(/*wait=*/false); }
 
 bool Worker::start() noexcept {
     const bool start_already_requested{!Stoppable::start()};
     if (start_already_requested) return false;
-    state_.store(State::kStarting);
-    signal_worker_state_changed(this);
 
     exception_ptr_ = nullptr;
     id_.store(0);
@@ -29,32 +27,21 @@ bool Worker::start() noexcept {
         // Retrieve the id
         id_.store(log::get_thread_id());
 
-        if (State expected_starting{State::kStarting};
-            state_.compare_exchange_strong(expected_starting, State::kStarted)) {
-            thread_started_cv_.notify_one();
-            signal_worker_state_changed(this);
-            try {
-                work();
-            } catch (const std::exception& ex) {
-                std::ignore = log::Error("Worker error", {"name", name_, "id", std::to_string(id_.load()), "exception",
-                                                          std::string(ex.what())});
-                exception_ptr_ = std::current_exception();
-            } catch (...) {
-                std::ignore = log::Error(
-                    "Worker error", {"name", name_, "id", std::to_string(id_.load()), "exception", "Undefined error"});
-            }
+        try {
+            work();
+        } catch (const std::exception& ex) {
+            std::ignore = log::Error(
+                "Worker error", {"name", name_, "id", std::to_string(id_.load()), "exception", std::string(ex.what())});
+            exception_ptr_ = std::current_exception();
+        } catch (...) {
+            std::ignore = log::Error("Worker error",
+                                     {"name", name_, "id", std::to_string(id_.load()), "exception", "Undefined error"});
         }
+
         state_.store(State::kStopped);
-        signal_worker_state_changed(this);
         id_.store(0);
     });
 
-    while (true) {
-        std::unique_lock lock(kick_mtx_);
-        if (thread_started_cv_.wait_for(lock, std::chrono::milliseconds(100)) == std::cv_status::no_timeout) {
-            break;
-        }
-    }
     return true;
 }
 
@@ -75,6 +62,9 @@ bool Worker::stop(bool wait) noexcept {
         if (wait and thread_->joinable()) {
             thread_->join();
             thread_.reset();
+        } else {
+            thread_->detach();
+            thread_.reset();
         }
     }
     return true;
@@ -88,32 +78,15 @@ void Worker::kick() {
 bool Worker::wait_for_kick(uint32_t timeout_milliseconds) {
     bool expected_kicked_value{true};
     while (not kicked_.compare_exchange_strong(expected_kicked_value, false)) {
-        // We've NOT been kicked yet hence either
-        // 1) We're stopping therefore we stop waiting and immediately return false
-        // 2) We change the state in kKickWaiting and begin to wait
-        if (is_stopping()) break;
-
-        if (State expected_state{State::kStarted};
-            state_.compare_exchange_strong(expected_state, State::kKickWaiting)) {
-            signal_worker_state_changed(this);
-        }
-        if (timeout_milliseconds > 0) {
+        if (is_stopping()) return false;
+        if (timeout_milliseconds > 0U) {
             std::unique_lock lock(kick_mtx_);
             std::ignore = kicked_cv_.wait_for(lock, std::chrono::milliseconds(timeout_milliseconds));
         } else {
             std::this_thread::yield();
         }
-
         expected_kicked_value = true;  // !!Important
     }
-
-    if (is_stopping()) {
-        state_.store(State::kStopping);
-        signal_worker_state_changed(this);
-        return false;
-    }
-    state_.store(State::kStarted);
-    signal_worker_state_changed(this);
     return true;
 }
 

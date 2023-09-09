@@ -50,7 +50,7 @@ class Worker : public Stoppable, private boost::noncopyable {
     }
 
     //! \brief Retrieves current state of thread
-    State state() const noexcept { return state_.load(std::memory_order_relaxed); }
+    State state() const noexcept { return state_.load(); }
 
     //! \brief Whether this worker/thread has encountered an exception
     bool has_exception() const noexcept { return exception_ptr_ not_eq nullptr; }
@@ -60,9 +60,6 @@ class Worker : public Stoppable, private boost::noncopyable {
 
     //! \brief Rethrows captured exception (if any)
     void rethrow() const;
-
-    //! \brief Signals connected handlers about worker's state changes
-    boost::signals2::signal<void(Worker* sender)> signal_worker_state_changed;
 
   protected:
     /**
@@ -83,7 +80,6 @@ class Worker : public Stoppable, private boost::noncopyable {
     std::atomic_uint64_t id_{0};  // Obtained from thread_id
     std::atomic<State> state_{State::kStopped};
     std::unique_ptr<std::thread> thread_{nullptr};
-    std::condition_variable thread_started_cv_{};
     std::exception_ptr exception_ptr_{nullptr};
     virtual void work() = 0;  // Derived classes must override
 };

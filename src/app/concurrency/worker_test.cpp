@@ -32,16 +32,6 @@ class TestWorker final : public Worker {
     }
 };
 
-std::mutex kick_mtx;
-std::condition_variable kick_cv;
-
-void trace_worker_state_changes(const Worker* origin) {
-    auto new_state{origin->state()};
-    std::ignore = log::Trace("Worker state changed", {"name", origin->name(), "id", std::to_string(origin->id()),
-                                                      "state", std::string(magic_enum::enum_name(new_state))});
-    if (new_state == Worker::State::kKickWaiting) kick_cv.notify_one();
-}
-
 TEST_CASE("Threaded Worker", "[concurrency]") {
     using namespace std::placeholders;
     using enum Worker::State;
@@ -49,34 +39,18 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
     const log::SetLogVerbosityGuard log_guard(log::Level::kTrace);
 
     SECTION("No throw") {
-        TestWorker worker(false);
-        auto connection = worker.signal_worker_state_changed.connect(std::bind(&trace_worker_state_changes, _1));
+        TestWorker worker(/* should_throw=*/false);
         CHECK(worker.state() == kStopped);
         worker.start();
-
-        {
-            std::unique_lock l(kick_mtx);
-            kick_cv.wait(l);
-        }
-        CHECK(worker.get_increment() == 0);
-
+        CHECK(worker.get_increment() == 0U);
         worker.kick();
-        {
-            std::unique_lock l(kick_mtx);
-            kick_cv.wait(l);
-        }
-        CHECK(worker.get_increment() == 1);
-
+        CHECK(worker.get_increment() == 1U);
         worker.kick();
-        {
-            std::unique_lock l(kick_mtx);
-            kick_cv.wait(l);
-        }
-        CHECK(worker.get_increment() == 2);
+        CHECK(worker.get_increment() == 2U);
 
         worker.stop(true);
         CHECK(worker.state() == kStopped);
-        connection.disconnect();
+        CHECK(worker.get_increment() == 2);
     }
 
     SECTION("Throw") {
@@ -94,7 +68,7 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
         CHECK(worker.state() == kStopped);
         worker.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        CHECK(worker.state() == kStopped);  // likely
+        CHECK(worker.state() == kStopped);
         CHECK(worker.stop(true) == false);
         CHECK(worker.state() == kStopped);
     }
