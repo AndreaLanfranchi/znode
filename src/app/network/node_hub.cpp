@@ -94,6 +94,10 @@ unsigned NodeHub::on_service_timer_expired(unsigned interval) {
             iterator = nodes_.erase(iterator);
             continue;
         }
+        if (not iterator->second->is_stopping()) {
+            ++iterator;
+            continue;
+        }
         auto& node{*iterator->second};
         if (is_stopping()) {
             std::ignore = node.stop(false);
@@ -229,7 +233,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
             [&socket_error_code](const boost::system::error_code& error_code) { socket_error_code = error_code; });
 
         while (socket_error_code == asio::error::in_progress) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             if (std::chrono::steady_clock::now() > deadline) {
                 socket.close(socket_error_code);
                 socket_error_code = boost::asio::error::timed_out;

@@ -8,13 +8,15 @@
 #include <app/common/log.hpp>
 #include <app/concurrency/worker.hpp>
 
+#include "core/common/assert.hpp"
+
 namespace zenpp {
 
 Worker::~Worker() { Worker::stop(/*wait=*/true); }
 
 bool Worker::start() noexcept {
-    const bool already_requested{!Stoppable::start()};
-    if (already_requested) return false;
+    const bool start_already_requested{!Stoppable::start()};
+    if (start_already_requested) return false;
     state_.store(State::kStarting);
     signal_worker_state_changed(this);
 
@@ -22,7 +24,7 @@ bool Worker::start() noexcept {
     id_.store(0);
 
     thread_ = std::make_unique<std::thread>([this]() {
-        log::set_thread_name(name_.c_str());
+        log::set_thread_name(name_);
 
         // Retrieve the id
         id_.store(log::get_thread_id());
@@ -37,6 +39,9 @@ bool Worker::start() noexcept {
                 std::ignore = log::Error("Worker error", {"name", name_, "id", std::to_string(id_.load()), "exception",
                                                           std::string(ex.what())});
                 exception_ptr_ = std::current_exception();
+            } catch (...) {
+                std::ignore = log::Error(
+                    "Worker error", {"name", name_, "id", std::to_string(id_.load()), "exception", "Undefined error"});
             }
         }
         state_.store(State::kStopped);
@@ -54,15 +59,25 @@ bool Worker::start() noexcept {
 }
 
 bool Worker::stop(bool wait) noexcept {
-    const bool already_requested{!Stoppable::stop(wait)};
-    if (not already_requested) kick();
-    if (wait and thread_ not_eq nullptr and thread_->joinable() and
-        thread_->get_id() not_eq std::this_thread::get_id()) {
-        thread_->join();
-        thread_.reset();
-        Stoppable::set_stopped();
+    // Worker thread cannot call stop on itself
+    // It has to exit the work() function to be stopped
+    if (thread_->get_id() == std::this_thread::get_id()) {
+        std::ignore =
+            log::Error("Worker::stop() called from worker thread", {"name", name_, "id", std::to_string(id_.load())});
+        ASSERT(false);
     }
-    return not already_requested and wait;
+
+    const bool stop_already_requested{not Stoppable::stop(wait)};
+    if (stop_already_requested) return false;
+
+    kick();
+    if (thread_ not_eq nullptr) {
+        if (wait and thread_->joinable()) {
+            thread_->join();
+            thread_.reset();
+        }
+    }
+    return true;
 }
 
 void Worker::kick() {
