@@ -78,14 +78,14 @@ void Worker::kick() {
 bool Worker::wait_for_kick(uint32_t timeout_milliseconds) {
     bool expected_kicked_value{true};
     while (not kicked_.compare_exchange_strong(expected_kicked_value, false)) {
-        if (is_stopping()) return false;
         if (timeout_milliseconds > 0U) {
             std::unique_lock lock(kick_mtx_);
             std::ignore = kicked_cv_.wait_for(lock, std::chrono::milliseconds(timeout_milliseconds));
         } else {
             std::this_thread::yield();
         }
-        expected_kicked_value = true;  // !!Important
+        if (is_stopping()) return false;  // Might have been a kick to stop
+        expected_kicked_value = true;     // !!Important - reset the expected value
     }
     return true;
 }
