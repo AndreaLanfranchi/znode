@@ -311,7 +311,7 @@ Note : a connection is deemed _idle_ when no data is exchanged between the two p
 
 ### `--network.pinginterval`
 
-This argument is an option. It specifies the interval, in seconds, between `ping` messages the node sends out to
+This argument is an option. It specifies the get_interval, in seconds, between `ping` messages the node sends out to
 connected peers to evaluate communication latency.
 The default value is 120. Acceptable values are in range (30, 3600). If you want to change this value you can pass the
 argument such as:
@@ -320,10 +320,10 @@ argument such as:
 $ ./zenpp [...] --network.pinginterval 240
 ```
 
-where `240` is the new interval, in seconds, between `ping` messages the node sends out to connected peers to evaluate
+where `240` is the new get_interval, in seconds, between `ping` messages the node sends out to connected peers to evaluate
 communication latency.
-Note: the effective interval between `ping` messages is randomized, on a connection basis, in a range value +/- 30%.
-This is done to avoid predictability of interval and as a result a possible _cheat_ on response values.
+Note: the effective get_interval between `ping` messages is randomized, on a connection basis, in a range value +/- 30%.
+This is done to avoid predictability of get_interval and as a result a possible _cheat_ on response values.
 
 ### `--network.pingtimeout`
 
@@ -430,10 +430,10 @@ frequent**
 ### `--syncloop.throttle`
 
 This argument is an option. Sets the minimum delay, in seconds, between sync loop starts. The default value is 0.
-It might be useful in conditions where the block interval is very narrow and the node keeps staying in sync with the tip
+It might be useful in conditions where the block get_interval is very narrow and the node keeps staying in sync with the tip
 of the chain while you don't have interest in such a realt time update: maybe you use node data for statistical purposes
 and you don't want to waste resources in keeping the node in sync with the tip of the chain.
-Generally it does not make sense to have this value set to anything below or equal the average block interval of the
+Generally it does not make sense to have this value set to anything below or equal the average block get_interval of the
 chain you're connecting to.
 If you want to change this value you can pass the argument such as:
 
@@ -445,7 +445,7 @@ where `10` is the new minimum delay, in seconds, between sync loop starts.
 
 ### `--syncloop.loginterval`
 
-This argument is an option. Sets the minimum interval, in seconds, between printouts of loglines informing about status
+This argument is an option. Sets the minimum get_interval, in seconds, between printouts of loglines informing about status
 of current stage.
 The default value is 30. Reducing this value might result in very verbose logs.
 If you want to change this value you can pass the argument such as:

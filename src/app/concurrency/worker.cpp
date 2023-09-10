@@ -84,8 +84,8 @@ bool Worker::wait_for_kick(uint32_t timeout_milliseconds) {
         } else {
             std::this_thread::yield();
         }
-        if (is_stopping()) return false;  // Might have been a kick to stop
-        expected_kicked_value = true;     // !!Important - reset the expected value
+        if (not is_running()) return false;  // Might have been a kick to stop
+        expected_kicked_value = true;        // !!Important - reset the expected value
     }
     return true;
 }

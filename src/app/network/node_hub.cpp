@@ -75,14 +75,16 @@ bool NodeHub::stop(bool wait) noexcept {
 unsigned NodeHub::on_service_timer_expired(unsigned interval) {
     print_network_info();  // Print info every 5 seconds
 
+    const bool running{is_running()};
+
     // If we have room connect to the pending connection requests
-    if (not is_stopping() and size() < 64U /*app_settings_.network.max_active_connections*/ and
+    if (running and size() < 64U /*app_settings_.network.max_active_connections*/ and
         not pending_connections_.empty()) {
-        const auto new_connection{pending_connections_.pop()};
-        const std::lock_guard<std::mutex> lock{nodes_mutex_};
-        if (not connected_addresses_.contains(*(*new_connection).endpoint_.address_)) {
-            bool expected{false};
-            if (async_connecting_.compare_exchange_strong(expected, true, std::memory_order_acquire)) {
+        bool expected{false};
+        if (async_connecting_.compare_exchange_strong(expected, true)) {
+            const auto new_connection{pending_connections_.pop()};
+            const std::lock_guard<std::mutex> lock{nodes_mutex_};
+            if (not connected_addresses_.contains(*(*new_connection).endpoint_.address_)) {
                 asio::post(asio_strand_, [this, new_connection]() { async_connect(*new_connection); });
             }
         }
@@ -94,14 +96,19 @@ unsigned NodeHub::on_service_timer_expired(unsigned interval) {
             iterator = nodes_.erase(iterator);
             continue;
         }
-        if (not iterator->second->is_stopping()) {
+        if (not iterator->second->is_running()) {
+            iterator->second.reset();
             ++iterator;
             continue;
         }
+        if (not running) {
+            std::ignore = iterator->second->stop(false);
+            ++iterator;
+            continue;
+        }
+
         auto& node{*iterator->second};
-        if (is_stopping()) {
-            std::ignore = node.stop(false);
-        } else if (const auto idling_result{node.is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
+        if (const auto idling_result{node.is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(idling_result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "node",
                                      std::to_string(iterator->first), "remote", node.to_string(), "reason", reason})
@@ -166,7 +173,7 @@ void NodeHub::feed_connections_from_dns() {
     }
 
     for (const auto& [host_name, endpoints] : host_to_endpoints) {
-        if (is_stopping()) return;
+        if (not is_running()) return;
         if (endpoints.empty()) {
             log::Error("NodeHub",
                        {"action", "dns_resolve", "host", host_name, "error", "Unable to resolve host or host unknown"});
@@ -186,7 +193,7 @@ std::map<std::string, std::vector<IPEndpoint>, std::less<>> NodeHub::dns_resolve
     boost::asio::ip::tcp::resolver resolver(asio_context_);
     const auto network_port = gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_);
     for (const auto& host : hosts) {
-        if (is_stopping()) break;
+        if (not is_running()) break;
         boost::system::error_code error_code;
         const auto dns_entries{resolver.resolve(version, host, "", error_code)};
         if (error_code == boost::asio::error::host_not_found or error_code == boost::asio::error::no_data) continue;
@@ -233,14 +240,14 @@ void NodeHub::async_connect(const IPConnection& connection) {
             [&socket_error_code](const boost::system::error_code& error_code) { socket_error_code = error_code; });
 
         while (socket_error_code == asio::error::in_progress) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             if (std::chrono::steady_clock::now() > deadline) {
-                socket.close(socket_error_code);
+                std::ignore = socket.close(socket_error_code);
                 socket_error_code = boost::asio::error::timed_out;
                 break;
             }
-            if (is_stopping()) {
-                socket.close(socket_error_code);
+            if (not is_running()) {
+                std::ignore = socket.close(socket_error_code);
                 socket_error_code = boost::asio::error::operation_aborted;
                 break;
             }
@@ -249,13 +256,14 @@ void NodeHub::async_connect(const IPConnection& connection) {
         if (socket_error_code) throw std::runtime_error(socket_error_code.message());
         set_common_socket_options(socket);
     } catch (const std::runtime_error& exception) {
-        socket.close(socket_error_code);
-        log::Error("Service",
-                   {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", exception.what()});
+        std::ignore = socket.close(socket_error_code);
+        std::ignore = log::Error(
+            "Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", exception.what()});
         return;
     } catch (...) {
-        socket.close(socket_error_code);
-        log::Error("Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", "unknown"});
+        std::ignore = socket.close(socket_error_code);
+        std::ignore = log::Error("Service",
+                                 {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", "unknown"});
         return;
     }
 
@@ -281,7 +289,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
 }
 
 void NodeHub::start_accept() {
-    if (is_stopping()) return;
+    if (not is_running()) return;
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service", {"name", "Node Hub", "status", "Listening for connections ..."});
     }
@@ -292,7 +300,7 @@ void NodeHub::start_accept() {
 }
 
 void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::asio::ip::tcp::socket socket) {
-    if (is_stopping() or error_code == boost::asio::error::operation_aborted) {
+    if (not is_running() or error_code == boost::asio::error::operation_aborted) {
         return;
     }
 
@@ -446,7 +454,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
 
     REQUIRES(message not_eq nullptr);
     REQUIRES(node not_eq nullptr);
-    if (is_stopping() or node->is_stopping()) return;
+    if (not is_running() or not node->is_running()) return;
 
     std::string error{};
 

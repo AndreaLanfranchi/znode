@@ -66,7 +66,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         ->check(CLI::Range(1U, 7200U));
 
     cli.add_option("--syncloop.loginterval", settings.sync_loop_log_interval_seconds,
-                   "Sets the interval between sync loop INFO logs (in seconds)")
+                   "Sets the get_interval between sync loop INFO logs (in seconds)")
         ->capture_default_str()
         ->check(CLI::Range(10U, 600U));
 

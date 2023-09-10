@@ -30,6 +30,6 @@ void Stage::check_block_sequence(BlockNum actual, BlockNum expected) {
 }
 
 void Stage::throw_if_stopping() {
-    if (is_stopping()) throw StageError(Stage::Result::kAborted);
+    if (not is_running()) throw StageError(Stage::Result::kAborted);
 }
 }  // namespace zenpp::stages

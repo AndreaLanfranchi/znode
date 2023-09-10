@@ -10,18 +10,19 @@
 namespace zenpp {
 
 bool Stoppable::start() noexcept {
-    State expected{State::kNotStarted};
-    return state_.compare_exchange_strong(expected, State::kStarted);
+    ComponentStatus expected{ComponentStatus::kNotStarted};
+    return state_.compare_exchange_strong(expected, ComponentStatus::kStarted);
 }
 
 bool Stoppable::stop([[maybe_unused]] /*in non-threaded components we don't need this*/ bool wait) noexcept {
-    State expected{State::kStarted};
-    return state_.compare_exchange_strong(expected, State::kStopping);
+    ComponentStatus expected{ComponentStatus::kStarted};
+    return state_.compare_exchange_strong(expected, ComponentStatus::kStopping);
 }
 
-Stoppable::State Stoppable::state() const noexcept { return state_.load(std::memory_order_acquire); }
+Stoppable::ComponentStatus Stoppable::status() const noexcept { return state_.load(std::memory_order_acquire); }
 
-bool Stoppable::is_stopping() const noexcept { return state() == State::kStopping; }
+bool Stoppable::is_running() const noexcept { return status() == ComponentStatus::kStarted; }
 
-void Stoppable::set_stopped() noexcept { state_.store(State::kNotStarted, std::memory_order_release); }
+void Stoppable::set_stopped() noexcept { state_.store(ComponentStatus::kNotStarted, std::memory_order_release); }
+
 }  // namespace zenpp

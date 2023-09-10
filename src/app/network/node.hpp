@@ -101,9 +101,6 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Returns whether the connection is secure
     [[nodiscard]] bool is_secure() const noexcept { return ssl_context_ != nullptr; }
 
-    //! \brief Returns whether the node is currently connected
-    [[nodiscard]] bool is_connected() const noexcept { return !is_stopping() && is_connected_.load(); }
-
     //! \brief Returns the remote endpoint
     [[nodiscard]] IPEndpoint remote_endpoint() const noexcept { return remote_endpoint_; }
 
@@ -116,8 +113,8 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     }
 
     //! \brief Returns whether the socket is connected and the protocol handshake is completed
-    [[nodiscard]] bool fully_connected() const noexcept {
-        return !is_stopping() && is_connected_.load() &&
+    [[nodiscard]] bool is_connected() const noexcept {
+        return is_running() && socket_.is_open() &&
                get_protocol_handshake_status() == ProtocolHandShakeStatus::kCompleted;
     }
 
@@ -126,7 +123,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the remote node supports the specified service
     [[nodiscard]] bool has_service(NodeServicesType service) const noexcept {
-        return (fully_connected() && (((local_version_.services_ & static_cast<uint64_t>(service)) != 0)));
+        return (is_connected() && (((local_version_.services_ & static_cast<uint64_t>(service)) != 0)));
     }
 
     //! \brief Returns the average ping latency in milliseconds
@@ -137,7 +134,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] NodeIdleResult is_idle() const noexcept;
 
     //! \brief Returns whether the node as advertised himself as a relayer (Version message)
-    [[nodiscard]] bool is_relayer() const noexcept { return (fully_connected() && local_version_.relay_); }
+    [[nodiscard]] bool is_relayer() const noexcept { return (is_connected() && local_version_.relay_); }
 
     //! \brief Returns the total number of bytes read from the socket
     [[nodiscard]] size_t bytes_received() const noexcept { return bytes_received_.load(); }
@@ -166,11 +163,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     void end_inbound_message();
 
     //! \brief Sends a ping to the remote peer on cadence
-    //! \remark The interval is randomly chosen on setting's ping interval +/- 30%
+    //! \remark The interval is randomly chosen on setting's ping get_interval +/- 30%
     uint32_t on_ping_timer_expired(uint32_t interval_milliseconds) noexcept;
 
     //! \brief Computes the ping latency and updates the EMA
-    //! \details Ping latency is the interval between the sending of a ping message and the reception of the
+    //! \details Ping latency is the get_interval between the sending of a ping message and the reception of the
     //! corresponding pong message
     void process_ping_latency(uint64_t latency_ms);
 
@@ -211,7 +208,6 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<ProtocolHandShakeStatus> protocol_handshake_status_{
         ProtocolHandShakeStatus::kNotInitiated};                         // Status of protocol handshake
     std::atomic_int version_{kDefaultProtocolVersion};                   // Protocol version negotiated during handshake
-    std::atomic_bool is_connected_{true};                                // Status of socket connection
     std::atomic<std::chrono::steady_clock::time_point> connected_time_;  // Time of connection
     std::atomic<std::chrono::steady_clock::time_point> last_message_received_time_;  // Last fully "in" message tstamp
     std::atomic<std::chrono::steady_clock::time_point> last_message_sent_time_;      // Last fully "out" message

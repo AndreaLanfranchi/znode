@@ -17,7 +17,7 @@ class Stoppable {
     virtual ~Stoppable() = default;
 
     //! \brief The state of the component
-    enum class State {
+    enum class ComponentStatus {
         kNotStarted,  // Not started yet
         kStarted,     // Started and running
         kStopping,    // A stop request has been issued
@@ -32,12 +32,12 @@ class Stoppable {
     virtual bool stop(bool wait) noexcept;
 
     //! \brief Returns the current state of the component
-    [[nodiscard]] State state() const noexcept;
+    [[nodiscard]] ComponentStatus status() const noexcept;
 
-    //! \brief Returns whether the component is stopping
-    //! \remarks It returns true also in case an OS signal has been trapped
-    [[nodiscard]] virtual bool is_stopping() const noexcept;
+    //! \brief Returns whether the component is running i.e. started
+    [[nodiscard]] virtual bool is_running() const noexcept;
 
+  protected:
     //! \brief This should be called by the component when, after a stop request,
     //! it has completed all outstanding tasks. This will set the component as stopped
     //! and will allow for a new start
@@ -45,7 +45,7 @@ class Stoppable {
     void set_stopped() noexcept;
 
   private:
-    std::atomic<State> state_{State::kNotStarted};  // The state of the component
+    std::atomic<ComponentStatus> state_{ComponentStatus::kNotStarted};  // The state of the component
     std::atomic_bool started_{false};               // Whether the component has been started
     std::atomic_bool stop_requested_{false};        // Whether a stop request has been issued
 };

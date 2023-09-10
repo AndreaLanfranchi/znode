@@ -81,8 +81,6 @@ bool Node::start() noexcept {
 bool Node::stop(bool wait) noexcept {
     const auto ret{Stoppable::stop(wait)};
     if (ret) /* not already stopped */ {
-        is_connected_.store(false);
-        is_writing_.store(false);
         ping_timer_.stop(false);
 
         boost::system::error_code error_code;
@@ -116,12 +114,10 @@ uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return 0U;
     }
-    return is_stopping() ? 0U : (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U);
+    return (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U);
 }
 
 void Node::process_ping_latency(const uint64_t latency_ms) {
-    if (is_stopping()) return;
-
     std::list<std::string> log_params{"action", __func__, "latency", absl::StrCat(latency_ms, "ms")};
 
     if (latency_ms > app_settings_.network.ping_timeout_milliseconds) {
@@ -161,7 +157,7 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
 
 void Node::start_ssl_handshake() {
     REQUIRES(ssl_context_ not_eq nullptr);
-    if (not is_connected_.load() or not socket_.is_open()) return;
+    if (not socket_.is_open()) return;
     const asio::ssl::stream_base::handshake_type handshake_type{connection_.type_ == IPConnectionType::kInbound
                                                                     ? asio::ssl::stream_base::server
                                                                     : asio::ssl::stream_base::client};
@@ -191,7 +187,7 @@ void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
 }
 
 void Node::start_read() {
-    if (is_stopping()) return;
+    if (not is_running()) return;
     auto read_handler{
         [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
             self->handle_read(error_code, bytes_transferred);
@@ -207,8 +203,8 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
     // Due to the nature of asio, this function might be called late after stop() has been called
     // and the socket has been closed. In this case we should do nothing as the payload received (if any)
     // is not relevant anymore.
-    if (is_stopping()) return;
-    if (error_code) [[unlikely]] {
+    if (not is_running()) return;
+    if (error_code) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", error_code.message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
@@ -236,7 +232,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
 }
 
 void Node::start_write() {
-    if (is_stopping()) return;
+    if (not is_running()) return;
     if (bool expected{false}; not is_writing_.compare_exchange_strong(expected, true)) {
         return;  // Already writing - the queue will cause this to re-enter automatically
     }
@@ -331,7 +327,7 @@ void Node::start_write() {
 }
 
 void Node::handle_write(const boost::system::error_code& error_code, size_t bytes_transferred) {
-    if (is_stopping()) {
+    if (not is_running()) {
         is_writing_.store(false);
         return;
     }
@@ -619,7 +615,7 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
 }
 
 void Node::on_fully_connected() {
-    if (is_stopping()) return;
+    if (not is_running()) return;
 
     // If this is a seeder node then we should send a `getaddr` message
     if (connection_.type_ == IPConnectionType::kSeedOutbound) {

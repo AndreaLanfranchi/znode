@@ -100,7 +100,7 @@ However, due to the lack of 128-bit integers support by MSVC, execution performa
 
 To be able to build on Windows you have to ensure the following requirements are installed
 - [Visual Studio] Build Tools >= 2019 16.9.2 : ensure your setup includes CMake support and Windows 10 SDK 
-- Perl Language : either [Strawberry Perl](https://strawberryperl.com/) or [Active State Perl](https://www.activestate.com/products/perl/) are fine
+- Perl Language : either [Strawberry Perl](https://strawberryperl.com/) or [Active ComponentStatus Perl](https://www.activestate.com/products/perl/) are fine
 
 If you're willing to use [Visual Studio] (Community Edition is fine) as your primary IDE then the build tools are already included in the setup package (still you have to ensure the required components are installed).
 Alternatively you can use [VSCode] or [CLion]

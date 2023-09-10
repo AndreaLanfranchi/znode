@@ -194,7 +194,7 @@ int main(int argc, char* argv[]) {
         // If it's too long, we'll stop the node
         StopWatch node_hub_idle_sw(true);
 
-        // TODO while (sync_loop.get_state() != Worker::State::kStopped) {
+        // TODO while (sync_loop.get_state() != Worker::ComponentStatus::kStopped) {
         while (true) {
             std::this_thread::sleep_for(500ms);
 

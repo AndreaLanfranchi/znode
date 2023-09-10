@@ -34,13 +34,13 @@ class TestWorker final : public Worker {
 
 TEST_CASE("Threaded Worker", "[concurrency]") {
     using namespace std::placeholders;
-    using enum Worker::State;
+    using enum Stoppable::ComponentStatus;
 
     const log::SetLogVerbosityGuard log_guard(log::Level::kTrace);
 
     SECTION("No throw") {
         TestWorker worker(/* should_throw=*/false);
-        CHECK(worker.state() == kStopped);
+        CHECK(worker.status() == kNotStarted);
         worker.start();
         CHECK(worker.get_increment() == 0U);
         worker.kick();
@@ -49,28 +49,28 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
         CHECK(worker.get_increment() == 2U);
 
         worker.stop(true);
-        CHECK(worker.state() == kStopped);
+        CHECK(worker.status() == kNotStarted);
         CHECK(worker.get_increment() == 2);
     }
 
     SECTION("Throw") {
         TestWorker worker(true);
-        CHECK(worker.state() == kStopped);
+        CHECK(worker.status() == kNotStarted);
         worker.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        CHECK(worker.state() == kStopped);
+        CHECK(worker.status() == kNotStarted);
         CHECK(worker.has_exception() == true);
         CHECK_THROWS(worker.rethrow());
     }
 
     SECTION("Stop when already exited") {
         TestWorker worker(true);
-        CHECK(worker.state() == kStopped);
+        CHECK(worker.status() == kNotStarted);
         worker.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        CHECK(worker.state() == kStopped);
+        CHECK(worker.status() == kNotStarted);
         CHECK(worker.stop(true) == false);
-        CHECK(worker.state() == kStopped);
+        CHECK(worker.status() == kNotStarted);
     }
 }
 }  // namespace zenpp
