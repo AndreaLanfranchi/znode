@@ -607,13 +607,13 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
     protocol_handshake_status_.store(static_cast<ProtocolHandShakeStatus>(status | new_status_flag));
     if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) {
         // Happens only once per session
-        on_fully_connected();
+        on_handshake_completed();
     }
 
     return kSuccess;
 }
 
-void Node::on_fully_connected() {
+void Node::on_handshake_completed() {
     if (not is_running()) return;
 
     // If this is a seeder node then we should send a `getaddr` message

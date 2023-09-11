@@ -182,7 +182,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
                                                                                abi::NetMessageType message_type);
 
-    void on_fully_connected();  // Called when the protocol handshake is completed
+    void on_handshake_completed();  // Called when the protocol handshake is completed
 
     void start_write();  // Begin writing to the socket asynchronously
     void handle_write(const boost::system::error_code& error_code, size_t bytes_transferred);  // Async write handler
