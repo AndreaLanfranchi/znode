@@ -31,7 +31,8 @@ Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_c
            std::function<void(std::shared_ptr<Node>, std::shared_ptr<abi::NetMessage>)> on_message)
     : app_settings_(app_settings),
       connection_(connection),
-      io_strand_(io_context),
+      input_strand_(io_context),
+      output_strand_(io_context),
       ping_timer_(io_context, "Node_ping_timer"),
       socket_(std::move(socket)),
       ssl_context_(ssl_context),
@@ -68,9 +69,9 @@ bool Node::start() noexcept {
 
     if (ssl_context_ not_eq nullptr) {
         ssl_stream_ = std::make_unique<asio::ssl::stream<tcp::socket&>>(socket_, *ssl_context_);
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->start_ssl_handshake(); });
+        asio::post(input_strand_, [self{shared_from_this()}]() { self->start_ssl_handshake(); });
     } else {
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
+        asio::post(input_strand_, [self{shared_from_this()}]() { self->start_read(); });
         std::ignore = push_message(abi::NetMessageType::kVersion, local_version_);
     }
     return true;
@@ -109,7 +110,7 @@ uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", std::string(magic_enum::enum_name(ret))};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+        asio::post(input_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return 0U;
     }
     return (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U);
@@ -122,7 +123,7 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
         log_params.insert(log_params.end(),
                           {"max", absl::StrCat(app_settings_.network.ping_timeout_milliseconds, "ms")});
         print_log(log::Level::kWarning, log_params, "Timeout! Disconnecting ...");
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+        asio::post(input_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return;
     }
 
@@ -206,7 +207,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", error_code.message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+        asio::post(input_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return;
     }
 
@@ -220,13 +221,13 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
             const std::list<std::string> log_params{"action", __func__, "status",
                                                     std::string(magic_enum::enum_name(parse_result))};
             print_log(log::Level::kError, log_params, " Disconnecting ...");
-            asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+            asio::post(input_strand_, [self{shared_from_this()}]() { self->stop(false); });
             return;
         }
     }
 
     // Continue reading from socket
-    asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
+    asio::post(input_strand_, [self{shared_from_this()}]() { self->start_read(); });
 }
 
 void Node::start_write() {
@@ -283,7 +284,7 @@ void Node::start_write() {
             }
             outbound_message_.reset();
             is_writing_.store(false);
-            asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+            asio::post(input_strand_, [self{shared_from_this()}]() { self->stop(false); });
             return;
         }
 
@@ -337,7 +338,7 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
             print_log(log::Level::kError, log_params, "Disconnecting ...");
         }
         is_writing_.store(false);
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+        asio::post(input_strand_, [self{shared_from_this()}]() { self->stop(false); });
         return;
     }
 
@@ -360,7 +361,7 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
         }
     } else {
         is_writing_.store(false);
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->start_write(); });
+        asio::post(output_strand_, [self{shared_from_this()}]() { self->start_write(); });
     }
 }
 
@@ -382,7 +383,7 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type, 
     outbound_messages_.emplace_back(new_message.release());
     lock.unlock();
 
-    boost::asio::post(io_strand_, [self{shared_from_this()}]() { self->start_write(); });
+    boost::asio::post(output_strand_, [self{shared_from_this()}]() { self->start_write(); });
     return kSuccess;
 }
 

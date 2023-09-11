@@ -18,4 +18,10 @@ The major components of the networking layer are:
 of its session while allowing other nodes to run concurrently. The concurrency level is function of the number of cores available on the running host. In any case the performances are unmatched.
 
 ## Node-hub
-The node-hub is the main network component of the `zenpp` instance. It handles the connections with all nodes whether inbound or outbound.
+The node-hub is the main network component for `zenpp` instance. It is responsible for the creation of nodes instances - whether inbound or outbound - and for the routing of messages:
+- inbound messages received from nodes are routed to the appropriate higher level handlers
+- outbound messages, generated within the application (e.g. requests for data) are routed to the appropriate node(s) for delivery
+As an additional feature node-hub is also responsible for the collection of nodes addressed as advised by DNS seeds or peers.
+
+## Node
+
