@@ -29,13 +29,6 @@
 
 namespace zenpp::network {
 
-// enum class NodeConnectionMode {
-//     kInbound,         // Node is accepting connections
-//     kOutbound,        // Node is connecting to other nodes
-//     kManualOutbound,  // Forced connection to a specific node
-//     kSeedOutbound     // Connection to a seed node
-// };
-
 enum class NodeIdleResult {
     kNotIdle,                   // Node is not idle
     kProtocolHandshakeTimeout,  // Too much time for protocol handshake
@@ -191,16 +184,15 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     void print_log(log::Level severity, const std::list<std::string>& params,
                    const std::string& extra_data = "") const noexcept;
 
-    AppSettings& app_settings_;                      // Reference to global application settings
-    static std::atomic_int next_node_id_;            // Used to generate unique node ids
-    const int node_id_{next_node_id()};              // Unique node id
-    const IPConnection connection_;                  // Whether inbound or outbound
-    boost::asio::io_context::strand input_strand_;   // Serialized execution of reads
-    boost::asio::io_context::strand output_strand_;  // Serialized execution of writes
-    AsioTimer ping_timer_;                           // To periodically send ping messages
-    boost::asio::ip::tcp::socket socket_;            // The underlying socket (either plain or SSL)
-    IPEndpoint remote_endpoint_;                     // Remote endpoint
-    IPEndpoint local_endpoint_;                      // Local endpoint
+    AppSettings& app_settings_;                  // Reference to global application settings
+    static std::atomic_int next_node_id_;        // Used to generate unique node ids
+    const int node_id_{next_node_id()};          // Unique node id
+    const IPConnection connection_;              // Whether inbound or outbound
+    boost::asio::io_context::strand io_strand_;  // Serialized execution of reads and writes
+    AsioTimer ping_timer_;                       // To periodically send ping messages
+    boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
+    IPEndpoint remote_endpoint_;                 // Remote endpoint
+    IPEndpoint local_endpoint_;                  // Local endpoint
 
     boost::asio::ssl::context* ssl_context_;
     std::unique_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> ssl_stream_;  // SSL stream
