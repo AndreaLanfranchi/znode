@@ -27,7 +27,6 @@ std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 
 Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
            boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
-           std::function<void(std::shared_ptr<Node>)> on_disconnect,
            std::function<void(DataDirectionMode, size_t)> on_data,
            std::function<void(std::shared_ptr<Node>, std::shared_ptr<abi::NetMessage>)> on_message)
     : app_settings_(app_settings),
@@ -36,7 +35,6 @@ Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_c
       ping_timer_(io_context, "Node_ping_timer"),
       socket_(std::move(socket)),
       ssl_context_(ssl_context),
-      on_disconnect_(std::move(on_disconnect)),
       on_data_(std::move(on_data)),
       on_message_(std::move(on_message)) {
     // TODO Set version's services according to settings
@@ -55,7 +53,7 @@ Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_c
     local_version_.nonce_ = app_settings_.network.nonce;
     local_version_.user_agent_ = get_buildinfo_string();
     local_version_.last_block_height_ = 0;  // TODO Set this value to the current blockchain height
-    local_version_.relay_ = true;           // TODO
+    local_version_.relay_ = true;           // TODO Set this value from command line options
 }
 
 bool Node::start() noexcept {
@@ -94,8 +92,8 @@ bool Node::stop(bool wait) noexcept {
             std::ignore = socket_.shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
             std::ignore = socket_.close(error_code);
         }
-
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->on_disconnect_(self); });
+        set_stopped();  // This marks all is done. Higher level code can now destroy the object if they hold the last
+                        // reference
     }
     return ret;
 }

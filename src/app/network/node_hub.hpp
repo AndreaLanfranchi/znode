@@ -62,7 +62,14 @@ class NodeHub : public Stoppable {
     void handle_accept(const boost::system::error_code& error_code,
                        boost::asio::ip::tcp::socket socket);  // Async accept handler
 
-    void on_node_disconnected(std::shared_ptr<Node> node);  // Handles disconnects from nodes
+    //! \brief Accounts data about node's socket disconnections
+    //! \remarks Requires a lock on nodes_mutex_ is holding
+    void on_node_disconnected(const std::shared_ptr<Node>& node);
+
+    //! \brief Accounts data about node's socket connections
+    void on_node_connected(const std::shared_ptr<Node>& node);
+
+    //! \brief Handles data traffic on the wire accounting from nodes
     void on_node_data(DataDirectionMode direction,
                       size_t bytes_transferred);  // Handles data size accounting from nodes
 
@@ -71,6 +78,7 @@ class NodeHub : public Stoppable {
     //! appropriate workers/handlers. Messages pertaining to node session itself MUST NOT reach here
     //! as they SHOULD be handled by the node itself.
     void on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message);
+
 
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options
 

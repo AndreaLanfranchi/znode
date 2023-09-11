@@ -60,7 +60,6 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
     Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
          boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
-         std::function<void(std::shared_ptr<Node>)> on_disconnect /* handles disconnections on node-hub */,
          std::function<void(DataDirectionMode, size_t)> on_data /* handles data size accounting on node-hub */,
          std::function<void(std::shared_ptr<Node>, std::shared_ptr<abi::NetMessage>)>
              on_message /* handles connections on node-hub */);
@@ -218,8 +217,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic_uint64_t min_ping_latency_{0};                                // Minimum ping latency
     std::atomic_uint64_t ema_ping_latency_{0};  // Exponential moving average of ping latency
 
-    std::function<void(std::shared_ptr<Node>)> on_disconnect_;  // Called after stop (notifies hub)
-    std::function<void(DataDirectionMode, size_t)> on_data_;    // To account data sizes stats at node hub
+    std::function<void(DataDirectionMode, size_t)> on_data_;  // To account data sizes stats at node hub
     std::function<void(std::shared_ptr<Node>, std::shared_ptr<abi::NetMessage>)>
         on_message_;  // Called on inbound message
 

@@ -97,6 +97,7 @@ unsigned NodeHub::on_service_timer_expired(unsigned interval) {
             continue;
         }
         if (not iterator->second->is_running()) {
+            on_node_disconnected(iterator->second);
             iterator->second.reset();
             ++iterator;
             continue;
@@ -267,13 +268,9 @@ void NodeHub::async_connect(const IPConnection& connection) {
         return;
     }
 
-    ++total_connections_;
-    ++current_active_outbound_connections_;
-
     std::shared_ptr<Node> new_node(
         new Node(
             app_settings_, connection, asio_context_, std::move(socket), tls_client_context_.get(),
-            [this](const std::shared_ptr<Node> node) { on_node_disconnected(node); },
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
             },
@@ -282,9 +279,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
             }),
         Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
 
-    lock.lock();
-    nodes_.try_emplace(new_node->id(), new_node);
-    connected_addresses_[*new_node->remote_endpoint().address_]++;
+    on_node_connected(new_node);
     new_node->start();
 }
 
@@ -325,7 +320,6 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
         return;
     }
 
-    ++total_connections_;
     // Check we do not exceed the maximum number of connections
     if (size() >= app_settings_.network.max_active_connections) {
         ++total_rejected_connections_;
@@ -336,6 +330,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
     }
 
     // Check we do not exceed the maximum number of connections per IP
+    std::unique_lock<std::mutex> lock{nodes_mutex_};
     if (auto item = connected_addresses_.find(socket.remote_endpoint().address());
         item not_eq connected_addresses_.end()) {
         if (item->second >= app_settings_.network.max_active_connections_per_ip) {
@@ -347,6 +342,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
             return;
         }
     }
+    lock.unlock();
 
     set_common_socket_options(socket);
     const IPEndpoint remote{socket.remote_endpoint()};
@@ -356,7 +352,6 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
     const std::shared_ptr<Node> new_node(
         new Node(
             app_settings_, connection, asio_context_, std::move(socket), tls_server_context_.get(),
-            [this](const std::shared_ptr<Node>& node) { on_node_disconnected(node); },
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
             },
@@ -367,13 +362,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
     log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local.to_string(), "remote",
                           remote.to_string(), "id", std::to_string(new_node->id())});
 
-    ++current_active_inbound_connections_;
-    {
-        const std::lock_guard<std::mutex> lock(nodes_mutex_);
-        nodes_.try_emplace(new_node->id(), new_node);
-        connected_addresses_[*new_node->remote_endpoint().address_]++;
-    }
-
+    on_node_connected(new_node);
     new_node->start();
     asio::post(asio_strand_, [this]() { this->start_accept(); });  // Continue listening for new connections
 }
@@ -396,9 +385,7 @@ void NodeHub::initialize_acceptor() {
                           local_endpoint.to_string()});
 }
 
-void NodeHub::on_node_disconnected(const std::shared_ptr<Node> node) {
-    const std::lock_guard<std::mutex> lock(nodes_mutex_);
-
+void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
     if (auto item{connected_addresses_.find(*node->remote_endpoint().address_)};
         item not_eq connected_addresses_.end()) {
         if (--item->second == 0) {
@@ -407,7 +394,6 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node> node) {
     }
 
     if (auto item{nodes_.find(node->id())}; item not_eq nodes_.end()) {
-        item->second.reset();  // Release the ownership of the shared_ptr (other copies may exist in flight)
         ++total_disconnections_;
         switch (node->connection().type_) {
             using enum IPConnectionType;
@@ -428,6 +414,30 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node> node) {
         }
     }
 
+    if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+        log::Trace("Service",
+                   {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",
+                    std::to_string(total_disconnections_), "rejections", std::to_string(total_rejected_connections_)});
+    }
+}
+
+void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
+    const std::lock_guard<std::mutex> lock(nodes_mutex_);
+    connected_addresses_[*node->remote_endpoint().address_]++;
+    ++total_connections_;
+    switch (node->connection().type_) {
+        case IPConnectionType::kInbound:
+            ++current_active_inbound_connections_;
+            break;
+        case IPConnectionType::kOutbound:
+        case IPConnectionType::kManualOutbound:
+        case IPConnectionType::kSeedOutbound:
+            ++current_active_outbound_connections_;
+            break;
+        default:
+            ASSERT(false);  // Should never happen
+    }
+    nodes_.try_emplace(node->id(), node);
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service",
                    {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",
