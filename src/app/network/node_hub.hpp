@@ -79,7 +79,6 @@ class NodeHub : public Stoppable {
     //! as they SHOULD be handled by the node itself.
     void on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message);
 
-
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options
 
     //! \brief Executes one maintenance cycle over all connected nodes
@@ -109,6 +108,7 @@ class NodeHub : public Stoppable {
     std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure client connections
 
     UniqueQueue<IPConnection> pending_connections_;  // Queue of pending connections to be made (outbound)
+    std::atomic_uint32_t current_active_connections_{0};
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};
 

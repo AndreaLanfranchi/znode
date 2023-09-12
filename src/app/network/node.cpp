@@ -39,7 +39,7 @@ Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_c
       on_message_(std::move(on_message)) {
     // TODO Set version's services according to settings
     local_version_.protocol_version_ = kDefaultProtocolVersion;
-    local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
+    local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork) bitor static_cast<uint64_t>(NodeServicesType::kNodeGetUTXO);
     local_version_.timestamp_ = ToUnixSeconds(absl::Now());
     local_version_.recipient_service_ = VersionNodeService(socket_.remote_endpoint());
     local_version_.sender_service_ = VersionNodeService(socket_.local_endpoint());
@@ -80,22 +80,34 @@ bool Node::stop(bool wait) noexcept {
     const auto ret{Stoppable::stop(wait)};
     if (ret) /* not already stopped */ {
         ping_timer_.stop(false);
-
-        boost::system::error_code error_code;
-        if (ssl_stream_ not_eq nullptr) {
-            std::ignore = ssl_stream_->shutdown(error_code);
-            std::ignore = ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
-            std::ignore = ssl_stream_->lowest_layer().close(error_code);
-            // Don't reset the stream !!! There might be outstanding async operations
-            // Let them gracefully complete
-        } else {
-            std::ignore = socket_.shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
-            std::ignore = socket_.close(error_code);
-        }
-        set_stopped();  // This marks all is done. Higher level code can now destroy the object if they hold the last
-                        // reference
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->begin_stop(); });
     }
     return ret;
+}
+
+void Node::begin_stop() {
+
+    boost::system::error_code error_code;
+    if (ssl_stream_ not_eq nullptr) {
+        std::ignore = ssl_stream_->shutdown(error_code);
+        std::ignore = ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
+        std::ignore = ssl_stream_->lowest_layer().close(error_code);
+        // Don't reset the stream !!! There might be outstanding async operations
+        // Let them gracefully complete
+    } else {
+        std::ignore = socket_.shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
+        std::ignore = socket_.close(error_code);
+    }
+    asio::post(io_strand_, [self{shared_from_this()}]() { self->on_stop_completed(); });
+
+}
+
+void Node::on_stop_completed() noexcept {
+    if (log::test_verbosity(log::Level::kTrace)) {
+        const std::list<std::string> log_params{"action", __func__, "status", "success"};
+        print_log(log::Level::kTrace, log_params);
+    }
+    set_stopped();
 }
 
 uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
