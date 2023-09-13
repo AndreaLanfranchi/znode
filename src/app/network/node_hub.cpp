@@ -75,7 +75,6 @@ bool NodeHub::stop(bool wait) noexcept {
 }
 
 unsigned NodeHub::on_service_timer_expired(unsigned interval) {
-
     print_network_info();  // Print info every 5 seconds
     const bool running{is_running()};
 
@@ -480,6 +479,10 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
             for (const auto& service : addr_payload.identifiers_) {
                 if (app_settings_.network.ipv4_only and service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
                     continue;
+                if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
+                    log::Warning("Service", {"name", "Node Hub", "action", "handle_received_message[addr]", "remote",
+                                             service.endpoint_.to_string(), "warn", "non standard port"});
+                }
                 std::ignore = pending_connections_.push(IPConnection{service.endpoint_, IPConnectionType::kOutbound});
             }
         } else {

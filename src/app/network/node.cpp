@@ -735,7 +735,7 @@ std::string Node::to_string() const noexcept { return remote_endpoint_.to_string
 
 void Node::print_log(const log::Level severity, const std::list<std::string>& params,
                      const std::string& extra_data) const noexcept {
-    if (log::test_verbosity(severity)) return;
+    if (not log::test_verbosity(severity)) return;
     std::vector<std::string> log_params{"id", std::to_string(node_id_), "remote", this->to_string()};
     log_params.insert(log_params.end(), params.begin(), params.end());
     log::BufferBase(severity, "Node", log_params) << extra_data;
