@@ -39,7 +39,8 @@ Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_c
       on_message_(std::move(on_message)) {
     // TODO Set version's services according to settings
     local_version_.protocol_version_ = kDefaultProtocolVersion;
-    local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork) bitor static_cast<uint64_t>(NodeServicesType::kNodeGetUTXO);
+    local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork) bitor
+                               static_cast<uint64_t>(NodeServicesType::kNodeGetUTXO);
     local_version_.timestamp_ = ToUnixSeconds(absl::Now());
     local_version_.recipient_service_ = VersionNodeService(socket_.remote_endpoint());
     local_version_.sender_service_ = VersionNodeService(socket_.local_endpoint());
@@ -80,16 +81,18 @@ bool Node::stop(bool wait) noexcept {
     const auto ret{Stoppable::stop(wait)};
     if (ret) /* not already stopped */ {
         ping_timer_.stop(false);
+        if (ssl_stream_ not_eq nullptr) {
+            boost::system::error_code error_code;
+            std::ignore = ssl_stream_->shutdown(error_code);
+        }
         asio::post(io_strand_, [self{shared_from_this()}]() { self->begin_stop(); });
     }
     return ret;
 }
 
 void Node::begin_stop() {
-
     boost::system::error_code error_code;
     if (ssl_stream_ not_eq nullptr) {
-        std::ignore = ssl_stream_->shutdown(error_code);
         std::ignore = ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
         std::ignore = ssl_stream_->lowest_layer().close(error_code);
         // Don't reset the stream !!! There might be outstanding async operations
@@ -99,7 +102,6 @@ void Node::begin_stop() {
         std::ignore = socket_.close(error_code);
     }
     asio::post(io_strand_, [self{shared_from_this()}]() { self->on_stop_completed(); });
-
 }
 
 void Node::on_stop_completed() noexcept {
@@ -121,7 +123,7 @@ uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", std::string(magic_enum::enum_name(ret))};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+        stop(false);
         return 0U;
     }
     return (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U);
@@ -134,7 +136,7 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
         log_params.insert(log_params.end(),
                           {"max", absl::StrCat(app_settings_.network.ping_timeout_milliseconds, "ms")});
         print_log(log::Level::kWarning, log_params, "Timeout! Disconnecting ...");
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+        stop(false);
         return;
     }
 
@@ -218,7 +220,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", error_code.message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+        stop(false);
         return;
     }
 
@@ -232,7 +234,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
             const std::list<std::string> log_params{"action", __func__, "status",
                                                     std::string(magic_enum::enum_name(parse_result))};
             print_log(log::Level::kError, log_params, " Disconnecting ...");
-            asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+            stop(false);
             return;
         }
     }
@@ -273,7 +275,7 @@ void Node::start_write() {
     // If message has been just loaded into the barrel then we must check its validity
     // against protocol handshake rules
     if (outbound_message_->data().tellg() == 0) {
-        if (app_settings_.log.log_verbosity == log::Level::kTrace) {
+        if (log::test_verbosity(log::Level::kTrace)) {
             const std::list<std::string> log_params{
                 "action",  __func__,
                 "message", std::string(magic_enum::enum_name(outbound_message_->get_type())),
@@ -284,7 +286,7 @@ void Node::start_write() {
         auto error{
             validate_message_for_protocol_handshake(DataDirectionMode::kOutbound, outbound_message_->get_type())};
         if (error not_eq serialization::Error::kSuccess) [[unlikely]] {
-            if (app_settings_.log.log_verbosity >= log::Level::kError) {
+            if (log::test_verbosity(log::Level::kError)) {
                 // TODO : Should we drop the connection here?
                 // Actually outgoing messages' correct sequence is local responsibility
                 // maybe we should either assert or push back the message into the queue
@@ -295,7 +297,7 @@ void Node::start_write() {
             }
             outbound_message_.reset();
             is_writing_.store(false);
-            asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+            stop(false);
             return;
         }
 
@@ -343,13 +345,13 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     }
 
     if (error_code) {
-        if (app_settings_.log.log_verbosity >= log::Level::kError) {
+        if (log::test_verbosity(log::Level::kError)) {
             const std::list<std::string> log_params{"action",  __func__, "status",
                                                     "failure", "reason", error_code.message()};
             print_log(log::Level::kError, log_params, "Disconnecting ...");
         }
         is_writing_.store(false);
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(false); });
+        stop(false);
         return;
     }
 
@@ -383,7 +385,7 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type, 
     auto new_message{std::make_unique<abi::NetMessage>(version_)};
     auto err{new_message->push(message_type, payload, app_settings_.chain_config->magic_)};
     if (err not_eq kSuccess) {
-        if (app_settings_.log.log_verbosity >= log::Level::kError) {
+        if (log::test_verbosity(log::Level::kError)) {
             const std::list<std::string> log_params{"action",  __func__, "status",
                                                     "failure", "reason", std::string{magic_enum::enum_name(err)}};
             print_log(log::Level::kError, log_params);
@@ -527,6 +529,9 @@ serialization::Error Node::process_inbound_message() {
                 // Ignore the message to avoid fingerprinting
                 err_extended_reason = "Ignoring duplicate 'getaddr' message on inbound connection.";
                 break;
+            } else if (connection_.type_ == IPConnectionType::kSeedOutbound) {
+                // Disconnect from seed nodes as soon as we get some addresses from them
+                stop(false);
             }
             notify_node_hub = true;
             break;
@@ -563,7 +568,7 @@ serialization::Error Node::process_inbound_message() {
     }
 
     const bool is_fatal{is_fatal_error(err)};
-    if (is_fatal or app_settings_.log.log_verbosity >= log::Level::kTrace) {
+    if (is_fatal or log::test_verbosity(log::Level::kTrace)) {
         const std::list<std::string> log_params{
             "action",  __func__,
             "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
@@ -730,7 +735,7 @@ std::string Node::to_string() const noexcept { return remote_endpoint_.to_string
 
 void Node::print_log(const log::Level severity, const std::list<std::string>& params,
                      const std::string& extra_data) const noexcept {
-    if (app_settings_.log.log_verbosity < severity) return;
+    if (log::test_verbosity(severity)) return;
     std::vector<std::string> log_params{"id", std::to_string(node_id_), "remote", this->to_string()};
     log_params.insert(log_params.end(), params.begin(), params.end());
     log::BufferBase(severity, "Node", log_params) << extra_data;

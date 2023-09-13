@@ -110,6 +110,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
                get_protocol_handshake_status() == ProtocolHandShakeStatus::kCompleted;
     }
 
+    //! \brief Returns the total duration of current connection
+    [[nodiscard]] std::chrono::steady_clock::duration connection_duration() const noexcept {
+        return std::chrono::steady_clock::now() - connected_time_.load();
+    }
+
     //! \brief Returns information about the received Version message
     [[nodiscard]] const abi::MsgVersionPayload& version_info() const noexcept { return remote_version_; }
 
@@ -175,7 +180,10 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
                                                                                abi::NetMessageType message_type);
 
-    void on_handshake_completed();  // Called when the protocol handshake is completed
+    //! \brief To be called as soon as the protocol handshake is completed
+    //! \details This is the place where the node is considered fully connected and could start sending/receiving
+    //! messages. Also ping timer is started here.
+    void on_handshake_completed();
 
     void start_write();  // Begin writing to the socket asynchronously
     void handle_write(const boost::system::error_code& error_code, size_t bytes_transferred);  // Async write handler
