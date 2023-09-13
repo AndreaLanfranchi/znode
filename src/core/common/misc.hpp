@@ -40,7 +40,7 @@ namespace zenpp {
 
 //! \brief Parses a string representing an unsigned integer
 template <typename T>
-requires std::unsigned_integral<T>
+    requires std::unsigned_integral<T>
 bool try_parse_uint(std::string_view input, int base, T& output) noexcept {
     size_t pos{0};
     if (input.empty()) return false;
@@ -65,8 +65,8 @@ bool try_parse_ip_address_and_port(std::string_view input, boost::asio::ip::addr
 //! \brief Generates a random value of type T in a provided (min, max) range
 template <typename T>
 typename std::enable_if<std::is_integral<T>::value, T>::type randomize(const T min, const T max) {
-    std::random_device rnd;
-    std::mt19937 gen(rnd());
+    ZEN_THREAD_LOCAL std::random_device rnd;
+    ZEN_THREAD_LOCAL std::mt19937 gen(rnd());
     std::uniform_int_distribution<T> dis(min, max);
     return dis(gen);
 }
