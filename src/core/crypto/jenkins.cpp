@@ -43,7 +43,6 @@ uint64_t Jenkins::Hash(const uint32_t* source, size_t length, const uint32_t* sa
     return (static_cast<uint64_t>(b) << 32) | c;
 }
 
-// TODO(AndreaLanfranchi) replace with builtins if available
 void Jenkins::HashMix(uint32_t& a, uint32_t& b, uint32_t& c) {
     a -= c;
     a ^= std::rotl(c, 4);

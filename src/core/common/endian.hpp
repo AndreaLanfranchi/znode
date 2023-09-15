@@ -13,17 +13,25 @@
 
 #include <core/common/base.hpp>
 
-namespace zenpp::endian {
-
-// TODO(C++23) replace with std::byteswap from <bits> header
-//! \brief Reverses the bytes for given integer value
+#if __cplusplus < 202300L
+namespace std {
+//! \brief Reverses the order of bytes in the object representation of value.
+//! \remarks This function is available in std C++23. This is a backport
+//! \tparam T The type of the object to reverse.
+//! \param value The value to reverse.
+//! \return The byte reversed representation of value.
+//! \see https://en.cppreference.com/w/cpp/numeric/byteswap
 template <std::integral T>
-constexpr T byte_swap(T value) {
+constexpr T byteswap(T value) noexcept {
     static_assert(std::has_unique_object_representations_v<T>, "T may not have padding bits");
     std::array<std::byte, sizeof(T)> value_bytes{std::bit_cast<std::array<std::byte, sizeof(T)>>(value)};
     std::ranges::reverse(value_bytes);
     return std::bit_cast<T>(value_bytes);
 }
+}  // namespace std
+#endif
+
+namespace zenpp::endian {
 
 // Similar to boost::endian::load_big_u16
 const auto load_big_u16 = intx::be::unsafe::load<uint16_t>;
