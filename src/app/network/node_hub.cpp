@@ -240,8 +240,8 @@ void NodeHub::async_connect(const IPConnection& connection) {
             [&socket_error_code](const boost::system::error_code& error_code) { socket_error_code = error_code; });
 
         while (socket_error_code == asio::error::in_progress) {
-            // std::this_thread::sleep_for(std::chrono::milliseconds(200));
             std::this_thread::yield();
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
             if (std::chrono::steady_clock::now() > deadline) {
                 std::ignore = socket.close(socket_error_code);
                 socket_error_code = boost::asio::error::timed_out;
@@ -479,8 +479,9 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                 if (app_settings_.network.ipv4_only and service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
                     continue;
                 if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
-                    log::Warning("Service", {"name", "Node Hub", "action", "handle_received_message[addr]", "remote",
-                                             service.endpoint_.to_string(), "warn", "non standard port"});
+                    log::Warning("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
+                                             service.endpoint_.to_string()})
+                        << " << Non standard port";
                 }
                 std::ignore = pending_connections_.push(IPConnection{service.endpoint_, IPConnectionType::kOutbound});
             }
