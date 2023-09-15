@@ -17,8 +17,8 @@
 namespace std {
 //! \brief Reverses the order of bytes in the object representation of value.
 //! \remarks This function is available in std C++23. This is a backport
-//! \tparam T The type of the object to reverse.
-//! \param value The value to reverse.
+//! \tparam T The type of the object whose bytes must be reversed.
+//! \param value The input value.
 //! \return The byte reversed representation of value.
 //! \see https://en.cppreference.com/w/cpp/numeric/byteswap
 template <std::integral T>

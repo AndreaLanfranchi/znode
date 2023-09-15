@@ -19,7 +19,6 @@ bool AsioTimer::start() noexcept {
         start_internal();
         return true;
     }
-    set_stopped();
     return false;
 }
 
@@ -32,7 +31,12 @@ bool AsioTimer::start(uint32_t interval, CallBackFunc call_back) noexcept {
 bool AsioTimer::stop(bool wait) noexcept {
     if (Stoppable::stop(wait)) {
         std::ignore = timer_.cancel();
-        set_stopped();
+        if (wait) {
+            while (status() not_eq ComponentStatus::kNotStarted) {
+                std::this_thread::yield();
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        }
         return true;
     }
     return false;
@@ -42,11 +46,11 @@ void AsioTimer::start_internal() {
     timer_.expires_after(std::chrono::milliseconds(interval_milliseconds_.load()));
     timer_.async_wait([this](const boost::system::error_code& error_code) {
         if (error_code) {
-            //if (error_code not_eq boost::asio::error::operation_aborted) {
-                auto severity{error_code == boost::asio::error::operation_aborted ? log::Level::kTrace
-                                                                                  : log::Level::kError};
-                log::BufferBase(severity, absl::StrCat("AsioTimer[", name_, "]"),
-                                {"action", "async_wait", "error", error_code.message()});
+            // if (error_code not_eq boost::asio::error::operation_aborted) {
+            auto severity{error_code == boost::asio::error::operation_aborted ? log::Level::kTrace
+                                                                              : log::Level::kError};
+            log::BufferBase(severity, absl::StrCat("AsioTimer[", name_, "]"),
+                            {"action", "async_wait", "error", error_code.message()});
             //}
             set_stopped();
             return;

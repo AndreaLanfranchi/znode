@@ -212,12 +212,6 @@ std::map<std::string, std::vector<IPEndpoint>, std::less<>> NodeHub::dns_resolve
 }
 
 void NodeHub::async_connect(const IPConnection& connection) {
-    // Final action: reset the flag
-    auto reset_flag{gsl::finally([this]() {
-        async_connecting_.exchange(false, std::memory_order_seq_cst);
-        // std::atomic_thread_fence(std::memory_order_release);
-        // async_connecting_.store(false, std::memory_order_relaxed);
-    })};
     const std::string remote{connection.endpoint_.to_string()};
 
     log::Info("Service", {"name", "Node Hub", "action", "connect", "remote", remote});
@@ -228,6 +222,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
         log::Error("Service",
                    {"name", "Node Hub", "action", "connect", "error", "max active connections per ip reached"});
         lock.unlock();
+        async_connecting_.exchange(false, std::memory_order_seq_cst);
         return;
     }
     lock.unlock();
@@ -235,6 +230,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
     // Create the socket and try to connect using a timeout
     boost::asio::ip::tcp::socket socket{asio_context_};
     boost::system::error_code socket_error_code{asio::error::in_progress};
+
     const auto deadline{std::chrono::steady_clock::now() +
                         std::chrono::seconds(app_settings_.network.connect_timeout_seconds)};
 
@@ -264,11 +260,13 @@ void NodeHub::async_connect(const IPConnection& connection) {
         std::ignore = socket.close(socket_error_code);
         std::ignore = log::Error(
             "Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", exception.what()});
+        async_connecting_.exchange(false, std::memory_order_seq_cst);
         return;
     } catch (...) {
         std::ignore = socket.close(socket_error_code);
         std::ignore = log::Error("Service",
                                  {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", "unknown"});
+        async_connecting_.exchange(false, std::memory_order_seq_cst);
         return;
     }
 
@@ -286,6 +284,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
 
     new_node->start();
     on_node_connected(new_node);
+    async_connecting_.exchange(false, std::memory_order_seq_cst);
 }
 
 void NodeHub::start_accept() {
