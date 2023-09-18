@@ -111,7 +111,7 @@ option(BUILD_TESTS "Build tests" ON)
 get_filename_component(PROJECT_MAIN_DIR . ABSOLUTE)
 set(BUILD_MAIN_SRC_DIR "${PROJECT_MAIN_DIR}/src")
 set(BUILD_CORE_COMPONENT "${PROJECT_NAME}-core")
-set(BUILD_MAIN_COMPONENT "${PROJECT_NAME}-app")
+set(BUILD_NODE_COMPONENT "${PROJECT_NAME}-node")
 
 message(
         "\n----------------------------------------------------------------------------\n"

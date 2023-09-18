@@ -37,7 +37,7 @@ if (NOT BUILD_CORE_ONLY)
     if (NOT SOURCE_ITEMS EQUAL 0)
         set(MAIN_BENCH_TARGET "${PROJECT_NAME}-main-benchmarks")
         add_executable(${MAIN_BENCH_TARGET} benchmark_test.cpp ${SOURCES})
-        target_link_libraries(${MAIN_BENCH_TARGET} PUBLIC third-party-includes PRIVATE ${BUILD_MAIN_COMPONENT} benchmark::benchmark)
+        target_link_libraries(${MAIN_BENCH_TARGET} PUBLIC third-party-includes PRIVATE ${BUILD_NODE_COMPONENT} benchmark::benchmark)
         target_include_directories(${MAIN_BENCH_TARGET} PRIVATE ${BUILD_MAIN_SRC_DIR})
     endif ()
 

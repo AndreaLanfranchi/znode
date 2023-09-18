@@ -19,13 +19,13 @@ if (NOT BUILD_CORE_ONLY)
 
     # The node executable itself
     add_executable(${PROJECT_NAME} "node.cpp;common.hpp;common.cpp")
-    target_link_libraries(${PROJECT_NAME} PUBLIC third-party-includes PRIVATE ${BUILD_MAIN_COMPONENT} ${BUILDINFO_LIB} CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
+    target_link_libraries(${PROJECT_NAME} PUBLIC third-party-includes PRIVATE ${BUILD_NODE_COMPONENT} ${BUILDINFO_LIB} CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
     target_include_directories(${PROJECT_NAME} PRIVATE ${BUILD_MAIN_SRC_DIR})
 
 
     # The db-tool executable
     add_executable(${PROJECT_NAME}-dbtool "toolbox.cpp;common.hpp;common.cpp")
-    target_link_libraries(${PROJECT_NAME}-dbtool PUBLIC third-party-includes PRIVATE ${BUILD_MAIN_COMPONENT} CLI11::CLI11)
+    target_link_libraries(${PROJECT_NAME}-dbtool PUBLIC third-party-includes PRIVATE ${BUILD_NODE_COMPONENT} CLI11::CLI11)
     target_include_directories(${PROJECT_NAME}-dbtool PRIVATE ${BUILD_MAIN_SRC_DIR})
 
 endif ()

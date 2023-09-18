@@ -38,7 +38,7 @@ if (NOT BUILD_CORE_ONLY)
         set(MAIN_TESTS_TARGET "${PROJECT_NAME}-main-tests")
         add_executable(${MAIN_TESTS_TARGET} unit_test.cpp ${SOURCES})
         target_include_directories(${MAIN_TESTS_TARGET} PRIVATE ${BUILD_MAIN_SRC_DIR})
-        target_link_libraries(${MAIN_TESTS_TARGET} PUBLIC third-party-includes PRIVATE ${BUILD_MAIN_COMPONENT} Catch2::Catch2)
+        target_link_libraries(${MAIN_TESTS_TARGET} PUBLIC third-party-includes PRIVATE ${BUILD_NODE_COMPONENT} Catch2::Catch2)
     endif ()
 
 endif ()
