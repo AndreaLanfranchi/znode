@@ -646,12 +646,12 @@ void Node::on_handshake_completed() {
     ping_timer_.start(ping_interval_ms, [this](uint32_t interval_ms) { return on_ping_timer_expired(interval_ms); });
 }
 
-void Node::clean_up(gsl::owner<Node*> ptr) noexcept {
-    if (ptr not_eq nullptr) {
-        ptr->stop(true);
-        delete ptr;
-    }
-}
+//void Node::clean_up(gsl::owner<Node*> ptr) noexcept {
+//    if (ptr not_eq nullptr) {
+//        ptr->stop(true);
+//        delete ptr;
+//    }
+//}
 
 NodeIdleResult Node::is_idle() const noexcept {
     using enum NodeIdleResult;

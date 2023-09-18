@@ -49,6 +49,7 @@ static constexpr size_t kMaxMessagesPerRead = 32;
 //! \brief Maximum number of bytes to read/write in a single operation
 static constexpr size_t kMaxBytesPerIO = 64_KiB;
 
+//! \brief A node holds a connection (and related session) to a remote peer
 class Node : public Stoppable, public std::enable_shared_from_this<Node> {
   public:
     Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
@@ -68,10 +69,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Stops the asynchronous read/write operations and disconnects
     bool stop(bool wait) noexcept override;
 
-    //! \brief Used as custom deleter for shared_ptr<Node> to ensure proper closure of the socket
-    //! \attention Do not call directly, use in std::shared_ptr<Node> instead
-    static void clean_up(gsl::owner<Node*> ptr) noexcept;
-
+    //! \brief Flags describing the status of the protocol handshake
     enum class ProtocolHandShakeStatus : uint32_t {
         kNotInitiated = 0,                  // 0
         kLocalVersionSent = 1 << 0,         // 1

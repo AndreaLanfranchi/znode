@@ -79,8 +79,8 @@ ByteView zeroless_view(ByteView data) {
 }
 
 std::string encode(ByteView bytes, bool with_prefix) noexcept {
-    static const std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
-                                                 '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+    static constexpr std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
+                                                     '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
     std::string out(bytes.length() * 2 + (with_prefix ? 2 : 0), 0x0);
     auto* dest{out.data()};
     const auto* src{bytes.data()};
@@ -140,10 +140,10 @@ tl::expected<Bytes, DecodingError> decode(std::string_view hex_str) noexcept {
     while (src < last) {
         const auto a{kUnhexTable4[static_cast<uint8_t>(*src++)]};
         const auto b{kUnhexTable[static_cast<uint8_t>(*src++)]};
-        if (a == 0xff || b == 0xff) {
+        if (a == 0xff or b == 0xff) {
             return tl::unexpected{DecodingError::kInvalidHexDigit};
         }
-        *dst++ = static_cast<uint8_t>(a | b);
+        *dst++ = static_cast<uint8_t>(a bitor b);
     }
     return out;
 }

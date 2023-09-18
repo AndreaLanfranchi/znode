@@ -46,7 +46,7 @@ bool try_parse_uint(std::string_view input, int base, T& output) noexcept {
     if (input.empty()) return false;
     auto input_str{std::string(input)};
     auto value{std::stoull(input_str, &pos, base)};
-    if (pos != input_str.length() || value > std::numeric_limits<T>::max()) {
+    if (pos not_eq input_str.length() or value > std::numeric_limits<T>::max()) {
         return false;
     }
     output = static_cast<T>(value);

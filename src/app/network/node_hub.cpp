@@ -280,8 +280,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
             },
             [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
                 on_node_received_message(node, std::move(message));
-            }),
-        Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
+            }));
 
     new_node->start();
     on_node_connected(new_node);
@@ -362,8 +361,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
             },
             [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
                 on_node_received_message(node, std::move(message));
-            }),
-        Node::clean_up /* ensures proper shutdown when shared_ptr falls out of scope*/);
+            }));
     log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local.to_string(), "remote",
                           remote.to_string(), "id", std::to_string(new_node->id())});
 

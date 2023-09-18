@@ -194,7 +194,7 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
         // requested
         file.read(buffer_data, static_cast<std::streamsize>(buffer.size()));
         auto bytes_read{static_cast<size_t>(file.gcount())};
-        if (bytes_read != 0) {
+        if (bytes_read not_eq 0U) {
             digest.update(ByteView{buffer.data(), bytes_read});
             progress_bar.set_progress(progress_bar.current() + bytes_read);
         }
@@ -234,18 +234,19 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     const ip::tcp::resolver::query query(kTrustedDownloadHost.data(), "https");
     auto endpoints = resolver.resolve(query);
 
-    boost::system::error_code ec;
-    boost::asio::connect(ssl_stream.next_layer(), endpoints, ec);
-    if (ec) {
-        log::Error("Failed to connect to server", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
+    boost::system::error_code error_code;
+    boost::asio::connect(ssl_stream.next_layer(), endpoints, error_code);
+    if (error_code) {
+        log::Error("Failed to connect to server",
+                   {"host", std::string(kTrustedDownloadHost), "error", error_code.message()});
         return false;
     }
 
     ssl_stream.set_verify_mode(ssl::verify_none);  // TODO ! Verify certificate
-    ssl_stream.handshake(ssl::stream_base::client, ec);
-    if (ec) {
+    ssl_stream.handshake(ssl::stream_base::client, error_code);
+    if (error_code) {
         log::Error("Failed to perform SSL handshake",
-                   {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
+                   {"host", std::string(kTrustedDownloadHost), "error", error_code.message()});
         return false;
     }
 
@@ -262,9 +263,10 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
                           " HTTP/1.1\r\nHost: " + std::string(kTrustedDownloadHost) + "\r\n" + "User-Agent: zen++\r\n" +
                           "Accept: */*\r\n" + "Connection: close\r\n\r\n";
 
-    boost::asio::write(ssl_stream, boost::asio::buffer(request), ec);
-    if (ec) {
-        log::Error("Failed to send request", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
+    boost::asio::write(ssl_stream, boost::asio::buffer(request), error_code);
+    if (error_code) {
+        log::Error("Failed to send request",
+                   {"host", std::string(kTrustedDownloadHost), "error", error_code.message()});
         return false;
     }
 
@@ -298,8 +300,8 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     std::array<char, buffer_size> data{0};
     auto buffer = boost::asio::buffer(data);
     bool headers_completed{false};
-    size_t bytes_read{static_cast<size_t>(boost::asio::read(ssl_stream, buffer, ec))};
-    while (bytes_read != 0) {
+    size_t bytes_read{static_cast<size_t>(boost::asio::read(ssl_stream, buffer, error_code))};
+    while (bytes_read not_eq 0U) {
         if (not headers_completed) [[unlikely]] {
             std::string response(data.data(), bytes_read);
             auto pos = response.find("\r\n\r\n");
@@ -315,10 +317,11 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
             file.write(data.data(), static_cast<std::streamsize>(bytes_read));
             progress_bar.set_progress(progress_bar.current() + bytes_read);
         }
-        bytes_read = static_cast<size_t>(boost::asio::read(ssl_stream, buffer, ec));
+        bytes_read = static_cast<size_t>(boost::asio::read(ssl_stream, buffer, error_code));
     }
-    if (ec && ec != boost::asio::error::eof) {
-        log::Error("Failed to read response", {"host", std::string(kTrustedDownloadHost), "error", ec.message()});
+    if (error_code and error_code not_eq boost::asio::error::eof) {
+        log::Error("Failed to read response",
+                   {"host", std::string(kTrustedDownloadHost), "error", error_code.message()});
         return false;
     }
 
