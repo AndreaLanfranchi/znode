@@ -4,7 +4,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <core/abi/messages.hpp>
+#include "messages.hpp"
 
 namespace zenpp::abi {
 

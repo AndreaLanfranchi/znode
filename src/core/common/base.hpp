@@ -11,7 +11,6 @@
 #include <core/common/preprocessor.hpp>  // Must be first
 // clang-format on
 
-
 #include <compare>
 #include <concepts>
 #include <cstddef>

@@ -5,9 +5,9 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <iostream>
+#include "assert.hpp"
 
-#include <core/common/assert.hpp>
+#include <iostream>
 
 namespace zenpp {
 void abort_due_to_assertion_failure(std::string_view message, const char* function, const char* file, long line) {

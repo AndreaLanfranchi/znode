@@ -5,13 +5,11 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <ranges>
+#include "config.hpp"
 
 #include <absl/strings/str_cat.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <magic_enum.hpp>
-
-#include <core/chain/config.hpp>
 
 namespace zenpp {
 

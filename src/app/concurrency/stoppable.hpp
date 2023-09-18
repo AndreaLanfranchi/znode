@@ -46,8 +46,8 @@ class Stoppable {
 
   private:
     std::atomic<ComponentStatus> state_{ComponentStatus::kNotStarted};  // The state of the component
-    std::atomic_bool started_{false};               // Whether the component has been started
-    std::atomic_bool stop_requested_{false};        // Whether a stop request has been issued
+    std::atomic_bool started_{false};                                   // Whether the component has been started
+    std::atomic_bool stop_requested_{false};                            // Whether a stop request has been issued
 };
 
 }  // namespace zenpp

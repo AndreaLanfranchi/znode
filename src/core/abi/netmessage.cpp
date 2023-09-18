@@ -6,11 +6,12 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "netmessage.hpp"
+
 #include <algorithm>
 
 #include <gsl/gsl_util>
 
-#include <core/abi/netmessage.hpp>
 #include <core/common/misc.hpp>
 
 namespace zenpp::abi {

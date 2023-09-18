@@ -6,14 +6,14 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "amounts.hpp"
+
 #include <iostream>
 #include <regex>
 
 #include <absl/strings/str_cat.h>
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
-
-#include <core/types/amounts.hpp>
 
 namespace zenpp {
 
@@ -27,7 +27,7 @@ Amount& Amount::operator=(int64_t value) noexcept {
 }
 
 std::string Amount::to_string() const {
-    if (not value_) return std::string("0 ").append(kCurrency);
+    if (value_ == 0U) return std::string("0 ").append(kCurrency);
 
     std::string sign;
     auto div{std::div(value_, kCoin)};
@@ -41,7 +41,7 @@ std::string Amount::to_string() const {
     // Strip all trailing zeroes and also the decimal point if
     // it is the last char of the string.
     char c{formatted.back()};
-    while (c) {
+    while (c not_eq 0x0) {
         switch (c) {
             case '0':
                 formatted.pop_back();
@@ -107,7 +107,7 @@ std::string FeeRate::to_string() const { return absl::StrCat(Amount::to_string()
 
 Amount FeeRate::fee(size_t bytes_size) const {
     const auto ret{this->operator*() * static_cast<int64_t>(bytes_size) / static_cast<int64_t>(1_KB)};
-    if (not ret) return *this;
+    if (ret == 0U) return Amount(this->operator*());
     return Amount(ret);
 }
 }  // namespace zenpp

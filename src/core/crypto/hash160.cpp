@@ -4,8 +4,9 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "hash160.hpp"
+
 #include <core/common/cast.hpp>
-#include <core/crypto/hash160.hpp>
 
 namespace zenpp::crypto {
 

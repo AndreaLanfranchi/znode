@@ -4,13 +4,14 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "base64.hpp"
+
 #include <memory>
 
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 
 #include <core/common/cast.hpp>
-#include <core/encoding/base64.hpp>
 
 namespace zenpp::base64 {
 
@@ -28,7 +29,7 @@ tl::expected<std::string, EncodingError> encode(ByteView bytes) noexcept {
         return tl::unexpected(EncodingError::kInputTooLong);
     }
 
-    std::unique_ptr<BIO, BIOFreeAll> b64(BIO_new(BIO_f_base64()));
+    const std::unique_ptr<BIO, BIOFreeAll> b64(BIO_new(BIO_f_base64()));
     BIO_set_flags(b64.get(), BIO_FLAGS_BASE64_NO_NL);  // No new line
 
     BIO* sink = BIO_new(BIO_s_mem());
@@ -51,11 +52,11 @@ tl::expected<std::string, EncodingError> encode(std::string_view data) noexcept 
 
 tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
     if (input.empty()) return Bytes();
-    std::unique_ptr<BIO, BIOFreeAll> b64(BIO_new(BIO_f_base64()));
+    const std::unique_ptr<BIO, BIOFreeAll> b64(BIO_new(BIO_f_base64()));
     BIO_set_flags(b64.get(), BIO_FLAGS_BASE64_NO_NL);
     BIO* source = BIO_new_mem_buf(input.data(), -1);
     BIO_push(b64.get(), source);
-    const auto maxlen{input.size() / 4 * 3 + 1};
+    const auto maxlen{input.size() / 4U * 3U + 1U};
     Bytes ret(maxlen, '\0');
     const auto effective_len{BIO_read(b64.get(), ret.data(), static_cast<int>(maxlen))};
     if (effective_len <= 0) return tl::unexpected(DecodingError::kInvalidBase64Input);

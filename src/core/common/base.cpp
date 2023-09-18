@@ -4,17 +4,17 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <iostream>
+#include "base.hpp"
 
-#include <core/common/base.hpp>
+#include <iostream>
 
 #if defined(BOOST_NO_EXCEPTIONS)
 namespace boost {
-void throw_exception(const std::exception&) {
+void throw_exception(const std::exception& /*unused*/) {
     std::cerr << "Aborted due to unallowed exception" << std::endl;
     std::abort();
 }
-void throw_exception(const std::exception&, const boost::source_location&) {
+void throw_exception(const std::exception& /*unused*/, const boost::source_location& /*unused*/) {
     std::cerr << "Aborted due to unallowed exception" << std::endl;
     std::abort();
 }

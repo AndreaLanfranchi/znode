@@ -30,7 +30,7 @@
 // clang-format on
 #endif
 
-#include <core/common/memory.hpp>
+#include "memory.hpp"
 
 namespace zenpp {
 // Inspired by:
@@ -66,7 +66,7 @@ size_t get_memory_usage(bool resident) {
 #elif defined(_WIN32) || defined(_WIN64)
     static HANDLE phandle{GetCurrentProcess()};
     PROCESS_MEMORY_COUNTERS_EX counters;
-    if (K32GetProcessMemoryInfo(phandle, (PROCESS_MEMORY_COUNTERS*)&counters, sizeof(counters))) {
+    if (K32GetProcessMemoryInfo(phandle, (PROCESS_MEMORY_COUNTERS*)&counters, sizeof(counters)) not_eq 0) {
         ret = resident ? counters.WorkingSetSize : counters.PagefileUsage;
     }
 #else

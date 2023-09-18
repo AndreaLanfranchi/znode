@@ -4,9 +4,9 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <bit>
+#include "jenkins.hpp"
 
-#include <core/crypto/jenkins.hpp>
+#include <bit>
 
 namespace zenpp::crypto {
 

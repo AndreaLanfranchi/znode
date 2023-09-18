@@ -5,10 +5,10 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "hex.hpp"
+
 #include <array>
 #include <ranges>
-
-#include <core/encoding/hex.hpp>
 
 namespace zenpp::hex {
 
@@ -79,10 +79,11 @@ ByteView zeroless_view(ByteView data) {
 }
 
 std::string encode(ByteView bytes, bool with_prefix) noexcept {
-    static const char kHexDigits[]{"0123456789abcdef"};
+    static const std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
+                                                 '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
     std::string out(bytes.length() * 2 + (with_prefix ? 2 : 0), 0x0);
     auto* dest{out.data()};
-    auto* src{bytes.data()};
+    const auto* src{bytes.data()};
     if (with_prefix) {
         *dest++ = '0';
         *dest++ = 'x';

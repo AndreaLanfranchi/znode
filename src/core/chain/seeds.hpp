@@ -11,4 +11,4 @@ namespace zenpp {
 
 const std::vector<std::string>& get_chain_seeds(const ChainConfig& chain_config);
 
-} // namespace zenpp
+}  // namespace zenpp

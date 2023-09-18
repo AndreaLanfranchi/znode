@@ -10,21 +10,25 @@ PointerAlignment: Left
 
 IncludeCategories:
   # Core headers
-  - Regex:           '<core\/.*'
-    Priority:        50
+  - Regex: '<core\/.*'
+    Priority: 50
 
   # Main headers
-  - Regex:           '<app\/.*'
-    Priority:        60
+  - Regex: '<app\/.*'
+    Priority: 60
+
+  # Self headers
+  - Regex: '".*"'
+    Priority: 10
 
   # C standard library
-  - Regex:           '<[[:alnum:]]+\.h>'
-    Priority:        10
+  - Regex: '<[[:alnum:]]+\.h>'
+    Priority: 20
 
   # C++ standard library
-  - Regex:           '<[[:alnum:]_]+>'
-    Priority:        20
+  - Regex: '<[[:alnum:]_]+>'
+    Priority: 30
 
   # Third-party libraries
-  - Regex:           '<.*'
-    Priority:        30
+  - Regex: '<.*'
+    Priority: 40

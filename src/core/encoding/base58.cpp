@@ -4,7 +4,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <core/encoding/base58.hpp>
+#include "base58.hpp"
 
 namespace zenpp::base58 {
 

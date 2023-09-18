@@ -4,6 +4,8 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "network.hpp"
+
 #include <bit>
 #include <regex>
 
@@ -12,7 +14,6 @@
 #include <boost/algorithm/string/split.hpp>
 
 #include <core/common/misc.hpp>
-#include <core/types/network.hpp>
 
 namespace zenpp {
 
@@ -44,10 +45,10 @@ bool IPAddress::is_unspecified() const noexcept {
     return value_.is_v4() ? value_.to_v4().is_unspecified() : value_.to_v6().is_unspecified();
 }
 
-bool IPAddress::is_valid() const noexcept { return not(is_any() || is_unspecified()); }
+bool IPAddress::is_valid() const noexcept { return not(is_any() or is_unspecified()); }
 
 bool IPAddress::is_routable() const noexcept {
-    if (not is_valid() || is_loopback()) return false;
+    if (not is_valid() or is_loopback()) return false;
 
     switch (address_reservation()) {
         using enum IPAddressReservationType;
@@ -89,30 +90,30 @@ IPAddressReservationType IPAddress::address_v4_reservation() const noexcept {
     const auto addr_bytes = value_.to_v4().to_bytes();
 
     // Private networks
-    if ((addr_bytes[0] == 10) || (addr_bytes[0] == 172 && addr_bytes[1] >= 16 && addr_bytes[1] <= 31) ||
-        (addr_bytes[0] == 192 && addr_bytes[1] == 168)) {
+    if ((addr_bytes[0] == 10) or (addr_bytes[0] == 172 and addr_bytes[1] >= 16 and addr_bytes[1] <= 31) or
+        (addr_bytes[0] == 192 and addr_bytes[1] == 168)) {
         ret = kRFC1918;
     }
 
     // Inter-network communications
-    if (addr_bytes[0] == 192 && (addr_bytes[1] == 18 || addr_bytes[1] == 19)) {
+    if (addr_bytes[0] == 192 and (addr_bytes[1] == 18 or addr_bytes[1] == 19)) {
         ret = kRFC2544;
     }
 
     // Shared Address Space
-    if (addr_bytes[0] == 100 && (addr_bytes[1] >= 64 && addr_bytes[1] <= 127)) {
+    if (addr_bytes[0] == 100 and (addr_bytes[1] >= 64 and addr_bytes[1] <= 127)) {
         ret = kRFC6598;
     }
 
     // Documentation Address Blocks
-    if ((addr_bytes[0] == 192 && addr_bytes[1] == 0 && addr_bytes[2] == 2) ||
-        (addr_bytes[0] == 198 && addr_bytes[1] == 51 && addr_bytes[2] == 100) ||
-        (addr_bytes[0] == 203 && addr_bytes[1] == 0 && addr_bytes[2] == 113)) {
+    if ((addr_bytes[0] == 192 and addr_bytes[1] == 0 and addr_bytes[2] == 2) or
+        (addr_bytes[0] == 198 and addr_bytes[1] == 51 and addr_bytes[2] == 100) or
+        (addr_bytes[0] == 203 and addr_bytes[1] == 0 and addr_bytes[2] == 113)) {
         ret = kRFC5737;
     }
 
     // Dynamic Configuration of IPv4 Link-Local Addresses
-    if (addr_bytes[0] == 169 && addr_bytes[1] == 254) {
+    if (addr_bytes[0] == 169 and addr_bytes[1] == 254) {
         ret = kRFC3927;
     }
 
@@ -127,45 +128,46 @@ IPAddressReservationType IPAddress::address_v6_reservation() const noexcept {
     const auto addr_bytes = value_.to_v6().to_bytes();
 
     // Documentation Address Blocks
-    if (addr_bytes[0] == 0x20 && addr_bytes[1] == 0x01 && addr_bytes[2] == 0x0D && addr_bytes[3] == 0xB8) {
+    if (addr_bytes[0] == 0x20 and addr_bytes[1] == 0x01 and addr_bytes[2] == 0x0D and addr_bytes[3] == 0xB8) {
         ret = kRFC3849;
     }
 
     // IPv6 Prefix for Overlay Routable Cryptographic Hash Identifiers (ORCHID)
-    if (addr_bytes[0] == 0x20 && addr_bytes[1] == 0x02) {
+    if (addr_bytes[0] == 0x20 and addr_bytes[1] == 0x02) {
         ret = kRFC3964;
     }
 
     // Unique Local IPv6 Unicast Addresses
-    if (addr_bytes[0] == 0xFC || addr_bytes[0] == 0xFD) {
+    if (addr_bytes[0] == 0xFC or addr_bytes[0] == 0xFD) {
         ret = kRFC4193;
     }
 
     // Teredo IPv6 tunneling
-    if (addr_bytes[0] == 0x20 && addr_bytes[1] == 0x01 && addr_bytes[2] == 0x00 && addr_bytes[3] == 0x00) {
+    if (addr_bytes[0] == 0x20 and addr_bytes[1] == 0x01 and addr_bytes[2] == 0x00 and addr_bytes[3] == 0x00) {
         ret = kRFC4380;
     }
 
     // An IPv6 Prefix for Overlay Routable Cryptographic Hash Identifiers (ORCHID)
-    if (addr_bytes[0] == 0x20 && addr_bytes[1] == 0x01 && addr_bytes[2] == 0x00 && ((addr_bytes[3] & 0xF0) == 0x10)) {
+    if (addr_bytes[0] == 0x20 and addr_bytes[1] == 0x01 and addr_bytes[2] == 0x00 and
+        ((addr_bytes[3] & 0xF0) == 0x10)) {
         ret = kRFC4843;
     }
 
     // IPv6 Stateless Address Autoconfiguration
-    if (addr_bytes[0] == 0xFE && addr_bytes[1] == 0x80) {
+    if (addr_bytes[0] == 0xFE and addr_bytes[1] == 0x80) {
         ret = kRFC4862;
     }
 
     // IPv6 Addressing of IPv4/IPv6 Translators
-    if (addr_bytes[0] == 0x00 && addr_bytes[1] == 0x64 && addr_bytes[2] == 0xFF && addr_bytes[3] == 0x9B) {
+    if (addr_bytes[0] == 0x00 and addr_bytes[1] == 0x64 and addr_bytes[2] == 0xFF and addr_bytes[3] == 0x9B) {
         ret = kRFC6052;
     }
 
     // IP/ICMP Translation Algorithm
-    if (addr_bytes[0] == 0x00 && addr_bytes[1] == 0x00 && addr_bytes[2] == 0xFF && addr_bytes[3] == 0xFF &&
-        addr_bytes[4] == 0x00 && addr_bytes[5] == 0x00 && addr_bytes[6] == 0x00 && addr_bytes[7] == 0x00 &&
-        addr_bytes[8] == 0x00 && addr_bytes[9] == 0x00 && addr_bytes[10] == 0x00 && addr_bytes[11] == 0x00 &&
-        addr_bytes[12] == 0x00 && addr_bytes[13] == 0x00 && addr_bytes[14] == 0x00 && addr_bytes[15] == 0x00) {
+    if (addr_bytes[0] == 0x00 and addr_bytes[1] == 0x00 and addr_bytes[2] == 0xFF and addr_bytes[3] == 0xFF and
+        addr_bytes[4] == 0x00 and addr_bytes[5] == 0x00 and addr_bytes[6] == 0x00 and addr_bytes[7] == 0x00 and
+        addr_bytes[8] == 0x00 and addr_bytes[9] == 0x00 and addr_bytes[10] == 0x00 and addr_bytes[11] == 0x00 and
+        addr_bytes[12] == 0x00 and addr_bytes[13] == 0x00 and addr_bytes[14] == 0x00 and addr_bytes[15] == 0x00) {
         ret = kRFC6145;
     }
 
@@ -352,9 +354,9 @@ tl::expected<boost::asio::ip::address, std::string> IPSubNet::calculate_subnet_b
         const uint32_t mask = (0xFFFFFFFFU << (32U - prefix_length));
         const uint32_t address_int = address.to_v4().to_uint();
         const uint32_t subnet_int = mask & address_int;
-        const std::array<unsigned char, 4> subnet_bytes{static_cast<unsigned char>((subnet_int >> 24) & 0xFFU),
-                                                        static_cast<unsigned char>((subnet_int >> 16) & 0xFFU),
-                                                        static_cast<unsigned char>((subnet_int >> 8) & 0xFFU),
+        const std::array<unsigned char, 4> subnet_bytes{static_cast<unsigned char>((subnet_int >> 24) bitand 0xFFU),
+                                                        static_cast<unsigned char>((subnet_int >> 16) bitand 0xFFU),
+                                                        static_cast<unsigned char>((subnet_int >> 8) bitand 0xFFU),
                                                         static_cast<unsigned char>(subnet_int & 0xFFU)};
 
         return boost::asio::ip::make_address_v4(subnet_bytes);

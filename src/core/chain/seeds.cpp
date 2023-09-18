@@ -4,7 +4,8 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <core/chain/seeds.hpp>
+#include "seeds.hpp"
+
 #include <core/common/assert.hpp>
 
 namespace zenpp {

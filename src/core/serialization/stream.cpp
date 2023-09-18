@@ -6,11 +6,12 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "stream.hpp"
+
 #include <utility>
 
 #include <core/common/overflow.hpp>
 #include <core/encoding/hex.hpp>
-#include <core/serialization/stream.hpp>
 
 namespace zenpp::serialization {
 

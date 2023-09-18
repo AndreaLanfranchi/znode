@@ -109,7 +109,7 @@ class LockedPagesManagerBase : private boost::noncopyable {
 
     //! \brief Removes all locks
     void clear() noexcept {
-        std::scoped_lock lock(mutex_);
+        const std::scoped_lock lock(mutex_);
         for (auto it{locked_pages_.cbegin()}; it != locked_pages_.cend();) {
             if (locker_.unlock(reinterpret_cast<void*>(it->first), page_size_)) {
                 it = locked_pages_.erase(it);
@@ -175,16 +175,16 @@ class LockedPagesManager final : public LockedPagesManagerBase<MemoryPageLocker>
 //! \brief Directly locks memory objects.
 //! \remarks Intended for non-dynamically allocated objects
 template <typename T>
-bool lock_object_memory(const T& t) {
-    return LockedPagesManager::instance().lock_range(static_cast<const void*>(&t), sizeof(t));
+bool lock_object_memory(const T& obj) {
+    return LockedPagesManager::instance().lock_range(static_cast<const void*>(&obj), sizeof(obj));
 }
 
 //! \brief Directly unlocks memory objects.
 //! \remarks Intended for non-dynamically allocated objects
 template <typename T>
-bool unlock_object_memory(const T& t) {
-    auto ptr = const_cast<void*>(reinterpret_cast<const void*>(&t));
-    memory_cleanse(ptr, sizeof(t));
-    return LockedPagesManager::instance().unlock_range(ptr, sizeof(t));
+bool unlock_object_memory(const T& obj) {
+    auto* ptr = const_cast<void*>(reinterpret_cast<const void*>(&obj));
+    memory_cleanse(ptr, sizeof(obj));
+    return LockedPagesManager::instance().unlock_range(ptr, sizeof(obj));
 }
 }  // namespace zenpp

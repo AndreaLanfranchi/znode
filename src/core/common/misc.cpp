@@ -5,8 +5,9 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "misc.hpp"
+
 #include <array>
-#include <random>
 #include <regex>
 #include <set>
 
@@ -14,12 +15,10 @@
 #include <boost/format.hpp>
 #include <gsl/gsl_util>
 
-#include <core/common/misc.hpp>
-
 namespace zenpp {
 
 std::string abridge(std::string_view input, size_t length) {
-    if (!length || input.empty()) return std::string(input);
+    if (length == 0U or input.empty()) return std::string(input);
     if (input.length() <= length) {
         return std::string(input);
     }
@@ -40,9 +39,9 @@ tl::expected<uint64_t, DecodingError> parse_human_bytes(const std::string& input
 
     uint64_t multiplier{1};  // Default for bytes (B|b)
 
-    std::string whole_part{matches[1].str()};
+    const std::string whole_part{matches[1].str()};
     std::string fract_part{matches[2].str()};
-    std::string suffix{matches[3].str()};
+    const std::string suffix{matches[3].str()};
     if (!fract_part.empty()) {
         fract_part.erase(fract_part.begin());
     }
@@ -81,16 +80,16 @@ tl::expected<uint64_t, DecodingError> parse_human_bytes(const std::string& input
 std::string to_human_bytes(const size_t input, bool binary) {
     static const std::array<const char*, 5> suffixes{"B", "KB", "MB", "GB", "TB"};             // Must have same ..
     static const std::array<const char*, 5> binary_suffixes{"B", "KiB", "MiB", "GiB", "TiB"};  // ...number of items
-    const auto divisor{binary ? kKiB : kKB};
+    const auto divisor{gsl::narrow_cast<float>(binary ? kKiB : kKB)};
     uint32_t index{0};
     double value{static_cast<double>(input)};
-    while (value >= divisor && index < suffixes.size()) {
+    while (value >= divisor and index < gsl::narrow_cast<uint32_t>(suffixes.size())) {
         value /= divisor;
         ++index;
     }
 
     // TODO(C++20/23) Replace with std::format when widely available on GCC and Clang
-    std::string formatter{index ? "%.02f %s" : "%.0f %s"};
+    const std::string formatter{index > 0U ? "%.02f %s" : "%.0f %s"};
     return boost::str(boost::format(formatter) % value % (binary ? binary_suffixes[index] : suffixes[index]));
 }
 
@@ -99,13 +98,9 @@ std::string get_random_alpha_string(size_t length) {
         "0123456789"
         "abcdefghijklmnopqrstuvwxyz"};
 
-    std::random_device rd;
-    std::default_random_engine engine{rd()};
-    std::uniform_int_distribution<size_t> uniform_dist{0, kAlphaNum.size() - 1};
-
     std::string ret(length, '0');
     for (size_t i{0}; i < length; ++i) {
-        const size_t random_number{uniform_dist(engine)};
+        const size_t random_number{randomize(kAlphaNum.size() - 1)};
         ret[i] = kAlphaNum[random_number];
     }
 
@@ -113,17 +108,17 @@ std::string get_random_alpha_string(size_t length) {
 }
 
 size_t count_duplicate_data_chunks(ByteView data, const size_t chunk_size, const size_t max_count) noexcept {
-    if (!chunk_size || data.length() < chunk_size) {
+    if (chunk_size == 0U || data.length() < chunk_size) {
         return 0;
     }
     std::set<ByteView, std::less<>> unique_chunks;
     size_t count{0};
-    size_t chunks{data.length() / chunk_size};
+    const size_t chunks{data.length() / chunk_size};
     for (size_t i{0}; i < chunks; ++i) {
         const auto chunk{data.substr(i * chunk_size, chunk_size)};
         if (!unique_chunks.insert(chunk).second) {
             ++count;
-            if (max_count && count == max_count) {
+            if (max_count not_eq 0U and count == max_count) {
                 break;
             }
         }

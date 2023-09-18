@@ -4,8 +4,9 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "hash256.hpp"
+
 #include <core/common/cast.hpp>
-#include <core/crypto/hash256.hpp>
 
 namespace zenpp::crypto {
 
