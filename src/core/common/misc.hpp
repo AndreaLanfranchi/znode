@@ -51,7 +51,7 @@ bool try_parse_uint(std::string_view input, int base, T& output) noexcept {
     }
     output = static_cast<T>(value);
     return true;
-};
+}
 
 //! \brief Parses a string representing an IP address and port
 //! \remarks If port is not provided then it will be set to zero
