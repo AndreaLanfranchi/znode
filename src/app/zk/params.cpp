@@ -4,12 +4,12 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "params.hpp"
+
 #include <fstream>
 #include <iostream>
 
 #include <gsl/gsl_util>
-
-#include <app/zk/params.hpp>
 
 #if defined(_MSC_VER)
 #pragma warning(push)
@@ -59,21 +59,21 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
             return false;
         }
         const auto file_path{directory / param_file.name};
-        if (!std::filesystem::exists(file_path)) {
+        if (not std::filesystem::exists(file_path)) {
             errored_param_files.push_back(param_file);
             continue;
         }
 
-        if (!std::filesystem::is_regular_file(file_path)) {
+        if (not std::filesystem::is_regular_file(file_path)) {
             log::Critical("Not a regular file", {"file", file_path.string()}) << "I don't trust to remove it";
             return false;
         }
 
         if (const auto actual_size{std::filesystem::file_size(file_path)}; actual_size != param_file.expected_size) {
-            std::vector<std::string> log_args{"file",     file_path.string(),
-                                              "expected", std::to_string(param_file.expected_size),
-                                              "actual",   std::to_string(actual_size)};
-            if (!std::filesystem::remove(file_path)) {
+            const std::vector<std::string> log_args{"file",     file_path.string(),
+                                                    "expected", std::to_string(param_file.expected_size),
+                                                    "actual",   std::to_string(actual_size)};
+            if (not std::filesystem::remove(file_path)) {
                 log::Critical("Invalid file size", log_args) << "Failed to remove invalid file";
                 return false;
             }
@@ -84,8 +84,8 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
 
         if (no_checksums) continue;  // Only first cycle. If we have to download the checksums are already checked
         const auto expected_checksum{hex::decode(param_file.expected_checksum)};
-        if (!validate_file_checksum(file_path, *expected_checksum)) {
-            if (!std::filesystem::remove(file_path)) {
+        if (not validate_file_checksum(file_path, *expected_checksum)) {
+            if (not std::filesystem::remove(file_path)) {
                 log::Critical("Invalid file checksum",
                               {"file", file_path.string(), "expected", std::string(param_file.expected_checksum)})
                     << "Failed to remove invalid file";
@@ -115,7 +115,7 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
               << "If you decide to download them now please allow some time:\nit's up to "
               << to_human_bytes(total_download_size, true) << " download." << std::endl;
 
-    if (!ask_user_confirmation("Do you want me to download them now?")) {
+    if (not ask_user_confirmation("Do you want me to download them now?")) {
         return false;
     }
 
@@ -124,22 +124,22 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
             return false;
         }
         const auto file_path{directory / param_file.name};
-        if (!download_param_file(asio_context, directory, param_file)) {
+        if (not download_param_file(asio_context, directory, param_file)) {
             log::Critical("Failed to download param file", {"file", file_path.string()});
             return false;
         }
 
         // Once again, check file's size and checksum
         if (const auto actual_size{std::filesystem::file_size(file_path)}; actual_size != param_file.expected_size) {
-            std::vector<std::string> log_args{"file",     file_path.string(),
-                                              "expected", std::to_string(param_file.expected_size),
-                                              "actual",   std::to_string(actual_size)};
+            const std::vector<std::string> log_args{"file",     file_path.string(),
+                                                    "expected", std::to_string(param_file.expected_size),
+                                                    "actual",   std::to_string(actual_size)};
             log::Critical("Invalid file size (again)", log_args);
             return false;
         }
 
         const auto expected_checksum{hex::decode(param_file.expected_checksum)};
-        if (!validate_file_checksum(file_path, *expected_checksum)) {
+        if (not validate_file_checksum(file_path, *expected_checksum)) {
             log::Critical("Invalid file checksum (again)",
                           {"file", file_path.string(), "expected", std::string(param_file.expected_checksum)});
 
@@ -151,7 +151,7 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
 
 std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_path) {
     using namespace indicators;
-    if (!std::filesystem::exists(file_path)) {
+    if (not std::filesystem::exists(file_path)) {
         log::Warning("File does not exist", {"file", file_path.string()});
         return std::nullopt;
     }
@@ -161,7 +161,7 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
     // causes the stream to never read anything. Hence, we open it as char and
     // cast the buffer accordingly. No issues instead with Windows and MSVC
     std::ifstream file{file_path.string().c_str(), std::ios_base::in | std::ios_base::binary};
-    if (!file.is_open()) {
+    if (not file.is_open()) {
         log::Warning("Failed to open file", {"file", file_path.string()});
         return std::nullopt;
     }
@@ -186,9 +186,9 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
 
     crypto::Sha256 digest;
     Bytes buffer(32_MiB, 0);
-    auto buffer_data{reinterpret_cast<char*>(buffer.data())};
+    auto* buffer_data{reinterpret_cast<char*>(buffer.data())};
     file.seekg(0, std::ios::beg);
-    while (!file.eof()) {
+    while (not file.eof()) {
         // Note ! Ignore the result of file.read() as it may be 0
         // also when the number of bytes read is LT the number of max bytes
         // requested
@@ -199,7 +199,7 @@ std::optional<Bytes> get_file_sha256_checksum(const std::filesystem::path& file_
             progress_bar.set_progress(progress_bar.current() + bytes_read);
         }
     }
-    if (!progress_bar.is_completed()) {
+    if (not progress_bar.is_completed()) {
         progress_bar.mark_as_completed();
     }
     indicators::show_console_cursor(true);
@@ -231,7 +231,7 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     SSL_set_tlsext_host_name(static_cast<SSL*>(ssl_stream.native_handle()), kTrustedDownloadHost.data());
 
     ip::tcp::resolver resolver{asio_context};
-    ip::tcp::resolver::query query(kTrustedDownloadHost.data(), "https");
+    const ip::tcp::resolver::query query(kTrustedDownloadHost.data(), "https");
     auto endpoints = resolver.resolve(query);
 
     boost::system::error_code ec;
@@ -242,7 +242,6 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     }
 
     ssl_stream.set_verify_mode(ssl::verify_none);  // TODO ! Verify certificate
-
     ssl_stream.handshake(ssl::stream_base::client, ec);
     if (ec) {
         log::Error("Failed to perform SSL handshake",
@@ -252,7 +251,7 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
 
     const auto target_file = (directory / param_file.name);
     std::ofstream file{target_file, std::ios_base::out | std::ios_base::binary};
-    if (!file.is_open()) {
+    if (not file.is_open()) {
         log::Error("Failed to open file", {"file", target_file.string()});
         return false;
     }
@@ -288,7 +287,7 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
         option::MaxProgress{param_file.expected_size}};
 
     auto free_progress{gsl::finally([&progress_bar] {
-        if (!progress_bar.is_completed()) {
+        if (not progress_bar.is_completed()) {
             progress_bar.mark_as_completed();
         }
         show_console_cursor(true);
@@ -301,7 +300,7 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     bool headers_completed{false};
     size_t bytes_read{static_cast<size_t>(boost::asio::read(ssl_stream, buffer, ec))};
     while (bytes_read != 0) {
-        if (!headers_completed) [[unlikely]] {
+        if (not headers_completed) [[unlikely]] {
             std::string response(data.data(), bytes_read);
             auto pos = response.find("\r\n\r\n");
             if (pos != std::string::npos) {
@@ -328,12 +327,12 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
 }
 bool validate_file_checksum(const std::filesystem::path& file_path, ByteView expected_checksum) {
     const auto actual_checksum{get_file_sha256_checksum(file_path)};
-    if (!actual_checksum) {
+    if (not actual_checksum) {
         log::Error("Failed to compute checksum", {"file", file_path.string()});
         return false;
     }
-    bool is_match{*actual_checksum == expected_checksum};
-    if (!is_match) {
+    const bool is_match{*actual_checksum == expected_checksum};
+    if (not is_match) {
         log::Error("Invalid file checksum", {"file", file_path.string(), "expected", hex::encode(expected_checksum),
                                              "actual", hex::encode(*actual_checksum)});
     }

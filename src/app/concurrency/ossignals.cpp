@@ -5,14 +5,14 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "ossignals.hpp"
+
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
 #include <utility>
 
 #include <absl/strings/str_cat.h>
-
-#include <app/concurrency/ossignals.hpp>
 
 namespace zenpp {
 

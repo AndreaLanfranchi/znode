@@ -4,14 +4,14 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "secure.hpp"
+
 #include <iostream>
 #include <random>
 
 #include <gsl/gsl_util>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
-
-#include <app/network/secure.hpp>
 
 namespace zenpp::network {
 
@@ -144,7 +144,7 @@ bool store_rsa_key_pair(EVP_PKEY* pkey, const std::string& password, const std::
 }
 
 bool store_x509_certificate(X509* cert, const std::filesystem::path& directory_path) {
-    if (!cert) {
+    if (cert == nullptr) {
         LOG_ERROR << "Invalid X509 certificate";
         return false;
     }
@@ -163,13 +163,13 @@ bool store_x509_certificate(X509* cert, const std::filesystem::path& directory_p
     file = fopen(file_path.string().c_str(), "wb");
 #endif
 
-    if (!file) {
+    if (file == nullptr) {
         LOG_ERROR << "Failed to open file " << file_path.string();
         return false;
     }
     auto file_close{gsl::finally([file]() { fclose(file); })};
 
-    if (!PEM_write_X509(file, cert)) {
+    if (PEM_write_X509(file, cert) == 0) {
         auto err{ERR_get_error()};
         print_ssl_error(err);
         LOG_ERROR << "Failed to write certificate to file " << file_path.string();
@@ -199,7 +199,7 @@ EVP_PKEY* load_rsa_private_key(const std::filesystem::path& directory_path, cons
     file = fopen(file_path.string().c_str(), "rb");
 #endif
 
-    if (!file) {
+    if (file == nullptr) {
         LOG_ERROR << "Failed to open file " << file_path.string();
         return nullptr;
     }
@@ -213,7 +213,7 @@ EVP_PKEY* load_rsa_private_key(const std::filesystem::path& directory_path, cons
         pkey = PEM_read_PrivateKey(file, nullptr, nullptr, nullptr);
     }
 
-    if (!pkey) {
+    if (pkey == nullptr) {
         LOG_ERROR << "Failed to read private key from file " << file_path.string();
         EVP_PKEY_free(pkey);
         return nullptr;

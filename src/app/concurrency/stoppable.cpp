@@ -5,7 +5,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <app/concurrency/stoppable.hpp>
+#include "stoppable.hpp"
 
 namespace zenpp {
 

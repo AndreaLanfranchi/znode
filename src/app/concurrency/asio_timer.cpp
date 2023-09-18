@@ -5,12 +5,13 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "asio_timer.hpp"
+
 #include <utility>
 
 #include <absl/strings/str_cat.h>
 
 #include <app/common/log.hpp>
-#include <app/concurrency/asio_timer.hpp>
 
 namespace zenpp {
 bool AsioTimer::start() noexcept {
@@ -46,12 +47,10 @@ void AsioTimer::start_internal() {
     timer_.expires_after(std::chrono::milliseconds(interval_milliseconds_.load()));
     timer_.async_wait([this](const boost::system::error_code& error_code) {
         if (error_code) {
-            // if (error_code not_eq boost::asio::error::operation_aborted) {
             auto severity{error_code == boost::asio::error::operation_aborted ? log::Level::kTrace
                                                                               : log::Level::kError};
             log::BufferBase(severity, absl::StrCat("AsioTimer[", name_, "]"),
                             {"action", "async_wait", "error", error_code.message()});
-            //}
             set_stopped();
             return;
         }

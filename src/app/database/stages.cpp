@@ -5,11 +5,11 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "stages.hpp"
+
 #include <absl/strings/str_cat.h>
 
 #include <core/common/endian.hpp>
-
-#include <app/database/stages.hpp>
 
 namespace zenpp::db::stages {
 

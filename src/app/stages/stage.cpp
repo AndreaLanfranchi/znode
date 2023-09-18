@@ -5,8 +5,9 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "stage.hpp"
+
 #include <app/database/stages.hpp>
-#include <app/stages/stage.hpp>
 
 namespace zenpp::stages {
 

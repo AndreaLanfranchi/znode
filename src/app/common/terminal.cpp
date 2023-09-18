@@ -12,10 +12,10 @@
 #endif
 #endif
 
+#include "terminal.hpp"
+
 #include <iostream>
 #include <regex>
-
-#include <app/common/terminal.hpp>
 
 namespace zenpp {
 

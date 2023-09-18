@@ -5,10 +5,11 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "core/common/assert.hpp"
+#include "worker.hpp"
+
+#include <core/common/assert.hpp>
 
 #include <app/common/log.hpp>
-#include <app/concurrency/worker.hpp>
 
 namespace zenpp {
 

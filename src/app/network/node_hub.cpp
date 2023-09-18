@@ -4,6 +4,8 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "node_hub.hpp"
+
 #include <utility>
 
 #include <absl/strings/str_cat.h>
@@ -16,7 +18,6 @@
 #include <core/common/misc.hpp>
 
 #include <app/common/log.hpp>
-#include <app/network/node_hub.hpp>
 
 namespace zenpp::network {
 

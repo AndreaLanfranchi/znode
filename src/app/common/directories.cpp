@@ -5,7 +5,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <app/common/directories.hpp>
+#include "directories.hpp"
 
 #if defined(_MSC_VER)
 // clang-format off

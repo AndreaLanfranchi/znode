@@ -5,6 +5,8 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "log.hpp"
+
 #include <fstream>
 #include <iostream>
 #include <mutex>
@@ -15,8 +17,6 @@
 #include <absl/time/clock.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/format.hpp>
-
-#include <app/common/log.hpp>
 
 namespace zenpp::log {
 

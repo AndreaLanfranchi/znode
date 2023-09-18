@@ -5,9 +5,9 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include <core/common/assert.hpp>
+#include "access_layer.hpp"
 
-#include <app/database/access_layer.hpp>
+#include <core/common/assert.hpp>
 
 namespace zenpp::db {
 
