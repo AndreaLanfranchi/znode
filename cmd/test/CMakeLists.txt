@@ -28,17 +28,31 @@ endif ()
 
 if (NOT BUILD_CORE_ONLY)
 
-    # Main app Tests
-    message(CHECK_START "Looking for main tests ...")
+    # Infra Tests
+    message(CHECK_START "Looking for infra tests ...")
     set(SOURCES)
-    file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${BUILD_MAIN_SRC_DIR}/app/*_test.?pp")
+    file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${BUILD_MAIN_SRC_DIR}/infra/*_test.?pp")
     list(LENGTH SOURCES SOURCE_ITEMS)
     message(CHECK_PASS "found ${SOURCE_ITEMS} source files")
     if (NOT SOURCE_ITEMS EQUAL 0)
-        set(MAIN_TESTS_TARGET "${PROJECT_NAME}-main-tests")
-        add_executable(${MAIN_TESTS_TARGET} unit_test.cpp ${SOURCES})
-        target_include_directories(${MAIN_TESTS_TARGET} PRIVATE ${BUILD_MAIN_SRC_DIR})
-        target_link_libraries(${MAIN_TESTS_TARGET} PUBLIC third-party-includes PRIVATE ${BUILD_NODE_COMPONENT} Catch2::Catch2)
+        set(INFRA_TESTS_TARGET "${PROJECT_NAME}-infra-tests")
+        add_executable(${INFRA_TESTS_TARGET} unit_test.cpp ${SOURCES})
+        target_include_directories(${INFRA_TESTS_TARGET} PRIVATE ${BUILD_MAIN_SRC_DIR})
+        target_link_libraries(${INFRA_TESTS_TARGET} PUBLIC third-party-includes PRIVATE ${BUILD_NODE_COMPONENT} Catch2::Catch2)
     endif ()
+
+    # Node Tests
+    message(CHECK_START "Looking for node tests ...")
+    set(SOURCES)
+    file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "${BUILD_MAIN_SRC_DIR}/node/*_test.?pp")
+    list(LENGTH SOURCES SOURCE_ITEMS)
+    message(CHECK_PASS "found ${SOURCE_ITEMS} source files")
+    if (NOT SOURCE_ITEMS EQUAL 0)
+        set(NODE_TESTS_TARGET "${PROJECT_NAME}-node-tests")
+        add_executable(${NODE_TESTS_TARGET} unit_test.cpp ${SOURCES})
+        target_include_directories(${NODE_TESTS_TARGET} PRIVATE ${BUILD_MAIN_SRC_DIR})
+        target_link_libraries(${NODE_TESTS_TARGET} PUBLIC third-party-includes PRIVATE ${BUILD_NODE_COMPONENT} ${BUILD_INFRA_COMPONENT} Catch2::Catch2)
+    endif ()
+
 
 endif ()

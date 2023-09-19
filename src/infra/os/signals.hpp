@@ -10,12 +10,12 @@
 #include <functional>
 #include <string>
 
-namespace zenpp {
+namespace zenpp::os {
 
 //! \brief Specific exception for
-class os_signal_exception : public std::exception {
+class signal_exception : public std::exception {
   public:
-    explicit os_signal_exception(int code);
+    explicit signal_exception(int code);
     [[nodiscard]] const char* what() const noexcept final;
     [[nodiscard]] int sig_code() const noexcept { return sig_code_; }
 
@@ -25,7 +25,7 @@ class os_signal_exception : public std::exception {
 };
 
 //! \brief Handler for OS Signals traps
-class Ossignals {
+class Signals {
   public:
     static void init(std::function<void(int)> custom_handler = {});  // Enable the hooks
     static void handle(int sig_code);                                // Handles incoming signal
@@ -40,4 +40,4 @@ class Ossignals {
     static std::function<void(int)> custom_handler_;  // Custom handling
 };
 
-}  // namespace zenpp
+}  // namespace zenpp::os

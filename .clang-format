@@ -13,8 +13,12 @@ IncludeCategories:
   - Regex: '<core\/.*'
     Priority: 50
 
+  # Infra headers
+  - Regex: '<infra\/.*'
+    Priority: 55
+
   # Main headers
-  - Regex: '<app\/.*'
+  - Regex: '<node\/.*'
     Priority: 60
 
   # Self headers

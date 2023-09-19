@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <app/database/mdbx_tables.hpp>
+#include <node/database/mdbx_tables.hpp>
 
 namespace zenpp::db::stages {
 

@@ -9,8 +9,8 @@
 #include <array>
 #include <ranges>
 
-#include <app/common/version.hpp>
-#include <app/database/mdbx.hpp>
+#include <node/common/version.hpp>
+#include <node/database/mdbx.hpp>
 
 namespace zenpp::db::tables {
 

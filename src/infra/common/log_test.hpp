@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <app/common/log.hpp>
+#include <infra/common/log.hpp>
 
 namespace zenpp::log {
 

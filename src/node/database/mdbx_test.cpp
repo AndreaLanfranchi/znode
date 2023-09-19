@@ -14,8 +14,9 @@
 
 #include <core/common/cast.hpp>
 
-#include <app/common/directories.hpp>
-#include <app/database/mdbx.hpp>
+#include <infra/common/directories.hpp>
+
+#include <node/database/mdbx.hpp>
 
 namespace zenpp::db {
 

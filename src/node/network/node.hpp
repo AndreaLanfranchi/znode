@@ -23,9 +23,10 @@
 #include <core/common/base.hpp>
 #include <core/types/network.hpp>
 
-#include <app/common/settings.hpp>
-#include <app/concurrency/asio_timer.hpp>
-#include <app/network/protocol.hpp>
+#include <infra/concurrency/asio_timer.hpp>
+
+#include <node/common/settings.hpp>
+#include <node/network/protocol.hpp>
 
 namespace zenpp::network {
 

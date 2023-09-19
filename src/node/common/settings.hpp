@@ -15,9 +15,10 @@
 #include <core/chain/config.hpp>
 #include <core/common/base.hpp>
 
-#include <app/common/directories.hpp>
-#include <app/common/log.hpp>
-#include <app/database/mdbx.hpp>  // TODO define dbsettings here and remove this include (mdbx.hpp must include this)
+#include <infra/common/directories.hpp>
+#include <infra/common/log.hpp>
+
+#include <node/database/mdbx.hpp>  // TODO define dbsettings here and remove this include (mdbx.hpp must include this)
 
 namespace zenpp {
 

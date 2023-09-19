@@ -5,6 +5,8 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "common.hpp"
+
 #include <iostream>
 #include <stdexcept>
 
@@ -14,14 +16,13 @@
 
 #include <core/common/memory.hpp>
 
-#include <app/common/stopwatch.hpp>
-#include <app/concurrency/ossignals.hpp>
-#include <app/database/access_layer.hpp>
-#include <app/database/mdbx_tables.hpp>
-#include <app/network/node_hub.hpp>
-#include <app/zk/params.hpp>
+#include <infra/common/stopwatch.hpp>
+#include <infra/os/signals.hpp>
 
-#include "common.hpp"
+#include <node/database/access_layer.hpp>
+#include <node/database/mdbx_tables.hpp>
+#include <node/network/node_hub.hpp>
+#include <node/zk/params.hpp>
 
 using namespace zenpp;
 using namespace std::chrono;
@@ -105,7 +106,7 @@ int main(int argc, char* argv[]) {
         OpenSSL_add_all_ciphers();
         ERR_load_crypto_strings();
 
-        Ossignals::init();       // Intercept OS signals
+        os::Signals::init();     // Intercept OS signals
         AppSettings settings{};  // Global app settings
         auto& network_settings = settings.network;
         auto& log_settings = settings.log;
@@ -207,7 +208,7 @@ int main(int argc, char* argv[]) {
             }
 
             // Check signals
-            if (Ossignals::signalled()) {
+            if (os::Signals::signalled()) {
                 // sync_loop.stop(true);
                 // continue;
                 break;

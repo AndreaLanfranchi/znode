@@ -44,9 +44,8 @@
 #include <core/crypto/md.hpp>
 #include <core/encoding/hex.hpp>
 
-#include <app/common/log.hpp>
-#include <app/common/terminal.hpp>
-#include <app/concurrency/ossignals.hpp>
+#include <infra/common/log.hpp>
+#include <infra/os/signals.hpp>
 
 namespace zenpp::zk {
 
@@ -55,7 +54,7 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
     std::vector<ParamFile> errored_param_files{};
 
     for (const auto& param_file : kParamFiles) {
-        if (Ossignals::signalled()) {
+        if (os::Signals::signalled()) {
             return false;
         }
         const auto file_path{directory / param_file.name};
@@ -120,7 +119,7 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
     }
 
     for (const auto& param_file : errored_param_files) {
-        if (Ossignals::signalled()) {
+        if (os::Signals::signalled()) {
             return false;
         }
         const auto file_path{directory / param_file.name};

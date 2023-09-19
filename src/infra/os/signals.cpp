@@ -5,7 +5,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "ossignals.hpp"
+#include "signals.hpp"
 
 #include <csignal>
 #include <cstdlib>
@@ -14,7 +14,7 @@
 
 #include <absl/strings/str_cat.h>
 
-namespace zenpp {
+namespace zenpp::os {
 
 namespace {
     const char* sig_name(int sig_code) {
@@ -95,19 +95,19 @@ constexpr int kHandleableCodes[] {  // NOLINT(*-avoid-c-arrays)
         SIGTERM  // Termination request (kill/killall default)
 };
 
-std::atomic_uint32_t Ossignals::sig_count_{0};
-std::atomic_int Ossignals::sig_code_{0};
-std::atomic_bool Ossignals::signalled_{false};
-std::function<void(int)> Ossignals::custom_handler_;
+std::atomic_uint32_t Signals::sig_count_{0};
+std::atomic_int Signals::sig_code_{0};
+std::atomic_bool Signals::signalled_{false};
+std::function<void(int)> Signals::custom_handler_;
 
-void Ossignals::init(std::function<void(int)> custom_handler) {
+void Signals::init(std::function<void(int)> custom_handler) {
     for (const int sig_code : kHandleableCodes) {
-        signal(sig_code, &Ossignals::handle);
+        signal(sig_code, &Signals::handle);
     }
     custom_handler_ = std::move(custom_handler);
 }
 
-void Ossignals::handle(int sig_code) {
+void Signals::handle(int sig_code) {
     if (bool expected{false}; signalled_.compare_exchange_strong(expected, true)) {
         sig_code_ = sig_code;
         std::cerr << absl::StrCat("\nCaught OS signal ", sig_name(sig_code_), ", shutting down ...\n") << std::endl;
@@ -124,21 +124,22 @@ void Ossignals::handle(int sig_code) {
     if (custom_handler_) {
         custom_handler_(sig_code);
     }
-    signal(sig_code, &Ossignals::handle);  // Re-enable the hook
+    signal(sig_code, &Signals::handle);  // Re-enable the hook
 }
 
-void Ossignals::reset() noexcept {
+void Signals::reset() noexcept {
     signalled_ = false;
     sig_count_ = 0;
 }
 
-void Ossignals::throw_if_signalled() {
+void Signals::throw_if_signalled() {
     if (signalled()) {
-        throw os_signal_exception(sig_code_);
+        throw signal_exception(sig_code_);
     }
 }
 
-os_signal_exception::os_signal_exception(int code)
+signal_exception::signal_exception(int code)
     : sig_code_{code}, message_{absl::StrCat("Caught OS signal ", sig_name(code))} {}
-const char* os_signal_exception::what() const noexcept { return message_.c_str(); }
-}  // namespace zenpp
+const char* signal_exception::what() const noexcept { return message_.c_str(); }
+
+}  // namespace zenpp::os

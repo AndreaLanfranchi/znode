@@ -102,7 +102,7 @@ class DataDirectory final : public Directory {
     ~DataDirectory() override = default;
 
     //! \brief Override DataDirectory's clear method to avoid accidental loss of data
-    void clear(bool) override{};
+    void clear(bool /*recurse*/) override{};
 
     static constexpr std::string_view kChainDataName = "chaindata";
     static constexpr std::string_view kEtlTmpName = "etl-tmp";

@@ -8,8 +8,8 @@
 #include <catch2/catch.hpp>
 #include <magic_enum.hpp>
 
-#include <app/common/log_test.hpp>
-#include <app/concurrency/worker.hpp>
+#include <infra/common/log_test.hpp>
+#include <infra/concurrency/worker.hpp>
 
 namespace zenpp {
 

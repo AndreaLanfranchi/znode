@@ -7,8 +7,9 @@
 
 #include <catch2/catch.hpp>
 
-#include <app/common/directories.hpp>
-#include <app/database/stages.hpp>
+#include <infra/common/directories.hpp>
+
+#include <node/database/stages.hpp>
 
 namespace zenpp::db {
 

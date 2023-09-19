@@ -16,10 +16,11 @@
 #include <core/common/cast.hpp>
 #include <core/common/misc.hpp>
 
-#include <app/common/directories.hpp>
-#include <app/common/log.hpp>
-#include <app/concurrency/ossignals.hpp>
-#include <app/database/mdbx.hpp>
+#include <infra/common/directories.hpp>
+#include <infra/common/log.hpp>
+#include <infra/os/signals.hpp>
+
+#include <node/database/mdbx.hpp>
 
 namespace fs = std::filesystem;
 using namespace zenpp;
@@ -179,8 +180,8 @@ void do_tables(const db::EnvConfig& config) {
 }
 
 int main(int argc, char* argv[]) {
-    Ossignals::init();
-    CLI::App app_main("Zenn db tool");
+    os::Signals::init();
+    CLI::App app_main("Zenpp db tool");
     app_main.get_formatter()->column_width(50);
     app_main.require_subcommand(1);      // At least 1 subcommand is required
     const log::Settings log_settings{};  // Holds logging settings

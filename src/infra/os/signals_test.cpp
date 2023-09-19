@@ -8,21 +8,21 @@
 
 #include <catch2/catch.hpp>
 
-#include <app/concurrency/ossignals.hpp>
+#include <infra/os/signals.hpp>
 
-namespace zenpp {
+namespace zenpp::os {
 
 TEST_CASE("Os Signals", "[concurrency]") {
-    Ossignals::init();  // Enable the hooks
+    Signals::init();  // Enable the hooks
     bool expected_trow{false};
     try {
         std::raise(SIGINT);
-        Ossignals::throw_if_signalled();
-    } catch (const os_signal_exception& ex) {
+        Signals::throw_if_signalled();
+    } catch (const signal_exception& ex) {
         expected_trow = true;
         CHECK(ex.sig_code() == SIGINT);
     }
     REQUIRE(expected_trow);
-    Ossignals::reset();  // Otherwise other tests get blocked
+    Signals::reset();  // Otherwise other tests get blocked
 }
-}  // namespace zenpp
+}  // namespace zenpp::os

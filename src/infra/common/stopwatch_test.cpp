@@ -9,7 +9,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <app/common/stopwatch.hpp>
+#include <infra/common/stopwatch.hpp>
 
 namespace zenpp {
 TEST_CASE("Stop Watch", "[misc]") {

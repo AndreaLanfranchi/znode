@@ -12,9 +12,10 @@
 
 #include <core/common/base.hpp>
 
-#include <app/common/log.hpp>
-#include <app/common/settings.hpp>
-#include <app/concurrency/stoppable.hpp>
+#include <infra/common/log.hpp>
+#include <infra/concurrency/stoppable.hpp>
+
+#include <node/common/settings.hpp>
 
 namespace zenpp::stages {
 

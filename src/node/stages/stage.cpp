@@ -7,7 +7,7 @@
 
 #include "stage.hpp"
 
-#include <app/database/stages.hpp>
+#include <node/database/stages.hpp>
 
 namespace zenpp::stages {
 

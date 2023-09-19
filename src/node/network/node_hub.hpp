@@ -15,12 +15,13 @@
 #include <core/common/misc.hpp>
 #include <core/types/network.hpp>
 
-#include <app/common/settings.hpp>
-#include <app/common/stopwatch.hpp>
-#include <app/concurrency/asio_timer.hpp>
-#include <app/concurrency/unique_queue.hpp>
-#include <app/network/node.hpp>
-#include <app/network/secure.hpp>
+#include <infra/common/stopwatch.hpp>
+#include <infra/concurrency/asio_timer.hpp>
+#include <infra/concurrency/unique_queue.hpp>
+
+#include <node/common/settings.hpp>
+#include <node/network/node.hpp>
+#include <node/network/secure.hpp>
 
 namespace zenpp::network {
 

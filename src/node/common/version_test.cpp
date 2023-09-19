@@ -7,7 +7,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <app/common/version.hpp>
+#include <node/common/version.hpp>
 
 namespace zenpp {
 TEST_CASE("Versions", "[misc]") {

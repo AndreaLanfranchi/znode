@@ -7,10 +7,7 @@
 ]]
 
 add_subdirectory(core) # Core components - always built
-
 if (NOT BUILD_CORE_ONLY)
-    if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/node)
-        message(FATAL_ERROR "No \"app\" directory found, cannot build")
-    endif ()
-    add_subdirectory(node) # The node implementation
+    add_subdirectory(infra) # Infrastructure components
+    add_subdirectory(node)  # The node implementation
 endif (NOT BUILD_CORE_ONLY)

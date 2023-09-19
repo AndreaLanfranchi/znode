@@ -10,7 +10,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <app/common/log_test.hpp>
+#include <infra/common/log_test.hpp>
 
 namespace zenpp::log {
 // Custom LogBuffer just for testing to access buffered content

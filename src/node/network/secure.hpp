@@ -13,8 +13,8 @@
 #include <openssl/rsa.h>
 #include <openssl/ssl.h>
 
-#include <app/common/directories.hpp>
-#include <app/common/log.hpp>
+#include <infra/common/directories.hpp>
+#include <infra/common/log.hpp>
 
 namespace zenpp::network {
 

@@ -13,7 +13,7 @@
 #include <boost/noncopyable.hpp>
 #include <boost/signals2/signal.hpp>
 
-#include <app/concurrency/stoppable.hpp>
+#include <infra/concurrency/stoppable.hpp>
 
 namespace zenpp {
 

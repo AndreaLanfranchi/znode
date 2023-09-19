@@ -17,7 +17,7 @@
 #include <core/common/assert.hpp>
 #include <core/common/misc.hpp>
 
-#include <app/common/log.hpp>
+#include <infra/common/log.hpp>
 
 namespace zenpp::network {
 
@@ -272,15 +272,12 @@ void NodeHub::async_connect(const IPConnection& connection) {
     }
 
     if (not is_running()) return;
-    std::shared_ptr<Node> new_node(
-        new Node(
-            app_settings_, connection, asio_context_, std::move(socket), tls_client_context_.get(),
-            [this](DataDirectionMode direction, size_t bytes_transferred) {
-                on_node_data(direction, bytes_transferred);
-            },
-            [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
-                on_node_received_message(node, std::move(message));
-            }));
+    std::shared_ptr<Node> new_node(new Node(
+        app_settings_, connection, asio_context_, std::move(socket), tls_client_context_.get(),
+        [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
+        [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
+            on_node_received_message(node, std::move(message));
+        }));
 
     new_node->start();
     on_node_connected(new_node);
@@ -353,15 +350,12 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
     const IPEndpoint local{socket.local_endpoint()};
     const IPConnection connection(remote, IPConnectionType::kInbound);
 
-    const std::shared_ptr<Node> new_node(
-        new Node(
-            app_settings_, connection, asio_context_, std::move(socket), tls_server_context_.get(),
-            [this](DataDirectionMode direction, size_t bytes_transferred) {
-                on_node_data(direction, bytes_transferred);
-            },
-            [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
-                on_node_received_message(node, std::move(message));
-            }));
+    const std::shared_ptr<Node> new_node(new Node(
+        app_settings_, connection, asio_context_, std::move(socket), tls_server_context_.get(),
+        [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
+        [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
+            on_node_received_message(node, std::move(message));
+        }));
     log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local.to_string(), "remote",
                           remote.to_string(), "id", std::to_string(new_node->id())});
 

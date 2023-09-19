@@ -12,8 +12,8 @@
 
 #include <core/common/misc.hpp>
 
-#include <app/common/directories.hpp>
-#include <app/common/log_test.hpp>
+#include <infra/common/directories.hpp>
+#include <infra/common/log_test.hpp>
 
 namespace zenpp {
 

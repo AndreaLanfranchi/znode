@@ -18,13 +18,12 @@
 #define _DARWIN_C_SOURCE
 #endif
 
-#include "core/common/assert.hpp"
-
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/steady_timer.hpp>
 
-#include <app/concurrency/ossignals.hpp>
-#include <app/concurrency/stoppable.hpp>
+#include <core/common/assert.hpp>
+
+#include <infra/concurrency/stoppable.hpp>
 
 namespace zenpp {
 //! \brief Implementation of an asynchronous timer relying on boost:asio
