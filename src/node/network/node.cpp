@@ -170,7 +170,6 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
 }
 
 void Node::start_ssl_handshake() {
-    REQUIRES(ssl_context_ not_eq nullptr);
     if (not socket_.is_open()) return;
     const asio::ssl::stream_base::handshake_type handshake_type{connection_.type_ == IPConnectionType::kInbound
                                                                     ? asio::ssl::stream_base::server
@@ -324,7 +323,7 @@ void Node::start_write() {
     // Push remaining data from the current message to the socket
     const auto bytes_to_write{std::min(kMaxBytesPerIO, outbound_message_->data().avail())};
     const auto data{outbound_message_->data().read(bytes_to_write)};
-    REQUIRES(data);
+    ASSERT_POST(data and "Must have data to write");
     send_buffer_.sputn(reinterpret_cast<const char*>(data->data()), static_cast<std::streamsize>(data->size()));
 
     auto write_handler{
@@ -480,7 +479,7 @@ serialization::Error Node::process_inbound_message() {
     std::string err_extended_reason{};
     bool notify_node_hub{false};
 
-    REQUIRES(inbound_message_ not_eq nullptr);
+    ASSERT_PRE(inbound_message_ not_eq nullptr and "Must have a valid message");
     inbound_message_metrics_[inbound_message_->get_type()].count_++;
     inbound_message_metrics_[inbound_message_->get_type()].bytes_ += inbound_message_->data().size();
 
@@ -501,7 +500,6 @@ serialization::Error Node::process_inbound_message() {
                 const std::list<std::string> log_params{
                     "agent",    remote_version_.user_agent_,
                     "version",  std::to_string(remote_version_.protocol_version_),
-                    "nonce",    std::to_string(remote_version_.nonce_),
                     "services", std::to_string(remote_version_.services_),
                     "relay",    (remote_version_.relay_ ? "true" : "false"),
                     "block",    std::to_string(remote_version_.last_block_height_),

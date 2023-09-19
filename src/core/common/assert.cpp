@@ -10,11 +10,11 @@
 #include <iostream>
 
 namespace zenpp {
-void abort_due_to_assertion_failure(std::string_view message, const char* function, const char* file, long line) {
+void abort_due_to_assertion_failure(std::string_view message, const std::source_location& location) {
     std::cerr << "\n!! Assertion failed !!\n"
               << "   Expression: " << message << "\n"
-              << "   Function  : " << function << "\n"
-              << "   Source    : " << file << ", line " << line << "\n\n"
+              << "   Function  : " << location.function_name() << "\n"
+              << "   Source    : " << location.file_name() << ", line " << location.line() << "\n\n"
               << "** Please report this to developers **. Aborting ...\n"
               << std::endl;
     std::abort();

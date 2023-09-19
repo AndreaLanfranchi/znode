@@ -38,8 +38,8 @@ class LockedPagesManagerBase : private boost::noncopyable {
     LockedPagesManagerBase() : LockedPagesManagerBase(get_system_page_size()){};
 
     explicit LockedPagesManagerBase(size_t page_size) : page_size_{page_size}, page_mask_{~(page_size - 1)} {
-        REQUIRES((page_size >= 512 && page_size <= 1_GiB));  // Martian values
-        REQUIRES((page_size & (page_size - 1)) == 0);        // Must be power of two
+        ASSERT_PRE((page_size >= 512 and page_size <= 1_GiB));  // Martian values
+        ASSERT_PRE((page_size & (page_size - 1)) == 0);         // Must be power of two
     };
 
     ~LockedPagesManagerBase() { clear(); }
@@ -76,8 +76,8 @@ class LockedPagesManagerBase : private boost::noncopyable {
         for (size_t page{start}; page <= end; page += page_size_) {
             auto item = locked_pages_.find(page);
             if (item == locked_pages_.end()) continue;  // Not previously locked
-            ENSURE(item->second > 0);                   // It MUST have a value
-            if (--item->second == 0) {                  // Decrement lock count
+            ASSERT_POST(item->second > 0 and "Must have a value");
+            if (--item->second == 0) {  // Decrement lock count
                 if (!locker_.unlock(reinterpret_cast<void*>(page), page_size_)) {
                     ret = false;
                     ++item->second;

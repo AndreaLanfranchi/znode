@@ -7,12 +7,21 @@
 
 #pragma once
 #include <string_view>
+#if __has_include(<source_location>)
+#include <source_location>
+#elif __has_include(<experimental/source_location>)
+#include <experimental/source_location>
+namespace std {
+using source_location = std::experimental::source_location;
+}
+#else
+#error "Missing <source_location>"
+#endif
 
 #include <core/common/preprocessor.hpp>
 
 namespace zenpp {
-[[noreturn]] void abort_due_to_assertion_failure(std::string_view message, const char* function, const char* file,
-                                                 long line);
+[[noreturn]] void abort_due_to_assertion_failure(std::string_view message, const std::source_location& location);
 }  // namespace zenpp
 
 //! \brief Always aborts program execution on assertion failure, even when NDEBUG is defined.
@@ -20,10 +29,10 @@ namespace zenpp {
     if ((expr)) [[likely]]    \
         static_cast<void>(0); \
     else                      \
-        ::zenpp::abort_due_to_assertion_failure(#expr, __func__, __FILE__, __LINE__)
+        ::zenpp::abort_due_to_assertion_failure(#expr, std::source_location::current())
 
-//! \brief An alias for ASSERT to make semantically clear that we're checking a precondition.
-#define REQUIRES(expr) ASSERT(expr)
+//! \brief An alias for ASSERT with semantic emphasis on pre-condition validation.
+#define ASSERT_PRE(expr) ASSERT(expr)
 
-//! \brief An alias for ASSERT to make semantically clear that we're checking a postcondition.
-#define ENSURE(expr) ASSERT(expr)
+//! \brief An alias for ASSERT with semantic emphasis on post-condition validation.
+#define ASSERT_POST(expr) ASSERT(expr)

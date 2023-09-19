@@ -406,7 +406,7 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
             }
             break;
         default:
-            ASSERT(false);  // Should never happen
+            ASSERT(false && "Should not happen");
     }
 
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
@@ -430,7 +430,7 @@ void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
             ++current_active_outbound_connections_;
             break;
         default:
-            ASSERT(false);  // Should never happen
+            ASSERT(false && "Should not happen");
     }
     nodes_.try_emplace(node->id(), node);
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
@@ -449,7 +449,7 @@ void NodeHub::on_node_data(network::DataDirectionMode direction, const size_t by
             total_bytes_sent_ += bytes_transferred;
             break;
         default:
-            ASSERT(false);  // Should never happen
+            ASSERT(false && "Should not happen");
     }
 }
 
@@ -457,8 +457,8 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
     using namespace serialization;
     using enum Error;
 
-    REQUIRES(message not_eq nullptr);
-    REQUIRES(node not_eq nullptr);
+    ASSERT_PRE(message not_eq nullptr);
+    ASSERT_PRE(node not_eq nullptr);
     if (not is_running() or not node->is_running()) return;
 
     std::string error{};

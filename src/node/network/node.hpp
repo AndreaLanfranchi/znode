@@ -24,9 +24,9 @@
 #include <core/types/network.hpp>
 
 #include <infra/concurrency/asio_timer.hpp>
+#include <infra/network/protocol.hpp>
 
 #include <node/common/settings.hpp>
-#include <node/network/protocol.hpp>
 
 namespace zenpp::network {
 

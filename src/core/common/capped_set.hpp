@@ -21,7 +21,7 @@ class CappedSet {
 
   public:
     explicit CappedSet(const size_t capacity) : capacity_{capacity} {
-        REQUIRES(capacity != 0);  // Can't create zero capped container
+        ASSERT_PRE(capacity not_eq 0U);  // Can't create zero capped container
     }
     ~CappedSet() = default;
 

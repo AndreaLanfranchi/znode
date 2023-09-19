@@ -13,11 +13,11 @@ namespace zenpp::db {
 
 std::optional<Version> read_schema_version(mdbx::txn& txn) {
     Cursor config(txn, db::tables::kConfig);
-    if (!config.seek(to_slice(tables::kDbSchemaVersionKey))) {
+    if (not config.seek(to_slice(tables::kDbSchemaVersionKey))) {
         return std::nullopt;
     }
     auto data{config.current()};
-    ASSERT(data.value.length() == sizeof(Version));
+    ASSERT_POST(data.value.length() == sizeof(Version) and "Invalid serialized schema");
     const auto* data_ptr = static_cast<uint8_t*>(data.value.data());
     Version ret{};
     ret.Major = endian::load_big_u32(&data_ptr[0]);

@@ -154,7 +154,7 @@ serialization::Error NetMessage::validate() noexcept {
         if (ser_stream_.avail() != expected_vector_data_size) return kMessagePayloadMismatchesVectorSize;
         // Look for duplicates
         const auto payload_view{ser_stream_.read()};
-        ASSERT(payload_view);
+        ASSERT_POST(payload_view and "Must have a valid payload view");
         if (const auto duplicate_count{count_duplicate_data_chunks(*payload_view, *message_definition.vector_item_size,
                                                                    1 /* one is enough */)};
             duplicate_count > 0) {
@@ -189,7 +189,7 @@ serialization::Error NetMessage::parse(ByteView& input_data, ByteView network_ma
         ret = header_.deserialize(ser_stream_);
         if (ret != kSuccess) return ret;
 
-        REQUIRES(network_magic.size() == header_.network_magic.size());
+        ASSERT_PRE(network_magic.size() == header_.network_magic.size());
         if (memcmp(header_.network_magic.data(), network_magic.data(), network_magic.size()) != 0) {
             return kMessageHeaderMagicMismatch;
         }
