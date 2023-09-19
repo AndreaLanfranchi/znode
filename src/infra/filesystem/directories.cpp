@@ -16,9 +16,11 @@
 #include <array>
 #include <fstream>
 
-#include <boost/process/environment.hpp>
+#include <absl/strings/str_cat.h>
 
 #include <core/common/misc.hpp>
+
+#include <infra/os/environment.hpp>
 
 namespace zenpp {
 
@@ -47,7 +49,7 @@ std::filesystem::path get_unique_temporary_path(std::optional<std::filesystem::p
     // If 1000 attempts fail we throw
     for (int i{0}; i < 1000; ++i) {
         auto temp_generated_absolute_path{*base_path / get_random_alpha_string(10)};
-        if (!std::filesystem::exists(temp_generated_absolute_path)) {
+        if (not std::filesystem::exists(temp_generated_absolute_path)) {
             return temp_generated_absolute_path;
         }
     }
@@ -56,54 +58,14 @@ std::filesystem::path get_unique_temporary_path(std::optional<std::filesystem::p
     throw std::filesystem::filesystem_error("Unable to find a valid unique non-existent name in " + base_path->string(),
                                             *base_path, std::make_error_code(std::errc::file_exists));
 }
-std::filesystem::path get_os_default_storage_path() {
-    std::string base_path_str{};
-    auto environment{boost::this_process::environment()};
-
-    if (auto env_value{environment["XDG_DATA_HOME"]}; not env_value.empty()) {
-        // Got storage path from docker
-        base_path_str.assign(env_value.to_string());
-    } else {
-#ifdef _WIN32
-        std::string const env_name{"LOCALAPPDATA"};
-#else
-        std::string env_name{"HOME"};
-#endif
-        env_value = environment[env_name];
-        if (env_value.empty()) {
-            // We don't actually know where to store data
-            // fallback to current directory
-            base_path_str.assign(std::filesystem::current_path().string());
-        } else {
-            base_path_str.assign(env_value.to_string());
-        }
-    }
-
-    std::filesystem::path base_dir_path{base_path_str};
-    std::string project_name{get_buildinfo()->project_name};
-    project_name.insert(0, 1, '.');
-#ifdef _WIN32
-    base_dir_path /= project_name;
-#elif __APPLE__
-    base_dir_path /= "Library";
-    base_dir_path /= "Application Support";
-    base_dir_path /= project_name;
-#else
-    base_dir_path /= ".local";
-    base_dir_path /= "share";
-    base_dir_path /= project_name;
-#endif
-
-    return base_dir_path;
-}
 
 Directory::Directory(const std::filesystem::path& path) : path_(path) {
     if (path_.empty()) path_ = std::filesystem::current_path();
-    if (!path.is_absolute()) path_ = std::filesystem::absolute(path_);
-    if (!path_.has_filename()) {
+    if (not path.is_absolute()) path_ = std::filesystem::absolute(path_);
+    if (not path_.has_filename()) {
         throw std::invalid_argument("Invalid path " + path_.string());
     }
-    if (std::filesystem::exists(path_) && !std::filesystem::is_directory(path_)) {
+    if (std::filesystem::exists(path_) and !std::filesystem::is_directory(path_)) {
         throw std::invalid_argument("Invalid path " + path_.string() + " not a directory");
     }
     create();
@@ -115,7 +77,7 @@ const std::filesystem::path& Directory::path() const noexcept { return path_; }
 
 void Directory::clear(bool recurse) {
     for (const auto& entry : std::filesystem::directory_iterator(path_)) {
-        if (std::filesystem::is_directory(entry) && !recurse) continue;
+        if (std::filesystem::is_directory(entry) and !recurse) continue;
         std::filesystem::remove_all(entry.path());
     }
 }
@@ -125,7 +87,7 @@ size_t Directory::size(bool recurse) const {
     for (auto it{std::filesystem::recursive_directory_iterator(path_)};
          it != std::filesystem::recursive_directory_iterator{}; ++it) {
         if (std::filesystem::is_directory(it->path())) {
-            if (!recurse) it.disable_recursion_pending();
+            if (not recurse) it.disable_recursion_pending();
         } else if (std::filesystem::is_regular_file(it->path())) {
             ret += std::filesystem::file_size(it->path());
         }
@@ -136,7 +98,7 @@ bool Directory::exists() const { return std::filesystem::exists(path_); }
 
 void Directory::create() const {
     if (exists()) return;
-    if (!std::filesystem::create_directories(path_)) {
+    if (not std::filesystem::create_directories(path_)) {
         throw std::filesystem::filesystem_error("Unable to create directory " + path_.string(), path_,
                                                 std::make_error_code(std::errc::io_error));
     }
@@ -144,7 +106,7 @@ void Directory::create() const {
 Directory Directory::operator[](const std::filesystem::path& path) const {
     if (path.empty() or path.is_absolute() or not path.has_filename()) throw std::invalid_argument("Invalid Path");
     const auto target{path_ / path};
-    if (!std::filesystem::exists(target) && !std::filesystem::create_directories(target)) {
+    if (not std::filesystem::exists(target) and not std::filesystem::create_directories(target)) {
         throw std::filesystem::filesystem_error("Unable to create directory " + target.string(), target,
                                                 std::make_error_code(std::errc::io_error));
     }
@@ -157,10 +119,31 @@ bool Directory::is_writable() const noexcept {
     }
     std::filesystem::path const test_file_path{path_ / test_file_name};
     std::ofstream test_file{test_file_path.string()};
-    if (!test_file.is_open()) return false;
+    if (not test_file.is_open()) return false;
     test_file << "test";
     test_file.close();
     std::filesystem::remove(test_file_path);
     return true;
+}
+std::filesystem::path DataDirectory::default_path() {
+    // Defaulted to executable's directory
+    const std::string base_path_str{
+        env::get_default_storage_path().value_or(get_process_absolute_full_path().string())};
+    const std::string proj_path_str{absl::StrCat(".", get_buildinfo()->project_name)};
+
+    std::filesystem::path base_dir_path{base_path_str};
+#ifdef _WIN32
+    base_dir_path /= proj_path_str;
+#elif __APPLE__
+    base_dir_path /= "Library";
+    base_dir_path /= "Application Support";
+    base_dir_path /= proj_path_str;
+#else
+    base_dir_path /= ".local";
+    base_dir_path /= "share";
+    base_dir_path /= proj_path_str;
+#endif
+
+    return base_dir_path;
 }
 }  // namespace zenpp

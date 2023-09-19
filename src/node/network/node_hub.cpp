@@ -31,7 +31,7 @@ bool NodeHub::start() noexcept {
     feed_connections_from_dns();
 
     if (app_settings_.network.use_tls) {
-        const auto ssl_data{(*app_settings_.data_directory)[DataDirectory::kSSLCert].path()};
+        const auto ssl_data{(*app_settings_.data_directory)[DataDirectory::kSSLCertName].path()};
         auto* ctx{generate_tls_context(TLSContextType::kServer, ssl_data, app_settings_.network.tls_password)};
         if (ctx == nullptr) {
             log::Error("NodeHub", {"action", "start", "error", "failed to generate TLS server context"});

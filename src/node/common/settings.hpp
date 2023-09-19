@@ -15,8 +15,8 @@
 #include <core/chain/config.hpp>
 #include <core/common/base.hpp>
 
-#include <infra/common/directories.hpp>
 #include <infra/common/log.hpp>
+#include <infra/filesystem/directories.hpp>
 
 #include <node/database/mdbx.hpp>  // TODO define dbsettings here and remove this include (mdbx.hpp must include this)
 

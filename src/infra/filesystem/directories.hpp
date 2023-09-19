@@ -19,9 +19,6 @@ namespace zenpp {
 //! \brief Returns the path to OS provided temporary storage location
 std::filesystem::path get_os_temporary_path();
 
-//! \brief Returns the path to OS provided default storage location
-std::filesystem::path get_os_default_storage_path();
-
 //! \brief Returns the path of current process's executable
 std::filesystem::path get_process_absolute_full_path();
 
@@ -96,6 +93,7 @@ class TempDirectory final : public Directory {
 //! |-- etl-tmp   <-- Where temporary files from etl collector are stored
 //! |-- nodes     <-- Where database for discovered nodes is stored
 //! |-- zk-params <-- Where zk-SNARK parameters are stored
+//! |-- ssl-cert  <-- Where TLS certificates are stored
 class DataDirectory final : public Directory {
   public:
     using Directory::Directory;
@@ -108,10 +106,12 @@ class DataDirectory final : public Directory {
     static constexpr std::string_view kEtlTmpName = "etl-tmp";
     static constexpr std::string_view kNodesName = "nodes";
     static constexpr std::string_view kZkParamsName = "zk-params";
-    static constexpr std::string_view kSSLCert = "ssl-cert";
+    static constexpr std::string_view kSSLCertName = "ssl-cert";
 
     static constexpr std::array<std::string_view, 5> kSubdirs = {kChainDataName, kEtlTmpName, kNodesName, kZkParamsName,
-                                                                 kSSLCert};
+                                                                 kSSLCertName};
+
+    static std::filesystem::path default_path();
 
     //! \brief Ensures all subdirs are properly created
     void deploy() {
@@ -119,7 +119,7 @@ class DataDirectory final : public Directory {
         std::ignore = operator[](kEtlTmpName);
         std::ignore = operator[](kNodesName);
         std::ignore = operator[](kZkParamsName);
-        std::ignore = operator[](kSSLCert);
+        std::ignore = operator[](kSSLCertName);
     }
 };
 }  // namespace zenpp

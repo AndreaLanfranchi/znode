@@ -12,8 +12,6 @@
 #include <string>
 #include <thread>
 
-#include <absl/time/time.h>
-#include <boost/algorithm/string/predicate.hpp>
 #include <boost/asio/ip/address.hpp>
 
 namespace zenpp::cmd {
@@ -30,7 +28,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
     std::string etl_buffer_size_str{to_human_bytes(settings.etl_buffer_size, /*binary=*/true)};
 
     cli.add_option("--datadir", data_dir_path, "Path to data directory")
-        ->default_val(get_os_default_storage_path().string());
+        ->default_val(DataDirectory::default_path().string());
 
     cli.add_option("--chain", settings.network_id, "Name or ID of the network to join (default \"mainnet\")")
         ->capture_default_str()

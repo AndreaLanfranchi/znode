@@ -5,6 +5,8 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "directories.hpp"
+
 #include <fstream>
 #include <vector>
 
@@ -12,7 +14,6 @@
 
 #include <core/common/misc.hpp>
 
-#include <infra/common/directories.hpp>
 #include <infra/common/log_test.hpp>
 
 namespace zenpp {

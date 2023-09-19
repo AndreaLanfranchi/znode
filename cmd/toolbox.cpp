@@ -5,6 +5,8 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "infra/filesystem/directories.hpp"
+
 #include <filesystem>
 #include <memory>
 
@@ -16,7 +18,6 @@
 #include <core/common/cast.hpp>
 #include <core/common/misc.hpp>
 
-#include <infra/common/directories.hpp>
 #include <infra/common/log.hpp>
 #include <infra/os/signals.hpp>
 
@@ -193,7 +194,7 @@ int main(int argc, char* argv[]) {
     db_opts->get_formatter()->column_width(35);
     auto* db_path = db_opts->add_option("--db", "Path to database")
                         ->capture_default_str()
-                        ->default_str((get_os_default_storage_path() / DataDirectory::kChainDataName).string())
+                        ->default_str((DataDirectory::default_path() / DataDirectory::kChainDataName).string())
                         ->check(CLI::ExistingDirectory);
     auto* shared_opt = db_opts->add_flag("--shared", "Open database in shared mode");
     auto* exclusive_opt = db_opts->add_flag("--exclusive", "Open database in exclusive mode")->excludes(shared_opt);

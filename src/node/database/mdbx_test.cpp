@@ -14,7 +14,7 @@
 
 #include <core/common/cast.hpp>
 
-#include <infra/common/directories.hpp>
+#include <infra/filesystem/directories.hpp>
 
 #include <node/database/mdbx.hpp>
 

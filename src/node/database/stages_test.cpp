@@ -7,7 +7,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <infra/common/directories.hpp>
+#include <infra/filesystem/directories.hpp>
 
 #include <node/database/stages.hpp>
 

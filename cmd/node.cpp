@@ -163,7 +163,7 @@ int main(int argc, char* argv[]) {
 
         // Check required certificate and key file are present to initialize SSL context
         if (network_settings.use_tls) {
-            auto const ssl_data{(*settings.data_directory)[DataDirectory::kSSLCert].path()};
+            auto const ssl_data{(*settings.data_directory)[DataDirectory::kSSLCertName].path()};
             if (not network::validate_tls_requirements(ssl_data, network_settings.tls_password)) {
                 throw std::filesystem::filesystem_error("Invalid SSL certificate or key file",
                                                         std::make_error_code(std::errc::no_such_file_or_directory));
