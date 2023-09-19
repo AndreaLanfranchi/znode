@@ -7,6 +7,7 @@
 
 #include "asio_timer.hpp"
 
+#include <thread>
 #include <utility>
 
 #include <absl/strings/str_cat.h>
