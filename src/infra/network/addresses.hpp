@@ -62,9 +62,9 @@ enum class IPConnectionType : uint8_t {
     kSeedOutbound = 4U,    // Dial-out initiated by process to query seed nodes
 };
 
-class IPAddress : public serialization::Serializable {
+class IPAddress : public ser::Serializable {
   public:
-    using serialization::Serializable::Serializable;
+    using ser::Serializable::Serializable;
     explicit IPAddress(std::string_view str);
     explicit IPAddress(boost::asio::ip::address address);
     ~IPAddress() override = default;
@@ -91,15 +91,15 @@ class IPAddress : public serialization::Serializable {
 
   private:
     boost::asio::ip::address value_{boost::asio::ip::address_v4()};
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
     [[nodiscard]] IPAddressReservationType address_v4_reservation() const noexcept;
     [[nodiscard]] IPAddressReservationType address_v6_reservation() const noexcept;
 };
 
-class IPEndpoint : public serialization::Serializable {
+class IPEndpoint : public ser::Serializable {
   public:
-    using serialization::Serializable::Serializable;
+    using ser::Serializable::Serializable;
     explicit IPEndpoint(std::string_view str);
     explicit IPEndpoint(const boost::asio::ip::tcp::endpoint& endpoint);
     IPEndpoint(std::string_view str, uint16_t port_num);
@@ -117,8 +117,8 @@ class IPEndpoint : public serialization::Serializable {
     uint16_t port_{0};
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class IPSubNet {
@@ -179,9 +179,9 @@ class IPConnection {
     IPConnectionType type_{IPConnectionType::kNone};
 };
 
-class NodeService : public serialization::Serializable {
+class NodeService : public ser::Serializable {
   public:
-    using serialization::Serializable::Serializable;
+    using ser::Serializable::Serializable;
     explicit NodeService(std::string_view str);
     explicit NodeService(boost::asio::ip::tcp::endpoint& endpoint);
     explicit NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint);
@@ -198,8 +198,8 @@ class NodeService : public serialization::Serializable {
     IPEndpoint endpoint_{};  // ipv4/ipv6 address and port
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 //! \brief VersionNodeService subclasses NodeService only to customize serialization
@@ -210,8 +210,8 @@ class VersionNodeService : public NodeService {
     ~VersionNodeService() override = default;
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 }  // namespace zenpp::net
 

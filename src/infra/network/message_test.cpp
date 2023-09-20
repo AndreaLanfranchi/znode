@@ -15,7 +15,7 @@
 
 namespace zenpp::net {
 
-using namespace zenpp::serialization;
+using namespace zenpp::ser;
 
 namespace test {
 
@@ -267,8 +267,7 @@ TEST_CASE("NetMessage", "[net]") {
         header.payload_length = static_cast<uint32_t>(payload.avail());
         digest_input = payload.read();
         REQUIRE(digest_input);
-        REQUIRE(digest_input->size() ==
-                serialization::ser_compact_sizeof(num_elements) + (kInvItemSize * kMaxInvItems));
+        REQUIRE(digest_input->size() == ser::ser_compact_sizeof(num_elements) + (kInvItemSize * kMaxInvItems));
         hasher.init(*digest_input);
         final_digest = hasher.finalize();
 

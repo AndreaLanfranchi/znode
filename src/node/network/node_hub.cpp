@@ -454,7 +454,7 @@ void NodeHub::on_node_data(net::DataDirectionMode direction, const size_t bytes_
 }
 
 void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
-    using namespace serialization;
+    using namespace ser;
     using enum Error;
 
     ASSERT_PRE(message not_eq nullptr);

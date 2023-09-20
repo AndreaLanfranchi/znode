@@ -17,7 +17,7 @@
 #include <core/serialization/base.hpp>
 
 //! \brief All functions dedicated to objects and types serialization
-namespace zenpp::serialization {
+namespace zenpp::ser {
 
 //! \brief Returns the serialized size of arithmetic types
 //! \remarks Do not define serializable classes members as size_t as it might lead to wrong results on

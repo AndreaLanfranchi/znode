@@ -21,7 +21,7 @@
 
 namespace zenpp::net {
 
-class MessageHeader : public serialization::Serializable {
+class MessageHeader : public ser::Serializable {
   public:
     MessageHeader() : Serializable(){};
 
@@ -47,25 +47,25 @@ class MessageHeader : public serialization::Serializable {
     [[nodiscard]] bool pristine() const noexcept;
 
     //! \brief Performs a sanity check on the header
-    [[nodiscard]] serialization::Error validate() noexcept;
+    [[nodiscard]] ser::Error validate() noexcept;
 
   private:
     MessageType message_type_{MessageType::kMissingOrUnknown};
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class Message {
   public:
     //! \brief Construct a blank NetMessage
-    Message() : ser_stream_{serialization::Scope::kNetwork, 0} {};
+    Message() : ser_stream_{ser::Scope::kNetwork, 0} {};
 
     //! \brief Construct a blank NetMessage with a specific version
-    explicit Message(int version) : ser_stream_{serialization::Scope::kNetwork, version} {};
+    explicit Message(int version) : ser_stream_{ser::Scope::kNetwork, version} {};
 
     //! \brief Construct a NetMessage with network magic provided
     explicit Message(int version, std::array<uint8_t, 4>& magic)
-        : ser_stream_{serialization::Scope::kNetwork, version} {
+        : ser_stream_{ser::Scope::kNetwork, version} {
         header_.network_magic = magic;
     };
 
@@ -78,8 +78,8 @@ class Message {
     [[nodiscard]] size_t size() const noexcept { return ser_stream_.size(); }
     [[nodiscard]] MessageType get_type() const noexcept { return header_.get_type(); }
     [[nodiscard]] MessageHeader& header() noexcept { return header_; }
-    [[nodiscard]] serialization::SDataStream& data() noexcept { return ser_stream_; }
-    [[nodiscard]] serialization::Error parse(ByteView& input_data, ByteView network_magic = {}) noexcept;
+    [[nodiscard]] ser::SDataStream& data() noexcept { return ser_stream_; }
+    [[nodiscard]] ser::Error parse(ByteView& input_data, ByteView network_magic = {}) noexcept;
 
     //! \brief Sets the message version (generally inherited from the protocol version)
     void set_version(int version) noexcept;
@@ -88,15 +88,15 @@ class Message {
     [[nodiscard]] int get_version() const noexcept;
 
     //! \brief Validates the message header, payload and checksum
-    [[nodiscard]] serialization::Error validate() noexcept;
+    [[nodiscard]] ser::Error validate() noexcept;
 
     //! \brief Populates the message header and payload
-    serialization::Error push(MessageType message_type, MessagePayload& payload, ByteView magic) noexcept;
+    ser::Error push(MessageType message_type, MessagePayload& payload, ByteView magic) noexcept;
 
   private:
     MessageHeader header_{};                 // Where the message header is deserialized
-    serialization::SDataStream ser_stream_;  // Contains all the message raw data
+    ser::SDataStream ser_stream_;  // Contains all the message raw data
 
-    [[nodiscard]] serialization::Error validate_checksum() noexcept;
+    [[nodiscard]] ser::Error validate_checksum() noexcept;
 };
 }  // namespace zenpp::net

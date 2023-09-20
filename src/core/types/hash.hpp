@@ -20,7 +20,7 @@ namespace zenpp {
 
 //! \brief A Hash is a fixed size sequence of bytes
 template <uint32_t BITS>
-class Hash : public serialization::Serializable {
+class Hash : public ser::Serializable {
   public:
     static_assert(BITS && (BITS & 7) == 0, "Must be a multiple of 8");
     enum : uint32_t {
@@ -110,9 +110,8 @@ class Hash : public serialization::Serializable {
   private:
     alignas(uint32_t) std::array<uint8_t, kSize> bytes_{0};
 
-    friend class serialization::SDataStream;
-    [[nodiscard]] serialization::Error serialization(serialization::SDataStream& stream,
-                                                     serialization::Action action) override {
+    friend class ser::SDataStream;
+    [[nodiscard]] ser::Error serialization(ser::SDataStream& stream, ser::Action action) override {
         return stream.bind(bytes_, action);
     }
 };

@@ -13,7 +13,7 @@
 #include <core/common/overflow.hpp>
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::serialization {
+namespace zenpp::ser {
 
 DataStream::DataStream(const ByteView data) {
     buffer_.reserve(data.size());

@@ -78,7 +78,7 @@ inline constexpr MessageDefinition kMessageInv{
     size_t{kMaxInvItems},
     size_t{kInvItemSize},
     size_t{1 + kInvItemSize},                                                                 //
-    size_t{serialization::ser_compact_sizeof(kMaxInvItems) + (kMaxInvItems * kInvItemSize)},  //
+    size_t{ser::ser_compact_sizeof(kMaxInvItems) + (kMaxInvItems * kInvItemSize)},  //
 };
 
 inline constexpr MessageDefinition kMessageAddr{
@@ -88,7 +88,7 @@ inline constexpr MessageDefinition kMessageAddr{
     size_t{kMaxAddrItems},
     size_t{kAddrItemSize},
     size_t{1 + kAddrItemSize},                                                                   //
-    size_t{serialization::ser_compact_sizeof(kMaxAddrItems) + (kMaxAddrItems * kAddrItemSize)},  //
+    size_t{ser::ser_compact_sizeof(kMaxAddrItems) + (kMaxAddrItems * kAddrItemSize)},  //
 };
 
 inline constexpr MessageDefinition kMessagePing{
@@ -118,7 +118,7 @@ inline constexpr MessageDefinition kMessageGetheaders{
     size_t{kMaxGetHeadersItems},                                                // max vector items
     size_t{h256::size()},                                                       // vector item size
     size_t{/*version*/ 4 + /*count*/ 1 + h256::size() * /* known + stop */ 2},  // min payload length
-    size_t{/*version*/ 4 + /*version*/ serialization::ser_compact_sizeof(kMaxGetHeadersItems) +
+    size_t{/*version*/ 4 + /*version*/ ser::ser_compact_sizeof(kMaxGetHeadersItems) +
            h256::size() * (/* known + stop */ kMaxGetHeadersItems + 1)},  // max payload length
 };
 

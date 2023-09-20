@@ -11,7 +11,7 @@
 #include <core/serialization/serialize.hpp>
 #include <core/serialization/stream.hpp>
 
-namespace zenpp::serialization {
+namespace zenpp::ser {
 
 TEST_CASE("Serialization Sizes", "[serialization]") {
     CHECK(ser_sizeof('a') == 1);

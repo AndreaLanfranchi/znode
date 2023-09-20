@@ -17,7 +17,7 @@
 
 namespace zenpp::net {
 
-using namespace serialization;
+using namespace ser;
 
 IPAddress::IPAddress(std::string_view str) {
     if (str.empty()) return;
@@ -174,7 +174,7 @@ IPAddressReservationType IPAddress::address_v6_reservation() const noexcept {
     return ret;
 }
 
-serialization::Error IPAddress::serialization(SDataStream& stream, serialization::Action action) {
+ser::Error IPAddress::serialization(SDataStream& stream, ser::Action action) {
     return stream.bind(value_, action);
 }
 
@@ -203,7 +203,7 @@ IPEndpoint::IPEndpoint(boost::asio::ip::address address, uint16_t port_num)
 
 std::string IPEndpoint::to_string() const noexcept { return absl::StrCat(address_.to_string(), ":", port_); }
 
-serialization::Error IPEndpoint::serialization(SDataStream& stream, serialization::Action action) {
+ser::Error IPEndpoint::serialization(SDataStream& stream, ser::Action action) {
     using enum Error;
     Error ret{kSuccess};
     if (not ret) ret = stream.bind(address_, action);

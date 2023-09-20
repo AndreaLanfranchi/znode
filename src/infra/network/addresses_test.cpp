@@ -213,10 +213,10 @@ TEST_CASE("Network Service Serialization", "[serialization]") {
     NodeService service("10.0.0.1:8333");
     service.services_ = static_cast<decltype(NodeService::services_)>(NodeServicesType::kNodeNetwork);
 
-    serialization::SDataStream stream(serialization::Scope::kNetwork, 0);
+    ser::SDataStream stream(ser::Scope::kNetwork, 0);
     CHECK(service.serialized_size(stream) == 30);
     stream.clear();
-    REQUIRE(service.serialize(stream) == serialization::Error::kSuccess);
+    REQUIRE(service.serialize(stream) == ser::Error::kSuccess);
 
     // See https://en.bitcoin.it/wiki/Protocol_documentation#Network_address
     const std::string expected_hex_dump(
@@ -228,7 +228,7 @@ TEST_CASE("Network Service Serialization", "[serialization]") {
     CHECK(stream.to_string() == expected_hex_dump);
 
     NodeService service2{};
-    REQUIRE(service2.deserialize(stream) == serialization::Error::kSuccess);
+    REQUIRE(service2.deserialize(stream) == ser::Error::kSuccess);
     CHECK(service2.services_ == service.services_);
     CHECK(service2.endpoint_ == service.endpoint_);
 }

@@ -13,7 +13,7 @@
 
 #include <core/serialization/base.hpp>
 
-namespace zenpp::serialization {
+namespace zenpp::ser {
 
 class SerializationException : public std::exception {
   public:
@@ -26,7 +26,7 @@ class SerializationException : public std::exception {
 
   private:
     std::string message_;
-    serialization::Error error_{Error::kUndefinedError};
+    ser::Error error_{Error::kUndefinedError};
 };
 
 inline void success_or_throw(Error err) {

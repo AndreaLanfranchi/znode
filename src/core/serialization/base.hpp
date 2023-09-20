@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <ranges>
 
-namespace zenpp::serialization {
+namespace zenpp::ser {
 
 static constexpr uint32_t kMaxSerializedCompactSize{0x02000000};
 

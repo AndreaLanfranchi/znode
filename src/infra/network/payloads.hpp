@@ -17,14 +17,14 @@ namespace zenpp::net {
 //! \brief This class represents the payload of a NetMessage.
 //! \details Is basically an abstract placeholder type to make semantically evident in function signatures
 //! that a NetMessage payload is expected.
-class MessagePayload : public serialization::Serializable {
+class MessagePayload : public ser::Serializable {
   public:
-    using serialization::Serializable::Serializable;
+    using ser::Serializable::Serializable;
     ~MessagePayload() override = default;
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override = 0;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override = 0;
 };
 
 class MsgNullPayload : public MessagePayload {
@@ -33,11 +33,10 @@ class MsgNullPayload : public MessagePayload {
     ~MsgNullPayload() override = default;
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& /*stream*/,
-                                       serialization::Action /*action*/) override {
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& /*stream*/, ser::Action /*action*/) override {
         // Nothing to (de)serialize here
-        return serialization::Error::kSuccess;
+        return ser::Error::kSuccess;
     };
 };
 
@@ -57,8 +56,8 @@ class MsgVersionPayload : public MessagePayload {
     bool relay_{false};
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class MsgPingPongPayload : public MessagePayload {
@@ -69,8 +68,8 @@ class MsgPingPongPayload : public MessagePayload {
     uint64_t nonce_{0};
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class MsgGetHeadersPayload : public MessagePayload {
@@ -83,8 +82,8 @@ class MsgGetHeadersPayload : public MessagePayload {
     h256 hash_stop_{};
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class MsgAddrPayload : public MessagePayload {
@@ -95,7 +94,7 @@ class MsgAddrPayload : public MessagePayload {
     std::vector<NodeService> identifiers_{};
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 }  // namespace zenpp::net

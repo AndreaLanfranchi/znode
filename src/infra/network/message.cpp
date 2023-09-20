@@ -39,8 +39,8 @@ void MessageHeader::set_type(const MessageType type) noexcept {
     message_type_ = type;
 }
 
-serialization::Error MessageHeader::serialization(serialization::SDataStream& stream, serialization::Action action) {
-    using namespace serialization;
+ser::Error MessageHeader::serialization(ser::SDataStream& stream, ser::Action action) {
+    using namespace ser;
     using enum Error;
     Error err{Error::kSuccess};
     if (!err) err = stream.bind(network_magic, action);
@@ -51,8 +51,8 @@ serialization::Error MessageHeader::serialization(serialization::SDataStream& st
     return err;
 }
 
-serialization::Error MessageHeader::validate() noexcept {
-    using namespace serialization;
+ser::Error MessageHeader::validate() noexcept {
+    using namespace ser;
     using enum Error;
     if (payload_length > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
@@ -108,8 +108,8 @@ const MessageDefinition& MessageHeader::get_definition() const noexcept {
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "readability-function-cognitive-complexity"
-serialization::Error Message::validate() noexcept {
-    using enum serialization::Error;
+ser::Error Message::validate() noexcept {
+    using enum ser::Error;
 
     if (ser_stream_.size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
     if (ser_stream_.size() > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
@@ -140,7 +140,7 @@ serialization::Error Message::validate() noexcept {
         ser_stream_.ignore(4);
     }
 
-    const auto expected_vector_size{serialization::read_compact(ser_stream_)};
+    const auto expected_vector_size{ser::read_compact(ser_stream_)};
     if (!expected_vector_size) return expected_vector_size.error();
     if (*expected_vector_size == 0U) return kMessagePayloadEmptyVector;  // MUST have at least 1 element
     if (*expected_vector_size > message_definition.max_vector_items.value_or(UINT32_MAX))
@@ -166,8 +166,8 @@ serialization::Error Message::validate() noexcept {
 }
 #pragma clang diagnostic pop
 
-serialization::Error Message::parse(ByteView& input_data, ByteView network_magic) noexcept {
-    using namespace serialization;
+ser::Error Message::parse(ByteView& input_data, ByteView network_magic) noexcept {
+    using namespace ser;
     using enum Error;
 
     Error ret{kSuccess};
@@ -213,8 +213,8 @@ serialization::Error Message::parse(ByteView& input_data, ByteView network_magic
     return ret;
 }
 
-serialization::Error Message::validate_checksum() noexcept {
-    using enum serialization::Error;
+ser::Error Message::validate_checksum() noexcept {
+    using enum ser::Error;
     const auto current_pos{ser_stream_.tellg()};
     if (ser_stream_.seekg(kMessageHeaderLength) != kMessageHeaderLength) return kMessageHeaderIncomplete;
     const auto data_to_payload{gsl::finally([this, current_pos] { std::ignore = ser_stream_.seekg(current_pos); })};
@@ -222,7 +222,7 @@ serialization::Error Message::validate_checksum() noexcept {
     const auto payload_view{ser_stream_.read()};
     if (!payload_view) return payload_view.error();
 
-    serialization::Error ret{kSuccess};
+    ser::Error ret{kSuccess};
     crypto::Hash256 payload_digest(*payload_view);
     if (auto payload_hash{payload_digest.finalize()};
         memcmp(payload_hash.data(), header_.payload_checksum.data(), header_.payload_checksum.size()) != 0) {
@@ -235,8 +235,8 @@ void Message::set_version(int version) noexcept { ser_stream_.set_version(versio
 
 int Message::get_version() const noexcept { return ser_stream_.get_version(); }
 
-serialization::Error Message::push(const MessageType message_type, MessagePayload& payload, ByteView magic) noexcept {
-    using namespace serialization;
+ser::Error Message::push(const MessageType message_type, MessagePayload& payload, ByteView magic) noexcept {
+    using namespace ser;
     using enum Error;
 
     if (message_type == MessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;

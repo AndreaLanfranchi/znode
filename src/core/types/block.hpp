@@ -15,9 +15,9 @@ namespace zenpp {
 
 static constexpr size_t kBlockHeaderSerializedSize{140};  // Excluding Equihash solution
 
-class BlockHeader : public serialization::Serializable {
+class BlockHeader : public ser::Serializable {
   public:
-    using serialization::Serializable::Serializable;
+    using ser::Serializable::Serializable;
 
     int32_t version{0};
     h256 parent_hash{};
@@ -31,7 +31,7 @@ class BlockHeader : public serialization::Serializable {
     void reset();
 
   private:
-    friend class serialization::SDataStream;
-    serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
+    friend class ser::SDataStream;
+    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 }  // namespace zenpp

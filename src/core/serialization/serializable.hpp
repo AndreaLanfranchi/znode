@@ -23,7 +23,7 @@
 #include <byteswap.h>
 #endif
 
-namespace zenpp::serialization {
+namespace zenpp::ser {
 
 //! \brief Public interface all serializable objects must implement
 class Serializable {
@@ -36,11 +36,11 @@ class Serializable {
         return stream.computed_size();
     }
 
-    [[nodiscard]] serialization::Error serialize(SDataStream& stream) {
+    [[nodiscard]] ser::Error serialize(SDataStream& stream) {
         return serialization(stream, Action::kSerialize);
     }
 
-    [[nodiscard]] serialization::Error deserialize(SDataStream& stream) {
+    [[nodiscard]] ser::Error deserialize(SDataStream& stream) {
         return serialization(stream, Action::kDeserialize);
     }
 

@@ -146,11 +146,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] static int next_node_id() noexcept { return next_node_id_.fetch_add(1); }
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
-    serialization::Error push_message(MessageType message_type, MessagePayload& payload);
+    ser::Error push_message(MessageType message_type, MessagePayload& payload);
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
     //! \remarks This a handy overload used to send messages with a null payload
-    serialization::Error push_message(MessageType message_type);
+    ser::Error push_message(MessageType message_type);
 
   private:
     void start_ssl_handshake();
@@ -170,14 +170,14 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
 
     void start_read();
     void handle_read(const boost::system::error_code& error_code, size_t bytes_transferred);
-    serialization::Error parse_messages(
+    ser::Error parse_messages(
         size_t bytes_transferred);  // Reads messages from the receiving buffer and consumes buffered data
 
-    serialization::Error process_inbound_message();  // Local processing (when possible) of inbound message
+    ser::Error process_inbound_message();  // Local processing (when possible) of inbound message
 
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
     //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
-    [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
+    [[nodiscard]] ser::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
                                                                                MessageType message_type);
 
     //! \brief To be called as soon as the protocol handshake is completed

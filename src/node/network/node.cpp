@@ -121,7 +121,7 @@ uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
     MsgPingPongPayload pong_payload{};
     pong_payload.nonce_ = ping_nonce_.load();
     const auto ret{push_message(MessageType::kPing, pong_payload)};
-    if (ret not_eq serialization::Error::kSuccess) {
+    if (ret not_eq ser::Error::kSuccess) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", std::string(magic_enum::enum_name(ret))};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
@@ -231,7 +231,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         on_data_(DataDirectionMode::kInbound, bytes_transferred);
 
         const auto parse_result{parse_messages(bytes_transferred)};
-        if (serialization::is_fatal_error(parse_result)) {
+        if (ser::is_fatal_error(parse_result)) {
             const std::list<std::string> log_params{"action", __func__, "status",
                                                     std::string(magic_enum::enum_name(parse_result))};
             print_log(log::Level::kError, log_params, " Disconnecting ...");
@@ -286,7 +286,7 @@ void Node::start_write() {
 
         auto error{
             validate_message_for_protocol_handshake(DataDirectionMode::kOutbound, outbound_message_->get_type())};
-        if (error not_eq serialization::Error::kSuccess) [[unlikely]] {
+        if (error not_eq ser::Error::kSuccess) [[unlikely]] {
             if (log::test_verbosity(log::Level::kError)) {
                 // TODO : Should we drop the connection here?
                 // Actually outgoing messages' correct sequence is local responsibility
@@ -379,8 +379,8 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     }
 }
 
-serialization::Error Node::push_message(const MessageType message_type, MessagePayload& payload) {
-    using namespace serialization;
+ser::Error Node::push_message(const MessageType message_type, MessagePayload& payload) {
+    using namespace ser;
     using enum Error;
 
     auto new_message{std::make_unique<Message>(version_)};
@@ -401,7 +401,7 @@ serialization::Error Node::push_message(const MessageType message_type, MessageP
     return kSuccess;
 }
 
-serialization::Error Node::push_message(const MessageType message_type) {
+ser::Error Node::push_message(const MessageType message_type) {
     MsgNullPayload null_payload{};
     return push_message(message_type, null_payload);
 }
@@ -413,8 +413,8 @@ void Node::end_inbound_message() {
     inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
 }
 
-serialization::Error Node::parse_messages(const size_t bytes_transferred) {
-    using namespace serialization;
+ser::Error Node::parse_messages(const size_t bytes_transferred) {
+    using namespace ser;
     using enum Error;
     Error err{kSuccess};
 
@@ -472,8 +472,8 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
     return err;
 }
 
-serialization::Error Node::process_inbound_message() {
-    using namespace serialization;
+ser::Error Node::process_inbound_message() {
+    using namespace ser;
     using enum Error;
     Error err{kSuccess};
     std::string err_extended_reason{};
@@ -586,9 +586,9 @@ serialization::Error Node::process_inbound_message() {
     return err;
 }
 
-serialization::Error Node::validate_message_for_protocol_handshake(const DataDirectionMode direction,
+ser::Error Node::validate_message_for_protocol_handshake(const DataDirectionMode direction,
                                                                    const MessageType message_type) {
-    using enum serialization::Error;
+    using enum ser::Error;
 
     // During protocol handshake we only allow version and verack messages
     // After protocol handshake we only allow other messages

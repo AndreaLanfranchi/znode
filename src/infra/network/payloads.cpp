@@ -10,7 +10,7 @@
 
 namespace zenpp::net {
 
-using namespace serialization;
+using namespace ser;
 
 Error MsgVersionPayload::serialization(SDataStream& stream, Action action) {
     using enum Error;
@@ -27,13 +27,13 @@ Error MsgVersionPayload::serialization(SDataStream& stream, Action action) {
     return ret;
 }
 
-Error MsgPingPongPayload::serialization(serialization::SDataStream& stream, serialization::Action action) {
+Error MsgPingPongPayload::serialization(ser::SDataStream& stream, ser::Action action) {
     return stream.bind(nonce_, action);
 }
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "readability-function-cognitive-complexity"
-Error MsgGetHeadersPayload::serialization(SDataStream& stream, serialization::Action action) {
+Error MsgGetHeadersPayload::serialization(SDataStream& stream, ser::Action action) {
     using enum Error;
     Error ret{kSuccess};
     protocol_version_ =
@@ -68,7 +68,7 @@ Error MsgGetHeadersPayload::serialization(SDataStream& stream, serialization::Ac
 }
 #pragma clang diagnostic pop
 
-serialization::Error MsgAddrPayload::serialization(SDataStream& stream, serialization::Action action) {
+ser::Error MsgAddrPayload::serialization(SDataStream& stream, ser::Action action) {
     using enum Error;
     Error ret{kSuccess};
     if (action == Action::kSerialize) {
