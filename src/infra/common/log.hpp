@@ -10,7 +10,7 @@
 #include <sstream>
 #include <vector>
 
-#include <infra/common/terminal.hpp>
+#include <infra/os/terminal.hpp>
 
 namespace zenpp::log {
 
