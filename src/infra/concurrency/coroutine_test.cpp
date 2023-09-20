@@ -14,9 +14,9 @@
 
 namespace zenpp {
 
-Task<int> f() { co_return 42; }
+Task<int> f42() { co_return 42; }
 
-TEST_CASE("check configuration", "[infra][concurrency]") {
+TEST_CASE("Corouting configuration", "[infra][concurrency][coroutine]") {
 #if __has_include(<coroutine>)
 #ifdef BOOST_ASIO_HAS_CO_AWAIT
     CHECK(true);
@@ -34,4 +34,17 @@ TEST_CASE("check configuration", "[infra][concurrency]") {
     CHECK(&typeid(std::suspend_never) != nullptr);
 }
 
+TEST_CASE("Coroutine co_return", "[infra][concurrency][coroutine]") {
+    boost::asio::io_context context;
+    auto task = co_spawn(
+        context,
+        f42(),
+        boost::asio::use_future);
+
+    std::size_t work_count;
+    do {
+        work_count = context.poll_one();
+    } while (work_count > 0);
+    CHECK(task.get() == 42);
+}
 }  // namespace zenpp

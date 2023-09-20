@@ -10,8 +10,6 @@
 #if __has_include(<coroutine>)
 #include <coroutine>
 
-#include <boost/asio/detail/config.hpp>
-
 #elif __has_include(<experimental/coroutine>)
 #include <experimental/coroutine>
 namespace std {
@@ -26,9 +24,8 @@ using suspend_never = std::experimental::suspend_never;
 #error "No <coroutine> or <experimental/coroutine> include found"
 #endif  // __has_include(<coroutine>)
 
-#include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/awaitable.hpp>
-
+#include <boost/asio/use_awaitable.hpp>
 
 namespace zenpp {
 
@@ -37,4 +34,5 @@ template <typename T>
 using Task = boost::asio::awaitable<T>;
 
 namespace ThisTask = boost::asio::this_coro;
-}
+
+}  // namespace zenpp
