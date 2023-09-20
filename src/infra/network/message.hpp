@@ -8,8 +8,6 @@
 
 #pragma once
 
-#include "payloads.hpp"
-
 #include <memory>
 #include <optional>
 
@@ -17,6 +15,9 @@
 #include <core/crypto/hash256.hpp>
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
+
+#include <infra/network/messages.hpp>
+#include <infra/network/payloads.hpp>
 
 namespace zenpp::net {
 

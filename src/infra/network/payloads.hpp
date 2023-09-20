@@ -5,14 +5,12 @@
 */
 
 #pragma once
-#include "messages.hpp"
-
 #include <cstdint>
 
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
-#include <infra/network/network.hpp>
+#include <infra/network/addresses.hpp>
 
 namespace zenpp::net {
 

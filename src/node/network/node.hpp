@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "infra/network/addresses.hpp"
+
 #include <atomic>
 #include <functional>
 #include <list>
@@ -23,7 +25,6 @@
 
 #include <infra/concurrency/asio_timer.hpp>
 #include <infra/network/message.hpp>
-#include <infra/network/network.hpp>
 #include <infra/network/protocol.hpp>
 
 #include <node/common/settings.hpp>

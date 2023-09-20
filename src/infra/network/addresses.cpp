@@ -4,7 +4,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "network.hpp"
+#include "addresses.hpp"
 
 #include <bit>
 #include <regex>

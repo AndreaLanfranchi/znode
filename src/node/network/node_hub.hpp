@@ -5,6 +5,8 @@
 */
 
 #pragma once
+#include "infra/network/addresses.hpp"
+
 #include <iostream>
 #include <map>
 #include <memory>
@@ -17,7 +19,6 @@
 #include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/asio_timer.hpp>
 #include <infra/concurrency/unique_queue.hpp>
-#include <infra/network/network.hpp>
 
 #include <node/common/settings.hpp>
 #include <node/network/node.hpp>

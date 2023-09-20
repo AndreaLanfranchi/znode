@@ -6,6 +6,8 @@
 
 #include "payloads.hpp"
 
+#include <infra/network/messages.hpp>
+
 namespace zenpp::net {
 
 using namespace serialization;
