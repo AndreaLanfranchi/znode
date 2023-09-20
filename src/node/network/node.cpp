@@ -18,8 +18,6 @@
 
 #include <infra/common/log.hpp>
 
-#include <node/serialization/exceptions.hpp>
-
 namespace zenpp::net {
 
 using namespace boost;

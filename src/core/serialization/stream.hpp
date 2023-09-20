@@ -317,7 +317,7 @@ class SDataStream : public DataStream {
         switch (action) {
             using enum Action;
             case kComputeSize:
-                computed_size_ += 16;
+                computed_size_ += bytes.size();
                 break;
             case kSerialize:
                 // Always transform in corresponding v6 representation
