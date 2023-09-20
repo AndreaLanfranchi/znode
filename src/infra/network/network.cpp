@@ -15,7 +15,7 @@
 
 #include <core/common/misc.hpp>
 
-namespace zenpp {
+namespace zenpp::net {
 
 using namespace serialization;
 
@@ -290,7 +290,7 @@ bool IPSubNet::contains(const boost::asio::ip::address& address) const noexcept 
     return true;
 }
 
-bool IPSubNet::contains(const zenpp::IPAddress& address) const noexcept {
+bool IPSubNet::contains(const IPAddress& address) const noexcept {
     if (not is_valid() or not address.is_valid()) return false;
     return contains(*address);
 }
@@ -408,4 +408,4 @@ Error VersionNodeService::serialization(SDataStream& stream, Action action) {
     if (not ret) ret = stream.bind(endpoint_, action);
     return ret;
 }
-}  // namespace zenpp
+}  // namespace zenpp::net

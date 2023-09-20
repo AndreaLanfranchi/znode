@@ -8,20 +8,21 @@
 
 #pragma once
 
+#include "messages.hpp"
+
 #include <memory>
 #include <optional>
 
-#include <core/abi/messages.hpp>
 #include <core/common/base.hpp>
 #include <core/crypto/hash256.hpp>
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
-namespace zenpp::abi {
+namespace zenpp::net {
 
-class NetMessageHeader : public serialization::Serializable {
+class MessageHeader : public serialization::Serializable {
   public:
-    NetMessageHeader() : Serializable(){};
+    MessageHeader() : Serializable(){};
 
     std::array<uint8_t, 4> network_magic{};     // Message magic (origin network)
     std::array<uint8_t, 12> command{};          // ASCII string identifying the packet content, NULL padded
@@ -32,11 +33,11 @@ class NetMessageHeader : public serialization::Serializable {
     [[nodiscard]] const MessageDefinition& get_definition() const noexcept;
 
     //! \brief Returns the decoded message type
-    [[nodiscard]] NetMessageType get_type() const noexcept { return get_definition().message_type; }
+    [[nodiscard]] MessageType get_type() const noexcept { return get_definition().message_type; }
 
     //! \brief Sets the message type and fills the command field
     //! \remarks On non pristine headers, this function has no effect
-    void set_type(NetMessageType type) noexcept;
+    void set_type(MessageType type) noexcept;
 
     //! \brief Reset the header to its factory state
     void reset() noexcept;
@@ -48,34 +49,34 @@ class NetMessageHeader : public serialization::Serializable {
     [[nodiscard]] serialization::Error validate() noexcept;
 
   private:
-    NetMessageType message_type_{NetMessageType::kMissingOrUnknown};
+    MessageType message_type_{MessageType::kMissingOrUnknown};
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
 
-class NetMessage {
+class Message {
   public:
     //! \brief Construct a blank NetMessage
-    NetMessage() : ser_stream_{serialization::Scope::kNetwork, 0} {};
+    Message() : ser_stream_{serialization::Scope::kNetwork, 0} {};
 
     //! \brief Construct a blank NetMessage with a specific version
-    explicit NetMessage(int version) : ser_stream_{serialization::Scope::kNetwork, version} {};
+    explicit Message(int version) : ser_stream_{serialization::Scope::kNetwork, version} {};
 
     //! \brief Construct a NetMessage with network magic provided
-    explicit NetMessage(int version, std::array<uint8_t, 4>& magic)
+    explicit Message(int version, std::array<uint8_t, 4>& magic)
         : ser_stream_{serialization::Scope::kNetwork, version} {
         header_.network_magic = magic;
     };
 
     // Not movable nor copyable
-    NetMessage(const NetMessage&) = delete;
-    NetMessage(const NetMessage&&) = delete;
-    NetMessage& operator=(const NetMessage&) = delete;
-    ~NetMessage() = default;
+    Message(const Message&) = delete;
+    Message(const Message&&) = delete;
+    Message& operator=(const Message&) = delete;
+    ~Message() = default;
 
     [[nodiscard]] size_t size() const noexcept { return ser_stream_.size(); }
-    [[nodiscard]] NetMessageType get_type() const noexcept { return header_.get_type(); }
-    [[nodiscard]] NetMessageHeader& header() noexcept { return header_; }
+    [[nodiscard]] MessageType get_type() const noexcept { return header_.get_type(); }
+    [[nodiscard]] MessageHeader& header() noexcept { return header_; }
     [[nodiscard]] serialization::SDataStream& data() noexcept { return ser_stream_; }
     [[nodiscard]] serialization::Error parse(ByteView& input_data, ByteView network_magic = {}) noexcept;
 
@@ -89,12 +90,12 @@ class NetMessage {
     [[nodiscard]] serialization::Error validate() noexcept;
 
     //! \brief Populates the message header and payload
-    serialization::Error push(NetMessageType message_type, NetMessagePayload& payload, ByteView magic) noexcept;
+    serialization::Error push(MessageType message_type, NetMessagePayload& payload, ByteView magic) noexcept;
 
   private:
-    NetMessageHeader header_{};              // Where the message header is deserialized
+    MessageHeader header_{};                 // Where the message header is deserialized
     serialization::SDataStream ser_stream_;  // Contains all the message raw data
 
     [[nodiscard]] serialization::Error validate_checksum() noexcept;
 };
-}  // namespace zenpp::abi
+}  // namespace zenpp::net

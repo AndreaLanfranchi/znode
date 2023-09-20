@@ -6,7 +6,7 @@
 
 #include "messages.hpp"
 
-namespace zenpp::abi {
+namespace zenpp::net {
 
 using namespace serialization;
 
@@ -92,4 +92,4 @@ serialization::Error MsgAddrPayload::serialization(SDataStream& stream, serializ
 
     return ret;
 }
-}  // namespace zenpp::abi
+}  // namespace zenpp::net

@@ -4,16 +4,17 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "network.hpp"
+
 #include <boost/algorithm/string/predicate.hpp>
 #include <catch2/catch.hpp>
 #include <magic_enum.hpp>
 
 #include <core/encoding/hex.hpp>
-#include <core/types/network.hpp>
 
-namespace zenpp {
+namespace zenpp::net {
 
-TEST_CASE("IPAddress Parsing", "[types]") {
+TEST_CASE("IPAddress Parsing", "[net]") {
     IPAddress address("127.0.0.1");
     CHECK(address->is_v4());
     CHECK(address.is_loopback());
@@ -83,7 +84,7 @@ TEST_CASE("IPAddress Parsing", "[types]") {
     CHECK(address.get_type() == IPAddressType::kUnroutable);
 }
 
-TEST_CASE("IPAddress Reservations", "[types]") {
+TEST_CASE("IPAddress Reservations", "[net]") {
     using enum IPAddressReservationType;
     const std::vector<std::pair<std::string_view, IPAddressReservationType>> test_cases{
         {"192.168.1.1", kRFC1918},
@@ -130,7 +131,7 @@ TEST_CASE("IPAddress Reservations", "[types]") {
     }
 }
 
-TEST_CASE("IPSubNet parsing", "[types]") {
+TEST_CASE("IPSubNet parsing", "[net]") {
     IPSubNet subnet("192.168.1.0/24");
     CHECK(subnet.base_address_->is_v4());
     CHECK(subnet.prefix_length_ == uint8_t(24U));
@@ -162,7 +163,7 @@ TEST_CASE("IPSubNet parsing", "[types]") {
     CHECK(boost::iequals(subnet.to_string(), "64:FF9B::/128"));
 }
 
-TEST_CASE("IPSubNet contains", "[types]") {
+TEST_CASE("IPSubNet contains", "[net]") {
     struct TestCase {
         std::string_view subnet;
         std::string_view address;
@@ -191,7 +192,7 @@ TEST_CASE("IPSubNet contains", "[types]") {
     }
 }
 
-TEST_CASE("Network Endpoint Parsing", "[types]") {
+TEST_CASE("Network Endpoint Parsing", "[net]") {
     IPEndpoint endpoint("8.8.8.4:8333");
     CHECK(endpoint.address_->is_v4());
     CHECK(endpoint.to_string() == "8.8.8.4:8333");

@@ -14,7 +14,7 @@
 #include <core/serialization/serialize.hpp>
 #include <core/types/hash.hpp>
 
-namespace zenpp::abi {
+namespace zenpp::net {
 
 static constexpr size_t kMaxProtocolMessageLength{static_cast<size_t>(4_MiB)};  // Maximum length of a protocol message
 static constexpr size_t kMessageHeaderLength{24};                               // Length of a protocol message header
@@ -25,7 +25,7 @@ static constexpr size_t kAddrItemSize{30};           // Size of an address item 
 static constexpr size_t kMaxGetHeadersItems{2'000};  // Maximum number of block headers in a getheaders message
 static constexpr size_t kMaxHeadersItems{160};       // Maximum number of block headers in a headers message
 
-enum class NetMessageType : uint32_t {
+enum class MessageType : uint32_t {
     kVersion,           // Dial-out nodes send their version first
     kVerAck,            // Reply by dial-in nodes to version message
     kInv,               // Inventory message to advertise the knowledge of hashes of blocks or transactions
@@ -40,20 +40,20 @@ enum class NetMessageType : uint32_t {
 };
 
 struct MessageDefinition {
-    const char* command{nullptr};                                    // The command string
-    NetMessageType message_type{NetMessageType::kMissingOrUnknown};  // The command id
-    const bool is_vectorized{false};                                 // Whether the payload is a vector of items
-    const std::optional<size_t> max_vector_items{};    // The maximum number of vector items in the payload
-    const std::optional<size_t> vector_item_size{};    // The size of a vector item
-    const std::optional<size_t> min_payload_length{};  // The min allowed payload length
-    const std::optional<size_t> max_payload_length{};  // The max allowed payload length
-    const std::optional<int> min_protocol_version{};   // The min protocol version that supports this message
-    const std::optional<int> max_protocol_version{};   // The max protocol version that supports this message
+    const char* command{nullptr};                              // The command string
+    MessageType message_type{MessageType::kMissingOrUnknown};  // The command id
+    const bool is_vectorized{false};                           // Whether the payload is a vector of items
+    const std::optional<size_t> max_vector_items{};            // The maximum number of vector items in the payload
+    const std::optional<size_t> vector_item_size{};            // The size of a vector item
+    const std::optional<size_t> min_payload_length{};          // The min allowed payload length
+    const std::optional<size_t> max_payload_length{};          // The max allowed payload length
+    const std::optional<int> min_protocol_version{};           // The min protocol version that supports this message
+    const std::optional<int> max_protocol_version{};           // The max protocol version that supports this message
 };
 
 inline constexpr MessageDefinition kMessageVersion{
-    "version",                 //
-    NetMessageType::kVersion,  //
+    "version",              //
+    MessageType::kVersion,  //
     false,
     std::nullopt,  //
     std::nullopt,  //
@@ -62,8 +62,8 @@ inline constexpr MessageDefinition kMessageVersion{
 };
 
 inline constexpr MessageDefinition kMessageVerack{
-    "verack",                 //
-    NetMessageType::kVerAck,  //
+    "verack",              //
+    MessageType::kVerAck,  //
     false,
     std::nullopt,  //
     std::nullopt,  //
@@ -72,8 +72,8 @@ inline constexpr MessageDefinition kMessageVerack{
 };
 
 inline constexpr MessageDefinition kMessageInv{
-    "inv",                 //
-    NetMessageType::kInv,  //
+    "inv",              //
+    MessageType::kInv,  //
     true,
     size_t{kMaxInvItems},
     size_t{kInvItemSize},
@@ -82,8 +82,8 @@ inline constexpr MessageDefinition kMessageInv{
 };
 
 inline constexpr MessageDefinition kMessageAddr{
-    "addr",                 //
-    NetMessageType::kAddr,  //
+    "addr",              //
+    MessageType::kAddr,  //
     true,
     size_t{kMaxAddrItems},
     size_t{kAddrItemSize},
@@ -92,8 +92,8 @@ inline constexpr MessageDefinition kMessageAddr{
 };
 
 inline constexpr MessageDefinition kMessagePing{
-    "ping",                 //
-    NetMessageType::kPing,  //
+    "ping",              //
+    MessageType::kPing,  //
     false,
     size_t{0},
     size_t{0},
@@ -102,8 +102,8 @@ inline constexpr MessageDefinition kMessagePing{
 };
 
 inline constexpr MessageDefinition kMessagePong{
-    "pong",                 //
-    NetMessageType::kPong,  //
+    "pong",              //
+    MessageType::kPong,  //
     false,
     size_t{0},
     size_t{0},
@@ -113,7 +113,7 @@ inline constexpr MessageDefinition kMessagePong{
 
 inline constexpr MessageDefinition kMessageGetheaders{
     "getheaders",                                                               //
-    NetMessageType::kGetHeaders,                                                //
+    MessageType::kGetHeaders,                                                   //
     true,                                                                       // vectorized
     size_t{kMaxGetHeadersItems},                                                // max vector items
     size_t{h256::size()},                                                       // vector item size
@@ -124,7 +124,7 @@ inline constexpr MessageDefinition kMessageGetheaders{
 
 inline constexpr MessageDefinition kMessageHeaders{
     "headers",                 //
-    NetMessageType::kHeaders,  //
+    MessageType::kHeaders,     //
     true,                      // vectorized
     size_t{kMaxHeadersItems},  // max vector items
     std::nullopt,              // vector item size
@@ -133,18 +133,18 @@ inline constexpr MessageDefinition kMessageHeaders{
 };
 
 inline constexpr MessageDefinition kMessageGetAddr{
-    "getaddr",                 //
-    NetMessageType::kGetAddr,  //
-    false,                     // vectorized
-    std::nullopt,              // max vector items
-    std::nullopt,              // vector item size
-    size_t{0},                 // min payload length
-    size_t{0},                 // max payload length
+    "getaddr",              //
+    MessageType::kGetAddr,  //
+    false,                  // vectorized
+    std::nullopt,           // max vector items
+    std::nullopt,           // vector item size
+    size_t{0},              // min payload length
+    size_t{0},              // max payload length
 };
 
 inline constexpr MessageDefinition kMessageMempool{
-    "mempool",                 //
-    NetMessageType::kMemPool,  //
+    "mempool",              //
+    MessageType::kMemPool,  //
     false,
     std::nullopt,
     std::nullopt,
@@ -153,8 +153,8 @@ inline constexpr MessageDefinition kMessageMempool{
 };
 
 inline constexpr MessageDefinition kMessageMissingOrUnknown{
-    nullptr,                            //
-    NetMessageType::kMissingOrUnknown,  //
+    nullptr,                         //
+    MessageType::kMissingOrUnknown,  //
     false,
     size_t{0},
     size_t{0},
@@ -178,7 +178,7 @@ inline constexpr std::array<MessageDefinition, 11> kMessageDefinitions{
     kMessageMissingOrUnknown,  // 10
 };
 
-static_assert(kMessageDefinitions.size() == static_cast<size_t>(NetMessageType::kMissingOrUnknown) + 1,
+static_assert(kMessageDefinitions.size() == static_cast<size_t>(MessageType::kMissingOrUnknown) + 1,
               "kMessageDefinitions must be kept in same order as the MessageCommand enum");
 
-}  // namespace zenpp::abi
+}  // namespace zenpp::net

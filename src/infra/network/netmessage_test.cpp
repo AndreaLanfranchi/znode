@@ -4,15 +4,16 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "netmessage.hpp"
+
 #include <catch2/catch.hpp>
 #include <magic_enum.hpp>
 
-#include <core/abi/netmessage.hpp>
 #include <core/common/endian.hpp>
 #include <core/crypto/hash256.hpp>
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::abi {
+namespace zenpp::net {
 
 using namespace zenpp::serialization;
 
@@ -26,9 +27,9 @@ namespace test {
 
 }  // namespace test
 
-TEST_CASE("NetMessage", "[abi]") {
+TEST_CASE("NetMessage", "[net]") {
     using enum Error;
-    NetMessage net_message{};
+    Message net_message{};
     auto& header{net_message.header()};
     auto& payload{net_message.data()};
 
@@ -276,4 +277,4 @@ TEST_CASE("NetMessage", "[abi]") {
     }
 }
 
-}  // namespace zenpp::abi
+}  // namespace zenpp::net

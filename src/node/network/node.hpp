@@ -19,11 +19,11 @@
 #include <magic_enum.hpp>
 #include <openssl/ssl.h>
 
-#include <core/abi/netmessage.hpp>
 #include <core/common/base.hpp>
-#include <core/types/network.hpp>
 
 #include <infra/concurrency/asio_timer.hpp>
+#include <infra/network/netmessage.hpp>
+#include <infra/network/network.hpp>
 #include <infra/network/protocol.hpp>
 
 #include <node/common/settings.hpp>
@@ -56,7 +56,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
          boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
          std::function<void(DataDirectionMode, size_t)> on_data /* handles data size accounting on node-hub */,
-         std::function<void(std::shared_ptr<Node>, std::shared_ptr<abi::NetMessage>)>
+         std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)>
              on_message /* handles connections on node-hub */);
 
     Node(Node& other) = delete;
@@ -115,7 +115,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     }
 
     //! \brief Returns information about the received Version message
-    [[nodiscard]] const abi::MsgVersionPayload& version_info() const noexcept { return remote_version_; }
+    [[nodiscard]] const MsgVersionPayload& version_info() const noexcept { return remote_version_; }
 
     //! \brief Returns whether the remote node supports the specified service
     [[nodiscard]] bool has_service(NodeServicesType service) const noexcept {
@@ -145,11 +145,11 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] static int next_node_id() noexcept { return next_node_id_.fetch_add(1); }
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
-    serialization::Error push_message(abi::NetMessageType message_type, abi::NetMessagePayload& payload);
+    serialization::Error push_message(MessageType message_type, NetMessagePayload& payload);
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
     //! \remarks This a handy overload used to send messages with a null payload
-    serialization::Error push_message(abi::NetMessageType message_type);
+    serialization::Error push_message(MessageType message_type);
 
   private:
     void start_ssl_handshake();
@@ -177,7 +177,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
     //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
     [[nodiscard]] serialization::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
-                                                                               abi::NetMessageType message_type);
+                                                                               MessageType message_type);
 
     //! \brief To be called as soon as the protocol handshake is completed
     //! \details This is the place where the node is considered fully connected and could start sending/receiving
@@ -221,8 +221,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic_uint64_t ema_ping_latency_{0};  // Exponential moving average of ping latency
 
     std::function<void(DataDirectionMode, size_t)> on_data_;  // To account data sizes stats at node hub
-    std::function<void(std::shared_ptr<Node>, std::shared_ptr<abi::NetMessage>)>
-        on_message_;  // Called on inbound message
+    std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)> on_message_;  // Called on inbound message
 
     boost::asio::streambuf receive_buffer_;  // Socket receive buffer
     boost::asio::streambuf send_buffer_;     // Socket send buffer
@@ -230,25 +229,25 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<size_t> bytes_sent_{0};      // Total bytes sent to the socket during the session
 
     std::atomic<std::chrono::steady_clock::time_point> inbound_message_start_time_{
-        std::chrono::steady_clock::time_point::min()};           // Start time of inbound msg
-    std::unique_ptr<abi::NetMessage> inbound_message_{nullptr};  // The "next" message being received
+        std::chrono::steady_clock::time_point::min()};      // Start time of inbound msg
+    std::unique_ptr<Message> inbound_message_{nullptr};  // The "next" message being received
 
     std::atomic_bool is_writing_{false};  // Whether a write operation is in progress
     std::atomic<std::chrono::steady_clock::time_point> outbound_message_start_time_{
         std::chrono::steady_clock::time_point::min()};              // Start time of outbound msg
-    std::shared_ptr<abi::NetMessage> outbound_message_{nullptr};    // The "next" message being sent
+    std::shared_ptr<Message> outbound_message_{nullptr};         // The "next" message being sent
     std::vector<decltype(outbound_message_)> outbound_messages_{};  // Queue of messages awaiting to be sent
     std::mutex outbound_messages_mutex_{};                          // Lock guard for messages to be sent
 
-    abi::MsgVersionPayload local_version_{};   // Local protocol version
-    abi::MsgVersionPayload remote_version_{};  // Remote protocol version
+    MsgVersionPayload local_version_{};   // Local protocol version
+    MsgVersionPayload remote_version_{};  // Remote protocol version
 
     struct MessageMetrics {
         std::atomic_uint32_t count_{0};
         std::atomic<size_t> bytes_{0};
     };
 
-    std::map<abi::NetMessageType, MessageMetrics> inbound_message_metrics_{};   // Stats for each message type
-    std::map<abi::NetMessageType, MessageMetrics> outbound_message_metrics_{};  // Stats for each message type
+    std::map<MessageType, MessageMetrics> inbound_message_metrics_{};   // Stats for each message type
+    std::map<MessageType, MessageMetrics> outbound_message_metrics_{};  // Stats for each message type
 };
-}  // namespace zenpp::network
+}  // namespace zenpp::net

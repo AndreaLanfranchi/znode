@@ -30,7 +30,7 @@ std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
            boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
            std::function<void(DataDirectionMode, size_t)> on_data,
-           std::function<void(std::shared_ptr<Node>, std::shared_ptr<abi::NetMessage>)> on_message)
+           std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)> on_message)
     : app_settings_(app_settings),
       connection_(connection),
       io_strand_(io_context),
@@ -74,7 +74,7 @@ bool Node::start() noexcept {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_ssl_handshake(); });
     } else {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
-        std::ignore = push_message(abi::NetMessageType::kVersion, local_version_);
+        std::ignore = push_message(MessageType::kVersion, local_version_);
     }
     return true;
 }
@@ -118,9 +118,9 @@ uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
     if (ping_nonce_.load() not_eq 0U) return interval_milliseconds;  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
     ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
-    abi::MsgPingPongPayload pong_payload{};
+    MsgPingPongPayload pong_payload{};
     pong_payload.nonce_ = ping_nonce_.load();
-    const auto ret{push_message(abi::NetMessageType::kPing, pong_payload)};
+    const auto ret{push_message(MessageType::kPing, pong_payload)};
     if (ret not_eq serialization::Error::kSuccess) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", std::string(magic_enum::enum_name(ret))};
@@ -196,7 +196,7 @@ void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
         print_log(log::Level::kTrace, log_params);
     }
     start_read();
-    push_message(abi::NetMessageType::kVersion, local_version_);
+    push_message(MessageType::kVersion, local_version_);
 }
 
 void Node::start_read() {
@@ -252,8 +252,8 @@ void Node::start_write() {
 
     if (outbound_message_ not_eq nullptr and outbound_message_->data().eof()) {
         // A message has been fully sent - Exclude kPing and kPong
-        const bool is_ping_pong{outbound_message_->get_type() == abi::NetMessageType::kPing or
-                                outbound_message_->get_type() == abi::NetMessageType::kPong};
+        const bool is_ping_pong{outbound_message_->get_type() == MessageType::kPing or
+                                outbound_message_->get_type() == MessageType::kPong};
         if (not is_ping_pong) {
             last_message_sent_time_.store(std::chrono::steady_clock::now());
             outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
@@ -308,7 +308,7 @@ void Node::start_write() {
         outbound_message_metrics_[msg_type].count_++;
         outbound_message_metrics_[msg_type].bytes_ += outbound_message_->data().size();
         switch (msg_type) {
-            using enum abi::NetMessageType;
+            using enum MessageType;
             case kPing:
                 last_ping_sent_time_.store(std::chrono::steady_clock::now());
                 [[fallthrough]];
@@ -379,11 +379,11 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     }
 }
 
-serialization::Error Node::push_message(const abi::NetMessageType message_type, abi::NetMessagePayload& payload) {
+serialization::Error Node::push_message(const MessageType message_type, NetMessagePayload& payload) {
     using namespace serialization;
     using enum Error;
 
-    auto new_message{std::make_unique<abi::NetMessage>(version_)};
+    auto new_message{std::make_unique<Message>(version_)};
     auto err{new_message->push(message_type, payload, app_settings_.chain_config->magic_)};
     if (err not_eq kSuccess) {
         if (log::test_verbosity(log::Level::kError)) {
@@ -401,12 +401,12 @@ serialization::Error Node::push_message(const abi::NetMessageType message_type, 
     return kSuccess;
 }
 
-serialization::Error Node::push_message(const abi::NetMessageType message_type) {
-    abi::MsgNullPayload null_payload{};
+serialization::Error Node::push_message(const MessageType message_type) {
+    MsgNullPayload null_payload{};
     return push_message(message_type, null_payload);
 }
 
-void Node::begin_inbound_message() { inbound_message_ = std::make_unique<abi::NetMessage>(version_); }
+void Node::begin_inbound_message() { inbound_message_ = std::make_unique<Message>(version_); }
 
 void Node::end_inbound_message() {
     inbound_message_.reset();
@@ -450,7 +450,7 @@ serialization::Error Node::parse_messages(const size_t bytes_transferred) {
 
         // We've got the header begin timing
         switch (inbound_message_->get_type()) {
-            using enum abi::NetMessageType;
+            using enum MessageType;
             case kPing:
             case kPong:
                 break;
@@ -484,7 +484,7 @@ serialization::Error Node::process_inbound_message() {
     inbound_message_metrics_[inbound_message_->get_type()].bytes_ += inbound_message_->data().size();
 
     switch (inbound_message_->get_type()) {
-        using enum abi::NetMessageType;
+        using enum MessageType;
         case kVersion:
             if (err = remote_version_.deserialize(inbound_message_->data()); err not_eq kSuccess) break;
             if (remote_version_.protocol_version_ < kMinSupportedProtocolVersion or
@@ -507,7 +507,7 @@ serialization::Error Node::process_inbound_message() {
                     "me",       remote_version_.recipient_service_.endpoint_.to_string()};
                 if (remote_version_.nonce_ not_eq local_version_.nonce_) {
                     print_log(log::Level::kInfo, log_params);
-                    err = push_message(abi::NetMessageType::kVerAck);
+                    err = push_message(MessageType::kVerAck);
                 } else {
                     err = kInvalidMessageState;
                     err_extended_reason = "Connected to self ? (same nonce)";
@@ -519,9 +519,9 @@ serialization::Error Node::process_inbound_message() {
             // and we don't need to forward the message elsewhere
             break;
         case kPing: {
-            abi::MsgPingPongPayload ping_pong{};
+            MsgPingPongPayload ping_pong{};
             if (err = ping_pong.deserialize(inbound_message_->data()); err == kSuccess) {
-                err = push_message(abi::NetMessageType::kPong, ping_pong);
+                err = push_message(MessageType::kPong, ping_pong);
             }
         } break;
         case kGetAddr:
@@ -542,7 +542,7 @@ serialization::Error Node::process_inbound_message() {
                 err_extended_reason = "Received an unrequested `pong` message.";
                 break;
             }
-            abi::MsgPingPongPayload ping_pong{};
+            MsgPingPongPayload ping_pong{};
             if (err = ping_pong.deserialize(inbound_message_->data()); err not_eq kSuccess) break;
             if (ping_pong.nonce_ not_eq expected_nonce) {
                 err = kMismatchingPingPongNonce;
@@ -577,8 +577,8 @@ serialization::Error Node::process_inbound_message() {
         print_log(is_fatal ? log::Level::kWarning : log::Level::kTrace, log_params, err_extended_reason);
     }
     if (not is_fatal and notify_node_hub) {
-        if (inbound_message_->get_type() not_eq abi::NetMessageType::kPing and
-            inbound_message_->get_type() not_eq abi::NetMessageType::kPong) {
+        if (inbound_message_->get_type() not_eq MessageType::kPing and
+            inbound_message_->get_type() not_eq MessageType::kPong) {
             last_message_received_time_.store(std::chrono::steady_clock::now());
         }
         on_message_(shared_from_this(), std::move(inbound_message_));
@@ -587,14 +587,13 @@ serialization::Error Node::process_inbound_message() {
 }
 
 serialization::Error Node::validate_message_for_protocol_handshake(const DataDirectionMode direction,
-                                                                   const abi::NetMessageType message_type) {
-    using namespace zenpp::abi;
+                                                                   const MessageType message_type) {
     using enum serialization::Error;
 
     // During protocol handshake we only allow version and verack messages
     // After protocol handshake we only allow other messages
     switch (message_type) {
-        using enum NetMessageType;
+        using enum MessageType;
         case kVersion:
         case kVerAck:
             if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) return kDuplicateProtocolHandShake;
@@ -609,12 +608,12 @@ serialization::Error Node::validate_message_for_protocol_handshake(const DataDir
         using enum DataDirectionMode;
         using enum ProtocolHandShakeStatus;
         case kInbound:
-            new_status_flag = static_cast<uint32_t>(
-                message_type == NetMessageType::kVersion ? kRemoteVersionReceived : kLocalVersionAckReceived);
+            new_status_flag = static_cast<uint32_t>(message_type == MessageType::kVersion ? kRemoteVersionReceived
+                                                                                          : kLocalVersionAckReceived);
             break;
         case kOutbound:
-            new_status_flag = static_cast<uint32_t>(message_type == NetMessageType::kVersion ? kLocalVersionSent
-                                                                                             : kRemoteVersionAckSent);
+            new_status_flag = static_cast<uint32_t>(message_type == MessageType::kVersion ? kLocalVersionSent
+                                                                                          : kRemoteVersionAckSent);
             break;
     }
 
@@ -634,7 +633,7 @@ void Node::on_handshake_completed() {
 
     // If this is a seeder node then we should send a `getaddr` message
     if (connection_.type_ == IPConnectionType::kSeedOutbound) {
-        push_message(abi::NetMessageType::kGetAddr);
+        push_message(MessageType::kGetAddr);
     }
 
     // Lets' send out a ping immediately and start the timer
@@ -741,4 +740,4 @@ void Node::print_log(const log::Level severity, const std::list<std::string>& pa
     log::BufferBase(severity, "Node", log_params) << extra_data;
 }
 
-}  // namespace zenpp::network
+}  // namespace zenpp::net

@@ -275,7 +275,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
     std::shared_ptr<Node> new_node(new Node(
         app_settings_, connection, asio_context_, std::move(socket), tls_client_context_.get(),
         [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
-        [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
+        [this](std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
             on_node_received_message(node, std::move(message));
         }));
 
@@ -353,7 +353,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
     const std::shared_ptr<Node> new_node(new Node(
         app_settings_, connection, asio_context_, std::move(socket), tls_server_context_.get(),
         [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
-        [this](std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
+        [this](std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
             on_node_received_message(node, std::move(message));
         }));
     log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local.to_string(), "remote",
@@ -453,7 +453,7 @@ void NodeHub::on_node_data(net::DataDirectionMode direction, const size_t bytes_
     }
 }
 
-void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message) {
+void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
     using namespace serialization;
     using enum Error;
 
@@ -463,8 +463,8 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
 
     std::string error{};
 
-    if (message->get_type() == abi::NetMessageType::kAddr) {
-        abi::MsgAddrPayload addr_payload{};
+    if (message->get_type() == MessageType::kAddr) {
+        MsgAddrPayload addr_payload{};
         const auto ret{addr_payload.deserialize(message->data())};
         if (not ret) {
             // TODO Pass it to the address manager
@@ -526,4 +526,4 @@ void NodeHub::set_common_socket_options(tcp::socket& socket) {
     socket.set_option(boost::asio::socket_base::receive_buffer_size(gsl::narrow_cast<int>(64_KiB)));
     socket.set_option(boost::asio::socket_base::send_buffer_size(gsl::narrow_cast<int>(64_KiB)));
 }
-}  // namespace zenpp::network
+}  // namespace zenpp::net

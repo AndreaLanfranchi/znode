@@ -16,7 +16,7 @@
 
 #include <core/serialization/serializable.hpp>
 
-namespace zenpp {
+namespace zenpp::net {
 
 enum class NodeServicesType : uint64_t {
     kNone = 0,                      // No services
@@ -138,7 +138,7 @@ class IPSubNet {
 
     [[nodiscard]] bool is_valid() const noexcept;
 
-    //! \brief Returns wehther the provided address is part of this subnet
+    //! \brief Returns whether the provided address is part of this subnet
     //! \remarks This method will return always false if the subnet is not valid
     //! \returns True if the address is part of this subnet, false otherwise
     [[nodiscard]] bool contains(const boost::asio::ip::address& address) const noexcept;
@@ -213,28 +213,28 @@ class VersionNodeService : public NodeService {
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
-}  // namespace zenpp
+}  // namespace zenpp::net
 
 namespace std {
 
 template <>
-struct hash<zenpp::IPAddress> {
-    size_t operator()(const zenpp::IPAddress& address) const noexcept {
+struct hash<zenpp::net::IPAddress> {
+    size_t operator()(const zenpp::net::IPAddress& address) const noexcept {
         return hash<boost::asio::ip::address>()(*address);
     }
 };
 
 template <>
-struct hash<zenpp::IPEndpoint> {
-    size_t operator()(const zenpp::IPEndpoint& endpoint) const noexcept {
-        return hash<zenpp::IPAddress>()(endpoint.address_) ^ hash<uint16_t>()(endpoint.port_);
+struct hash<zenpp::net::IPEndpoint> {
+    size_t operator()(const zenpp::net::IPEndpoint& endpoint) const noexcept {
+        return hash<zenpp::net::IPAddress>()(endpoint.address_) ^ hash<uint16_t>()(endpoint.port_);
     }
 };
 
 template <>
-struct hash<zenpp::IPConnection> {
-    size_t operator()(const zenpp::IPConnection& connection) const noexcept {
-        return hash<zenpp::IPEndpoint>()(connection.endpoint_) ^
+struct hash<zenpp::net::IPConnection> {
+    size_t operator()(const zenpp::net::IPConnection& connection) const noexcept {
+        return hash<zenpp::net::IPEndpoint>()(connection.endpoint_) ^
                hash<uint16_t>()(static_cast<uint16_t>(connection.type_));
     }
 };

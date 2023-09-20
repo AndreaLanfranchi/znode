@@ -5,14 +5,16 @@
 */
 
 #pragma once
+#include "message_defs.hpp"
+
 #include <cstdint>
 
-#include <core/abi/message_defs.hpp>
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
-#include <core/types/network.hpp>
 
-namespace zenpp::abi {
+#include <infra/network/network.hpp>
+
+namespace zenpp::net {
 
 //! \brief This class represents the payload of a NetMessage.
 //! \details Is basically an abstract placeholder type to make semantically evident in function signatures
@@ -98,4 +100,4 @@ class MsgAddrPayload : public NetMessagePayload {
     friend class serialization::SDataStream;
     serialization::Error serialization(serialization::SDataStream& stream, serialization::Action action) override;
 };
-}  // namespace zenpp::abi
+}  // namespace zenpp::net

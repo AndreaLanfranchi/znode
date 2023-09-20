@@ -8,30 +8,30 @@
 
 #include "netmessage.hpp"
 
+#include "core/common/misc.hpp"
+
 #include <algorithm>
 
 #include <gsl/gsl_util>
 
-#include <core/common/misc.hpp>
+namespace zenpp::net {
 
-namespace zenpp::abi {
-
-void NetMessageHeader::reset() noexcept {
+void MessageHeader::reset() noexcept {
     network_magic.fill('0');
     command.fill('0');
     payload_length = 0;
     payload_checksum.fill('0');
-    message_type_ = NetMessageType::kMissingOrUnknown;
+    message_type_ = MessageType::kMissingOrUnknown;
 }
 
-bool NetMessageHeader::pristine() const noexcept {
+bool MessageHeader::pristine() const noexcept {
     return std::ranges::all_of(network_magic, [](const auto ubyte) { return ubyte == 0U; }) &&
            std::ranges::all_of(command, [](const auto ubyte) { return ubyte == 0U; }) &&
            std::ranges::all_of(payload_checksum, [](const auto ubyte) { return ubyte == 0U; }) &&
-           message_type_ == NetMessageType::kMissingOrUnknown && payload_length == 0;
+           message_type_ == MessageType::kMissingOrUnknown && payload_length == 0;
 }
 
-void NetMessageHeader::set_type(const NetMessageType type) noexcept {
+void MessageHeader::set_type(const MessageType type) noexcept {
     if (!pristine()) return;
     const auto& message_definition{kMessageDefinitions[static_cast<size_t>(type)]};
     const auto command_bytes{strnlen_s(message_definition.command, command.size())};
@@ -39,7 +39,7 @@ void NetMessageHeader::set_type(const NetMessageType type) noexcept {
     message_type_ = type;
 }
 
-serialization::Error NetMessageHeader::serialization(serialization::SDataStream& stream, serialization::Action action) {
+serialization::Error MessageHeader::serialization(serialization::SDataStream& stream, serialization::Action action) {
     using namespace serialization;
     using enum Error;
     Error err{Error::kSuccess};
@@ -51,7 +51,7 @@ serialization::Error NetMessageHeader::serialization(serialization::SDataStream&
     return err;
 }
 
-serialization::Error NetMessageHeader::validate() noexcept {
+serialization::Error MessageHeader::validate() noexcept {
     using namespace serialization;
     using enum Error;
     if (payload_length > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
@@ -76,13 +76,13 @@ serialization::Error NetMessageHeader::validate() noexcept {
     for (const auto& msg_def : kMessageDefinitions) {
         if (const auto def_command_len{strnlen_s(msg_def.command, command.size())};
             got_command_len == def_command_len && memcmp(msg_def.command, command.data(), def_command_len) == 0) {
-            message_type_ = static_cast<NetMessageType>(definition_id);
+            message_type_ = static_cast<MessageType>(definition_id);
             break;
         }
         ++definition_id;
     }
 
-    if (message_type_ == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
+    if (message_type_ == MessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
 
     const auto& message_definition{get_definition()};
     if (message_definition.min_payload_length.has_value() && payload_length < *message_definition.min_payload_length) {
@@ -102,20 +102,20 @@ serialization::Error NetMessageHeader::validate() noexcept {
     return kSuccess;
 }
 
-const MessageDefinition& NetMessageHeader::get_definition() const noexcept {
+const MessageDefinition& MessageHeader::get_definition() const noexcept {
     return kMessageDefinitions[static_cast<decltype(kMessageDefinitions)::size_type>(message_type_)];
 }
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "readability-function-cognitive-complexity"
-serialization::Error NetMessage::validate() noexcept {
+serialization::Error Message::validate() noexcept {
     using enum serialization::Error;
 
     if (ser_stream_.size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
     if (ser_stream_.size() > kMaxProtocolMessageLength) return kMessageHeaderOversizedPayload;
 
     const auto& message_definition(header_.get_definition());
-    if (message_definition.message_type == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
+    if (message_definition.message_type == MessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
 
     if (ser_stream_.size() < kMessageHeaderLength) return kMessageHeaderIncomplete;
     if (ser_stream_.size() < kMessageHeaderLength + header_.payload_length) return kMessageBodyIncomplete;
@@ -136,7 +136,7 @@ serialization::Error NetMessage::validate() noexcept {
 
     // Message `getheaders` payload does not start with the number of items
     // rather with version. We need to skip it (4 bytes)
-    if (message_definition.message_type == NetMessageType::kGetHeaders) {
+    if (message_definition.message_type == MessageType::kGetHeaders) {
         ser_stream_.ignore(4);
     }
 
@@ -147,11 +147,11 @@ serialization::Error NetMessage::validate() noexcept {
         return kMessagePayloadOversizedVector;
     if (message_definition.vector_item_size.has_value()) {
         // Message `getheaders` has an extra item of 32 bytes (the stop hash)
-        const uint64_t extra_item{message_definition.message_type == NetMessageType::kGetHeaders ? 1U : 0U};
+        const uint64_t extra_item{message_definition.message_type == MessageType::kGetHeaders ? 1U : 0U};
         const auto expected_vector_data_size{(*expected_vector_size + extra_item) *
                                              *message_definition.vector_item_size};
 
-        if (ser_stream_.avail() != expected_vector_data_size) return kMessagePayloadMismatchesVectorSize;
+        if (ser_stream_.avail() not_eq expected_vector_data_size) return kMessagePayloadMismatchesVectorSize;
         // Look for duplicates
         const auto payload_view{ser_stream_.read()};
         ASSERT_POST(payload_view and "Must have a valid payload view");
@@ -166,7 +166,7 @@ serialization::Error NetMessage::validate() noexcept {
 }
 #pragma clang diagnostic pop
 
-serialization::Error NetMessage::parse(ByteView& input_data, ByteView network_magic) noexcept {
+serialization::Error Message::parse(ByteView& input_data, ByteView network_magic) noexcept {
     using namespace serialization;
     using enum Error;
 
@@ -213,7 +213,7 @@ serialization::Error NetMessage::parse(ByteView& input_data, ByteView network_ma
     return ret;
 }
 
-serialization::Error NetMessage::validate_checksum() noexcept {
+serialization::Error Message::validate_checksum() noexcept {
     using enum serialization::Error;
     const auto current_pos{ser_stream_.tellg()};
     if (ser_stream_.seekg(kMessageHeaderLength) != kMessageHeaderLength) return kMessageHeaderIncomplete;
@@ -231,16 +231,16 @@ serialization::Error NetMessage::validate_checksum() noexcept {
     return ret;
 }
 
-void NetMessage::set_version(int version) noexcept { ser_stream_.set_version(version); }
+void Message::set_version(int version) noexcept { ser_stream_.set_version(version); }
 
-int NetMessage::get_version() const noexcept { return ser_stream_.get_version(); }
+int Message::get_version() const noexcept { return ser_stream_.get_version(); }
 
-serialization::Error NetMessage::push(const NetMessageType message_type, NetMessagePayload& payload,
+serialization::Error Message::push(const MessageType message_type, NetMessagePayload& payload,
                                       ByteView magic) noexcept {
     using namespace serialization;
     using enum Error;
 
-    if (message_type == NetMessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
+    if (message_type == MessageType::kMissingOrUnknown) return kMessageHeaderUnknownCommand;
     if (magic.size() != header_.network_magic.size()) return kMessageHeaderMagicMismatch;
     if (!header_.pristine()) return kInvalidMessageState;
     header_.set_type(message_type);
@@ -270,4 +270,4 @@ serialization::Error NetMessage::push(const NetMessageType message_type, NetMess
 
     return validate();  // Ensure the message is valid also when we push it
 }
-}  // namespace zenpp::abi
+}  // namespace zenpp::net

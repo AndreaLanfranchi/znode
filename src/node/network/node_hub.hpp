@@ -13,11 +13,11 @@
 #include <boost/asio/spawn.hpp>
 
 #include <core/common/misc.hpp>
-#include <core/types/network.hpp>
 
 #include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/asio_timer.hpp>
 #include <infra/concurrency/unique_queue.hpp>
+#include <infra/network/network.hpp>
 
 #include <node/common/settings.hpp>
 #include <node/network/node.hpp>
@@ -78,7 +78,7 @@ class NodeHub : public Stoppable {
     //! \details This function behaves as a collector of messages from nodes and will route them to the
     //! appropriate workers/handlers. Messages pertaining to node session itself MUST NOT reach here
     //! as they SHOULD be handled by the node itself.
-    void on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<abi::NetMessage> message);
+    void on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<Message> message);
 
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options
 
@@ -127,4 +127,4 @@ class NodeHub : public Stoppable {
     StopWatch info_stopwatch_{/*auto_start=*/false};  // To measure the effective elapsed amongst two service_timer_
                                                       // events (for bandwidth calculation)
 };
-}  // namespace zenpp::network
+}  // namespace zenpp::net
