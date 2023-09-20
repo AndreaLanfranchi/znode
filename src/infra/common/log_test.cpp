@@ -43,7 +43,7 @@ class StreamSwap {
     std::ostream& stream_;
 };
 
-TEST_CASE("LogBuffer", "[common][log]") {
+TEST_CASE("LogBuffer", "[infra][common][log]") {
     // Temporarily override std::cout and std::cerr with null stream to avoid terminal output
     StreamSwap cout_swap{std::cout, null_stream()};
     StreamSwap cerr_swap{std::cerr, null_stream()};
@@ -80,7 +80,7 @@ TEST_CASE("LogBuffer", "[common][log]") {
     SECTION("Settings enable/disable thread tracing") {
         // Default thread tracing
         std::stringstream thread_id_stream;
-        thread_id_stream << std::this_thread::get_id();
+        thread_id_stream << log::get_thread_id();
         auto log_buffer1 = TestLogBuffer<kInfo>();
         log_buffer1 << "test";
         CHECK(log_buffer1.content().find(thread_id_stream.str()) == std::string::npos);

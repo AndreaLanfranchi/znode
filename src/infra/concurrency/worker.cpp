@@ -13,13 +13,14 @@
 
 namespace zenpp {
 
-Worker::~Worker() { Worker::stop(/*wait=*/false); }
+Worker::~Worker() { stop(true); }
 
 bool Worker::start() noexcept {
-    const bool start_already_requested{!Stoppable::start()};
+    const bool start_already_requested{not Stoppable::start()};
     if (start_already_requested) return false;
 
     exception_ptr_ = nullptr;
+    kicked_.store(false);
     id_.store(0);
 
     thread_ = std::make_unique<std::thread>([this]() {
@@ -39,34 +40,30 @@ bool Worker::start() noexcept {
                                      {"name", name_, "id", std::to_string(id_.load()), "exception", "Undefined error"});
         }
 
-        state_.store(State::kStopped);
+        state_.store(ComponentStatus::kNotStarted, std::memory_order_release);
+        kicked_.store(false, std::memory_order_release);
         id_.store(0);
     });
 
     return true;
 }
 
-bool Worker::stop(bool wait) noexcept {
-    // Worker thread cannot call stop on itself
-    // It has to exit the work() function to be stopped
-    if (thread_->get_id() == std::this_thread::get_id()) {
-        std::ignore =
-            log::Error("Worker::stop() called from worker thread", {"name", name_, "id", std::to_string(id_.load())});
-        ASSERT(false);
-    }
-
+bool Worker::stop([[maybe_unused]] bool wait) noexcept {
     const bool stop_already_requested{not Stoppable::stop(wait)};
     if (stop_already_requested) return false;
 
     kick();
     if (thread_ not_eq nullptr) {
-        if (wait and thread_->joinable()) {
-            thread_->join();
-            thread_.reset();
-        } else {
-            thread_->detach();
-            thread_.reset();
+        // Worker thread cannot call stop on itself
+        // It has to exit the work() function to be stopped
+        if (id_ == log::get_thread_id()) {
+            std::ignore = log::Error("Worker::stop() called from worker thread",
+                                     {"name", name_, "id", std::to_string(id_.load())});
+            ASSERT(false);
         }
+
+        if (thread_->joinable()) thread_->join();
+        thread_.reset();
     }
     return true;
 }
@@ -79,7 +76,7 @@ void Worker::kick() {
 bool Worker::wait_for_kick(uint32_t timeout_milliseconds) {
     bool expected_kicked_value{true};
     while (not kicked_.compare_exchange_strong(expected_kicked_value, false)) {
-        if (timeout_milliseconds > 0U) {
+        if (timeout_milliseconds not_eq 0U) {
             std::unique_lock lock(kick_mtx_);
             std::ignore = kicked_cv_.wait_for(lock, std::chrono::milliseconds(timeout_milliseconds));
         } else {

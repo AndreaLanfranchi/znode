@@ -17,13 +17,13 @@ class TestWorker final : public Worker {
   public:
     explicit TestWorker(bool should_throw = false) : Worker("testworker"), should_throw_(should_throw){};
     ~TestWorker() override = default;
-    uint32_t get_increment() const { return increment_; }
+    uint32_t get_increment() const { return increment_.load(); }
 
   private:
     std::atomic_bool should_throw_;
     std::atomic_uint32_t increment_{0};
     void work() override {
-        while (wait_for_kick()) {
+        while (wait_for_kick(10)) {
             ++increment_;
             if (should_throw_) {
                 throw std::runtime_error("An exception");
@@ -42,10 +42,13 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
         TestWorker worker(/* should_throw=*/false);
         CHECK(worker.status() == kNotStarted);
         worker.start();
-        CHECK(worker.get_increment() == 0U);
+        CHECK(worker.status() == kStarted);
+        REQUIRE(worker.get_increment() == 0U);
         worker.kick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.get_increment() == 1U);
         worker.kick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.get_increment() == 2U);
 
         worker.stop(true);
@@ -58,9 +61,16 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
         CHECK(worker.status() == kNotStarted);
         worker.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        CHECK(worker.status() == kStarted);
+        CHECK(worker.has_exception() == false);
+        worker.kick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        CHECK(worker.get_increment() == 1U);
         CHECK(worker.status() == kNotStarted);
         CHECK(worker.has_exception() == true);
         CHECK_THROWS(worker.rethrow());
+        CHECK(worker.what() == "An exception");
+        worker.stop(true);
     }
 
     SECTION("Stop when already exited") {
@@ -68,8 +78,12 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
         CHECK(worker.status() == kNotStarted);
         worker.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        CHECK(worker.status() == kStarted);
+        worker.kick();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.status() == kNotStarted);
-        CHECK(worker.stop(true) == false);
+        CHECK(worker.stop(true) == true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.status() == kNotStarted);
     }
 }

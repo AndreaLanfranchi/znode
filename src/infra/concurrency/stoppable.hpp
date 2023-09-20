@@ -44,10 +44,7 @@ class Stoppable {
     //! \remarks For threaded components (Worker.cpp) this is called automatically at the end of the work() function
     void set_stopped() noexcept;
 
-  private:
     std::atomic<ComponentStatus> state_{ComponentStatus::kNotStarted};  // The state of the component
-    std::atomic_bool started_{false};                                   // Whether the component has been started
-    std::atomic_bool stop_requested_{false};                            // Whether a stop request has been issued
 };
 
 }  // namespace zenpp

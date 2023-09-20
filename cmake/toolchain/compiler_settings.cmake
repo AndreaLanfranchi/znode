@@ -25,7 +25,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 
     # LINK : fatal error LNK1104: cannot open file 'libboost_date_time-vc142-mt-x64-1_72.lib
     # is solved by this (issue only for MVC)
-    add_definitions(-DBOOST_ALL_NO_LIB)
+    # add_definitions(-DBOOST_ALL_NO_LIB)
 
     # Abseil triggers some deprecation warnings
     add_compile_definitions(_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING)

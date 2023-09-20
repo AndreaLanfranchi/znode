@@ -15,6 +15,7 @@ bool Stoppable::start() noexcept {
 }
 
 bool Stoppable::stop([[maybe_unused]] /*in non-threaded components we don't need this*/ bool wait) noexcept {
+    if (status() == ComponentStatus::kNotStarted) return true;
     ComponentStatus expected{ComponentStatus::kStarted};
     return state_.compare_exchange_strong(expected, ComponentStatus::kStopping);
 }

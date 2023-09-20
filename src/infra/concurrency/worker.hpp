@@ -21,15 +21,6 @@ namespace zenpp {
 //! \remarks Can also stay im non-busy wait for new work to be done
 class Worker : public Stoppable, private boost::noncopyable {
   public:
-    //! \brief Actually the state of the underlying thread
-    enum class State {
-        kStopped,
-        kStarting,
-        kStarted,
-        kKickWaiting,
-        kStopping
-    };
-
     Worker() : name_{"worker"} {}
     explicit Worker(const std::string& name) : name_{name} {}
     explicit Worker(std::string&& name) : name_{std::move(name)} {}
@@ -81,7 +72,6 @@ class Worker : public Stoppable, private boost::noncopyable {
 
   private:
     std::atomic_uint64_t id_{0};  // Obtained from thread_id
-    std::atomic<State> state_{State::kStopped};
     std::unique_ptr<std::thread> thread_{nullptr};
     std::exception_ptr exception_ptr_{nullptr};
     virtual void work() = 0;  // Derived classes must override

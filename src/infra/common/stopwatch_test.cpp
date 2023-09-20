@@ -12,7 +12,7 @@
 #include <infra/common/stopwatch.hpp>
 
 namespace zenpp {
-TEST_CASE("Stop Watch", "[misc]") {
+TEST_CASE("Stop Watch", "[infra][common][stopwatch]") {
     using namespace std::chrono_literals;
 
     StopWatch sw_autostart(true);

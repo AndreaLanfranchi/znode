@@ -94,13 +94,11 @@ std::string to_human_bytes(const size_t input, bool binary) {
 }
 
 std::string get_random_alpha_string(size_t length) {
-    static constexpr std::string_view kAlphaNum{
-        "0123456789"
-        "abcdefghijklmnopqrstuvwxyz"};
+    static constexpr std::string_view kAlphaNum{"0123456789abcdefghijklmnopqrstuvwxyz"};
 
     std::string ret(length, '0');
     for (size_t i{0}; i < length; ++i) {
-        const size_t random_number{randomize(kAlphaNum.size() - 1)};
+        const size_t random_number{randomize<size_t>(0, kAlphaNum.size() - 1)};
         ret[i] = kAlphaNum[random_number];
     }
 
