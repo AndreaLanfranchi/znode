@@ -13,7 +13,7 @@
 #include <openssl/pem.h>
 #include <openssl/rand.h>
 
-namespace zenpp::network {
+namespace zenpp::net {
 
 void print_ssl_error(unsigned long err, const log::Level severity) {
     if (err == 0U) return;

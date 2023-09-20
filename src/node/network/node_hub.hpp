@@ -23,7 +23,7 @@
 #include <node/network/node.hpp>
 #include <node/network/secure.hpp>
 
-namespace zenpp::network {
+namespace zenpp::net {
 
 class NodeHub : public Stoppable {
   public:

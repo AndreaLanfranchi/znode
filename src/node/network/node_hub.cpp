@@ -19,7 +19,7 @@
 
 #include <infra/common/log.hpp>
 
-namespace zenpp::network {
+namespace zenpp::net {
 
 using namespace boost;
 using asio::ip::tcp;
@@ -440,7 +440,7 @@ void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
     }
 }
 
-void NodeHub::on_node_data(network::DataDirectionMode direction, const size_t bytes_transferred) {
+void NodeHub::on_node_data(net::DataDirectionMode direction, const size_t bytes_transferred) {
     switch (direction) {
         case DataDirectionMode::kInbound:
             total_bytes_received_ += bytes_transferred;

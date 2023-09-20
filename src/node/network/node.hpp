@@ -28,7 +28,7 @@
 
 #include <node/common/settings.hpp>
 
-namespace zenpp::network {
+namespace zenpp::net {
 
 enum class NodeIdleResult {
     kNotIdle,                   // Node is not idle

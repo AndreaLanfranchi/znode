@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
         // Check required certificate and key file are present to initialize SSL context
         if (network_settings.use_tls) {
             auto const ssl_data{(*settings.data_directory)[DataDirectory::kSSLCertName].path()};
-            if (not network::validate_tls_requirements(ssl_data, network_settings.tls_password)) {
+            if (not net::validate_tls_requirements(ssl_data, network_settings.tls_password)) {
                 throw std::filesystem::filesystem_error("Invalid SSL certificate or key file",
                                                         std::make_error_code(std::errc::no_such_file_or_directory));
             }
@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
         log::Message("Validated  ZK params", {"elapsed", StopWatch::format(stop_watch.since_start())});
 
         // 1) Instantiate and start a new NodeHub
-        network::NodeHub node_hub{settings, asio_context};
+        net::NodeHub node_hub{settings, asio_context};
         node_hub.start();
 
         // Keep waiting till sync_loop stops

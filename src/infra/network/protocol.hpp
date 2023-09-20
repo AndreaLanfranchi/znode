@@ -8,10 +8,10 @@
 #include <cstdint>
 #include <limits>
 
-namespace zenpp::network {
+namespace zenpp::net {
 
 inline constexpr int kDefaultProtocolVersion{170'002};                               // Our protocol version
 inline constexpr int kMinSupportedProtocolVersion{170'002};                          // Min acceptable protocol version
 inline constexpr int kMaxSupportedProtocolVersion{std::numeric_limits<int>::max()};  // Max acceptable protocol version
 
-}  // namespace zenpp::network
+}  // namespace zenpp::net

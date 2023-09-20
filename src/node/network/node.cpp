@@ -20,7 +20,7 @@
 
 #include <node/serialization/exceptions.hpp>
 
-namespace zenpp::network {
+namespace zenpp::net {
 
 using namespace boost;
 using asio::ip::tcp;

@@ -16,7 +16,7 @@
 #include <infra/common/log.hpp>
 #include <infra/filesystem/directories.hpp>
 
-namespace zenpp::network {
+namespace zenpp::net {
 
 static constexpr size_t kCertificateKeyLength{4096};
 static constexpr size_t kCertificateValidityDays{3650};  // 10 years
