@@ -6,7 +6,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "netmessage.hpp"
+#include "message.hpp"
 
 #include "core/common/misc.hpp"
 
@@ -235,7 +235,7 @@ void Message::set_version(int version) noexcept { ser_stream_.set_version(versio
 
 int Message::get_version() const noexcept { return ser_stream_.get_version(); }
 
-serialization::Error Message::push(const MessageType message_type, NetMessagePayload& payload,
+serialization::Error Message::push(const MessageType message_type, MessagePayload& payload,
                                       ByteView magic) noexcept {
     using namespace serialization;
     using enum Error;

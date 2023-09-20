@@ -379,7 +379,7 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     }
 }
 
-serialization::Error Node::push_message(const MessageType message_type, NetMessagePayload& payload) {
+serialization::Error Node::push_message(const MessageType message_type, MessagePayload& payload) {
     using namespace serialization;
     using enum Error;
 

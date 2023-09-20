@@ -4,7 +4,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "netmessage.hpp"
+#include "message.hpp"
 
 #include <catch2/catch.hpp>
 #include <magic_enum.hpp>

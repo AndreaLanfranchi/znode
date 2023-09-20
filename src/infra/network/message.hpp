@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "messages.hpp"
+#include "payloads.hpp"
 
 #include <memory>
 #include <optional>
@@ -90,7 +90,7 @@ class Message {
     [[nodiscard]] serialization::Error validate() noexcept;
 
     //! \brief Populates the message header and payload
-    serialization::Error push(MessageType message_type, NetMessagePayload& payload, ByteView magic) noexcept;
+    serialization::Error push(MessageType message_type, MessagePayload& payload, ByteView magic) noexcept;
 
   private:
     MessageHeader header_{};                 // Where the message header is deserialized

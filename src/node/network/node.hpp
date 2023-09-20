@@ -22,7 +22,7 @@
 #include <core/common/base.hpp>
 
 #include <infra/concurrency/asio_timer.hpp>
-#include <infra/network/netmessage.hpp>
+#include <infra/network/message.hpp>
 #include <infra/network/network.hpp>
 #include <infra/network/protocol.hpp>
 
@@ -145,7 +145,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] static int next_node_id() noexcept { return next_node_id_.fetch_add(1); }
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
-    serialization::Error push_message(MessageType message_type, NetMessagePayload& payload);
+    serialization::Error push_message(MessageType message_type, MessagePayload& payload);
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
     //! \remarks This a handy overload used to send messages with a null payload
