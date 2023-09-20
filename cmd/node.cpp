@@ -39,7 +39,7 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
     }
 
     // Open chaindata environment and check tables
-    log::Message("Opening database", {"path", node_settings.chaindata_env_config.path});
+    std::ignore = log::Message("Opening database", {"path", node_settings.chaindata_env_config.path});
     auto chaindata_env{db::open_env(node_settings.chaindata_env_config)};
     db::RWTxn txn(chaindata_env);
 
@@ -49,7 +49,7 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
         if (not detected_schema_version.has_value()) {
             throw db::Exception("Unable to detect schema version");
         }
-        log::Message("Database schema", {"version", detected_schema_version->to_string()});
+        std::ignore = log::Message("Database schema", {"version", detected_schema_version->to_string()});
         if (*detected_schema_version < db::tables::kRequiredSchemaVersion) {
             // TODO Run migrations and update schema version
             // for the moment an exception is thrown
@@ -70,7 +70,6 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
     if (not node_settings.chain_config.has_value() && init_if_not_configured) {
         const auto chain_config{lookup_known_chain(node_settings.network_id)};
         if (not chain_config.has_value()) throw std::runtime_error("Unknown chain");
-        const auto json_config{chain_config->second->to_json()};
         db::write_chain_config(*txn, *chain_config->second);
         txn.commit(/*renew=*/true);
         node_settings.chain_config = db::read_chain_config(*txn);
@@ -83,7 +82,7 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
                                             "'. You might want to specify a different data directory.")};
         throw std::runtime_error(what);
     }
-    log::Message("Chain", {"config", to_string(node_settings.chain_config->to_json())});
+    std::ignore = log::Message("Chain", {"config", to_string(node_settings.chain_config->to_json())});
 
     txn.commit(/*renew=*/false);
     chaindata_env.close();
@@ -120,15 +119,16 @@ int main(int argc, char* argv[]) {
         log::set_thread_name("main");
 
         // Output BuildInfo
-        log::Message("Using " + std::string(get_buildinfo()->project_name), {"version", get_buildinfo_string()});
+        std::ignore =
+            log::Message("Using " + std::string(get_buildinfo()->project_name), {"version", get_buildinfo_string()});
 
         // Output mdbx build info
         auto const& mdbx_ver{mdbx::get_version()};
         auto const& mdbx_bld{mdbx::get_build()};
-        log::Message("Using libmdbx",
-                     {"version", mdbx_ver.git.describe, "build", mdbx_bld.target, "compiler", mdbx_bld.compiler});
+        std::ignore = log::Message("Using libmdbx", {"version", mdbx_ver.git.describe, "build", mdbx_bld.target,
+                                                     "compiler", mdbx_bld.compiler});
         // Output OpenSSL build info
-        log::Message("Using OpenSSL", {"version", OPENSSL_VERSION_TEXT});
+        std::ignore = log::Message("Using OpenSSL", {"version", OPENSSL_VERSION_TEXT});
 
         // Check and open db
         prepare_chaindata_env(settings, true);
@@ -143,13 +143,14 @@ int main(int argc, char* argv[]) {
             asio_threads.emplace_back([&asio_context, i]() {
                 const std::string thread_name{"asio-" + std::to_string(i)};
                 log::set_thread_name(thread_name);
-                log::Trace("Service", {"name", thread_name, "status", "starting"});
+                std::ignore = log::Trace("Service", {"name", thread_name, "status", "starting"});
                 asio_context.run();
-                log::Trace("Service", {"name", thread_name, "status", "stopped"});
+                std::ignore = log::Trace("Service", {"name", thread_name, "status", "stopped"});
             });
         }
 
-        // clang-tidy offers no way to suppress this warning
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "UnusedValue"
         auto stop_asio{gsl::finally([&asio_guard, &asio_threads]() {
             log::Info("Service", {"name", "asio", "status", "stopping threads"});
             asio_guard.reset();  // Release the work guard - pending tasks will complete gracefully
@@ -157,8 +158,9 @@ int main(int argc, char* argv[]) {
                 if (thread.joinable()) thread.join();
             });
         })};
+#pragma clang diagnostic pop
 
-        // Let some time to allow threads to properly start
+        // Let some time allow threads to properly start
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Check required certificate and key file are present to initialize SSL context
@@ -173,12 +175,12 @@ int main(int argc, char* argv[]) {
         // Validate mandatory zk params
         StopWatch stop_watch(true);
         const auto zk_params_path{(*settings.data_directory)[DataDirectory::kZkParamsName].path()};
-        log::Message("Validating ZK params", {"directory", zk_params_path.string()});
+        std::ignore = log::Message("Validating ZK params", {"directory", zk_params_path.string()});
         if (!zk::validate_param_files(asio_context, zk_params_path, settings.no_zk_checksums)) {
             throw std::filesystem::filesystem_error("Invalid ZK file params",
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }
-        log::Message("Validated  ZK params", {"elapsed", StopWatch::format(stop_watch.since_start())});
+        std::ignore = log::Message("Validated  ZK params", {"elapsed", StopWatch::format(stop_watch.since_start())});
 
         // 1) Instantiate and start a new NodeHub
         net::NodeHub node_hub{settings, asio_context};
@@ -244,7 +246,7 @@ int main(int argc, char* argv[]) {
 
         node_hub.stop(/*wait=*/true);  // 1) Stop networking server
 
-        log::Message("Closing database", {"path", chaindata_dir.path().string()});
+        std::ignore = log::Message("Closing database", {"path", chaindata_dir.path().string()});
         chaindata_env.close();
         // sync_loop.rethrow();  // Eventually throws the exception which caused the stop
 
@@ -274,6 +276,6 @@ int main(int argc, char* argv[]) {
     }
 
     const auto total_duration{std::chrono::steady_clock::now() - start_time};
-    log::Info("All done", {"uptime", StopWatch::format(total_duration)});
+    std::ignore = log::Info("All done", {"uptime", StopWatch::format(total_duration)});
     return 0;
 }
