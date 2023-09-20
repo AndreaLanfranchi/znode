@@ -232,4 +232,4 @@ TEST_CASE("Network Service Serialization", "[serialization]") {
     CHECK(service2.services_ == service.services_);
     CHECK(service2.endpoint_ == service.endpoint_);
 }
-}  // namespace zenpp
+}  // namespace zenpp::net

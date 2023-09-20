@@ -5,11 +5,11 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include "mdbx.hpp"
+
 #include <stdexcept>
 
 #include <core/common/misc.hpp>
-
-#include "mdbx.hpp"
 
 namespace zenpp::db {
 

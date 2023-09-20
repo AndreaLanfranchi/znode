@@ -422,4 +422,4 @@ bool validate_tls_requirements(const std::filesystem::path& directory_path, cons
 
     return true;
 }
-}  // namespace zenpp::network
+}  // namespace zenpp::net

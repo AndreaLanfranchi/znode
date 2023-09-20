@@ -230,13 +230,13 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<size_t> bytes_sent_{0};      // Total bytes sent to the socket during the session
 
     std::atomic<std::chrono::steady_clock::time_point> inbound_message_start_time_{
-        std::chrono::steady_clock::time_point::min()};      // Start time of inbound msg
+        std::chrono::steady_clock::time_point::min()};   // Start time of inbound msg
     std::unique_ptr<Message> inbound_message_{nullptr};  // The "next" message being received
 
     std::atomic_bool is_writing_{false};  // Whether a write operation is in progress
     std::atomic<std::chrono::steady_clock::time_point> outbound_message_start_time_{
         std::chrono::steady_clock::time_point::min()};              // Start time of outbound msg
-    std::shared_ptr<Message> outbound_message_{nullptr};         // The "next" message being sent
+    std::shared_ptr<Message> outbound_message_{nullptr};            // The "next" message being sent
     std::vector<decltype(outbound_message_)> outbound_messages_{};  // Queue of messages awaiting to be sent
     std::mutex outbound_messages_mutex_{};                          // Lock guard for messages to be sent
 

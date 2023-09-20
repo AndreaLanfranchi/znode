@@ -83,4 +83,4 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
 //! agrees, generates them
 bool validate_tls_requirements(const std::filesystem::path& directory_path, const std::string& key_password);
 
-}  // namespace zenpp::network
+}  // namespace zenpp::net
