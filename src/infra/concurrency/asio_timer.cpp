@@ -14,7 +14,7 @@
 
 #include <infra/common/log.hpp>
 
-namespace zenpp {
+namespace zenpp::con {
 bool AsioTimer::start() noexcept {
     if (interval_milliseconds_ == 0U or not call_back_) return false;
     if (Stoppable::start()) {
@@ -70,4 +70,4 @@ void AsioTimer::start_internal() {
         }
     });
 }
-}  // namespace zenpp
+}  // namespace zenpp::con

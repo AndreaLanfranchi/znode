@@ -11,7 +11,7 @@
 #include <infra/common/log_test.hpp>
 #include <infra/concurrency/worker.hpp>
 
-namespace zenpp {
+namespace zenpp::con {
 
 class TestWorker final : public Worker {
   public:
@@ -87,4 +87,4 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
         CHECK(worker.status() == kNotStarted);
     }
 }
-}  // namespace zenpp
+}  // namespace zenpp::con

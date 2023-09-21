@@ -11,7 +11,7 @@
 
 #include <infra/common/log.hpp>
 
-namespace zenpp {
+namespace zenpp::con {
 
 Worker::~Worker() { stop(true); }
 
@@ -109,4 +109,4 @@ void Worker::rethrow() const {
         std::rethrow_exception(exception_ptr_);
     }
 }
-}  // namespace zenpp
+}  // namespace zenpp::con

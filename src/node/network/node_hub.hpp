@@ -26,7 +26,7 @@
 
 namespace zenpp::net {
 
-class NodeHub : public Stoppable {
+class NodeHub : public con::Stoppable {
   public:
     explicit NodeHub(AppSettings& settings, boost::asio::io_context& io_context)
         : app_settings_{settings},
@@ -104,12 +104,12 @@ class NodeHub : public Stoppable {
 
     boost::asio::io_context::strand asio_strand_;     // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
-    AsioTimer service_timer_;                         // Triggers a maintenance cycle
+    con::AsioTimer service_timer_;                    // Triggers a maintenance cycle
 
     std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure server connections
     std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure client connections
 
-    UniqueQueue<IPConnection> pending_connections_;  // Queue of pending connections to be made (outbound)
+    con::UniqueQueue<IPConnection> pending_connections_;  // Queue of pending connections to be made (outbound)
     std::atomic_uint32_t current_active_connections_{0};
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};

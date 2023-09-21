@@ -15,6 +15,7 @@ namespace {
     void log_signal(int signum) { log::Warning() << "Caught OS signal : " << std::to_string(signum); }
 }  // namespace
 
+using namespace zenpp::con;
 
 void ShutDownSignal::on_signal(std::function<void(Signum)> callback) {
     signals_.async_wait([callback_{std::move(callback)}](const boost::system::error_code& error_code, int signum) {

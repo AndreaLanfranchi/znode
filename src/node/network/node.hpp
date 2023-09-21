@@ -52,7 +52,7 @@ static constexpr size_t kMaxMessagesPerRead = 32;
 static constexpr size_t kMaxBytesPerIO = 64_KiB;
 
 //! \brief A node holds a connection (and related session) to a remote peer
-class Node : public Stoppable, public std::enable_shared_from_this<Node> {
+class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
   public:
     Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
          boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
@@ -200,7 +200,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     const int node_id_{next_node_id()};          // Unique node id
     const IPConnection connection_;              // Whether inbound or outbound
     boost::asio::io_context::strand io_strand_;  // Serialized execution of reads and writes
-    AsioTimer ping_timer_;                       // To periodically send ping messages
+    con::AsioTimer ping_timer_;                  // To periodically send ping messages
     boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
     IPEndpoint remote_endpoint_;                 // Remote endpoint
     IPEndpoint local_endpoint_;                  // Local endpoint

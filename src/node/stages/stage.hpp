@@ -36,7 +36,7 @@ struct SyncContext : private boost::noncopyable {
     std::optional<BlockNum> previous_unwind_point;
 };
 
-class Stage : public Stoppable {
+class Stage : public con::Stoppable {
   public:
     enum class [[nodiscard("Return codes must always be checked")]] Result{
         kSuccess,                 //

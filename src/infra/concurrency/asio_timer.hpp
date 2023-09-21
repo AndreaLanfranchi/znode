@@ -25,7 +25,7 @@
 
 #include <infra/concurrency/stoppable.hpp>
 
-namespace zenpp {
+namespace zenpp::con {
 //! \brief Implementation of an asynchronous timer relying on boost:asio
 class AsioTimer : public Stoppable {
   public:
@@ -93,4 +93,4 @@ class AsioTimer : public Stoppable {
     std::atomic_bool autoreset_{true};               // If true, timer is resubmitted after callback execution
     std::function<unsigned(unsigned)> call_back_;    // Function to call on triggered event
 };
-}  // namespace zenpp
+}  // namespace zenpp::con

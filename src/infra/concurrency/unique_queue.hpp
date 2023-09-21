@@ -13,7 +13,7 @@
 #include <stdexcept>
 #include <unordered_set>
 
-namespace zenpp {
+namespace zenpp::con {
 
 //! \brief A thread safe queue of unique items with optional maximum capacity
 //! \details When container reaches capacity every insertion evicts the oldest element (FIFO)
@@ -86,4 +86,4 @@ class UniqueQueue {
     std::condition_variable cond_;
 };
 
-}  // namespace zenpp
+}  // namespace zenpp::con
