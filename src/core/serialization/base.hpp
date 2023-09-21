@@ -65,4 +65,4 @@ inline constexpr std::array<Error, 3> kNonFatalErrors{Error::kSuccess, Error::kM
 
 inline bool is_fatal_error(Error e) { return std::ranges::find(kNonFatalErrors, e) == kNonFatalErrors.end(); }
 
-}  // namespace zenpp::serialization
+}  // namespace zenpp::ser

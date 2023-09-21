@@ -145,4 +145,4 @@ void SDataStream::clear() noexcept {
     DataStream::clear();
     computed_size_ = 0;
 }
-}  // namespace zenpp::serialization
+}  // namespace zenpp::ser

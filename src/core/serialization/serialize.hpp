@@ -163,4 +163,4 @@ inline tl::expected<uint64_t, Error> read_compact(Stream& stream, bool range_che
     if (range_check and ret > kMaxSerializedCompactSize) return tl::unexpected(Error::kCompactSizeTooBig);
     return ret;
 }
-}  // namespace zenpp::serialization
+}  // namespace zenpp::ser

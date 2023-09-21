@@ -6,13 +6,12 @@
 */
 
 #pragma once
-
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/use_awaitable.hpp>
 
 namespace zenpp {
 
-//! Asynchronous task returned by any coroutine, i.e. asynchronous operation
+//! \brief Asynchronous task returned by any coroutine, i.e. asynchronous operation
 template <typename T>
 using Task = boost::asio::awaitable<T>;
 

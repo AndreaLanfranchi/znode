@@ -178,7 +178,7 @@ class Node : public Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
     //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
     [[nodiscard]] ser::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
-                                                                               MessageType message_type);
+                                                                     MessageType message_type);
 
     //! \brief To be called as soon as the protocol handshake is completed
     //! \details This is the place where the node is considered fully connected and could start sending/receiving

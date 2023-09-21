@@ -36,13 +36,9 @@ class Serializable {
         return stream.computed_size();
     }
 
-    [[nodiscard]] ser::Error serialize(SDataStream& stream) {
-        return serialization(stream, Action::kSerialize);
-    }
+    [[nodiscard]] ser::Error serialize(SDataStream& stream) { return serialization(stream, Action::kSerialize); }
 
-    [[nodiscard]] ser::Error deserialize(SDataStream& stream) {
-        return serialization(stream, Action::kDeserialize);
-    }
+    [[nodiscard]] ser::Error deserialize(SDataStream& stream) { return serialization(stream, Action::kDeserialize); }
 
     // Needed for derived classes implementing spaceship operator
     constexpr auto operator<=>(const Serializable&) const = default;
@@ -50,4 +46,4 @@ class Serializable {
   private:
     virtual Error serialization(SDataStream& stream, Action action) = 0;
 };
-}  // namespace zenpp::serialization
+}  // namespace zenpp::ser

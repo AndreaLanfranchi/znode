@@ -5,7 +5,7 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "coroutine.hpp"
+#include "task.hpp"
 
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/io_context.hpp>
@@ -36,10 +36,7 @@ TEST_CASE("Corouting configuration", "[infra][concurrency][coroutine]") {
 
 TEST_CASE("Coroutine co_return", "[infra][concurrency][coroutine]") {
     boost::asio::io_context context;
-    auto task = co_spawn(
-        context,
-        f42(),
-        boost::asio::use_future);
+    auto task = co_spawn(context, f42(), boost::asio::use_future);
 
     std::size_t work_count;
     do {

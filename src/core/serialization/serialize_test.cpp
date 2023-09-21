@@ -335,4 +335,4 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         CHECK(value.error() == Error::kCompactSizeTooBig);
     }
 }
-}  // namespace zenpp::serialization
+}  // namespace zenpp::ser

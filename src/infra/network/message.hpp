@@ -64,8 +64,7 @@ class Message {
     explicit Message(int version) : ser_stream_{ser::Scope::kNetwork, version} {};
 
     //! \brief Construct a NetMessage with network magic provided
-    explicit Message(int version, std::array<uint8_t, 4>& magic)
-        : ser_stream_{ser::Scope::kNetwork, version} {
+    explicit Message(int version, std::array<uint8_t, 4>& magic) : ser_stream_{ser::Scope::kNetwork, version} {
         header_.network_magic = magic;
     };
 
@@ -94,7 +93,7 @@ class Message {
     ser::Error push(MessageType message_type, MessagePayload& payload, ByteView magic) noexcept;
 
   private:
-    MessageHeader header_{};                 // Where the message header is deserialized
+    MessageHeader header_{};       // Where the message header is deserialized
     ser::SDataStream ser_stream_;  // Contains all the message raw data
 
     [[nodiscard]] ser::Error validate_checksum() noexcept;

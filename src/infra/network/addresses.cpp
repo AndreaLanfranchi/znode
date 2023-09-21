@@ -174,9 +174,7 @@ IPAddressReservationType IPAddress::address_v6_reservation() const noexcept {
     return ret;
 }
 
-ser::Error IPAddress::serialization(SDataStream& stream, ser::Action action) {
-    return stream.bind(value_, action);
-}
+ser::Error IPAddress::serialization(SDataStream& stream, ser::Action action) { return stream.bind(value_, action); }
 
 std::string IPAddress::to_string() const noexcept {
     if (value_.is_v6()) return absl::StrCat("[", value_.to_string(), "]");

@@ -77,7 +77,7 @@ inline constexpr MessageDefinition kMessageInv{
     true,
     size_t{kMaxInvItems},
     size_t{kInvItemSize},
-    size_t{1 + kInvItemSize},                                                                 //
+    size_t{1 + kInvItemSize},                                                       //
     size_t{ser::ser_compact_sizeof(kMaxInvItems) + (kMaxInvItems * kInvItemSize)},  //
 };
 
@@ -87,7 +87,7 @@ inline constexpr MessageDefinition kMessageAddr{
     true,
     size_t{kMaxAddrItems},
     size_t{kAddrItemSize},
-    size_t{1 + kAddrItemSize},                                                                   //
+    size_t{1 + kAddrItemSize},                                                         //
     size_t{ser::ser_compact_sizeof(kMaxAddrItems) + (kMaxAddrItems * kAddrItemSize)},  //
 };
 

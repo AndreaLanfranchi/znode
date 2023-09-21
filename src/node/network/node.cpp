@@ -585,7 +585,7 @@ ser::Error Node::process_inbound_message() {
 }
 
 ser::Error Node::validate_message_for_protocol_handshake(const DataDirectionMode direction,
-                                                                   const MessageType message_type) {
+                                                         const MessageType message_type) {
     using enum ser::Error;
 
     // During protocol handshake we only allow version and verack messages

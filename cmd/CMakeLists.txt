@@ -17,8 +17,15 @@ endif ()
 
 if (NOT BUILD_CORE_ONLY)
 
+    set(COMMON_SRC
+            common.hpp
+            common.cpp
+            common/shutdown_signal.hpp
+            common/shutdown_signal.cpp
+    )
+
     # The node executable itself
-    add_executable(${PROJECT_NAME} "node.cpp;common.hpp;common.cpp")
+    add_executable(${PROJECT_NAME} "node.cpp;${COMMON_SRC}")
     target_link_libraries(${PROJECT_NAME} PUBLIC third-party-includes PRIVATE ${BUILD_NODE_COMPONENT} ${BUILDINFO_LIB} CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
     target_include_directories(${PROJECT_NAME} PRIVATE ${BUILD_MAIN_SRC_DIR})
 
