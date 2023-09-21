@@ -7,23 +7,6 @@
 
 #pragma once
 
-#if __has_include(<coroutine>)
-#include <coroutine>
-
-#elif __has_include(<experimental/coroutine>)
-#include <experimental/coroutine>
-namespace std {
-template <typename T>
-using coroutine_handle = std::experimental::coroutine_handle<T>;
-
-using suspend_always = std::experimental::suspend_always;
-
-using suspend_never = std::experimental::suspend_never;
-}  // namespace std
-#else
-#error "No <coroutine> or <experimental/coroutine> include found"
-#endif  // __has_include(<coroutine>)
-
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/use_awaitable.hpp>
 

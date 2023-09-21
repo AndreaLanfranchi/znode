@@ -35,7 +35,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 
     add_compile_options(/MP)            # Enable parallel compilation
     add_compile_options(/EHa)           # Enable standard C++ unwinding
-    add_compile_options(/await:strict)  # Enable coroutine support in std namespace
+    # add_compile_options(/await:strict)  # Enable coroutine support in std namespace (not needed in C++20)
 
     add_compile_options(/wd4127) # Silence warnings about "conditional expression is constant" (abseil mainly)
     add_compile_options(/wd5030) # Silence warnings about GNU attributes
