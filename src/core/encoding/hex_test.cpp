@@ -94,4 +94,18 @@ TEST_CASE("Hex encoding integrals", "[encoding]") {
     CHECK(expected_hex == obtained_hex);
 }
 
+TEST_CASE("Hex encoding big integrals", "[encoding]") {
+    uint256_t value("1182508626613988427021106");
+    std::string expected_hex = "fa67ebcd123450abbb32";
+    std::string obtained_hex = hex::encode(value, false);
+    CHECK(expected_hex == obtained_hex);
+    expected_hex = "0xfa67ebcd123450abbb32";
+    obtained_hex = hex::encode(value, true);
+    CHECK(expected_hex == obtained_hex);
+
+    auto decoded{hex::decode(expected_hex)};
+    REQUIRE(decoded);
+    uint256_t decoded_value{decoded.value()};
+    CHECK(decoded_value == value);
+}
 }  // namespace zenpp::hex

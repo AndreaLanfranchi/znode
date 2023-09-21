@@ -19,13 +19,13 @@ class BlockHeader : public ser::Serializable {
   public:
     using ser::Serializable::Serializable;
 
-    int32_t version{0};
-    h256 parent_hash{};
-    h256 merkle_root{};
-    h256 scct_root{};
-    uint32_t time{0};
-    uint32_t bits{0};
-    intx::uint256 nonce{0};
+    int32_t version{0};  // 4 bytes
+    h256 parent_hash{};  // 32 bytes
+    h256 merkle_root{};  // 32 bytes
+    h256 scct_root{};    // 32 bytes
+    uint32_t time{0};    // 4 bytes
+    uint32_t bits{0};    // 4 bytes
+    uint256_t nonce{0};  // 32 bytes Total: 140 bytes
     Bytes solution{};
 
     void reset();

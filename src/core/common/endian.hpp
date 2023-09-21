@@ -11,6 +11,8 @@
 #include <concepts>
 #include <ranges>
 
+#include <boost/endian/conversion.hpp>
+
 #include <core/common/base.hpp>
 
 #if __cplusplus < 202300L
@@ -33,40 +35,20 @@ constexpr T byteswap(T value) noexcept {
 
 namespace zenpp::endian {
 
-// Similar to boost::endian::load_big_u16
-const auto load_big_u16 = intx::be::unsafe::load<uint16_t>;
+const auto load_big_u16 = boost::endian::load_big_u16;
+const auto load_big_u32 = boost::endian::load_big_u32;
+const auto load_big_u64 = boost::endian::load_big_u64;
 
-// Similar to boost::endian::load_big_u32
-const auto load_big_u32 = intx::be::unsafe::load<uint32_t>;
+const auto load_little_u16 = boost::endian::load_little_u16;
+const auto load_little_u32 = boost::endian::load_little_u32;
+const auto load_little_u64 = boost::endian::load_little_u64;
 
-// Similar to boost::endian::load_big_u64
-const auto load_big_u64 = intx::be::unsafe::load<uint64_t>;
+const auto store_big_u16 = boost::endian::store_big_u16;
+const auto store_big_u32 = boost::endian::store_big_u32;
+const auto store_big_u64 = boost::endian::store_big_u64;
 
-// Similar to boost::endian::load_little_u16
-const auto load_little_u16 = intx::le::unsafe::load<uint16_t>;
-
-// Similar to boost::endian::load_little_u32
-const auto load_little_u32 = intx::le::unsafe::load<uint32_t>;
-
-// Similar to boost::endian::load_little_u64
-const auto load_little_u64 = intx::le::unsafe::load<uint64_t>;
-
-// Similar to boost::endian::store_big_u16
-const auto store_big_u16 = intx::be::unsafe::store<uint16_t>;
-
-// Similar to boost::endian::store_big_u32
-const auto store_big_u32 = intx::be::unsafe::store<uint32_t>;
-
-// Similar to boost::endian::store_big_u64
-const auto store_big_u64 = intx::be::unsafe::store<uint64_t>;
-
-// Similar to boost::endian::store_little_u16
-const auto store_little_u16 = intx::le::unsafe::store<uint16_t>;
-
-// Similar to boost::endian::store_little_u32
-const auto store_little_u32 = intx::le::unsafe::store<uint32_t>;
-
-// Similar to boost::endian::store_little_u64
-const auto store_little_u64 = intx::le::unsafe::store<uint64_t>;
+const auto store_little_u16 = boost::endian::store_little_u16;
+const auto store_little_u32 = boost::endian::store_little_u32;
+const auto store_little_u64 = boost::endian::store_little_u64;
 
 }  // namespace zenpp::endian

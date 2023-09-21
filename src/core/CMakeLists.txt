@@ -33,7 +33,6 @@ set(PUBLIC_LIBS
         third-party-includes
         absl::strings
         absl::time
-        intx::intx
         Microsoft.GSL::GSL
         nlohmann_json
         OpenSSL::Crypto)

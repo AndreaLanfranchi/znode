@@ -9,6 +9,7 @@
 
 #include <string_view>
 
+#include <boost/endian/conversion.hpp>
 #include <tl/expected.hpp>
 
 #include <core/common/base.hpp>
@@ -36,10 +37,25 @@ ByteView zeroless_view(ByteView data);
 [[nodiscard]] std::string encode(ByteView bytes, bool with_prefix = false) noexcept;
 
 //! \brief Returns a string of ascii chars with the hexadecimal representation of provided unsigned integral
-template <UnsignedIntegralEx T>
+template <UnsignedBigIntegral T>
 [[nodiscard]] std::string encode(const T value, bool with_prefix = false) noexcept {
-    uint8_t bytes[sizeof(T)];
-    intx::be::store(bytes, value);
+    Bytes bytes{};
+    boost::multiprecision::export_bits(value, std::back_inserter(bytes), CHAR_BIT, true);
+    auto hexed{encode(zeroless_view(bytes), with_prefix)};
+    if (hexed.length() == (with_prefix ? 2U : 0U)) {
+        hexed += "00";
+    }
+    return hexed;
+}
+
+//! \brief Returns a string of ascii chars with the hexadecimal representation of provided unsigned integral
+template <UnsignedIntegral T>
+[[nodiscard]] std::string encode(const T value, bool with_prefix = false) noexcept {
+    Bytes bytes(sizeof(T), 0x0);
+    std::memcpy(bytes.data(), &value, sizeof(T));
+    if (bytes.size() not_eq 1U) {
+        std::ranges::reverse(bytes);
+    }
     auto hexed{encode(zeroless_view(bytes), with_prefix)};
     if (hexed.length() == (with_prefix ? 2U : 0U)) {
         hexed += "00";

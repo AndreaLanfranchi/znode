@@ -23,13 +23,6 @@ hunter_cmake_args(
 )
 
 hunter_config(
-        intx
-        VERSION 0.10.0
-        URL https://github.com/chfast/intx/archive/refs/tags/v0.10.0.tar.gz
-        SHA1 3a6ebe0b1a36527b6ef291ee93a8e508371e5b77
-)
-
-hunter_config(
         OpenSSL
         VERSION 3.1.0
 )
