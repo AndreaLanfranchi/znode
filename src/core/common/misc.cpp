@@ -15,6 +15,8 @@
 #include <boost/format.hpp>
 #include <gsl/gsl_util>
 
+#include <core/common/random.hpp>
+
 namespace zenpp {
 
 std::string abridge(std::string_view input, size_t length) {

@@ -15,6 +15,7 @@
 #include <boost/asio/spawn.hpp>
 
 #include <core/common/misc.hpp>
+#include <core/common/random.hpp>
 
 #include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/asio_timer.hpp>
