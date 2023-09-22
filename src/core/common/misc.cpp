@@ -12,6 +12,7 @@
 #include <set>
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <boost/format.hpp>
 #include <gsl/gsl_util>
 
@@ -20,11 +21,11 @@
 namespace zenpp {
 
 std::string abridge(std::string_view input, size_t length) {
-    if (length == 0U or input.empty()) return std::string(input);
-    if (input.length() <= length) {
-        return std::string(input);
-    }
-    return std::string(input.substr(0, length)) + "...";
+    if (input.length() <= length) return std::string(input);
+    std::string abridged{input.substr(0, length)};
+    boost::algorithm::trim_right(abridged);
+    abridged += "...";
+    return abridged;
 }
 
 tl::expected<uint64_t, DecodingError> parse_human_bytes(const std::string& input) {
@@ -136,6 +137,7 @@ bool try_parse_ip_address_and_port(std::string_view input, boost::asio::ip::addr
 
     std::smatch matches;
     boost::system::error_code error_code;
+
     const std::string input_str{input};
     if (std::regex_match(input_str, matches, ipv4_pattern)) {
         address = boost::asio::ip::make_address_v4(matches[1].str(), error_code);
@@ -148,7 +150,7 @@ bool try_parse_ip_address_and_port(std::string_view input, boost::asio::ip::addr
         return !error_code;
     }
     if (std::regex_match(input_str, matches, ipv6_ipv4_pattern)) {
-        address = boost::asio::ip::make_address_v4(matches[1].str(), error_code);
+        address = boost::asio::ip::make_address_v6(matches[1].str(), error_code).to_v4();
         port = matches[4].matched ? gsl::narrow_cast<uint16_t>(std::stoul(matches[4].str())) : port;
         return !error_code;
     }

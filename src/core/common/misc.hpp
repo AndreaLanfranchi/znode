@@ -39,8 +39,7 @@ namespace zenpp {
 [[nodiscard]] size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size, size_t max_count = 0) noexcept;
 
 //! \brief Parses a string representing an unsigned integer
-template <typename T>
-requires std::unsigned_integral<T>
+template <UnsignedIntegral T>
 bool try_parse_uint(std::string_view input, int base, T& output) noexcept {
     size_t pos{0};
     if (input.empty()) return false;
