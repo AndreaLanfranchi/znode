@@ -196,6 +196,7 @@ class SDataStream : public DataStream {
         /*
          * When used at fixed precision, the size of type boost cpp_int is always one machine word larger
          * than you would expect for an N-bit integer
+         * https://www.boost.org/doc/libs/1_81_0/libs/multiprecision/doc/html/boost_multiprecision/tut/ints/cpp_int.html
          * */
         std::array<uint8_t, sizeof(T) - sizeof(intptr_t)> bytes{0x0};
         Error result{Error::kSuccess};
@@ -220,12 +221,14 @@ class SDataStream : public DataStream {
 
     // Serialization for Serializable classes
     template <class T>
-    requires std::derived_from<T, Serializable>
-    [[nodiscard]] Error bind(T& object, Action action) { return object.serialization(*this, action); }
+        requires std::derived_from<T, Serializable>
+    [[nodiscard]] Error bind(T& object, Action action) {
+        return object.serialization(*this, action);
+    }
 
     // Serialization for bytes array (fixed size)
     template <class T, std::size_t N>
-    requires std::is_fundamental_v<T>
+        requires std::is_fundamental_v<T>
     [[nodiscard]] Error bind(std::array<T, N>& object, Action action) {
         Error result{Error::kSuccess};
         const auto element_size{ser_sizeof(object[0])};
@@ -255,7 +258,7 @@ class SDataStream : public DataStream {
     // a special case as they're always the last element of a structure.
     // Due to this the size of the member is not recorded
     template <class T>
-    requires std::is_same_v<T, Bytes>
+        requires std::is_same_v<T, Bytes>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
@@ -278,7 +281,7 @@ class SDataStream : public DataStream {
 
     // Serialization for std::string
     template <class T>
-    requires std::is_same_v<T, std::string>
+        requires std::is_same_v<T, std::string>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         switch (action) {
@@ -310,7 +313,7 @@ class SDataStream : public DataStream {
     // Serialization for ip::address
     // see https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
     template <class T>
-    requires std::is_same_v<T, boost::asio::ip::address>
+        requires std::is_same_v<T, boost::asio::ip::address>
     [[nodiscard]] Error bind(T& object, Action action) {
         Error result{Error::kSuccess};
         std::array<uint8_t, 16> bytes{0x0};

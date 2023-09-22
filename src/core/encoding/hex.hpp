@@ -36,7 +36,7 @@ ByteView zeroless_view(ByteView data);
 //! \remark If provided an empty input the return string is empty as well (with prefix if requested)
 [[nodiscard]] std::string encode(ByteView bytes, bool with_prefix = false) noexcept;
 
-//! \brief Returns a string of ascii chars with the hexadecimal representation of provided unsigned integral
+//! \brief Returns a string of ascii chars with the hexadecimal representation of provided unsigned big integral
 template <UnsignedBigIntegral T>
 [[nodiscard]] std::string encode(const T value, bool with_prefix = false) noexcept {
     Bytes bytes{};
