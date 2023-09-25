@@ -16,7 +16,7 @@
 #include <boost/format.hpp>
 #include <gsl/gsl_util>
 
-#include <core/common/random.hpp>
+#include <infra/common/random.hpp>  // Can be included as it's header only
 
 namespace zenpp {
 

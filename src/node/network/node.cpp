@@ -15,9 +15,9 @@
 
 #include <core/common/assert.hpp>
 #include <core/common/misc.hpp>
-#include <core/common/random.hpp>
 
 #include <infra/common/log.hpp>
+#include <infra/common/random.hpp>
 
 namespace zenpp::net {
 

@@ -5,10 +5,10 @@
 */
 
 #pragma once
+#include "core/common/base.hpp"
+
 #include <limits>
 #include <random>
-
-#include <core/common/base.hpp>
 
 namespace zenpp {
 
@@ -34,6 +34,8 @@ T randomize() {
 }
 
 //! \brief Generates a random value of type T in range (T * (1.0F - percentage), T * (1.0F + percentage))
+//! \remarks If the value is 0 or percentage is 0.0, the value is returned as is
+//! \remarks Function is over/underflow safe
 template <Integral T>
 T randomize(T val, double percentage) {
     if (val == T(0) or percentage == 0.0) return val;

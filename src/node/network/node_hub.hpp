@@ -5,8 +5,6 @@
 */
 
 #pragma once
-#include "infra/network/addresses.hpp"
-
 #include <iostream>
 #include <map>
 #include <memory>
@@ -15,11 +13,12 @@
 #include <boost/asio/spawn.hpp>
 
 #include <core/common/misc.hpp>
-#include <core/common/random.hpp>
 
+#include <infra/common/random.hpp>
 #include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/asio_timer.hpp>
 #include <infra/concurrency/unique_queue.hpp>
+#include <infra/network/addresses.hpp>
 
 #include <node/common/settings.hpp>
 #include <node/network/node.hpp>
