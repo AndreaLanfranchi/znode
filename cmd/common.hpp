@@ -14,10 +14,10 @@
 #include <core/common/misc.hpp>
 
 #include <infra/common/log.hpp>
+
 #include <node/common/settings.hpp>
 
 namespace zenpp::cmd {
-
 
 //! \brief Parses command line arguments for node instance
 void parse_node_command_line(CLI::App& cli, int argc, char* argv[], AppSettings& settings);

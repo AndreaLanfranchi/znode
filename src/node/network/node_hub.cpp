@@ -155,7 +155,9 @@ void NodeHub::print_network_info() {
 
 void NodeHub::feed_connections_from_cli() {
     for (auto const& str : app_settings_.network.connect_nodes) {
-        const IPConnection connection{IPEndpoint(str), IPConnectionType::kManualOutbound};
+        const auto endpoint{IPEndpoint::from_string(str)};
+        if (not endpoint) continue;  // Invalid endpoint - Should not happen as already validated by CLI
+        const IPConnection connection{endpoint.value(), IPConnectionType::kManualOutbound};
         std::ignore = pending_connections_.push(connection);
     }
 }
@@ -365,9 +367,13 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
 }
 
 void NodeHub::initialize_acceptor() {
-    IPEndpoint local_endpoint{app_settings_.network.local_endpoint};
-    if (local_endpoint.port_ == 0)
-        local_endpoint.port_ = gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_);
+    auto local_endpoint{IPEndpoint::from_string(app_settings_.network.local_endpoint)};
+    if (not local_endpoint) {
+        log::Error("Service", {"name", "Node Hub", "error", "Invalid listen local endpoint"});
+        return;
+    }
+    if (local_endpoint.value().port_ == 0)
+        local_endpoint.value().port_ = gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_);
 
     socket_acceptor_.open(tcp::v4());
     socket_acceptor_.set_option(tcp::acceptor::reuse_address(true));
@@ -375,11 +381,11 @@ void NodeHub::initialize_acceptor() {
     socket_acceptor_.set_option(boost::asio::socket_base::keep_alive(true));
     socket_acceptor_.set_option(boost::asio::socket_base::receive_buffer_size(gsl::narrow_cast<int>(64_KiB)));
     socket_acceptor_.set_option(boost::asio::socket_base::send_buffer_size(gsl::narrow_cast<int>(64_KiB)));
-    socket_acceptor_.bind(local_endpoint.to_endpoint());
+    socket_acceptor_.bind(local_endpoint.value().to_endpoint());
     socket_acceptor_.listen();
 
     log::Info("Service", {"name", "Node Hub", "secure", (app_settings_.network.use_tls ? "yes" : "no"), "bound to",
-                          local_endpoint.to_string()});
+                          local_endpoint.value().to_string()});
 }
 
 void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {

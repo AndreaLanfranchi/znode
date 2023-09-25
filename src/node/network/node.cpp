@@ -48,9 +48,10 @@ Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_c
 
     // We use the same port declared in the settings or the one from the configured chain
     // if the former is not set
-    const IPEndpoint local_endpoint{app_settings_.network.local_endpoint};
+    const auto local_endpoint{IPEndpoint::from_string(app_settings_.network.local_endpoint)};
+    ASSERT_POST(local_endpoint and "Invalid local endpoint");
     local_version_.sender_service_.endpoint_.port_ =
-        local_endpoint.port_ == 0U ? app_settings_.chain_config->default_port_ : local_endpoint.port_;
+        local_endpoint.value().port_ == 0U ? app_settings_.chain_config->default_port_ : local_endpoint.value().port_;
 
     local_version_.nonce_ = app_settings_.network.nonce;
     local_version_.user_agent_ = get_buildinfo_string();

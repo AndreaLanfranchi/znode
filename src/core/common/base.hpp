@@ -21,7 +21,10 @@
 #include <string_view>
 
 #include <boost/multiprecision/cpp_int.hpp>
+#include <boost/outcome.hpp>
 #include <zenpp/buildinfo.h>
+
+namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
 
 #if defined(BOOST_NO_EXCEPTIONS)
 #include <boost/throw_exception.hpp>

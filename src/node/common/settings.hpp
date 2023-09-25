@@ -10,6 +10,7 @@
 #include <optional>
 #include <vector>
 
+#include <absl/strings/str_cat.h>
 #include <boost/asio/io_context.hpp>
 
 #include <core/chain/config.hpp>
@@ -23,7 +24,7 @@
 namespace zenpp {
 
 struct NetworkSettings {
-    std::string local_endpoint{"0.0.0.0:9033"};       // Local node listen address
+    std::string local_endpoint{absl::StrCat("0.0.0.0:", kMainNetConfig.default_port_)};  // Local node listen address
     bool ipv4_only{false};                            // Whether to listen/connect on IPv4 addresses only
     uint32_t max_active_connections{256};             // Maximum allowed number of connected nodes
     uint32_t max_active_connections_per_ip{1};        // Maximum allowed number of connected nodes per single IP address

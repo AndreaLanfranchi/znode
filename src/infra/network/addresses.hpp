@@ -49,9 +49,8 @@ enum class IPAddressReservationType {
 };
 
 enum class IPAddressType : uint8_t {
-    kUnroutable = 0,
     kIPv4 = 1,
-    kIPv6 = 2
+    kIPv6 = 4,
 };
 
 enum class IPConnectionType : uint8_t {
@@ -65,7 +64,6 @@ enum class IPConnectionType : uint8_t {
 class IPAddress : public ser::Serializable {
   public:
     using ser::Serializable::Serializable;
-    explicit IPAddress(std::string_view str);
     explicit IPAddress(boost::asio::ip::address address);
     ~IPAddress() override = default;
 
@@ -86,6 +84,9 @@ class IPAddress : public ser::Serializable {
     [[nodiscard]] IPAddressType get_type() const noexcept;
     [[nodiscard]] IPAddressReservationType address_reservation() const noexcept;
 
+    //! \brief Parses a string representing an IP address
+    static outcome::result<IPAddress> from_string(const std::string& input);
+
     //! \brief Overrides boost's to_string methods so we always have IPv6 addresses enclosed in square brackets
     [[nodiscard]] std::string to_string() const noexcept;
 
@@ -100,13 +101,14 @@ class IPAddress : public ser::Serializable {
 class IPEndpoint : public ser::Serializable {
   public:
     using ser::Serializable::Serializable;
-    explicit IPEndpoint(std::string_view str);
     explicit IPEndpoint(const boost::asio::ip::tcp::endpoint& endpoint);
-    IPEndpoint(std::string_view str, uint16_t port_num);
+    explicit IPEndpoint(const IPAddress& address);
+    explicit IPEndpoint(const boost::asio::ip::address& address);
+    explicit IPEndpoint(uint16_t port_num);
+    IPEndpoint(const IPAddress& address, uint16_t port_num);
     IPEndpoint(boost::asio::ip::address address, uint16_t port_num);
     ~IPEndpoint() override = default;
 
-    [[nodiscard]] std::string to_string() const noexcept;
     [[nodiscard]] boost::asio::ip::tcp::endpoint to_endpoint() const noexcept;
     [[nodiscard]] bool is_valid() const noexcept;
     [[nodiscard]] bool is_routable() const noexcept;
@@ -116,6 +118,12 @@ class IPEndpoint : public ser::Serializable {
     IPAddress address_{};
     uint16_t port_{0};
 
+    //! \brief Parses a string representing an IP endpoint
+    static outcome::result<IPEndpoint> from_string(const std::string& input);
+
+    //! \brief Overrides boost's to_string methods so we always have IPv6 addresses enclosed in square brackets
+    [[nodiscard]] std::string to_string() const noexcept;
+
   private:
     friend class ser::SDataStream;
     ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
@@ -124,15 +132,12 @@ class IPEndpoint : public ser::Serializable {
 class IPSubNet {
   public:
     IPSubNet() = default;
-    //! \brief Parses a string representing an IP subnet
-    //! \details The following formats are supported:
-    //! - ipv4_address/prefix_length (CIDR notation)
-    //! - ipv4_address/subnet_mask (dotted decimal notation)
-    //! - ipv4_address (defaults to /32 CIDR notation)
-    //! - ipv6_address/prefix_length (CIDR notation)
-    //! - ipv6_address/subnet_mask (dotted decimal notation)
-    //! - ipv6_address (defaults to /128)
-    explicit IPSubNet(std::string_view value);
+
+    IPSubNet(const IPAddress& address, uint8_t prefix_length) noexcept
+        : base_address_{address}, prefix_length_{prefix_length} {}
+
+    IPSubNet(const boost::asio::ip::address& address, uint8_t prefix_length) noexcept
+        : base_address_{address}, prefix_length_{prefix_length} {}
 
     ~IPSubNet() = default;
 
@@ -142,7 +147,21 @@ class IPSubNet {
     //! \remarks This method will return always false if the subnet is not valid
     //! \returns True if the address is part of this subnet, false otherwise
     [[nodiscard]] bool contains(const boost::asio::ip::address& address) const noexcept;
+
+    //! \brief Returns whether the provided address is part of this subnet
+    //! \remarks This method will return always false if the subnet is not valid
+    //! \returns True if the address is part of this subnet, false otherwise
     [[nodiscard]] bool contains(const IPAddress& address) const noexcept;
+
+    //! \brief Parses a string representing an IP subnet
+    //! \details The following formats are supported:
+    //! - ipv4_address/prefix_length (CIDR notation)
+    //! - ipv4_address/subnet_mask (dotted decimal notation)
+    //! - ipv4_address (defaults to /32 CIDR notation)
+    //! - ipv6_address/prefix_length (CIDR notation)
+    //! - ipv6_address/subnet_mask (dotted decimal notation)
+    //! - ipv6_address (defaults to /128)
+    static outcome::result<IPSubNet> from_string(const std::string& input);
 
     //! \brief Returns the string representation of this subnet
     //! \details The returned string will be in CIDR notation and IPv6 addresses will be enclosed in square brackets
@@ -150,13 +169,17 @@ class IPSubNet {
 
     //! \brief Returns the prefix length of a given subnet mask
     //! \details The subnet mask must be a valid dotted decimal notation (for IPv4) or CIDR notation (for IPv4 / IPv6)
-    //! \returns An unsigned integer on success or an error string on failure
-    [[nodiscard]] static tl::expected<unsigned, std::string> parse_prefix_length(const std::string& value) noexcept;
+    [[nodiscard]] static outcome::result<uint8_t> parse_prefix_length(const std::string& input) noexcept;
 
     //! \brief Calculates the base subnet address from a given address and prefix length
-    //! \returns An IPAddress on success or an error string on failure
-    [[nodiscard]] static tl::expected<boost::asio::ip::address, std::string> calculate_subnet_base_address(
+    //! \returns An boost::asio::ip::address on success or an error on failure
+    [[nodiscard]] static outcome::result<boost::asio::ip::address> calculate_subnet_base_address(
         const boost::asio::ip::address& address, unsigned prefix_length) noexcept;
+
+    //! \brief Calculates the base subnet address from a given address and prefix length
+    //! \returns An IPAddress on success or an error on failure
+    [[nodiscard]] static outcome::result<IPAddress> calculate_subnet_base_address(const IPAddress& address,
+                                                                                  unsigned prefix_length) noexcept;
 
     IPAddress base_address_{};
     uint8_t prefix_length_{0};
@@ -182,11 +205,9 @@ class IPConnection {
 class NodeService : public ser::Serializable {
   public:
     using ser::Serializable::Serializable;
-    explicit NodeService(std::string_view str);
     explicit NodeService(boost::asio::ip::tcp::endpoint& endpoint);
+    explicit NodeService(const IPEndpoint& endpoint);
     explicit NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint);
-    NodeService(std::string_view str, uint64_t services);
-    NodeService(std::string_view address, uint16_t port_num);
     NodeService(boost::asio::ip::address address, uint16_t port_num);
     ~NodeService() override = default;
 

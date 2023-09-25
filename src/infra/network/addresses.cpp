@@ -12,19 +12,13 @@
 #include <absl/strings/str_cat.h>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <core/common/misc.hpp>
 
 namespace zenpp::net {
 
 using namespace ser;
-
-IPAddress::IPAddress(std::string_view str) {
-    if (str.empty()) return;
-    uint16_t port_num{0};  // Only to ignore it
-    std::ignore = try_parse_ip_address_and_port(str, value_, port_num);
-    std::ignore = port_num;
-}
 
 IPAddress::IPAddress(boost::asio::ip::address address) : value_(std::move(address)) {}
 
@@ -73,7 +67,6 @@ bool IPAddress::is_reserved() const noexcept {
 }
 
 IPAddressType IPAddress::get_type() const noexcept {
-    if (not is_routable() or is_any()) return IPAddressType::kUnroutable;
     return value_.is_v4() ? IPAddressType::kIPv4 : IPAddressType::kIPv6;
 }
 
@@ -176,28 +169,71 @@ IPAddressReservationType IPAddress::address_v6_reservation() const noexcept {
 
 ser::Error IPAddress::serialization(SDataStream& stream, ser::Action action) { return stream.bind(value_, action); }
 
+outcome::result<IPAddress> IPAddress::from_string(const std::string& input) {
+    if (input.empty()) return IPAddress();
+    // Try to parse as IPv4
+    boost::system::error_code error;
+    boost::asio::ip::address_v4 address_v4{boost::asio::ip::make_address_v4(input, error)};
+    if (not error) return IPAddress{address_v4};
+    // Try to parse as IPv6
+    boost::asio::ip::address_v6 address_v6{boost::asio::ip::make_address_v6(input, error)};
+    if (error) return boost::system::errc::bad_address;
+    if (address_v6.is_v4_mapped()) return IPAddress{address_v6.to_v4()};
+    return IPAddress{address_v6};
+}
+
 std::string IPAddress::to_string() const noexcept {
-    if (value_.is_v6()) return absl::StrCat("[", value_.to_string(), "]");
-    return value_.to_string();
+    if (value_.is_v6()) return absl::StrCat("[", value_.to_v6().to_string(), "]");
+    return value_.to_v4().to_string();
 }
 
-IPEndpoint::IPEndpoint(std::string_view str) {
-    if (str.empty()) return;
-    boost::asio::ip::address address;
-    if (try_parse_ip_address_and_port(str, address, port_)) {
-        address_ = IPAddress{address};
-    }
-}
+IPEndpoint::IPEndpoint(const boost::asio::ip::tcp::endpoint& endpoint)
+    : address_{endpoint.address()}, port_(endpoint.port()) {}
 
-IPEndpoint::IPEndpoint(std::string_view str, uint16_t port_num) {
-    if (str.empty()) return;
-    boost::asio::ip::address address;
-    std::ignore = try_parse_ip_address_and_port(str, address, port_);
-    port_ = port_num;
-}
+IPEndpoint::IPEndpoint(const IPAddress& address) : address_{address} {}
+
+IPEndpoint::IPEndpoint(const boost::asio::ip::address& address) : address_{address} {}
+
+IPEndpoint::IPEndpoint(uint16_t port_num) : address_{}, port_{port_num} {}
+
+IPEndpoint::IPEndpoint(const IPAddress& address, uint16_t port_num) : address_{address}, port_{port_num} {}
 
 IPEndpoint::IPEndpoint(boost::asio::ip::address address, uint16_t port_num)
     : address_{std::move(address)}, port_{port_num} {}
+
+outcome::result<IPEndpoint> IPEndpoint::from_string(const std::string& input) {
+    if (input.empty()) return IPEndpoint();
+    static const std::regex ipv4_pattern(R"((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?)");
+    static const std::regex ipv6_pattern(R"(\[?([0-9a-f:]+)\]?(?::(\d+))?)", std::regex_constants::icase);
+    static const std::regex ipv6_ipv4_pattern(R"(\[?::ffff:((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))\]?(?::(\d+))?)",
+                                              std::regex_constants::icase);
+
+    std::smatch matches;
+    int address_match{0};
+    int port_match{0};
+    if (std::regex_match(input, matches, ipv6_ipv4_pattern)) {
+        address_match = 1;
+        port_match = 4;
+    } else if (std::regex_match(input, matches, ipv4_pattern) or std::regex_match(input, matches, ipv6_pattern)) {
+        address_match = 1;
+        port_match = 2;
+    } else {
+        return boost::system::errc::invalid_argument;
+    }
+
+    auto parsed_address{IPAddress::from_string(matches[address_match].str())};
+    if (parsed_address.has_error()) return parsed_address.error();
+    if (matches[port_match].matched) {
+        try {
+            auto port_parsed{boost::lexical_cast<uint64_t>(matches[port_match].str())};
+            if (port_parsed > 65535U) return boost::system::errc::value_too_large;
+            return IPEndpoint{parsed_address.value(), boost::numeric_cast<uint16_t>(port_parsed)};
+        } catch (const boost::bad_lexical_cast& /*exception*/) {
+            return boost::system::errc::invalid_argument;
+        }
+    }
+    return IPEndpoint{parsed_address.value()};
+}
 
 std::string IPEndpoint::to_string() const noexcept { return absl::StrCat(address_.to_string(), ":", port_); }
 
@@ -215,9 +251,6 @@ ser::Error IPEndpoint::serialization(SDataStream& stream, ser::Action action) {
 
 boost::asio::ip::tcp::endpoint IPEndpoint::to_endpoint() const noexcept { return {*address_, port_}; }
 
-IPEndpoint::IPEndpoint(const boost::asio::ip::tcp::endpoint& endpoint)
-    : address_{endpoint.address()}, port_(endpoint.port()) {}
-
 bool IPEndpoint::is_valid() const noexcept { return ((port_ > 1 and port_ < 65535) and address_.is_valid()); }
 
 bool IPEndpoint::is_routable() const noexcept { return address_.is_routable() and (port_ > 1 and port_ < 65535); }
@@ -226,33 +259,9 @@ bool IPEndpoint::operator==(const IPEndpoint& other) const noexcept {
     return address_ == other.address_ and port_ == other.port_;
 }
 
-IPSubNet::IPSubNet(const std::string_view value) {
-    if (value.empty()) return;
-
-    // Split the string into address and mask
-    std::vector<std::string> parts;
-    boost::split(parts, value, boost::is_any_of("/"));
-
-    const IPAddress tmp_address{parts[0]};
-    if (not tmp_address.is_valid()) return;
-
-    if (parts.size() == 1U) {
-        // No netmask or CIDR notation provided
-        prefix_length_ = tmp_address->is_v4() ? 32 : 128;
-    } else if (auto parsed{parse_prefix_length(parts[1])}; parsed) {
-        prefix_length_ = gsl::narrow_cast<uint8_t>(*parsed);
-    } else {
-        return;  // Is not valid
-    }
-
-    if (auto expected_address{calculate_subnet_base_address(*tmp_address, prefix_length_)}; expected_address) {
-        base_address_ = IPAddress(*expected_address);
-    }
-}
-
 bool IPSubNet::is_valid() const noexcept {
     return base_address_.is_valid() and
-           (prefix_length_ > 0U and prefix_length_ < (base_address_->is_v4() ? 33U : 129U));
+           (prefix_length_ > 0U and prefix_length_ <= (base_address_->is_v4() ? 32U : 128U));
 }
 
 bool IPSubNet::contains(const boost::asio::ip::address& address) const noexcept {
@@ -293,62 +302,96 @@ bool IPSubNet::contains(const IPAddress& address) const noexcept {
     return contains(*address);
 }
 
+outcome::result<IPSubNet> IPSubNet::from_string(const std::string& input) {
+    if (input.empty()) return IPSubNet();
+
+    // Split the string into address and mask
+    std::vector<std::string> parts;
+    boost::split(parts, input, boost::is_any_of("/"));
+    if (parts.size() > 2) return boost::system::errc::invalid_argument;
+
+    // Try parse the address part
+    auto parsed_address{IPAddress::from_string(parts[0])};
+    if (not parsed_address) return parsed_address.error();
+
+    // If we don't have a prefix length, we assume the maximum for the address type
+    if (parts.size() == 1U) {
+        return IPSubNet{parsed_address.value(),
+                        gsl::narrow_cast<uint8_t>(parsed_address.value()->is_v4() ? 32U : 128U)};
+    }
+
+    // Try parse the prefix length
+    auto parsed_prefix_length{parse_prefix_length(parts[1])};
+    if (not parsed_prefix_length) return parsed_prefix_length.error();
+    if (parsed_address.value()->is_v4() and parsed_prefix_length.value() > 32U) {
+        return boost::system::errc::value_too_large;
+    }
+
+    return IPSubNet(parsed_address.value(), gsl::narrow_cast<uint8_t>(parsed_prefix_length.value()));
+}
+
 std::string IPSubNet::to_string() const noexcept {
-    if (not is_valid()) return {"invalid"};
     auto ret{absl::StrCat(base_address_->to_string(), "/", prefix_length_)};
     return ret;
 }
 
-tl::expected<unsigned, std::string> IPSubNet::parse_prefix_length(const std::string& value) noexcept {
-    unsigned ret{0};
-    if (value.empty()) return ret;
+outcome::result<uint8_t> IPSubNet::parse_prefix_length(const std::string& input) noexcept {
+    if (input.empty()) return boost::system::errc::invalid_argument;
 
+    unsigned ret{0};
     const std::regex decimal_notation_pattern(R"(^([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3})$)");
     const std::regex cidr_notation_pattern(R"(^([0-9]{1,3})$)");
     std::smatch matches;
 
-    if (std::regex_match(value, matches, decimal_notation_pattern)) {
+    if (std::regex_match(input, matches, decimal_notation_pattern)) {
         bool zero_found{false};
         for (unsigned i{1}; i < 5U; ++i) {
-            const auto match_value{std::stoul(matches[i])};
-            switch (match_value) {
-                case 0:
+            uint16_t octet_value{0};
+            try {
+                octet_value = boost::lexical_cast<uint16_t>(matches[i]);
+            } catch (const boost::bad_lexical_cast&) {
+                return boost::system::errc::invalid_argument;
+            }
+            switch (octet_value) {
+                case 0U:
                     zero_found = true;
                     break;
                     /* valid octets >> */
-                case 128:
-                case 192:
-                case 224:
-                case 240:
-                case 248:
-                case 252:
-                case 254:
-                case 255:
-                    if (zero_found) return tl::unexpected("invalid_network_mask");
-                    ret += static_cast<decltype(ret)>(std::popcount(match_value));
+                case 128U:
+                case 192U:
+                case 224U:
+                case 240U:
+                case 248U:
+                case 252U:
+                case 254U:
+                case 255U:
+                    if (zero_found) return boost::system::errc::illegal_byte_sequence;
+                    ret += static_cast<decltype(ret)>(std::popcount(octet_value));
                     break;
                     /* valid octets << */
                 default:
-                    return tl::unexpected("invalid_network_mask");
+                    return boost::system::errc::invalid_argument;
             }
         }
-        return ret;
-    }
 
-    if (std::regex_match(value, matches, cidr_notation_pattern)) {
-        ret = gsl::narrow_cast<decltype(ret)>(std::stoul(value));
-        if (ret > 128U) return tl::unexpected("invalid_prefix_length");
-        return ret;
+    } else if (std::regex_match(input, matches, cidr_notation_pattern)) {
+        try {
+            ret = boost::lexical_cast<uint16_t>(input);
+            if (ret > 128U) return boost::system::errc::value_too_large;
+        } catch (const boost::bad_lexical_cast&) {
+            return boost::system::errc::invalid_argument;
+        }
+    } else {
+        // Not a recognized notation
+        return boost::system::errc::invalid_argument;
     }
-
-    // Not a recognized notation
-    return tl::unexpected("invalid_network_mask");
+    return gsl::narrow_cast<uint8_t>(ret);
 }
 
-tl::expected<boost::asio::ip::address, std::string> IPSubNet::calculate_subnet_base_address(
+outcome::result<boost::asio::ip::address> IPSubNet::calculate_subnet_base_address(
     const boost::asio::ip::address& address, unsigned prefix_length) noexcept {
     if (address.is_v4()) {
-        if (prefix_length > 32U) return tl::unexpected("invalid_prefix_length");
+        if (prefix_length > 32U) return boost::system::errc::value_too_large;
         const uint32_t mask = (0xFFFFFFFFU << (32U - prefix_length));
         const uint32_t address_int = address.to_v4().to_uint();
         const uint32_t subnet_int = mask & address_int;
@@ -360,7 +403,7 @@ tl::expected<boost::asio::ip::address, std::string> IPSubNet::calculate_subnet_b
         return boost::asio::ip::make_address_v4(subnet_bytes);
     }
 
-    if (prefix_length > 128U) return tl::unexpected("invalid_prefix_length");
+    if (prefix_length > 128U) return boost::system::errc::value_too_large;
     std::array<uint8_t, 16U> mask{0U};
     for (unsigned i{}, end{static_cast<unsigned>(prefix_length / unsigned(CHAR_BIT))}; i < end; ++i) {
         mask[i] = 0xFFU;
@@ -376,16 +419,20 @@ tl::expected<boost::asio::ip::address, std::string> IPSubNet::calculate_subnet_b
     return boost::asio::ip::address_v6(ipv6_bytes);
 }
 
-NodeService::NodeService(std::string_view str) : endpoint_{str} {}
-
-NodeService::NodeService(std::string_view str, uint64_t services) : services_{services}, endpoint_{str} {}
-
-NodeService::NodeService(std::string_view address, uint16_t port_num) : endpoint_(address, port_num) {}
+outcome::result<IPAddress> IPSubNet::calculate_subnet_base_address(const IPAddress& address,
+                                                                   unsigned prefix_length) noexcept {
+    if (not address.is_valid()) return boost::system::errc::invalid_argument;
+    auto ret{calculate_subnet_base_address(*address, prefix_length)};
+    if (not ret) return ret.error();
+    return IPAddress{ret.value()};
+}
 
 NodeService::NodeService(boost::asio::ip::address address, uint16_t port_num)
     : endpoint_(std::move(address), port_num) {}
 
 NodeService::NodeService(boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(endpoint) {}
+
+NodeService::NodeService(const IPEndpoint& endpoint) : endpoint_(endpoint) {}
 
 Error NodeService::serialization(SDataStream& stream, Action action) {
     using enum Error;

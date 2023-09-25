@@ -12,7 +12,7 @@
 #include <string>
 #include <thread>
 
-#include <boost/asio/ip/address.hpp>
+#include <infra/network/addresses.hpp>
 
 namespace zenpp::cmd {
 
@@ -85,7 +85,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
     network_opts.add_option("--network.localendpoint", network_settings.local_endpoint, "Local node listening address")
         ->capture_default_str()
         ->check(IPEndPointValidator(/*allow_empty=*/true,
-                                    /*default_port=*/9033));  // TODO the port will be on behalf of network
+                                    /*default_port=*/0));
 
     auto* notls_flag = network_opts.add_flag("--network.notls", "Disable TLS secure communications");
 
@@ -230,22 +230,18 @@ TimeZoneValidator::TimeZoneValidator(bool allow_empty) {
 }
 
 IPEndPointValidator::IPEndPointValidator(bool allow_empty, uint16_t default_port) {
+    description("a valid IP endpoint");
     func_ = [allow_empty, default_port](std::string& value) -> std::string {
         if (value.empty() && allow_empty) {
             return {};
         }
 
-        boost::asio::ip::address address;
-        uint16_t port{0};
-
-        if (!try_parse_ip_address_and_port(value, address, port)) {
+        auto parsed_value{net::IPEndpoint::from_string(value)};
+        if (!parsed_value) {
             return "Value \"" + value + "\" is not a valid endpoint";
         }
-        if (port == 0U) {
-            port = static_cast<uint16_t>(default_port);
-        }
-
-        value = address.to_string() + ":" + std::to_string(port);
+        parsed_value.value().port_ = parsed_value.value().port_ == 0 ? default_port : parsed_value.value().port_;
+        value = parsed_value.value().to_string();
         return {};
     };
 }

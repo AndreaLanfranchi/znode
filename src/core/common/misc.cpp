@@ -126,34 +126,4 @@ size_t count_duplicate_data_chunks(ByteView data, const size_t chunk_size, const
     }
     return count;
 }
-
-bool try_parse_ip_address_and_port(std::string_view input, boost::asio::ip::address& address, uint16_t& port) noexcept {
-    if (input.empty()) return false;
-
-    static const std::regex ipv4_pattern(R"((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?)");
-    static const std::regex ipv6_pattern(R"(\[?([0-9a-f:]+)\]?(?::(\d+))?)", std::regex_constants::icase);
-    static const std::regex ipv6_ipv4_pattern(R"(\[?::ffff:((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))\]?(?::(\d+))?)",
-                                              std::regex_constants::icase);
-
-    std::smatch matches;
-    boost::system::error_code error_code;
-
-    const std::string input_str{input};
-    if (std::regex_match(input_str, matches, ipv4_pattern)) {
-        address = boost::asio::ip::make_address_v4(matches[1].str(), error_code);
-        port = matches[2].matched ? gsl::narrow_cast<uint16_t>(std::stoul(matches[2].str())) : port;
-        return !error_code;
-    }
-    if (std::regex_match(input_str, matches, ipv6_pattern)) {
-        address = boost::asio::ip::make_address_v6(matches[1].str(), error_code);
-        port = matches[2].matched ? gsl::narrow_cast<uint16_t>(std::stoul(matches[2].str())) : port;
-        return !error_code;
-    }
-    if (std::regex_match(input_str, matches, ipv6_ipv4_pattern)) {
-        address = boost::asio::ip::make_address_v6(matches[1].str(), error_code).to_v4();
-        port = matches[4].matched ? gsl::narrow_cast<uint16_t>(std::stoul(matches[4].str())) : port;
-        return !error_code;
-    }
-    return false;
-}
 }  // namespace zenpp
