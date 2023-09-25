@@ -23,11 +23,6 @@ class Amount {
 
     static constexpr int64_t kMax{kCoinMaxSupply * kCoin};
 
-    //! \brief Parses an amount expressed in token denomination (e.g. 1.0458)
-    //! \remarks Should the input not match the boundaries of Amount or not honors the valid_money() test
-    //! then an unexpected DecodingError is returned
-    static tl::expected<Amount, DecodingError> parse(const std::string& input);
-
     //! \brief Returns wether the amount value is in valid range (0, kMax)
     [[nodiscard]] bool valid_money() const noexcept;
 
@@ -42,6 +37,12 @@ class Amount {
     void operator++() noexcept;
     void operator--() noexcept;
 
+    //! \brief Parses an amount expressed in token denomination (e.g. 1.0458)
+    //! \remarks Should the input not match the boundaries of Amount or not honors the valid_money() test
+    //! then an unexpected DecodingError is returned
+    static tl::expected<Amount, DecodingError> from_string(const std::string& input);
+
+    //! \brief Returns the string representation of Amount expressed in token denomination (e.g. 1.0458)
     [[nodiscard]] virtual std::string to_string() const;
 
     friend Amount operator+(const Amount& lhs, const Amount& rhs) { return Amount(lhs.value_ + rhs.value_); }

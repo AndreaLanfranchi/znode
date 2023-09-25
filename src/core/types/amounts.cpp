@@ -26,6 +26,51 @@ Amount& Amount::operator=(int64_t value) noexcept {
     return *this;
 }
 
+Amount& Amount::operator+=(int64_t value) noexcept {
+    value_ += value;
+    return *this;
+}
+
+Amount& Amount::operator*=(int64_t value) noexcept {
+    value_ *= value;
+    return *this;
+}
+
+Amount& Amount::operator-=(int64_t value) noexcept {
+    value_ -= value;
+    return *this;
+}
+
+void Amount::operator++() noexcept { ++value_; }
+
+void Amount::operator--() noexcept { --value_; }
+
+tl::expected<Amount, DecodingError> Amount::from_string(const std::string& input) {
+    static const std::string kMaxWhole(std::to_string(kCoinMaxSupply));
+    const std::string dyn_pattern{
+        boost::str(boost::format(R"(^(\d{0,%i})(\.\d{0,%i})?$)") % kMaxWhole.size() % kCoinMaxDecimals)};
+    const std::regex pattern(dyn_pattern, std::regex_constants::icase);
+
+    std::smatch matches;
+    if (!std::regex_search(input, matches, pattern, std::regex_constants::match_default)) {
+        return tl::unexpected{DecodingError::kInvalidInput};
+    }
+
+    const std::string whole_part{matches[1].str()};
+    std::string fract_part{matches[2].str()};
+    if (!fract_part.empty()) {
+        fract_part.erase(fract_part.begin());
+        fract_part.resize(kCoinMaxDecimals, '0');
+    }
+
+    const auto whole{whole_part.empty() ? 0L : boost::lexical_cast<int64_t>(whole_part)};
+    const auto fract{fract_part.empty() ? 0L : boost::lexical_cast<int64_t>(fract_part)};
+    const auto value{whole * kCoin + fract};
+    Amount ret(value);
+    if (not ret.valid_money()) return tl::unexpected{DecodingError::kInvalidAmountRange};
+    return ret;
+}
+
 std::string Amount::to_string() const {
     if (value_ == 0U) return std::string("0 ").append(kCurrency);
 
@@ -56,51 +101,6 @@ std::string Amount::to_string() const {
     }
 
     return formatted.append(" ").append(kCurrency);
-}
-
-Amount& Amount::operator+=(int64_t value) noexcept {
-    value_ += value;
-    return *this;
-}
-
-Amount& Amount::operator*=(int64_t value) noexcept {
-    value_ *= value;
-    return *this;
-}
-
-Amount& Amount::operator-=(int64_t value) noexcept {
-    value_ -= value;
-    return *this;
-}
-
-void Amount::operator++() noexcept { ++value_; }
-
-void Amount::operator--() noexcept { --value_; }
-
-tl::expected<Amount, DecodingError> Amount::parse(const std::string& input) {
-    static const std::string kMaxWhole(std::to_string(kCoinMaxSupply));
-    const std::string dyn_pattern{
-        boost::str(boost::format(R"(^(\d{0,%i})(\.\d{0,%i})?$)") % kMaxWhole.size() % kCoinMaxDecimals)};
-    const std::regex pattern(dyn_pattern, std::regex_constants::icase);
-
-    std::smatch matches;
-    if (!std::regex_search(input, matches, pattern, std::regex_constants::match_default)) {
-        return tl::unexpected{DecodingError::kInvalidInput};
-    }
-
-    const std::string whole_part{matches[1].str()};
-    std::string fract_part{matches[2].str()};
-    if (!fract_part.empty()) {
-        fract_part.erase(fract_part.begin());
-        fract_part.resize(kCoinMaxDecimals, '0');
-    }
-
-    const auto whole{whole_part.empty() ? 0L : boost::lexical_cast<int64_t>(whole_part)};
-    const auto fract{fract_part.empty() ? 0L : boost::lexical_cast<int64_t>(fract_part)};
-    const auto value{whole * kCoin + fract};
-    Amount ret(value);
-    if (not ret.valid_money()) return tl::unexpected{DecodingError::kInvalidAmountRange};
-    return ret;
 }
 
 std::string FeeRate::to_string() const { return absl::StrCat(Amount::to_string(), "/K"); }

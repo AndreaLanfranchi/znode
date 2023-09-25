@@ -50,30 +50,30 @@ TEST_CASE("Amounts", "[types]") {
     a1 = 1'000'000;
     CHECK(a1.to_string() == append_currency("0.01"));
 
-    auto parsed{Amount::parse("1.25")};
+    auto parsed{Amount::from_string("1.25")};
     CHECK(parsed);
     CHECK(parsed->to_string() == append_currency("1.25"));
 
     std::string input{std::to_string(kCoinMaxSupply)};
     input.push_back('0');  // To exceed max allowable length
-    parsed = Amount::parse(input);
+    parsed = Amount::from_string(input);
     CHECK_FALSE(parsed);
     CHECK(parsed.error() == DecodingError::kInvalidInput);
     input.pop_back();
-    parsed = Amount::parse(input);
+    parsed = Amount::from_string(input);
     CHECK((parsed && *(*parsed) == Amount::kMax));
 
     input = std::to_string(kCoinMaxSupply + 2);  // To cause overflow on range
-    parsed = Amount::parse(input);
+    parsed = Amount::from_string(input);
     CHECK_FALSE(parsed);
     CHECK(parsed.error() == DecodingError::kInvalidAmountRange);
 
     std::string decimals(kCoinMaxDecimals, '1');
     decimals.push_back('1');  // Exceed the amount of allowed digits
-    parsed = Amount::parse("10." + decimals);
+    parsed = Amount::from_string("10." + decimals);
     CHECK_FALSE(parsed);
     decimals.pop_back();
-    parsed = Amount::parse("10." + decimals);
+    parsed = Amount::from_string("10." + decimals);
     CHECK(parsed);
 }
 
