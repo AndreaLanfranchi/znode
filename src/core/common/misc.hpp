@@ -38,17 +38,4 @@ namespace zenpp {
 //! otherwise it will stop counting and return as soon as max_count is reached
 [[nodiscard]] size_t count_duplicate_data_chunks(ByteView data, size_t chunk_size, size_t max_count = 0) noexcept;
 
-//! \brief Parses a string representing an unsigned integer
-template <UnsignedIntegral T>
-bool try_parse_uint(std::string_view input, int base, T& output) noexcept {
-    size_t pos{0};
-    if (input.empty()) return false;
-    auto input_str{std::string(input)};
-    auto value{std::stoull(input_str, &pos, base)};
-    if (pos not_eq input_str.length() or value > std::numeric_limits<T>::max()) {
-        return false;
-    }
-    output = static_cast<T>(value);
-    return true;
-}
 }  // namespace zenpp
