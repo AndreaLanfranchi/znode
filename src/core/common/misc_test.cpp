@@ -88,7 +88,9 @@ TEST_CASE("abridge", "[misc]") {
     CHECK(abridged == "012...");
 
     CHECK(abridge("", 0).empty());
-    CHECK(abridge("0123", 0) == "0123");
+    CHECK(abridge("0123", 0) == "...");
+    CHECK(abridge("Hello World", 6) == "Hello...");
+    CHECK(abridge("Hello World", 5) == "Hello...");
+    CHECK(abridge("Hello World", 7) == "Hello W...");
 }
-
 }  // namespace zenpp

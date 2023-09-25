@@ -8,9 +8,9 @@
 
 #include "stream.hpp"
 
+#include <limits>
 #include <utility>
 
-#include <core/common/overflow.hpp>
 #include <core/encoding/hex.hpp>
 
 namespace zenpp::ser {
@@ -30,10 +30,9 @@ void DataStream::reserve(size_type count) { buffer_.reserve(count); }
 void DataStream::resize(size_type new_size, value_type item) { buffer_.resize(new_size, item); }
 
 Error DataStream::write(ByteView data) {
-    const auto next_size(safe_add(buffer_.size(), data.size()));
-    if (not next_size.has_value()) return Error::kOverflow;
-
-    buffer_.append(data);
+    const auto bytes_count = std::min<size_type>(std::numeric_limits<size_type>::max() - read_position_, data.size());
+    if (bytes_count not_eq data.size()) return Error::kOverflow;
+    buffer_.insert(buffer_.end(), data.begin(), data.begin() + bytes_count);
     return Error::kSuccess;
 }
 
@@ -79,24 +78,14 @@ void DataStream::erase(const size_type pos, std::optional<size_type> count) {
 void DataStream::push_back(uint8_t byte) { buffer_.push_back(byte); }
 
 tl::expected<ByteView, Error> DataStream::read(std::optional<size_t> count) noexcept {
-    if (not count.has_value()) count = avail();
-
-    const auto next_read_position{safe_add(read_position_, *count)};
-    if (not next_read_position or *next_read_position > buffer_.length()) {
-        return tl::unexpected(Error::kReadBeyondData);
-    }
-    ByteView ret(&buffer_[read_position_], *count);
-    read_position_ = *next_read_position;
+    const auto bytes_being_read{count.value_or(avail())};
+    if (bytes_being_read > avail()) return tl::unexpected{Error::kReadBeyondData};
+    ByteView ret(&buffer_[read_position_], bytes_being_read);
+    read_position_ += bytes_being_read;
     return ret;
 }
 
-void DataStream::ignore(size_type count) noexcept {
-    const auto pos(safe_add(read_position_, count));
-    if (not pos.has_value() or pos.value() > buffer_.size()) {
-        read_position_ = buffer_.size();
-    }
-    read_position_ = *pos;
-}
+void DataStream::ignore(size_type count) noexcept { read_position_ += std::min<size_type>(count, avail()); }
 
 bool DataStream::eof() const noexcept { return read_position_ >= buffer_.size(); }
 
