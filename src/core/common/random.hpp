@@ -35,12 +35,18 @@ T randomize() {
 
 //! \brief Generates a random value of type T in range (T * (1.0F - percentage), T * (1.0F + percentage))
 template <Integral T>
-T randomize(T val, float percentage) {
-    percentage = std::abs(percentage);
-    if (percentage > 1.0F) percentage = 1.0F;
-    const T min = static_cast<T>(val * (1.0F - percentage));
-    const T max = static_cast<T>(val * (1.0F + percentage));
+T randomize(T val, double percentage) {
+    if(val == T(0)) return val;
+    percentage = std::max<double>(1.0, std::abs(percentage));
+    T abs_value{val};
+    if constexpr (std::is_signed_v<T>) {
+        abs_value = static_cast<T>(val < 0 ? -val : val);
+    }
+    const auto variance = static_cast<T>(abs_value * percentage);
+    if (variance == T(0)) return val;
+    const T min =
+        (val > (std::numeric_limits<T>::lowest() + variance)) ? val - variance : std::numeric_limits<T>::lowest();
+    const T max = ((std::numeric_limits<T>::max() - variance) > val) ? val + variance : std::numeric_limits<T>::max();
     return randomize<T>(min, max);
 }
-
 }  // namespace zenpp

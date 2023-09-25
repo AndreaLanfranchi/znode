@@ -128,7 +128,7 @@ uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
         stop(false);
         return 0U;
     }
-    return (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U);
+    return (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.3) * 1'000U);
 }
 
 void Node::process_ping_latency(const uint64_t latency_ms) {
@@ -638,7 +638,7 @@ void Node::on_handshake_completed() {
 
     // Lets' send out a ping immediately and start the timer
     // for subsequent pings
-    const auto ping_interval_ms{randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.30F) * 1'000U};
+    const auto ping_interval_ms{randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.3) * 1'000U};
     std::ignore = on_ping_timer_expired(ping_interval_ms);
     ping_timer_.set_autoreset(true);
     ping_timer_.start(ping_interval_ms, [this](uint32_t interval_ms) { return on_ping_timer_expired(interval_ms); });
