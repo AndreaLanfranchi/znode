@@ -36,7 +36,7 @@ T randomize() {
 //! \brief Generates a random value of type T in range (T * (1.0F - percentage), T * (1.0F + percentage))
 template <Integral T>
 T randomize(T val, double percentage) {
-    if(val == T(0)) return val;
+    if (val == T(0) or percentage == 0.0) return val;
     percentage = std::max<double>(1.0, std::abs(percentage));
     T abs_value{val};
     if constexpr (std::is_signed_v<T>) {
