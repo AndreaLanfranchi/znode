@@ -7,10 +7,8 @@
 */
 
 #pragma once
-#include <tl/expected.hpp>
 
 #include <core/common/base.hpp>
-#include <core/encoding/errors.hpp>
 
 namespace zenpp {
 
@@ -39,8 +37,8 @@ class Amount {
 
     //! \brief Parses an amount expressed in token denomination (e.g. 1.0458)
     //! \remarks Should the input not match the boundaries of Amount or not honors the valid_money() test
-    //! then an unexpected DecodingError is returned
-    static tl::expected<Amount, DecodingError> from_string(const std::string& input);
+    //! then an error is returned
+    static outcome::result<Amount> from_string(const std::string& input);
 
     //! \brief Returns the string representation of Amount expressed in token denomination (e.g. 1.0458)
     [[nodiscard]] virtual std::string to_string() const;

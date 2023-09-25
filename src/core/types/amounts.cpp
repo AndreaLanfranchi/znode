@@ -45,7 +45,7 @@ void Amount::operator++() noexcept { ++value_; }
 
 void Amount::operator--() noexcept { --value_; }
 
-tl::expected<Amount, DecodingError> Amount::from_string(const std::string& input) {
+outcome::result<Amount> Amount::from_string(const std::string& input) {
     static const std::string kMaxWhole(std::to_string(kCoinMaxSupply));
     const std::string dyn_pattern{
         boost::str(boost::format(R"(^(\d{0,%i})(\.\d{0,%i})?$)") % kMaxWhole.size() % kCoinMaxDecimals)};
@@ -53,7 +53,7 @@ tl::expected<Amount, DecodingError> Amount::from_string(const std::string& input
 
     std::smatch matches;
     if (!std::regex_search(input, matches, pattern, std::regex_constants::match_default)) {
-        return tl::unexpected{DecodingError::kInvalidInput};
+        return boost::system::errc::invalid_argument;
     }
 
     const std::string whole_part{matches[1].str()};
@@ -67,7 +67,7 @@ tl::expected<Amount, DecodingError> Amount::from_string(const std::string& input
     const auto fract{fract_part.empty() ? 0L : boost::lexical_cast<int64_t>(fract_part)};
     const auto value{whole * kCoin + fract};
     Amount ret(value);
-    if (not ret.valid_money()) return tl::unexpected{DecodingError::kInvalidAmountRange};
+    if (not ret.valid_money()) return boost::system::errc::invalid_argument;
     return ret;
 }
 
