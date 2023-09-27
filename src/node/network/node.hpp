@@ -146,11 +146,11 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] static int next_node_id() noexcept { return next_node_id_.fetch_add(1); }
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
-    ser::Error push_message(MessageType message_type, MessagePayload& payload);
+    outcome::result<void> push_message(MessageType message_type, MessagePayload& payload);
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
     //! \remarks This a handy overload used to send messages with a null payload
-    ser::Error push_message(MessageType message_type);
+    outcome::result<void> push_message(MessageType message_type);
 
   private:
     void start_ssl_handshake();
@@ -170,15 +170,15 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     void start_read();
     void handle_read(const boost::system::error_code& error_code, size_t bytes_transferred);
-    ser::Error parse_messages(
+    outcome::result<void> parse_messages(
         size_t bytes_transferred);  // Reads messages from the receiving buffer and consumes buffered data
 
-    ser::Error process_inbound_message();  // Local processing (when possible) of inbound message
+    outcome::result<void> process_inbound_message();  // Local processing (when possible) of inbound message
 
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
     //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
-    [[nodiscard]] ser::Error validate_message_for_protocol_handshake(DataDirectionMode direction,
-                                                                     MessageType message_type);
+    [[nodiscard]] outcome::result<void> validate_message_for_protocol_handshake(DataDirectionMode direction,
+                                                                                MessageType message_type);
 
     //! \brief To be called as soon as the protocol handshake is completed
     //! \details This is the place where the node is considered fully connected and could start sending/receiving

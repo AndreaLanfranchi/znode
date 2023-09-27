@@ -161,32 +161,32 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
     // Parse and validate
     cli.parse(argc, argv);
 
-    auto parsed_size_value{parse_human_bytes(chaindata_page_size_str)};
-    if ((*parsed_size_value & (*parsed_size_value - 1)) != 0) {
+    auto parsed_size{parse_human_bytes(chaindata_page_size_str)};
+    settings.chaindata_env_config.page_size = parsed_size.value();
+    if ((settings.chaindata_env_config.page_size & (settings.chaindata_env_config.page_size - 1)) != 0) {
         throw std::invalid_argument("--chaindata.pagesize value is not a power of 2");
     }
-    settings.chaindata_env_config.page_size = *parsed_size_value;
 
     const auto mdbx_max_size_hard_limit{settings.chaindata_env_config.page_size * db::kMdbxMaxPages};
-    parsed_size_value = parse_human_bytes(chaindata_max_size_str);
-    if (*parsed_size_value > mdbx_max_size_hard_limit) {
+    parsed_size = parse_human_bytes(chaindata_max_size_str);
+    if (parsed_size.value() > mdbx_max_size_hard_limit) {
         throw std::invalid_argument("--chaindata.maxsize is invalid or > " +
                                     to_human_bytes(mdbx_max_size_hard_limit, /*binary=*/
                                                    true));
     }
-    settings.chaindata_env_config.max_size = *parsed_size_value;
+    settings.chaindata_env_config.max_size = parsed_size.value();
 
-    parsed_size_value = parse_human_bytes(chaindata_growth_size_str);
-    if (*parsed_size_value > (mdbx_max_size_hard_limit / /* two increments ?*/ 2U)) {
+    parsed_size = parse_human_bytes(chaindata_growth_size_str);
+    if (parsed_size.value() > (mdbx_max_size_hard_limit / /* two increments ?*/ 2U)) {
         throw std::invalid_argument("--chaindata.growthsize max value > " +
                                     to_human_bytes(mdbx_max_size_hard_limit / 2, /*binary=*/true));
     }
 
-    settings.chaindata_env_config.growth_size = *parsed_size_value;
+    settings.chaindata_env_config.growth_size = parsed_size.value();
     settings.data_directory = std::make_unique<DataDirectory>(data_dir_path);
     settings.data_directory->deploy();  // Ensure subdirs are created
-    settings.batch_size = *parse_human_bytes(batch_size_str);
-    settings.etl_buffer_size = *parse_human_bytes(etl_buffer_size_str);
+    settings.batch_size = parse_human_bytes(batch_size_str).value();
+    settings.etl_buffer_size = parse_human_bytes(etl_buffer_size_str).value();
     settings.asio_concurrency = user_asio_concurrency;
     network_settings.use_tls = !*notls_flag;
 }

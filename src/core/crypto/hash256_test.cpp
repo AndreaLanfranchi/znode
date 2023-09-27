@@ -30,7 +30,7 @@ TEST_CASE("Bitcoin Hash256", "[crypto]") {
     // Above digests are taken as input for H256 which reverses the order bytes
     // hence we reverse the inputs too
     for (auto& digest : digests) {
-        digest = hex::reverse_hex(digest);
+        digest = enc::hex::reverse_hex(digest);
     }
 
     Hash256 hasher;

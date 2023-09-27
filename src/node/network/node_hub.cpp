@@ -471,8 +471,8 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
 
     if (message->get_type() == MessageType::kAddr) {
         MsgAddrPayload addr_payload{};
-        const auto ret{addr_payload.deserialize(message->data())};
-        if (not ret) {
+        const auto result{addr_payload.deserialize(message->data())};
+        if (not result.has_error()) {
             // TODO Pass it to the address manager
             for (const auto& service : addr_payload.identifiers_) {
                 if (app_settings_.network.ipv4_only and service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
@@ -485,7 +485,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                 std::ignore = pending_connections_.push(IPConnection{service.endpoint_, IPConnectionType::kOutbound});
             }
         } else {
-            error = absl::StrCat("error ", magic_enum::enum_name(ret));
+            error = absl::StrCat("error ", result.error().message());
         }
     }
 

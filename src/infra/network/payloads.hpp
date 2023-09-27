@@ -11,6 +11,7 @@
 #include <core/types/hash.hpp>
 
 #include <infra/network/addresses.hpp>
+#include <infra/network/errors.hpp>
 
 namespace zenpp::net {
 
@@ -24,7 +25,7 @@ class MessagePayload : public ser::Serializable {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override = 0;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override = 0;
 };
 
 class MsgNullPayload : public MessagePayload {
@@ -34,9 +35,9 @@ class MsgNullPayload : public MessagePayload {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& /*stream*/, ser::Action /*action*/) override {
+    outcome::result<void> serialization(ser::SDataStream& /*stream*/, ser::Action /*action*/) override {
         // Nothing to (de)serialize here
-        return ser::Error::kSuccess;
+        return outcome::success();
     };
 };
 
@@ -57,7 +58,7 @@ class MsgVersionPayload : public MessagePayload {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class MsgPingPongPayload : public MessagePayload {
@@ -69,7 +70,7 @@ class MsgPingPongPayload : public MessagePayload {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class MsgGetHeadersPayload : public MessagePayload {
@@ -83,7 +84,7 @@ class MsgGetHeadersPayload : public MessagePayload {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class MsgAddrPayload : public MessagePayload {
@@ -95,6 +96,6 @@ class MsgAddrPayload : public MessagePayload {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 }  // namespace zenpp::net

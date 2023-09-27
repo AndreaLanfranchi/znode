@@ -16,10 +16,11 @@ namespace zenpp {
 
 TEST_CASE("Parse Human Bytes", "[misc]") {
     auto parsed = parse_human_bytes("");
-    CHECK((parsed && *parsed == 0));
+    REQUIRE_FALSE(parsed.has_error());
+    CHECK(parsed.value() == 0U);
 
     parsed = parse_human_bytes("not a number");
-    CHECK_FALSE(parsed);
+    REQUIRE_FALSE(parsed);
 
     const std::vector<std::pair<std::string, uint64_t>> tests{
         {"128", 128},      // Indivisible bytes
@@ -46,9 +47,9 @@ TEST_CASE("Parse Human Bytes", "[misc]") {
     };
 
     for (const auto& [input, expected] : tests) {
-        const auto value = parse_human_bytes(input);
-        REQUIRE(value);
-        CHECK(*value == expected);
+        parsed = parse_human_bytes(input);
+        REQUIRE_FALSE(parsed.has_error());
+        CHECK(parsed.value() == expected);
     }
 }
 

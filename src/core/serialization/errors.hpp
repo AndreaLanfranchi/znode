@@ -12,21 +12,20 @@
 #include <boost/system/error_code.hpp>
 #include <magic_enum.hpp>
 
-namespace zenpp::enc {
+namespace zenpp::ser {
 
 enum class Error {
-    kSuccess,             // Not actually an error
-    kIllegalHexDigit,     // One or more input characters is not a valid hex digit
-    kIllegalBase58Digit,  // One or more input characters is not a valid base58 digit
-    kIllegalBase64Digit,  // One or more input characters is not a valid base64 digit
-    kInputTooLarge,       // Input is too large for function to handle
-    kInputTooNarrow,      // Function expects an input of a certain size or more
-    kUnexpectedError,     // An unexpected error occurred
+    kSuccess,                  // Not actually an error
+    kInputTooLarge,            // The input is too large
+    kReadOverflow,             // The read operation would overflow the buffer
+    kNonCanonicalCompactSize,  // The compact size is not canonical
+    kCompactSizeTooBig,        // The compact size is too big
+    kUnexpectedError,          // An unexpected error occurred
 };
 
 class ErrorCategory : public boost::system::error_category {
   public:
-    const char* name() const noexcept override { return "EncodingError"; }
+    const char* name() const noexcept override { return "SerializationError"; }
     std::string message(int err_code) const override {
         const auto errc = magic_enum::enum_cast<Error>(err_code);
         std::string desc{"Unknown error"};
@@ -45,14 +44,12 @@ class ErrorCategory : public boost::system::error_category {
             using enum Error;
             case kSuccess:
                 return boost::system::error_condition{boost::system::errc::success};
-            case kIllegalHexDigit:
-            case kIllegalBase58Digit:
-            case kIllegalBase64Digit:
-                return make_error_condition(boost::system::errc::argument_out_of_domain);
             case kInputTooLarge:
+            case kReadOverflow:
                 return make_error_condition(boost::system::errc::value_too_large);
-            case kInputTooNarrow:
-                return make_error_condition(boost::system::errc::invalid_argument);
+            case kNonCanonicalCompactSize:
+            case kCompactSizeTooBig:
+                return make_error_condition(boost::system::errc::argument_out_of_domain);
             case kUnexpectedError:
                 return make_error_condition(boost::system::errc::io_error);
             default:
@@ -66,11 +63,11 @@ class ErrorCategory : public boost::system::error_category {
 inline boost::system::error_code make_error_code(Error err_code) {
     return {static_cast<int>(err_code), ErrorCategory()};
 }
-}  // namespace zenpp::enc
+}  // namespace zenpp::ser
 
 namespace boost::system {
 // Tell the C++ 11 STL metaprogramming that our enums are registered with the
 // error code system
 template <>
-struct is_error_code_enum<zenpp::enc::Error> : public std::true_type {};
+struct is_error_code_enum<zenpp::ser::Error> : public std::true_type {};
 }  // namespace boost::system

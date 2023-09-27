@@ -13,12 +13,12 @@
 #include <span>
 
 #include <boost/asio/ip/address.hpp>
-#include <tl/expected.hpp>
 
 #include <core/common/base.hpp>
 #include <core/common/cast.hpp>
 #include <core/common/secure_bytes.hpp>
 #include <core/serialization/base.hpp>
+#include <core/serialization/errors.hpp>
 #include <core/serialization/serialize.hpp>
 
 namespace zenpp::ser {
@@ -44,16 +44,16 @@ class DataStream {
     virtual ~DataStream() = default;
 
     //! \brief Reserves capacity
-    void reserve(size_type count);
+    outcome::result<void> reserve(size_type count);
 
     //! \brief Adjusts the size of the underlying buffer
-    void resize(size_type new_size, value_type item = value_type{});
+    outcome::result<void> resize(size_type new_size, value_type item = value_type{});
 
     //! \brief Appends provided data to internal buffer
-    Error write(ByteView data);
+    outcome::result<void> write(ByteView data);
 
     //! \brief Appends provided data to internal buffer
-    Error write(const uint8_t* ptr, size_type count);
+    outcome::result<void> write(const uint8_t* ptr, size_type count);
 
     //! \brief Returns an iterator to beginning of the unconsumed part of data
     iterator begin();
@@ -84,7 +84,7 @@ class DataStream {
     //! \brief Returns a view of requested bytes count from the actual read position
     //! \remarks After the view is returned the read position is advanced by count
     //! \remarks If count is omitted the whole unconsumed part of data is returned
-    [[nodiscard]] tl::expected<ByteView, Error> read(std::optional<size_t> count = std::nullopt) noexcept;
+    [[nodiscard]] outcome::result<ByteView> read(std::optional<size_t> count = std::nullopt) noexcept;
 
     //! \brief Advances the read position by count without returning any data
     //! \remarks If the count of bytes to be skipped exceeds the boundary of the buffer the read position
@@ -111,7 +111,7 @@ class DataStream {
     virtual void clear() noexcept;
 
     //! \brief Copies unconsumed data into dest and clears
-    void get_clear(DataStream& dst);
+    outcome::result<void> get_clear(DataStream& dst);
 
     //! \brief Returns the current read position
     [[nodiscard]] size_type tellg() const noexcept;
@@ -155,51 +155,45 @@ class SDataStream : public DataStream {
     void clear() noexcept override;
 
     // Serialization for bool
-    [[nodiscard]] Error bind(bool& object, Action action) {
-        Error result{Error::kSuccess};
+    [[nodiscard]] outcome::result<void> bind(bool& object, Action action) {
         switch (action) {
             using enum Action;
             case kComputeSize:
                 ++computed_size_;
                 break;
             case kSerialize:
-                write_data(*this, object);
-                break;
+                return write_data(*this, object);
             case kDeserialize:
-                result = read_data(*this, object);
-                break;
+                return read_data(*this, object);
         }
-        return result;
+        return outcome::success();
     }
 
     // Serialization for arithmetic types
     template <Integral T>
-    [[nodiscard]] Error bind(T& object, Action action) {
-        Error result{Error::kSuccess};
+    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         switch (action) {
             using enum Action;
             case kComputeSize:
                 computed_size_ += ser_sizeof(object);
                 break;
             case kSerialize:
-                write_data(*this, object);
-                break;
+                return write_data(*this, object);
             case kDeserialize:
-                result = read_data(*this, object);
+                return read_data(*this, object);
                 break;
         }
-        return result;
+        return outcome::success();
     }
 
     template <UnsignedBigIntegral T>
-    [[nodiscard]] Error bind(T& object, Action action) {
+    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         /*
          * When used at fixed precision, the size of type boost cpp_int is always one machine word larger
          * than you would expect for an N-bit integer
          * https://www.boost.org/doc/libs/1_81_0/libs/multiprecision/doc/html/boost_multiprecision/tut/ints/cpp_int.html
          * */
         std::array<uint8_t, sizeof(T) - sizeof(intptr_t)> bytes{0x0};
-        Error result{Error::kSuccess};
         switch (action) {
             using enum Action;
             case kComputeSize:
@@ -207,28 +201,28 @@ class SDataStream : public DataStream {
                 break;
             case kSerialize:
                 boost::multiprecision::export_bits(object, bytes.begin(), CHAR_BIT);
-                result = write(bytes);
-                break;
+                return write(bytes);
             case kDeserialize:
-                result = bind(bytes, action);
-                if (result == Error::kSuccess) {
-                    boost::multiprecision::import_bits(object, bytes.begin(), bytes.end(), CHAR_BIT);
+                if (const auto read_result{bind(bytes, action)}; read_result.has_error()) [[unlikely]] {
+                    return read_result.error();
                 }
+                boost::multiprecision::import_bits(object, bytes.begin(), bytes.end(), CHAR_BIT);
                 break;
         }
-        return result;
+        return outcome::success();
     }
 
     // Serialization for Serializable classes
     template <class T>
-    requires std::derived_from<T, Serializable>
-    [[nodiscard]] Error bind(T& object, Action action) { return object.serialization(*this, action); }
+        requires std::derived_from<T, Serializable>
+    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
+        return object.serialization(*this, action);
+    }
 
     // Serialization for bytes array (fixed size)
     template <class T, std::size_t N>
-    requires std::is_fundamental_v<T>
-    [[nodiscard]] Error bind(std::array<T, N>& object, Action action) {
-        Error result{Error::kSuccess};
+        requires std::is_fundamental_v<T>
+    [[nodiscard]] outcome::result<void> bind(std::array<T, N>& object, Action action) {
         const auto element_size{ser_sizeof(object[0])};
         const auto array_bytes_size{N * element_size};
         switch (action) {
@@ -237,18 +231,16 @@ class SDataStream : public DataStream {
                 computed_size_ += array_bytes_size;
                 break;
             case kSerialize:
-                result = write(static_cast<uint8_t*>(object.data()), array_bytes_size);
-                break;
+                return write(static_cast<uint8_t*>(object.data()), array_bytes_size);
             case kDeserialize:
-                auto read_result{read(array_bytes_size)};
-                if (!read_result) {
-                    result = read_result.error();
+                if (auto read_result{read(array_bytes_size)}; read_result.has_error()) [[unlikely]] {
+                    return read_result.error();
                 } else {
-                    std::memcpy(&object[0], read_result->data(), array_bytes_size);
+                    std::memcpy(&object[0], read_result.value().data(), array_bytes_size);
                 }
                 break;
         }
-        return result;
+        return outcome::success();
     }
 
     // Serialization for basic_string<bytes>
@@ -256,64 +248,59 @@ class SDataStream : public DataStream {
     // a special case as they're always the last element of a structure.
     // Due to this the size of the member is not recorded
     template <class T>
-    requires std::is_same_v<T, Bytes>
-    [[nodiscard]] Error bind(T& object, Action action) {
-        Error result{Error::kSuccess};
+        requires std::is_same_v<T, Bytes>
+    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         switch (action) {
             using enum Action;
             case kComputeSize:
                 computed_size_ += object.size();
                 break;
             case kSerialize:
-                result = write(object);
-                break;
+                return write(object);
             case kDeserialize:
-                auto data_length{this->avail()};
-                auto data{read(data_length)};
-                ASSERT(data);  // Should not return an error
-                object.assign(*data);
+                if (auto read_result{read()}; read_result.has_error()) [[unlikely]] {
+                    return read_result.error();
+                } else {
+                    object.assign(read_result.value());
+                }
                 break;
         }
-        return result;
+        return outcome::success();
     }
 
     // Serialization for std::string
     template <class T>
-    requires std::is_same_v<T, std::string>
-    [[nodiscard]] Error bind(T& object, Action action) {
-        Error result{Error::kSuccess};
+        requires std::is_same_v<T, std::string>
+    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         switch (action) {
             using enum Action;
             case kComputeSize:
                 computed_size_ += ser_compact_sizeof(object.size()) + object.size();
                 break;
             case kSerialize:
-                write_compact(*this, static_cast<uint64_t>(object.size()));
-                write(string_view_to_byte_view(object));
-                break;
+                if (const auto result{write_compact(*this, static_cast<uint64_t>(object.size()))}; result.has_error())
+                    [[unlikely]] {
+                    return result.error();
+                }
+                return write(string_view_to_byte_view(object));
             case kDeserialize:
-                auto data_length{read_compact(*this)};
-                if (!data_length) {
-                    result = data_length.error();
-                    break;
+                if (const auto data_length{read_compact(*this)}; data_length.has_error()) [[unlikely]] {
+                    return data_length.error();
+                } else {
+                    auto data{read(data_length.value())};
+                    if (data.has_error()) return data.error();
+                    object.assign(data.value().begin(), data.value().end());
                 }
-                auto data{read(*data_length)};
-                if (!data) {
-                    result = data.error();
-                    break;
-                }
-                object.assign(data->begin(), data->end());
                 break;
         }
-        return result;
+        return outcome::success();
     }
 
     // Serialization for ip::address
     // see https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
     template <class T>
-    requires std::is_same_v<T, boost::asio::ip::address>
-    [[nodiscard]] Error bind(T& object, Action action) {
-        Error result{Error::kSuccess};
+        requires std::is_same_v<T, boost::asio::ip::address>
+    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         std::array<uint8_t, 16> bytes{0x0};
         switch (action) {
             using enum Action;
@@ -328,11 +315,11 @@ class SDataStream : public DataStream {
                 } else {
                     bytes = object.to_v6().to_bytes();
                 }
-                result = bind(bytes, action);
-                break;
+                return bind(bytes, action);
             case kDeserialize:
-                result = bind(bytes, action);
-                if (result == Error::kSuccess) {
+                if (auto read_result{bind(bytes, action)}; read_result.has_error()) [[unlikely]] {
+                    return read_result.error();
+                } else {
                     if (reinterpret_cast<uint64_t*>(bytes.data())[0] == 0U) {
                         object = boost::asio::ip::make_address_v4(
                             std::array<uint8_t, 4>{bytes[12], bytes[13], bytes[14], bytes[15]});
@@ -342,7 +329,7 @@ class SDataStream : public DataStream {
                 }
                 break;
         }
-        return result;
+        return outcome::success();
     }
 
   private:

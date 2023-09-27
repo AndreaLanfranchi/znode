@@ -53,12 +53,12 @@ class Hash : public ser::Serializable {
     //! \brief Returns a hash loaded from a hex string
     //! \param input The hex string to de-hexify
     //! \param reverse If true, the bytes sequence is reversed after being de-hexified
-    static tl::expected<Hash<BITS>, DecodingError> from_hex(std::string_view input, bool reverse = false) noexcept {
-        auto parsed_bytes{hex::decode(input)};
-        if (!parsed_bytes) return tl::unexpected(parsed_bytes.error());
+    static outcome::result<Hash<BITS>> from_hex(std::string_view input, bool reverse = false) noexcept {
+        auto parsed_bytes{enc::hex::decode(input)};
+        if (!parsed_bytes) return parsed_bytes.error();
         if (reverse) [[unlikely]]
-            std::ranges::reverse(*parsed_bytes);
-        return Hash<BITS>(ByteView(*parsed_bytes));
+            std::ranges::reverse(parsed_bytes.value());
+        return Hash<BITS>(ByteView(parsed_bytes.value()));
     }
 
     //! \brief Returns the hexadecimal representation of this hash
@@ -68,9 +68,9 @@ class Hash : public ser::Serializable {
         if (reverse) [[unlikely]] {
             auto reversed{bytes_};
             std::ranges::reverse(reversed);
-            return hex::encode({&reversed[0], kSize}, with_prefix);
+            return enc::hex::encode({&reversed[0], kSize}, with_prefix);
         }
-        return hex::encode({&bytes_[0], kSize}, with_prefix);
+        return enc::hex::encode({&bytes_[0], kSize}, with_prefix);
     }
 
     //! \brief An alias for to_hex with no prefix
@@ -111,7 +111,7 @@ class Hash : public ser::Serializable {
     alignas(uint32_t) std::array<uint8_t, kSize> bytes_{0};
 
     friend class ser::SDataStream;
-    [[nodiscard]] ser::Error serialization(ser::SDataStream& stream, ser::Action action) override {
+    [[nodiscard]] outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override {
         return stream.bind(bytes_, action);
     }
 };

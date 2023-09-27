@@ -6,7 +6,7 @@
 
 #include "base58.hpp"
 
-namespace zenpp::base58 {
+namespace zenpp::enc::base58 {
 
 /*
  * A note about the implementation
@@ -23,8 +23,9 @@ constexpr std::string_view kBase58Digits{"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcde
 // How many chars to append from Sha256 digest checksum
 constexpr size_t kCheckSumLength{4};
 
-tl::expected<std::string, EncodingError> encode(ByteView input) noexcept {
+outcome::result<std::string> encode(ByteView input) noexcept {
     if (input.empty()) return std::string{};
+    if (input.size() > 1_KiB) return Error::kInputTooLarge;
 
     // Convert byte sequence to an integer
     using namespace boost::multiprecision;
@@ -52,18 +53,18 @@ tl::expected<std::string, EncodingError> encode(ByteView input) noexcept {
     return encoded;
 }
 
-tl::expected<std::string, EncodingError> encode_check(ByteView input) noexcept {
+outcome::result<std::string> encode_check(ByteView input) noexcept {
     Bytes buffer(input);
     crypto::Sha256 digest(buffer);
     const auto hash{digest.finalize()};
     buffer.append(hash.data(), kCheckSumLength);
     const auto ret{encode(buffer)};
-    if (not ret) return tl::unexpected(ret.error());
-    return *ret;
+    if (not ret) return ret.error();
+    return ret.value();
 }
 
-tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
-    if (input.empty()) return {};
+outcome::result<Bytes> decode(std::string_view input) noexcept {
+    if (input.empty()) return Bytes{};
     using namespace boost::multiprecision;
     cpp_int value{0};
 
@@ -71,7 +72,7 @@ tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
     for (auto chr : input) {
         const auto pos{kBase58Digits.find(chr)};
         if (pos == std::string::npos) [[unlikely]] {
-            return tl::unexpected(DecodingError::kInvalidBase58Input);
+            return Error::kIllegalBase58Digit;
         }
         value = value * 58 + pos;
     }
@@ -93,10 +94,10 @@ tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
     return decoded;
 }
 
-tl::expected<Bytes, DecodingError> decode_check(std::string_view input) noexcept {
+outcome::result<Bytes> decode_check(std::string_view input) noexcept {
     const auto decoded{decode(input)};
-    if (not decoded) return tl::unexpected(decoded.error());
-    if (decoded.value().size() < kCheckSumLength) return tl::unexpected(DecodingError::kInputTooShort);
+    if (not decoded) return decoded.error();
+    if (decoded.value().size() < kCheckSumLength) return Error::kInputTooNarrow;
 
     // Split decoded into original value and its checksum
     const auto& decoded_value{decoded.value()};
@@ -105,8 +106,8 @@ tl::expected<Bytes, DecodingError> decode_check(std::string_view input) noexcept
 
     // Recompute Digest256 from original and check it starts with checksum
     if (crypto::Sha256 digest{original}; not digest.finalize().starts_with(checksum)) {
-        return tl::unexpected(DecodingError::kInvalidBase58Checksum);
+        return Error::kIllegalBase58Digit;
     }
     return Bytes(original);
 }
-}  // namespace zenpp::base58
+}  // namespace zenpp::enc::base58

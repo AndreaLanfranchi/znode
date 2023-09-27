@@ -32,6 +32,6 @@ class BlockHeader : public ser::Serializable {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 }  // namespace zenpp

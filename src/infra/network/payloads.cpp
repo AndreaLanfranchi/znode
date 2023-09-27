@@ -12,86 +12,73 @@ namespace zenpp::net {
 
 using namespace ser;
 
-Error MsgVersionPayload::serialization(SDataStream& stream, Action action) {
-    using enum Error;
-    Error ret{kSuccess};
-    if (!ret) ret = stream.bind(protocol_version_, action);
-    if (!ret) ret = stream.bind(services_, action);
-    if (!ret) ret = stream.bind(timestamp_, action);
-    if (!ret) ret = stream.bind(recipient_service_, action);
-    if (!ret) ret = stream.bind(sender_service_, action);
-    if (!ret) ret = stream.bind(nonce_, action);
-    if (!ret) ret = stream.bind(user_agent_, action);
-    if (!ret) ret = stream.bind(last_block_height_, action);
-    if (!ret) ret = stream.bind(relay_, action);
-    return ret;
+outcome::result<void> MsgVersionPayload::serialization(SDataStream& stream, Action action) {
+    auto result{stream.bind(protocol_version_, action)};
+    if (not result.has_error()) result = stream.bind(services_, action);
+    if (not result.has_error()) result = stream.bind(timestamp_, action);
+    if (not result.has_error()) result = stream.bind(recipient_service_, action);
+    if (not result.has_error()) result = stream.bind(sender_service_, action);
+    if (not result.has_error()) result = stream.bind(nonce_, action);
+    if (not result.has_error()) result = stream.bind(user_agent_, action);
+    if (not result.has_error()) result = stream.bind(last_block_height_, action);
+    if (not result.has_error()) result = stream.bind(relay_, action);
+    return result;
 }
 
-Error MsgPingPongPayload::serialization(ser::SDataStream& stream, ser::Action action) {
+outcome::result<void> MsgPingPongPayload::serialization(ser::SDataStream& stream, ser::Action action) {
     return stream.bind(nonce_, action);
 }
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "readability-function-cognitive-complexity"
-Error MsgGetHeadersPayload::serialization(SDataStream& stream, ser::Action action) {
-    using enum Error;
-    Error ret{kSuccess};
+outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, ser::Action action) {
     protocol_version_ =
         (action == Action::kSerialize) ? static_cast<decltype(protocol_version_)>(stream.get_version()) : 0U;
-    if (!ret) ret = stream.bind(protocol_version_, action);
-    if (!ret) {
+    auto result = stream.bind(protocol_version_, action);
+    if (not result.has_error()) {
         if (action == Action::kSerialize) {
             const auto vector_size = block_locator_hashes_.size();
             if (vector_size == 0U) return Error::kMessagePayloadEmptyVector;
             if (vector_size > 2000U) return Error::kMessagePayloadOversizedVector;
-            write_compact(stream, vector_size);
+            if (result = write_compact(stream, vector_size); result.has_error()) return result.error();
             for (auto& item : block_locator_hashes_) {
-                if (ret != Error::kSuccess) break;
-                ret = item.serialize(stream);
+                if (result = item.serialize(stream); result.has_error()) break;
             }
-            if (!ret) ret = hash_stop_.serialize(stream);
+            if (not result.has_error()) result = hash_stop_.serialize(stream);
         } else {
-            const auto expected_vector_size = read_compact(stream);
-            if (!expected_vector_size) return expected_vector_size.error();
-            if (*expected_vector_size == 0U) return Error::kMessagePayloadEmptyVector;
-            if (*expected_vector_size > 2000U) return Error::kMessagePayloadOversizedVector;
-            block_locator_hashes_.resize(*expected_vector_size);
+            const auto expected_vector_size{read_compact(stream)};
+            if (expected_vector_size.has_error()) return expected_vector_size.error();
+            if (expected_vector_size.value() == 0U) return Error::kMessagePayloadEmptyVector;
+            if (expected_vector_size.value() > 2000U) return Error::kMessagePayloadOversizedVector;
+            block_locator_hashes_.resize(expected_vector_size.value());
             for (auto& item : block_locator_hashes_) {
-                if (ret != Error::kSuccess) break;
-                ret = item.deserialize(stream);
+                if (result = item.deserialize(stream); result.has_error()) break;
             }
-            if (!ret) ret = hash_stop_.deserialize(stream);
+            if (not result.has_error()) result = hash_stop_.deserialize(stream);
         }
     }
-
-    return ret;
 }
 #pragma clang diagnostic pop
 
-ser::Error MsgAddrPayload::serialization(SDataStream& stream, ser::Action action) {
-    using enum Error;
-    Error ret{kSuccess};
+outcome::result<void> MsgAddrPayload::serialization(SDataStream& stream, ser::Action action) {
     if (action == Action::kSerialize) {
         const auto vector_size = identifiers_.size();
         if (vector_size == 0U) return Error::kMessagePayloadEmptyVector;
         if (vector_size > kMaxAddrItems) return Error::kMessagePayloadOversizedVector;
-        write_compact(stream, vector_size);
+        if (auto result = write_compact(stream, vector_size); result.has_error()) return result.error();
         for (auto& item : identifiers_) {
-            if (ret != Error::kSuccess) break;
-            ret = item.serialize(stream);
+            if (auto result{item.serialize(stream)}; result.has_error()) return result.error();
         }
     } else {
         const auto expected_vector_size = read_compact(stream);
-        if (!expected_vector_size) return expected_vector_size.error();
-        if (*expected_vector_size == 0U) return Error::kMessagePayloadEmptyVector;
-        if (*expected_vector_size > kMaxAddrItems) return Error::kMessagePayloadOversizedVector;
-        identifiers_.resize(*expected_vector_size);
+        if (expected_vector_size.has_error()) return expected_vector_size.error();
+        if (expected_vector_size.value() == 0U) return Error::kMessagePayloadEmptyVector;
+        if (expected_vector_size.value() > kMaxAddrItems) return Error::kMessagePayloadOversizedVector;
+        identifiers_.resize(expected_vector_size.value());
         for (auto& item : identifiers_) {
-            if (ret != Error::kSuccess) break;
-            ret = item.deserialize(stream);
+            if (auto result = item.deserialize(stream); result.has_error()) return result.error();
         }
     }
-
-    return ret;
+    return outcome::success();
 }
 }  // namespace zenpp::net

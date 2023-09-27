@@ -31,12 +31,12 @@ struct HumanSizeParserValidator : public CLI::Validator {
 
         func_ = [min, max](const std::string& value) -> std::string {
             auto parsed_size{parse_human_bytes(value)};
-            if (not parsed_size) {
+            if (parsed_size.has_error()) {
                 return std::string("Value " + value + " is not a parseable size");
             }
-            const auto min_size{*parse_human_bytes(min)};
-            const auto max_size{max.has_value() ? *parse_human_bytes(max.value()) : UINT64_MAX};
-            if (*parsed_size < min_size or *parsed_size > max_size) {
+            const auto min_size{parse_human_bytes(min).value()};
+            const auto max_size{max.has_value() ? parse_human_bytes(max.value()).value() : UINT64_MAX};
+            if (parsed_size.value() < min_size or parsed_size.value() > max_size) {
                 return "Value " + value + " not in range " + min + " to " + (max.has_value() ? max.value() : "inf");
             }
             return {};

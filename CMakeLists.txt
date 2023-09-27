@@ -238,6 +238,8 @@ else ()
     add_compile_options(/we4267)  # Signedness
     add_compile_options(/we4389)  # Signedness
 
+    add_compile_options(/we4715)  # Not all control paths return a value
+
     add_compile_options(/we6244)  # Equivalent to -Wshadow
     add_compile_options(/we6246)  # Equivalent to -Wshadow
 

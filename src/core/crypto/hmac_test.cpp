@@ -15,17 +15,18 @@ namespace zenpp::crypto {
 TEST_CASE("Hmac test vectors", "[crypto]") {
     // See https://www.rfc-editor.org/rfc/rfc4231
     static const std::vector<std::pair<std::string, std::string>> inputs{
-        {hex::encode(Bytes(20, 0x0b)), hex::encode(string_view_to_byte_view("Hi There"))},  // Test 1
-        {hex::encode(string_view_to_byte_view("Jefe")),
-         hex::encode(string_view_to_byte_view("what do ya want for nothing?"))},                        // Test 2
-        {std::string(40, 'a'), std::string(100, 'd')},                                                  // Test 3
-        {"0102030405060708090a0b0c0d0e0f10111213141516171819", hex::encode(Bytes(50, 0xcd))},           // Test 4
-        {hex::encode(Bytes(20, 0x0c)), hex::encode(string_view_to_byte_view("Test With Truncation"))},  // Test 5
+        {enc::hex::encode(Bytes(20, 0x0b)), enc::hex::encode(string_view_to_byte_view("Hi There"))},  // Test 1
+        {enc::hex::encode(string_view_to_byte_view("Jefe")),
+         enc::hex::encode(string_view_to_byte_view("what do ya want for nothing?"))},               // Test 2
+        {std::string(40, 'a'), std::string(100, 'd')},                                              // Test 3
+        {"0102030405060708090a0b0c0d0e0f10111213141516171819", enc::hex::encode(Bytes(50, 0xcd))},  // Test 4
+        {enc::hex::encode(Bytes(20, 0x0c)),
+         enc::hex::encode(string_view_to_byte_view("Test With Truncation"))},  // Test 5
         {std::string(262, 'a'),
-         hex::encode(string_view_to_byte_view("Test Using Larger Than Block-Size Key - Hash Key First"))},  // Test
-                                                                                                            // 6
+         enc::hex::encode(string_view_to_byte_view("Test Using Larger Than Block-Size Key - Hash Key First"))},  // Test
+                                                                                                                 // 6
         {std::string(262, 'a'),
-         hex::encode(string_view_to_byte_view(
+         enc::hex::encode(string_view_to_byte_view(
              "This is a test using a larger than block-size key and a larger than block-size data. The key needs to be "
              "hashed before being used by the HMAC algorithm."))},  // Test 7
     };

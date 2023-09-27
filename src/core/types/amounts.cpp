@@ -67,7 +67,7 @@ outcome::result<Amount> Amount::from_string(const std::string& input) {
     const auto fract{fract_part.empty() ? 0L : boost::lexical_cast<int64_t>(fract_part)};
     const auto value{whole * kCoin + fract};
     Amount ret(value);
-    if (not ret.valid_money()) return boost::system::errc::invalid_argument;
+    if (not ret.valid_money()) return boost::system::errc::result_out_of_range;
     return ret;
 }
 

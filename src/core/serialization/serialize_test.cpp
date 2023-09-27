@@ -68,7 +68,7 @@ TEST_CASE("Serialization stream", "[serialization]") {
     CHECK(stream.eof());
 
     Bytes data{0x00, 0x01, 0x02, 0xff};
-    stream.write(data);
+    REQUIRE_FALSE(stream.write(data).has_error());
     CHECK(stream.size() == data.size());
     CHECK(stream.avail() == data.size());
 
@@ -107,7 +107,7 @@ TEST_CASE("Serialization stream", "[serialization]") {
     CHECK(stream[3] == 0xff);
 
     SDataStream dst(Scope::kStorage, 0);
-    stream.get_clear(dst);
+    REQUIRE_FALSE(stream.get_clear(dst).has_error());
     CHECK(stream.eof());
     CHECK(dst.avail() == data.size());
 }
@@ -117,24 +117,24 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         SDataStream stream(Scope::kStorage, 0);
 
         uint8_t u8{0x10};
-        write_data(stream, u8);
+        REQUIRE_FALSE(write_data(stream, u8).has_error());
         CHECK(stream.size() == ser_sizeof(u8));
         uint16_t u16{0x10};
-        write_data(stream, u16);
+        REQUIRE_FALSE(write_data(stream, u16).has_error());
         CHECK(stream.size() == ser_sizeof(u8) + ser_sizeof(u16));
         uint32_t u32{0x10};
-        write_data(stream, u32);
+        REQUIRE_FALSE(write_data(stream, u32).has_error());
         CHECK(stream.size() == ser_sizeof(u8) + ser_sizeof(u16) + ser_sizeof(u32));
         uint64_t u64{0x10};
-        write_data(stream, u64);
+        REQUIRE_FALSE(write_data(stream, u64).has_error());
         CHECK(stream.size() == ser_sizeof(u8) + ser_sizeof(u16) + ser_sizeof(u32) + ser_sizeof(u64));
 
         float f{1.05f};
-        write_data(stream, f);
+        REQUIRE_FALSE(write_data(stream, f).has_error());
         CHECK(stream.size() == ser_sizeof(u8) + ser_sizeof(u16) + ser_sizeof(u32) + ser_sizeof(u64) + ser_sizeof(f));
 
         double d{f * 2};
-        write_data(stream, d);
+        REQUIRE_FALSE(write_data(stream, d).has_error());
         CHECK(stream.size() ==
               ser_sizeof(u8) + ser_sizeof(u16) + ser_sizeof(u32) + ser_sizeof(u64) + ser_sizeof(f) + ser_sizeof(d));
     }
@@ -142,119 +142,119 @@ TEST_CASE("Serialization of base types", "[serialization]") {
     SECTION("Floats serialization", "[serialization]") {
         static const double f64v{19880124.0};
         SDataStream stream(Scope::kStorage, 0);
-        write_data(stream, f64v);
+        REQUIRE_FALSE(write_data(stream, f64v).has_error());
         CHECK(stream.to_string() == "000000c08bf57241");
 
         stream.clear();
         for (int i{0}; i < 1000; ++i) {
-            write_data(stream, double(i));
+            std::ignore = write_data(stream, double(i));
         }
 
         // Get Double SHA256 bitcoin like style
         crypto::Sha256 hasher;
-        hasher.update(*stream.read(stream.avail()));
+        hasher.update(stream.read(stream.avail()).value());
         auto hash{hasher.finalize()};
         hasher.init();
         hasher.update(hash);
         hash.assign(hasher.finalize());
-        auto hexed_hash{hex::encode(hash)};
+        auto hexed_hash{enc::hex::encode(hash)};
         // Same as bitcoin tests but with the hex reversed as uint256S uses base_blob<BITS>::SetHex which processes
         // the string from the bottom
-        CHECK(hexed_hash == hex::reverse_hex("43d0c82591953c4eafe114590d392676a01585d25b25d433557f0d7878b23f96"));
+        CHECK(hexed_hash == enc::hex::reverse_hex("43d0c82591953c4eafe114590d392676a01585d25b25d433557f0d7878b23f96"));
 
         stream.seekg(0);
         for (int i{0}; i < 1000; ++i) {
-            const auto returned_value{read_data<double>(stream)};
-            REQUIRE(returned_value);
-            CHECK(*returned_value == double(i));
+            const auto returned{read_data<double>(stream)};
+            REQUIRE_FALSE(returned.has_error());
+            CHECK(returned.value() == double(i));
         }
 
         stream.clear();
         for (int i{0}; i < 1000; ++i) {
-            write_data(stream, float(i));
+            std::ignore = write_data(stream, float(i));
         }
 
         hasher.init();
-        hasher.update(*stream.read(stream.avail()));
+        hasher.update(stream.read(stream.avail()).value());
         hash.assign(hasher.finalize());
         hasher.init();
         hasher.update(hash);
         hash.assign(hasher.finalize());
-        hexed_hash.assign(hex::encode(hash));
-        CHECK(hexed_hash == hex::reverse_hex("8e8b4cf3e4df8b332057e3e23af42ebc663b61e0495d5e7e32d85099d7f3fe0c"));
+        hexed_hash.assign(enc::hex::encode(hash));
+        CHECK(hexed_hash == enc::hex::reverse_hex("8e8b4cf3e4df8b332057e3e23af42ebc663b61e0495d5e7e32d85099d7f3fe0c"));
 
         stream.seekg(0);
         for (int i{0}; i < 1000; ++i) {
-            const auto returned_value{read_data<float>(stream)};
-            REQUIRE(returned_value);
-            CHECK(*returned_value == float(i));
+            const auto returned{read_data<float>(stream)};
+            REQUIRE_FALSE(returned.has_error());
+            CHECK(returned.value() == float(i));
         }
     }
 
     SECTION("Write compact") {
         SDataStream stream(Scope::kStorage, 0);
         uint64_t value{0};
-        write_compact(stream, value);
+        REQUIRE_FALSE(write_compact(stream, value).has_error());
         CHECK(stream.size() == 1);
 
         auto read_bytes(stream.read(stream.avail()));
-        REQUIRE(read_bytes);
-        CHECK(hex::encode(*read_bytes) == "00");
+        REQUIRE_FALSE(read_bytes.has_error());
+        CHECK(enc::hex::encode(read_bytes.value()) == "00");
         CHECK(stream.eof());
 
         stream.clear();
         value = 0xfc;
-        write_compact(stream, value);
+        REQUIRE_FALSE(write_compact(stream, value).has_error());
         CHECK(stream.size() == 1);
         read_bytes = stream.read(1);
-        REQUIRE(read_bytes);
-        CHECK(hex::encode(*read_bytes) == "fc");
+        REQUIRE_FALSE(read_bytes.has_error());
+        CHECK(enc::hex::encode(read_bytes.value()) == "fc");
         CHECK(stream.eof());
 
         stream.clear();
         value = 0xfffe;
-        write_compact(stream, value);
+        REQUIRE_FALSE(write_compact(stream, value).has_error());
         CHECK(stream.size() == 3);
         read_bytes = stream.read(1);
         REQUIRE(read_bytes);
-        CHECK(hex::encode(*read_bytes) == "fd");
+        CHECK(enc::hex::encode(read_bytes.value()) == "fd");
         CHECK(stream.tellg() == 1);
         read_bytes = stream.read(stream.avail());
         REQUIRE(read_bytes);
-        CHECK(hex::encode(*read_bytes) == "feff" /*swapped*/);
+        CHECK(enc::hex::encode(read_bytes.value()) == "feff" /*swapped*/);
         CHECK(stream.eof());
 
         stream.clear();
         value = 0xfffffffe;
-        write_compact(stream, value);
+        REQUIRE_FALSE(write_compact(stream, value).has_error());
         CHECK(stream.size() == 5);
         read_bytes = stream.read(1);
         REQUIRE(read_bytes);
-        CHECK(hex::encode(*read_bytes) == "fe");
+        CHECK(enc::hex::encode(read_bytes.value()) == "fe");
         CHECK(stream.tellg() == 1);
         read_bytes = stream.read(stream.avail());
         REQUIRE(read_bytes);
-        CHECK(hex::encode(*read_bytes) == "feffffff" /*swapped*/);
+        CHECK(enc::hex::encode(read_bytes.value()) == "feffffff" /*swapped*/);
         CHECK(stream.eof());
 
         stream.clear();
         value = 0xffffffffa0;
-        write_compact(stream, value);
+        REQUIRE_FALSE(write_compact(stream, value).has_error());
         CHECK(stream.size() == 9);
         read_bytes = stream.read(1);
         REQUIRE(read_bytes);
-        CHECK(hex::encode(*read_bytes) == "ff");
+        CHECK(enc::hex::encode(read_bytes.value()) == "ff");
         CHECK(stream.tellg() == 1);
         read_bytes = stream.read(stream.avail());
         REQUIRE(read_bytes);
-        CHECK(hex::encode(*read_bytes) == "a0ffffffff000000" /*swapped*/);
+        CHECK(enc::hex::encode(read_bytes.value()) == "a0ffffffff000000" /*swapped*/);
 
         // Try read more bytes than avail
         stream.clear();
-        write_compact(stream, value);
+        REQUIRE_FALSE(write_compact(stream, value).has_error());
         read_bytes = stream.read(stream.avail() + 1);
-        REQUIRE_FALSE(read_bytes);
-        CHECK(read_bytes.error() == Error::kReadBeyondData);
+        REQUIRE(read_bytes.has_error());
+        REQUIRE(read_bytes.error().value() == static_cast<int>(Error::kReadOverflow));
     }
 
     SECTION("Read Compact", "[serialization]") {
@@ -262,17 +262,17 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         DataStream::size_type i;
 
         for (i = 1; i <= kMaxSerializedCompactSize; i *= 2) {
-            write_compact(stream, i - 1);
-            write_compact(stream, i);
+            std::ignore = write_compact(stream, i - 1);
+            std::ignore = write_compact(stream, i);
         }
 
         for (i = 1; i <= kMaxSerializedCompactSize; i *= 2) {
-            auto value{read_compact(stream)};
-            REQUIRE(value);
-            CHECK(*value == i - 1);
-            value = read_compact(stream);
-            REQUIRE(value);
-            CHECK(*value == i);
+            auto result{read_compact(stream)};
+            REQUIRE_FALSE(result.has_error());
+            CHECK(result.value() == i - 1);
+            result = read_compact(stream);
+            REQUIRE_FALSE(result.has_error());
+            CHECK(result.value() == i);
         }
 
         // Should be consumed entirely
@@ -282,57 +282,57 @@ TEST_CASE("Serialization of base types", "[serialization]") {
     SECTION("Non Canonical Compact", "[serialization]") {
         SDataStream stream(Scope::kStorage, 0);
         auto value{read_compact(stream)};
-        REQUIRE_FALSE(value);
-        CHECK(value.error() == Error::kReadBeyondData);
+        REQUIRE(value.has_error());
+        CHECK(value.error().value() == static_cast<int>(Error::kReadOverflow));
 
         Bytes data{0xfd, 0x00, 0x00};  // Zero encoded with 3 bytes
-        stream.write(data);
+        REQUIRE_FALSE(stream.write(data).has_error());
         value = read_compact(stream);
         REQUIRE_FALSE(value);
-        CHECK(value.error() == Error::kNonCanonicalCompactSize);
+        CHECK(value.error().value() == static_cast<int>(Error::kNonCanonicalCompactSize));
 
         data.assign({0xfd, 0xfc, 0x00});  // 252 encoded with 3 bytes
-        stream.write(data);
+        REQUIRE_FALSE(stream.write(data).has_error());
         value = read_compact(stream);
         REQUIRE_FALSE(value);
-        CHECK(value.error() == Error::kNonCanonicalCompactSize);
+        CHECK(value.error().value() == static_cast<int>(Error::kNonCanonicalCompactSize));
 
         data.assign({0xfd, 0xfd, 0x00});  // 253 encoded with 3 bytes
-        stream.write(data);
+        REQUIRE_FALSE(stream.write(data).has_error());
         value = read_compact(stream);
         REQUIRE(value);
 
         data.assign({0xfe, 0x00, 0x00, 0x00, 0x00});  // Zero encoded with 5 bytes
-        stream.write(data);
+        REQUIRE_FALSE(stream.write(data).has_error());
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == Error::kNonCanonicalCompactSize);
+        CHECK(value.error().value() == static_cast<int>(Error::kNonCanonicalCompactSize));
 
         data.assign({0xfe, 0xff, 0xff, 0x00, 0x00});  // 0xffff encoded with 5 bytes
-        stream.write(data);
+        REQUIRE_FALSE(stream.write(data).has_error());
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == Error::kNonCanonicalCompactSize);
+        CHECK(value.error().value() == static_cast<int>(Error::kNonCanonicalCompactSize));
 
         data.assign({0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00});  // Zero encoded with 9 bytes
-        stream.write(data);
+        REQUIRE_FALSE(stream.write(data).has_error());
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == Error::kNonCanonicalCompactSize);
+        CHECK(value.error().value() == static_cast<int>(Error::kNonCanonicalCompactSize));
 
         data.assign({0xff, 0xff, 0xff, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00});  // 0x01ffffff encoded with nine bytes
-        stream.write(data);
+        REQUIRE_FALSE(stream.write(data).has_error());
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == Error::kNonCanonicalCompactSize);
+        CHECK(value.error().value() == static_cast<int>(Error::kNonCanonicalCompactSize));
 
         const uint32_t too_big_value{kMaxSerializedCompactSize + 1};
         Bytes too_big_data(reinterpret_cast<const uint8_t*>(&too_big_value), sizeof(too_big_value));
         too_big_data.insert(too_big_data.begin(), 0xfe);
-        stream.write(too_big_data);
+        REQUIRE_FALSE(stream.write(too_big_data).has_error());
         value = read_compact(stream);
         CHECK_FALSE(value);
-        CHECK(value.error() == Error::kCompactSizeTooBig);
+        CHECK(value.error().value() == static_cast<int>(Error::kCompactSizeTooBig));
     }
 }
 }  // namespace zenpp::ser

@@ -8,11 +8,10 @@
 
 #include <catch2/catch.hpp>
 
-#include <core/common/cast.hpp>
 #include <core/encoding/base58.hpp>
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::base58 {
+namespace zenpp::enc::base58 {
 
 // See https://github.com/status-im/nim-stew/blob/master/tests/test_base58.nim
 // Checked they're the same as Zen old code base
@@ -45,9 +44,9 @@ TEST_CASE("Base58 encoding", "[encoding]") {
     for (const auto& [input, expected_output] : tests) {
         const auto bytes{hex::decode(input)};
         REQUIRE(bytes);
-        const auto output{base58::encode(*bytes)};
+        const auto output{base58::encode(bytes.value())};
         REQUIRE(output);
-        CHECK(*output == expected_output);
+        CHECK(output.value() == expected_output);
     }
 }
 
@@ -55,7 +54,7 @@ TEST_CASE("Base58 decoding", "[encoding]") {
     for (const auto& [expected_output, input] : tests) {
         const auto output{base58::decode(input)};
         REQUIRE(output);
-        const auto hexed{hex::encode(*output)};
+        const auto hexed{hex::encode(output.value())};
         CHECK(hexed == expected_output);
     }
 }
@@ -65,15 +64,14 @@ TEST_CASE("Base58 encode/decode with checksum", "[encoding]") {
         std::ignore = not_checksummed_output;
         const auto input_bytes{hex::decode(input)};
         REQUIRE(input_bytes);
-        const auto checksum_encoded{encode_check(*input_bytes)};
-        REQUIRE(checksum_encoded);
+        const auto checksum_encoded{encode_check(input_bytes.value())};
 
-        const auto checksum_decoded{decode_check(*checksum_encoded)};
+        REQUIRE(checksum_encoded);
+        const auto checksum_decoded{decode_check(checksum_encoded.value())};
         REQUIRE(checksum_decoded);
 
-        const auto hexed_checksum_decoded{hex::encode(*checksum_decoded)};
+        const auto hexed_checksum_decoded{hex::encode(checksum_decoded.value())};
         CHECK(hexed_checksum_decoded == input);
     }
 }
-
-}  // namespace zenpp::base58
+}  // namespace zenpp::enc::base58

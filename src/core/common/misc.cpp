@@ -28,7 +28,7 @@ std::string abridge(std::string_view input, size_t length) {
     return abridged;
 }
 
-tl::expected<uint64_t, DecodingError> parse_human_bytes(const std::string& input) {
+outcome::result<uint64_t> parse_human_bytes(const std::string& input) {
     if (input.empty()) {
         return 0ULL;
     }
@@ -37,7 +37,7 @@ tl::expected<uint64_t, DecodingError> parse_human_bytes(const std::string& input
                                     std::regex_constants::icase};
     std::smatch matches;
     if (!std::regex_search(input, matches, pattern, std::regex_constants::match_default)) {
-        return tl::unexpected{DecodingError::kInvalidInput};
+        return boost::system::errc::invalid_argument;
     }
 
     uint64_t multiplier{1};  // Default for bytes (B|b)

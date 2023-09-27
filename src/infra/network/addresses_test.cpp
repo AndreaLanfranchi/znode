@@ -134,12 +134,12 @@ TEST_CASE("IPAddress Reservations", "[infra][net][addresses]") {
         REQUIRE(parsed.has_value());
         CHECK_FALSE(parsed.value().is_unspecified());
 
-        const auto address{parsed.value()};
+        const auto& address{parsed.value()};
         std::string address_hexed{};
         if (address->is_v4()) {
-            address_hexed = hex::encode(address->to_v4().to_bytes());
+            address_hexed = enc::hex::encode(address->to_v4().to_bytes());
         } else {
-            address_hexed = hex::encode(address->to_v6().to_bytes());
+            address_hexed = enc::hex::encode(address->to_v6().to_bytes());
         }
         const auto expected_reservation{std::string(magic_enum::enum_name(reservation)) + " " + address_hexed};
         const auto actual_reservation{std::string(magic_enum::enum_name(address.address_reservation())) + " " +
@@ -172,7 +172,7 @@ TEST_CASE("IPSubNet parsing", "[infra][net][addresses]") {
         const auto parsed{IPSubNet::from_string(input)};
         if (expected_valid) {
             REQUIRE(parsed.has_value());
-            const auto subnet{parsed.value()};
+            const auto& subnet{parsed.value()};
             CHECK(subnet.is_valid());
             CHECK(subnet.base_address_.get_type() == address_type);
             CHECK(subnet.prefix_length_ == prefix_length);
@@ -205,11 +205,11 @@ TEST_CASE("IPSubNet contains", "[infra][net][addresses]") {
     for (const auto& test_case : test_cases) {
         const auto parsed_subnet{IPSubNet::from_string(test_case.subnet)};
         REQUIRE(parsed_subnet.has_value());
-        const auto subnet{parsed_subnet.value()};
+        const auto& subnet{parsed_subnet.value()};
         CHECK(subnet.is_valid());
         const auto parsed_address{IPAddress::from_string(test_case.address)};
         REQUIRE(parsed_address.has_value());
-        const auto address{parsed_address.value()};
+        const auto& address{parsed_address.value()};
         CHECK(address.is_valid());
         CHECK(subnet.contains(address) == test_case.expected);
     }
@@ -258,7 +258,7 @@ TEST_CASE("Network Endpoint Parsing", "[infra][net][addresses]") {
         } else {
             REQUIRE_FALSE(parsed.has_error());
             REQUIRE(parsed.has_value());
-            const auto endpoint{parsed.value()};
+            const auto& endpoint{parsed.value()};
             CHECK(endpoint.is_valid() == test_case.expected_valid);
             CHECK(endpoint.address_.to_string() == test_case.expected_address);
             CHECK(endpoint.port_ == test_case.expected_port);
@@ -276,7 +276,7 @@ TEST_CASE("Network Service Serialization", "[infra][net][addresses][serializatio
     ser::SDataStream stream(ser::Scope::kNetwork, 0);
     CHECK(service.serialized_size(stream) == 30);
     stream.clear();
-    REQUIRE(service.serialize(stream) == ser::Error::kSuccess);
+    REQUIRE_FALSE(service.serialize(stream).has_error());
 
     // See https://en.bitcoin.it/wiki/Protocol_documentation#Network_address
     const std::string expected_hex_dump(
@@ -288,7 +288,7 @@ TEST_CASE("Network Service Serialization", "[infra][net][addresses][serializatio
     CHECK(stream.to_string() == expected_hex_dump);
 
     NodeService service2{};
-    REQUIRE(service2.deserialize(stream) == ser::Error::kSuccess);
+    REQUIRE_FALSE(service2.deserialize(stream).has_error());
     CHECK(service2.services_ == service.services_);
     CHECK(service2.endpoint_ == service.endpoint_);
 }

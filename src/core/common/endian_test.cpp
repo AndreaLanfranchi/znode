@@ -67,10 +67,10 @@ TEST_CASE("64 bit", "[endianness]") {
 
 TEST_CASE("Byte swapping", "[endianness]") {
     uint64_t value{0x123456789abcdef0};
-    CHECK(hex::encode(value, true) == "0x123456789abcdef0");
+    CHECK(enc::hex::encode(value, true) == "0x123456789abcdef0");
     auto value_swapped = std::byteswap(value);
-    CHECK(hex::encode(value_swapped, true) == "0xf0debc9a78563412");
-    CHECK(hex::reverse_hex(hex::encode(value, true)) == "0xf0debc9a78563412");
+    CHECK(enc::hex::encode(value_swapped, true) == "0xf0debc9a78563412");
+    CHECK(enc::hex::reverse_hex(enc::hex::encode(value, true)) == "0xf0debc9a78563412");
 }
 
 }  // namespace zenpp::endian

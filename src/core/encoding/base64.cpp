@@ -13,7 +13,7 @@
 
 #include <core/common/cast.hpp>
 
-namespace zenpp::base64 {
+namespace zenpp::enc::base64 {
 
 // Inspired by https://stackoverflow.com/questions/5288076/base64-encoding-and-decoding-with-openssl
 
@@ -23,10 +23,10 @@ namespace {
     };
 }  // namespace
 
-tl::expected<std::string, EncodingError> encode(ByteView bytes) noexcept {
+outcome::result<std::string> encode(ByteView bytes) noexcept {
     if (bytes.empty()) return std::string{};
     if (bytes.length() > (std::numeric_limits<std::string::size_type>::max() / 4U) * 3U) {
-        return tl::unexpected(EncodingError::kInputTooLong);
+        return Error::kInputTooLarge;
     }
 
     const std::unique_ptr<BIO, BIOFreeAll> b64(BIO_new(BIO_f_base64()));
@@ -37,7 +37,7 @@ tl::expected<std::string, EncodingError> encode(ByteView bytes) noexcept {
 
     while (BIO_write(b64.get(), bytes.data(), static_cast<int>(bytes.length())) <= 0) {
         if (BIO_should_retry(b64.get())) continue;
-        return tl::unexpected(EncodingError::kUnexpectedError);
+        return Error::kUnexpectedError;
     }
 
     BIO_flush(b64.get());
@@ -46,11 +46,11 @@ tl::expected<std::string, EncodingError> encode(ByteView bytes) noexcept {
     return std::string(encoded, static_cast<std::string::size_type>(encoded_len));
 }
 
-tl::expected<std::string, EncodingError> encode(std::string_view data) noexcept {
+outcome::result<std::string> encode(std::string_view data) noexcept {
     return encode(zenpp::string_view_to_byte_view(data));
 }
 
-tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
+outcome::result<Bytes> decode(std::string_view input) noexcept {
     if (input.empty()) return Bytes();
     const std::unique_ptr<BIO, BIOFreeAll> b64(BIO_new(BIO_f_base64()));
     BIO_set_flags(b64.get(), BIO_FLAGS_BASE64_NO_NL);
@@ -59,9 +59,8 @@ tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept {
     const auto maxlen{input.size() / 4U * 3U + 1U};
     Bytes ret(maxlen, '\0');
     const auto effective_len{BIO_read(b64.get(), ret.data(), static_cast<int>(maxlen))};
-    if (effective_len <= 0) return tl::unexpected(DecodingError::kInvalidBase64Input);
+    if (effective_len <= 0) return Error::kIllegalBase64Digit;
     ret.resize(static_cast<std::string::size_type>(effective_len));
     return ret;
 }
-
-}  // namespace zenpp::base64
+}  // namespace zenpp::enc::base64

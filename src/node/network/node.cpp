@@ -120,10 +120,9 @@ uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
     ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
     MsgPingPongPayload pong_payload{};
     pong_payload.nonce_ = ping_nonce_.load();
-    const auto ret{push_message(MessageType::kPing, pong_payload)};
-    if (ret not_eq ser::Error::kSuccess) {
+    if (const auto result{push_message(MessageType::kPing, pong_payload)}; result.has_error()) {
         const std::list<std::string> log_params{"action",  __func__, "status",
-                                                "failure", "reason", std::string(magic_enum::enum_name(ret))};
+                                                "failure", "reason", result.error().message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
         stop(false);
         return 0U;
@@ -196,7 +195,7 @@ void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
         print_log(log::Level::kTrace, log_params);
     }
     start_read();
-    push_message(MessageType::kVersion, local_version_);
+    std::ignore = push_message(MessageType::kVersion, local_version_);
 }
 
 void Node::start_read() {
@@ -231,9 +230,9 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         on_data_(DataDirectionMode::kInbound, bytes_transferred);
 
         const auto parse_result{parse_messages(bytes_transferred)};
-        if (ser::is_fatal_error(parse_result)) {
-            const std::list<std::string> log_params{"action", __func__, "status",
-                                                    std::string(magic_enum::enum_name(parse_result))};
+        if (parse_result.has_error() and
+            parse_result.error().default_error_condition() not_eq boost::system::errc::operation_in_progress) {
+            const std::list<std::string> log_params{"action", __func__, "status", parse_result.error().message()};
             print_log(log::Level::kError, log_params, " Disconnecting ...");
             stop(false);
             return;
@@ -284,16 +283,16 @@ void Node::start_write() {
             print_log(log::Level::kTrace, log_params);
         }
 
-        auto error{
+        const auto result{
             validate_message_for_protocol_handshake(DataDirectionMode::kOutbound, outbound_message_->get_type())};
-        if (error not_eq ser::Error::kSuccess) [[unlikely]] {
+        if (result.has_error()) [[unlikely]] {
             if (log::test_verbosity(log::Level::kError)) {
                 // TODO : Should we drop the connection here?
                 // Actually outgoing messages' correct sequence is local responsibility
                 // maybe we should either assert or push back the message into the queue
                 const std::list<std::string> log_params{
                     "action", __func__,  "message", std::string(magic_enum::enum_name(outbound_message_->get_type())),
-                    "status", "failure", "reason",  std::string(magic_enum::enum_name(error))};
+                    "status", "failure", "reason",  result.error().message()};
                 print_log(log::Level::kError, log_params, "Disconnecting peer but is local fault ...");
             }
             outbound_message_.reset();
@@ -324,7 +323,8 @@ void Node::start_write() {
     const auto bytes_to_write{std::min(kMaxBytesPerIO, outbound_message_->data().avail())};
     const auto data{outbound_message_->data().read(bytes_to_write)};
     ASSERT_POST(data and "Must have data to write");
-    send_buffer_.sputn(reinterpret_cast<const char*>(data->data()), static_cast<std::streamsize>(data->size()));
+    send_buffer_.sputn(reinterpret_cast<const char*>(data.value().data()),
+                       static_cast<std::streamsize>(data.value().size()));
 
     auto write_handler{
         [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
@@ -379,29 +379,29 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     }
 }
 
-ser::Error Node::push_message(const MessageType message_type, MessagePayload& payload) {
+outcome::result<void> Node::push_message(const MessageType message_type, MessagePayload& payload) {
     using namespace ser;
     using enum Error;
 
     auto new_message{std::make_unique<Message>(version_)};
-    auto err{new_message->push(message_type, payload, app_settings_.chain_config->magic_)};
-    if (err not_eq kSuccess) {
+    auto result{new_message->push(message_type, payload, app_settings_.chain_config->magic_)};
+    if (result.has_error()) {
         if (log::test_verbosity(log::Level::kError)) {
             const std::list<std::string> log_params{"action",  __func__, "status",
-                                                    "failure", "reason", std::string{magic_enum::enum_name(err)}};
+                                                    "failure", "reason", result.error().message()};
             print_log(log::Level::kError, log_params);
         }
-        return err;
+        return result.error();
     }
     std::unique_lock lock(outbound_messages_mutex_);
     outbound_messages_.emplace_back(new_message.release());
     lock.unlock();
 
     boost::asio::post(io_strand_, [self{shared_from_this()}]() { self->start_write(); });
-    return kSuccess;
+    return outcome::success();
 }
 
-ser::Error Node::push_message(const MessageType message_type) {
+outcome::result<void> Node::push_message(const MessageType message_type) {
     MsgNullPayload null_payload{};
     return push_message(message_type, null_payload);
 }
@@ -413,38 +413,31 @@ void Node::end_inbound_message() {
     inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
 }
 
-ser::Error Node::parse_messages(const size_t bytes_transferred) {
-    using namespace ser;
-    using enum Error;
-    Error err{kSuccess};
-
+outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
     size_t messages_parsed{0};
+    outcome::result<void> result{outcome::success()};
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
+
     while (!data.empty()) {
         if (inbound_message_ == nullptr) begin_inbound_message();
-        err = inbound_message_->parse(data, app_settings_.chain_config->magic_);  // Consumes data
-        if (err == kMessageHeaderIncomplete) break;
-        if (is_fatal_error(err)) {
-            // Some debugging before exiting for fatal
-            if (log::test_verbosity(log::Level::kDebug)) {
-                switch (err) {
-                    using enum Error;
-                    case kMessageHeaderUnknownCommand:
-                        print_log(log::Level::kDebug,
-                                  {"action", __func__, "status", std::string(magic_enum::enum_name(err))},
-                                  std::string(reinterpret_cast<char*>(inbound_message_->header().command.data()), 12));
-                        break;
-                    default:
-                        break;
-                }
+        result = inbound_message_->parse(data, app_settings_.chain_config->magic_);  // Consumes data
+        if (result.has_error()) {
+            if (result.error() == net::Error::kMessageHeaderIncomplete) {
+                // We need more data to parse the header - assume success
+                result = outcome::success();
+                break;
+            }
+            if (result.error() == net::Error::kMessageHeaderIllegalCommand) {
+                print_log(log::Level::kDebug, {"action", __func__, "error", result.error().message()},
+                          std::string(reinterpret_cast<char*>(inbound_message_->header().command.data()), 12));
             }
             break;
         }
 
-        if (const auto protocol_error{
+        if (const auto handshake_result{
                 validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type())};
-            protocol_error not_eq kSuccess) {
-            err = protocol_error;
+            handshake_result.has_error()) {
+            result = handshake_result.error();
             break;
         }
 
@@ -459,23 +452,25 @@ ser::Error Node::parse_messages(const size_t bytes_transferred) {
                 break;
         }
 
-        if (err == kMessageBodyIncomplete) break;  // Can't do anything but read other data
+        if (result.has_error() and result.error() == net::Error::kMessageBodyIncomplete) {
+            result = outcome::success();
+            break;  // Can't do anything but read other data
+        }
+
         if (++messages_parsed > kMaxMessagesPerRead) {
-            err = KMessagesFloodingDetected;
+            result = net::Error::kMessageFloodingDetected;
             break;
         }
 
-        if (err = process_inbound_message(); err not_eq kSuccess) break;
+        if (result = process_inbound_message(); result.has_error()) break;
         end_inbound_message();
     }
     receive_buffer_.consume(bytes_transferred);
-    return err;
+    return result;
 }
 
-ser::Error Node::process_inbound_message() {
-    using namespace ser;
-    using enum Error;
-    Error err{kSuccess};
+outcome::result<void> Node::process_inbound_message() {
+    outcome::result<void> result{outcome::success()};
     std::string err_extended_reason{};
     bool notify_node_hub{false};
 
@@ -486,10 +481,10 @@ ser::Error Node::process_inbound_message() {
     switch (inbound_message_->get_type()) {
         using enum MessageType;
         case kVersion:
-            if (err = remote_version_.deserialize(inbound_message_->data()); err not_eq kSuccess) break;
+            if (result = remote_version_.deserialize(inbound_message_->data()); result.has_error()) break;
             if (remote_version_.protocol_version_ < kMinSupportedProtocolVersion or
                 remote_version_.protocol_version_ > kMaxSupportedProtocolVersion) {
-                err = kInvalidProtocolVersion;
+                result = Error::kInvalidProtocolVersion;
                 err_extended_reason =
                     absl::StrCat("Expected in range [", kMinSupportedProtocolVersion, ", ",
                                  kMaxSupportedProtocolVersion, "] got", remote_version_.protocol_version_, ".");
@@ -507,9 +502,9 @@ ser::Error Node::process_inbound_message() {
                     "me",       remote_version_.recipient_service_.endpoint_.to_string()};
                 if (remote_version_.nonce_ not_eq local_version_.nonce_) {
                     print_log(log::Level::kInfo, log_params);
-                    err = push_message(MessageType::kVerAck);
+                    result = push_message(MessageType::kVerAck);
                 } else {
-                    err = kInvalidMessageState;
+                    result = Error::kConnectedToSelf;
                     err_extended_reason = "Connected to self ? (same nonce)";
                 }
             }
@@ -520,8 +515,8 @@ ser::Error Node::process_inbound_message() {
             break;
         case kPing: {
             MsgPingPongPayload ping_pong{};
-            if (err = ping_pong.deserialize(inbound_message_->data()); err == kSuccess) {
-                err = push_message(MessageType::kPong, ping_pong);
+            if (result = ping_pong.deserialize(inbound_message_->data()); not result.has_error()) {
+                result = push_message(MessageType::kPong, ping_pong);
             }
         } break;
         case kGetAddr:
@@ -538,14 +533,14 @@ ser::Error Node::process_inbound_message() {
         case kPong: {
             const auto expected_nonce{ping_nonce_.load()};
             if (expected_nonce == 0U) {
-                err = kInvalidMessageState;
+                result = Error::kUnsolicitedPong;
                 err_extended_reason = "Received an unrequested `pong` message.";
                 break;
             }
             MsgPingPongPayload ping_pong{};
-            if (err = ping_pong.deserialize(inbound_message_->data()); err not_eq kSuccess) break;
+            if (result = ping_pong.deserialize(inbound_message_->data()); result.has_error()) break;
             if (ping_pong.nonce_ not_eq expected_nonce) {
-                err = kMismatchingPingPongNonce;
+                result = Error::kInvalidPingPongNonce;
                 err_extended_reason = absl::StrCat("Expected ", expected_nonce, " got ", ping_pong.nonce_, ".");
                 break;
             }
@@ -567,13 +562,14 @@ ser::Error Node::process_inbound_message() {
             break;
     }
 
-    const bool is_fatal{is_fatal_error(err)};
+    const bool is_fatal{result.has_error() and
+                        result.error().default_error_condition() not_eq boost::system::errc::operation_in_progress};
     if (is_fatal or log::test_verbosity(log::Level::kTrace)) {
         const std::list<std::string> log_params{
             "action",  __func__,
             "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
             "size",    to_human_bytes(inbound_message_->size()),
-            "status",  std::string(magic_enum::enum_name(err))};
+            "status",  std::string(is_fatal ? result.error().message() : "success")};
         print_log(is_fatal ? log::Level::kWarning : log::Level::kTrace, log_params, err_extended_reason);
     }
     if (not is_fatal and notify_node_hub) {
@@ -583,12 +579,12 @@ ser::Error Node::process_inbound_message() {
         }
         on_message_(shared_from_this(), std::move(inbound_message_));
     }
-    return err;
+    return result;
 }
 
-ser::Error Node::validate_message_for_protocol_handshake(const DataDirectionMode direction,
-                                                         const MessageType message_type) {
-    using enum ser::Error;
+outcome::result<void> Node::validate_message_for_protocol_handshake(const DataDirectionMode direction,
+                                                                    const MessageType message_type) {
+    using enum net::Error;
 
     // During protocol handshake we only allow version and verack messages
     // After protocol handshake we only allow other messages
@@ -600,7 +596,7 @@ ser::Error Node::validate_message_for_protocol_handshake(const DataDirectionMode
             break;  // Continue with validation
         default:
             if (protocol_handshake_status_ not_eq ProtocolHandShakeStatus::kCompleted) return kInvalidProtocolHandShake;
-            return kSuccess;
+            return outcome::success();
     }
 
     uint32_t new_status_flag{0U};
@@ -625,7 +621,7 @@ ser::Error Node::validate_message_for_protocol_handshake(const DataDirectionMode
         on_handshake_completed();
     }
 
-    return kSuccess;
+    return outcome::success();
 }
 
 void Node::on_handshake_completed() {
@@ -633,7 +629,7 @@ void Node::on_handshake_completed() {
 
     // If this is a seeder node then we should send a `getaddr` message
     if (connection_.type_ == IPConnectionType::kSeedOutbound) {
-        push_message(MessageType::kGetAddr);
+        std::ignore = push_message(MessageType::kGetAddr);
     }
 
     // Lets' send out a ping immediately and start the timer

@@ -5,107 +5,109 @@
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
+#include <optional>
 #include <vector>
 
 #include <catch2/catch.hpp>
 
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::hex {
+namespace zenpp::enc::hex {
+namespace {
+    struct TestCaseDecodeHex {
+        std::string hexstring;
+        std::optional<enc::Error> expected;
+        Bytes bytes;
+    };
 
-struct TestCaseDecodeHex {
-    std::string hexstring;
-    DecodingError expected;
-    Bytes bytes;
-};
+    const std::vector<TestCaseDecodeHex> TestCasesDecodeHex{
+        {"0x", std::nullopt, {}},
+        {"0xg", enc::Error::kIllegalHexDigit, {}},
+        {"0", std::nullopt, {0x0}},
+        {"0x0", std::nullopt, {0x0}},
+        {"0xa", std::nullopt, {0x0a}},
+        {"0xa1f", std::nullopt, {0x0a, 0x1f}},
+        {"0x0a1f", std::nullopt, {0x0a, 0x1f}},
+        {"111111111111111111111111",
+         std::nullopt,
+         {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}}};
+}  // namespace
 
-static const std::vector<TestCaseDecodeHex> TestCasesDecodeHex{
-    {"0x", DecodingError::kSuccess, {}},
-    {"0xg", DecodingError::kInvalidHexDigit, {}},
-    {"0", DecodingError::kSuccess, {0x0}},
-    {"0x0", DecodingError::kSuccess, {0x0}},
-    {"0xa", DecodingError::kSuccess, {0x0a}},
-    {"0xa1f", DecodingError::kSuccess, {0x0a, 0x1f}},
-    {"0x0a1f", DecodingError::kSuccess, {0x0a, 0x1f}},
-    {"111111111111111111111111",
-     DecodingError::kSuccess,
-     {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11}}};
-
-TEST_CASE("Decoding Hex", "[encoding]") {
-    CHECK(hex::decode_digit('0'));
-    CHECK(hex::decode_digit('1'));
-    CHECK(hex::decode_digit('5'));
-    CHECK(hex::decode_digit('a'));
-    CHECK(hex::decode_digit('d'));
-    CHECK(hex::decode_digit('f'));
-    CHECK_FALSE(hex::decode_digit('g'));
+TEST_CASE("Decoding Hex", "[encoding][hex]") {
+    CHECK_FALSE(decode_digit('0').has_error());
+    CHECK_FALSE(decode_digit('1').has_error());
+    CHECK_FALSE(decode_digit('5').has_error());
+    CHECK_FALSE(decode_digit('a').has_error());
+    CHECK_FALSE(decode_digit('d').has_error());
+    CHECK_FALSE(decode_digit('f').has_error());
+    CHECK_FALSE(decode_digit('g'));
 
     for (const auto& test : TestCasesDecodeHex) {
-        auto parsed_bytes{hex::decode(test.hexstring)};
-        if (test.expected != DecodingError::kSuccess) {
-            REQUIRE_FALSE(parsed_bytes);
-            REQUIRE(parsed_bytes.error() == test.expected);
+        const auto parsed_bytes{decode(test.hexstring)};
+        if (test.expected.has_value()) {
+            REQUIRE(parsed_bytes.has_error());
+            REQUIRE(parsed_bytes.error().value() == static_cast<int>(test.expected.value()));
         } else {
-            REQUIRE(parsed_bytes);
-            REQUIRE(*parsed_bytes == test.bytes);
+            REQUIRE_FALSE(parsed_bytes.has_error());
+            REQUIRE(parsed_bytes.value() == test.bytes);
         }
     }
 }
 
-TEST_CASE("Hex encoding integrals", "[encoding]") {
+TEST_CASE("Hex encoding integrals", "[encoding]][hex]") {
     uint32_t value{0};
     std::string expected_hex = "0x00";
-    std::string obtained_hex = hex::encode(value, true);
+    std::string obtained_hex = encode(value, true);
     CHECK(expected_hex == obtained_hex);
     expected_hex = "00";
-    obtained_hex = hex::encode(value, false);
+    obtained_hex = encode(value, false);
     CHECK(expected_hex == obtained_hex);
 
     value = 10;
     expected_hex = "0x0a";
-    obtained_hex = hex::encode(value, true);
+    obtained_hex = encode(value, true);
     CHECK(expected_hex == obtained_hex);
     expected_hex = "0a";
-    obtained_hex = hex::encode(value, false);
+    obtained_hex = encode(value, false);
     CHECK(expected_hex == obtained_hex);
 
     value = 255;
     expected_hex = "0xff";
-    obtained_hex = hex::encode(value, true);
+    obtained_hex = encode(value, true);
     CHECK(expected_hex == obtained_hex);
     expected_hex = "ff";
-    obtained_hex = hex::encode(value, false);
+    obtained_hex = encode(value, false);
     CHECK(expected_hex == obtained_hex);
 
     uint8_t value1{10};
     expected_hex = "0x0a";
-    obtained_hex = hex::encode(value1, true);
+    obtained_hex = encode(value1, true);
     CHECK(expected_hex == obtained_hex);
     expected_hex = "0a";
-    obtained_hex = hex::encode(value1, false);
+    obtained_hex = encode(value1, false);
     CHECK(expected_hex == obtained_hex);
 
     uint64_t value2{10};
     expected_hex = "0x0a";
-    obtained_hex = hex::encode(value2, true);
+    obtained_hex = encode(value2, true);
     CHECK(expected_hex == obtained_hex);
     expected_hex = "0a";
-    obtained_hex = hex::encode(value2, false);
+    obtained_hex = encode(value2, false);
     CHECK(expected_hex == obtained_hex);
 }
 
-TEST_CASE("Hex encoding big integrals", "[encoding]") {
+TEST_CASE("Hex encoding big integrals", "[encoding]][hex]") {
     uint256_t value("1182508626613988427021106");
     std::string expected_hex = "fa67ebcd123450abbb32";
-    std::string obtained_hex = hex::encode(value, false);
+    std::string obtained_hex = encode(value, false);
     CHECK(expected_hex == obtained_hex);
     expected_hex = "0xfa67ebcd123450abbb32";
-    obtained_hex = hex::encode(value, true);
+    obtained_hex = encode(value, true);
     CHECK(expected_hex == obtained_hex);
 
-    auto decoded{hex::decode(expected_hex)};
-    REQUIRE(decoded);
-    uint256_t decoded_value{decoded.value()};
+    auto decoded_bytes{decode(expected_hex)};
+    REQUIRE(decoded_bytes);
+    uint256_t decoded_value{decoded_bytes.value()};
     CHECK(decoded_value == value);
 }
-}  // namespace zenpp::hex
+}  // namespace zenpp::enc::hex

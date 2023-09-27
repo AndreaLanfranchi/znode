@@ -93,7 +93,7 @@ class IPAddress : public ser::Serializable {
   private:
     boost::asio::ip::address value_{boost::asio::ip::address_v4()};
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
     [[nodiscard]] IPAddressReservationType address_v4_reservation() const noexcept;
     [[nodiscard]] IPAddressReservationType address_v6_reservation() const noexcept;
 };
@@ -126,7 +126,7 @@ class IPEndpoint : public ser::Serializable {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class IPSubNet {
@@ -220,7 +220,7 @@ class NodeService : public ser::Serializable {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 //! \brief VersionNodeService subclasses NodeService only to customize serialization
@@ -232,7 +232,7 @@ class VersionNodeService : public NodeService {
 
   private:
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 }  // namespace zenpp::net
 

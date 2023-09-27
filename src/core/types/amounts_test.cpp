@@ -67,7 +67,7 @@ TEST_CASE("Amounts", "[types]") {
     input = std::to_string(kCoinMaxSupply + 2);  // To cause overflow on range
     parsed = Amount::from_string(input);
     CHECK_FALSE(parsed);
-    CHECK(parsed.error() == boost::system::errc::invalid_argument);
+    CHECK(parsed.error().value() == static_cast<int>(boost::system::errc::result_out_of_range));
 
     std::string decimals(kCoinMaxDecimals, '1');
     decimals.push_back('1');  // Exceed the amount of allowed digits

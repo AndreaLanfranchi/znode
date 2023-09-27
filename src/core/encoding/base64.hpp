@@ -6,23 +6,21 @@
 
 #pragma once
 
-#include <tl/expected.hpp>
-
 #include <core/common/base.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zenpp::base64 {
+namespace zenpp::enc::base64 {
 
 //! \brief Returns a string of ascii chars with the base64 representation of input
 //! \remark If provided an empty input the return string is empty as well
-[[nodiscard]] tl::expected<std::string, EncodingError> encode(ByteView bytes) noexcept;
+[[nodiscard]] outcome::result<std::string> encode(ByteView bytes) noexcept;
 
 //! \brief Returns a string of ascii chars with the base64 representation of input
 //! \remark If provided an empty input the return string is empty as well
-[[nodiscard]] tl::expected<std::string, EncodingError> encode(std::string_view data) noexcept;
+[[nodiscard]] outcome::result<std::string> encode(std::string_view data) noexcept;
 
 //! \brief Returns a string of bytes with the decoded base64 payload
 //! \remark If provided an empty input the returned bytes are empty as well
-[[nodiscard]] tl::expected<Bytes, DecodingError> decode(std::string_view input) noexcept;
+[[nodiscard]] outcome::result<Bytes> decode(std::string_view input) noexcept;
 
-}  // namespace zenpp::base64
+}  // namespace zenpp::enc::base64

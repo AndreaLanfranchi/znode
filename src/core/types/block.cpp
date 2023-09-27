@@ -21,18 +21,16 @@ void BlockHeader::reset() {
     solution.clear();
 }
 
-ser::Error BlockHeader::serialization(ser::SDataStream& stream, ser::Action action) {
-    using namespace ser;
-    using enum Error;
-    Error error{stream.bind(version, action)};
-    if (!error) stream.set_version(version);
-    if (!error) error = stream.bind(parent_hash, action);
-    if (!error) error = stream.bind(merkle_root, action);
-    if (!error) error = stream.bind(scct_root, action);
-    if (!error) error = stream.bind(time, action);
-    if (!error) error = stream.bind(bits, action);
-    if (!error) error = stream.bind(nonce, action);
-    if (!error) error = stream.bind(solution, action);
-    return error;
+outcome::result<void> BlockHeader::serialization(ser::SDataStream& stream, ser::Action action) {
+    auto result{stream.bind(version, action)};
+    if (not result.has_error()) stream.set_version(version);
+    if (not result.has_error()) result = stream.bind(parent_hash, action);
+    if (not result.has_error()) result = stream.bind(merkle_root, action);
+    if (not result.has_error()) result = stream.bind(scct_root, action);
+    if (not result.has_error()) result = stream.bind(time, action);
+    if (not result.has_error()) result = stream.bind(bits, action);
+    if (not result.has_error()) result = stream.bind(nonce, action);
+    if (not result.has_error()) result = stream.bind(solution, action);
+    return result;
 }
 }  // namespace zenpp

@@ -82,8 +82,9 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
         }
 
         if (no_checksums) continue;  // Only first cycle. If we have to download the checksums are already checked
-        const auto expected_checksum{hex::decode(param_file.expected_checksum)};
-        if (not validate_file_checksum(file_path, *expected_checksum)) {
+        const auto expected_checksum{enc::hex::decode(param_file.expected_checksum)};
+        ASSERT_POST(expected_checksum and "Invalid checksum");
+        if (not validate_file_checksum(file_path, expected_checksum.value())) {
             if (not std::filesystem::remove(file_path)) {
                 log::Critical("Invalid file checksum",
                               {"file", file_path.string(), "expected", std::string(param_file.expected_checksum)})
@@ -137,8 +138,9 @@ bool validate_param_files(boost::asio::io_context& asio_context, const std::file
             return false;
         }
 
-        const auto expected_checksum{hex::decode(param_file.expected_checksum)};
-        if (not validate_file_checksum(file_path, *expected_checksum)) {
+        const auto expected_checksum{enc::hex::decode(param_file.expected_checksum)};
+        ASSERT_POST(expected_checksum and "Invalid checksum");
+        if (not validate_file_checksum(file_path, expected_checksum.value())) {
             log::Critical("Invalid file checksum (again)",
                           {"file", file_path.string(), "expected", std::string(param_file.expected_checksum)});
 
@@ -335,8 +337,9 @@ bool validate_file_checksum(const std::filesystem::path& file_path, ByteView exp
     }
     const bool is_match{*actual_checksum == expected_checksum};
     if (not is_match) {
-        log::Error("Invalid file checksum", {"file", file_path.string(), "expected", hex::encode(expected_checksum),
-                                             "actual", hex::encode(*actual_checksum)});
+        log::Error("Invalid file checksum",
+                   {"file", file_path.string(), "expected", enc::hex::encode(expected_checksum), "actual",
+                    enc::hex::encode(*actual_checksum)});
     }
     return is_match;
 }

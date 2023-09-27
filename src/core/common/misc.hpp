@@ -12,10 +12,8 @@
 #include <string_view>
 
 #include <boost/asio/ip/address.hpp>
-#include <tl/expected.hpp>
 
 #include <core/common/base.hpp>
-#include <core/encoding/errors.hpp>
 
 namespace zenpp {
 
@@ -24,7 +22,7 @@ namespace zenpp {
 [[nodiscard]] std::string abridge(std::string_view input, size_t length);
 
 //! \brief Parses a string input value representing a size in human-readable format with qualifiers. eg "256MB"
-[[nodiscard]] tl::expected<uint64_t, DecodingError> parse_human_bytes(const std::string& input);
+[[nodiscard]] outcome::result<uint64_t> parse_human_bytes(const std::string& input);
 
 //! \brief Transforms a size value into it's decimal string representation with suffix (optional binary)
 //! \see https://en.wikipedia.org/wiki/Binary_prefix

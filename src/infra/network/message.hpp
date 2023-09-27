@@ -47,12 +47,12 @@ class MessageHeader : public ser::Serializable {
     [[nodiscard]] bool pristine() const noexcept;
 
     //! \brief Performs a sanity check on the header
-    [[nodiscard]] ser::Error validate() noexcept;
+    [[nodiscard]] outcome::result<void> validate() noexcept;
 
   private:
     MessageType message_type_{MessageType::kMissingOrUnknown};
     friend class ser::SDataStream;
-    ser::Error serialization(ser::SDataStream& stream, ser::Action action) override;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
 class Message {
@@ -78,7 +78,7 @@ class Message {
     [[nodiscard]] MessageType get_type() const noexcept { return header_.get_type(); }
     [[nodiscard]] MessageHeader& header() noexcept { return header_; }
     [[nodiscard]] ser::SDataStream& data() noexcept { return ser_stream_; }
-    [[nodiscard]] ser::Error parse(ByteView& input_data, ByteView network_magic = {}) noexcept;
+    [[nodiscard]] outcome::result<void> parse(ByteView& input_data, ByteView network_magic = {}) noexcept;
 
     //! \brief Sets the message version (generally inherited from the protocol version)
     void set_version(int version) noexcept;
@@ -87,15 +87,15 @@ class Message {
     [[nodiscard]] int get_version() const noexcept;
 
     //! \brief Validates the message header, payload and checksum
-    [[nodiscard]] ser::Error validate() noexcept;
+    [[nodiscard]] outcome::result<void> validate() noexcept;
 
     //! \brief Populates the message header and payload
-    ser::Error push(MessageType message_type, MessagePayload& payload, ByteView magic) noexcept;
+    outcome::result<void> push(MessageType message_type, MessagePayload& payload, ByteView magic) noexcept;
 
   private:
     MessageHeader header_{};       // Where the message header is deserialized
     ser::SDataStream ser_stream_;  // Contains all the message raw data
 
-    [[nodiscard]] ser::Error validate_checksum() noexcept;
+    [[nodiscard]] outcome::result<void> validate_checksum() noexcept;
 };
 }  // namespace zenpp::net

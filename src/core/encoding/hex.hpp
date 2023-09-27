@@ -10,12 +10,11 @@
 #include <string_view>
 
 #include <boost/endian/conversion.hpp>
-#include <tl/expected.hpp>
 
 #include <core/common/base.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zenpp::hex {
+namespace zenpp::enc::hex {
 
 //! \brief Whether provided string begins with "0x" prefix (case insensitive)
 //! \param [in] source : string input
@@ -65,9 +64,9 @@ template <UnsignedIntegral T>
 
 //! \brief Returns the bytes string obtained by decoding an hexadecimal ascii input
 // TODO(C++23) switch to std::expected
-tl::expected<Bytes, DecodingError> decode(std::string_view hex_str) noexcept;
+outcome::result<Bytes> decode(std::string_view hex_str) noexcept;
 
 //! \brief Returns the integer value corresponding to the ascii hex digit provided
-tl::expected<unsigned, DecodingError> decode_digit(char input) noexcept;
+outcome::result<unsigned> decode_digit(char input) noexcept;
 
-}  // namespace zenpp::hex
+}  // namespace zenpp::enc::hex

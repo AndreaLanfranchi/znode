@@ -25,18 +25,25 @@ DataStream::DataStream(const std::span<value_type> data) {
     buffer_.insert(buffer_.end(), data.begin(), data.end());
 }
 
-void DataStream::reserve(size_type count) { buffer_.reserve(count); }
-
-void DataStream::resize(size_type new_size, value_type item) { buffer_.resize(new_size, item); }
-
-Error DataStream::write(ByteView data) {
-    const auto bytes_count = std::min<size_type>(std::numeric_limits<size_type>::max() - read_position_, data.size());
-    if (bytes_count not_eq data.size()) return Error::kOverflow;
-    buffer_.insert(buffer_.end(), data.begin(), data.begin() + bytes_count);
-    return Error::kSuccess;
+outcome::result<void> DataStream::reserve(size_type count) {
+    if (count > kMaxStreamSize) return Error::kInputTooLarge;
+    buffer_.reserve(count);
 }
 
-Error DataStream::write(const uint8_t* const ptr, DataStream::size_type count) { return write({ptr, count}); }
+outcome::result<void> DataStream::resize(size_type new_size, value_type item) {
+    if (new_size > kMaxStreamSize) return Error::kInputTooLarge;
+    buffer_.resize(new_size, item);
+}
+
+outcome::result<void> DataStream::write(ByteView data) {
+    if (size() + data.size() > kMaxStreamSize) return Error::kInputTooLarge;
+    buffer_.insert(buffer_.end(), data.begin(), data.end());
+    return outcome::success();
+}
+
+outcome::result<void> DataStream::write(const uint8_t* const ptr, DataStream::size_type count) {
+    return write({ptr, count});
+}
 
 DataStream::iterator DataStream::begin() { return buffer_.begin() + static_cast<difference_type>(read_position_); }
 
@@ -77,9 +84,9 @@ void DataStream::erase(const size_type pos, std::optional<size_type> count) {
 
 void DataStream::push_back(uint8_t byte) { buffer_.push_back(byte); }
 
-tl::expected<ByteView, Error> DataStream::read(std::optional<size_t> count) noexcept {
+outcome::result<ByteView> DataStream::read(std::optional<size_t> count) noexcept {
     const auto bytes_being_read{count.value_or(avail())};
-    if (bytes_being_read > avail()) return tl::unexpected{Error::kReadBeyondData};
+    if (bytes_being_read > avail()) return Error::kReadOverflow;
     ByteView ret(&buffer_[read_position_], bytes_being_read);
     read_position_ += bytes_being_read;
     return ret;
@@ -96,7 +103,7 @@ DataStream::size_type DataStream::seekg(size_type position) noexcept {
     return read_position_;
 }
 
-std::string DataStream::to_string() const { return zenpp::hex::encode({buffer_.data(), buffer_.size()}, false); }
+std::string DataStream::to_string() const { return enc::hex::encode({buffer_.data(), buffer_.size()}, false); }
 
 void DataStream::consume(std::optional<size_type> pos) noexcept {
     const size_t count{std::min(read_position_, pos.value_or(std::numeric_limits<size_type>::max()))};
@@ -115,9 +122,12 @@ void DataStream::clear() noexcept {
     read_position_ = 0;
 }
 
-void DataStream::get_clear(DataStream& dst) {
-    dst.write({&buffer_[read_position_], avail()});
+outcome::result<void> DataStream::get_clear(DataStream& dst) {
+    if (const auto write_result{dst.write({&buffer_[read_position_], avail()})}; not write_result) {
+        return write_result.error();
+    }
     clear();
+    return outcome::success();
 }
 
 SDataStream::SDataStream(Scope scope, int version) : DataStream(), scope_(scope), version_(version) {}

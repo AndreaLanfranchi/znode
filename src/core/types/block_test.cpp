@@ -17,15 +17,11 @@ TEST_CASE("Block Serialization", "[serialization]") {
     ser::SDataStream stream(ser::Scope::kNetwork, 0);
     CHECK(header.serialized_size(stream) == kBlockHeaderSerializedSize);
     stream.clear();
-    REQUIRE(header.serialize(stream) == ser::Error::kSuccess);
+    REQUIRE_FALSE(header.serialize(stream).has_error());
 
     BlockHeader header2;
-    REQUIRE(header2.deserialize(stream) == ser::Error::kSuccess);
+    REQUIRE_FALSE(header2.deserialize(stream).has_error());
     CHECK(header == header2);
     CHECK(stream.eof());
-
-    // Check the version equals to 15
-    //    auto version_parsed{endian::load_little_u32(&archive[0])};
-    //    CHECK(version_parsed == 15);
 }
 }  // namespace zenpp

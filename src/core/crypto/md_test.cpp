@@ -84,7 +84,7 @@ TEST_CASE("Sha2 test vectors", "[crypto]") {
         Bytes digest{hasher.finalize(/*compress=*/true)};
         CHECK_FALSE(digest.empty());
         // Notice the order of bytes is reversed (uint256S - from legacy code - does it)
-        CHECK(hex::encode(digest) == "da5698be17b9b46962335799779fbeca8ce5d491c0d26243bafef9ea1837a9d8");
+        CHECK(enc::hex::encode(digest) == "da5698be17b9b46962335799779fbeca8ce5d491c0d26243bafef9ea1837a9d8");
 
         // Alter the input length : should return an empty digest which means error
         input.push_back(0);
@@ -102,7 +102,7 @@ TEST_CASE("Sha2 test vectors", "[crypto]") {
         hasher.init(input);
         digest.assign(hasher.finalize(/*compress=*/true));
         CHECK_FALSE(digest.empty());
-        CHECK(hex::encode(digest) == "867d9811862dbdab2f8fa343e3e841df7db2ded433172800b0369e8741ec70da");
+        CHECK(enc::hex::encode(digest) == "867d9811862dbdab2f8fa343e3e841df7db2ded433172800b0369e8741ec70da");
     }
 
     SECTION("Sha512") {

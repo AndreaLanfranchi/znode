@@ -167,7 +167,9 @@ IPAddressReservationType IPAddress::address_v6_reservation() const noexcept {
     return ret;
 }
 
-ser::Error IPAddress::serialization(SDataStream& stream, ser::Action action) { return stream.bind(value_, action); }
+outcome::result<void> IPAddress::serialization(SDataStream& stream, ser::Action action) {
+    return stream.bind(value_, action);
+}
 
 outcome::result<IPAddress> IPAddress::from_string(const std::string& input) {
     if (input.empty()) return IPAddress();
@@ -237,16 +239,15 @@ outcome::result<IPEndpoint> IPEndpoint::from_string(const std::string& input) {
 
 std::string IPEndpoint::to_string() const noexcept { return absl::StrCat(address_.to_string(), ":", port_); }
 
-ser::Error IPEndpoint::serialization(SDataStream& stream, ser::Action action) {
-    using enum Error;
-    Error ret{kSuccess};
-    if (not ret) ret = stream.bind(address_, action);
-    if (not ret) {
+outcome::result<void> IPEndpoint::serialization(SDataStream& stream, ser::Action action) {
+    auto result{stream.bind(address_, action)};
+    if (not result.has_error()) result = stream.bind(address_, action);
+    if (not result.has_error()) {
         port_ = bswap_16(port_);
-        ret = stream.bind(port_, action);
+        result = stream.bind(port_, action);
         port_ = bswap_16(port_);
     }
-    return ret;
+    return result;
 }
 
 boost::asio::ip::tcp::endpoint IPEndpoint::to_endpoint() const noexcept { return {*address_, port_}; }
@@ -434,23 +435,20 @@ NodeService::NodeService(boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(e
 
 NodeService::NodeService(const IPEndpoint& endpoint) : endpoint_(endpoint) {}
 
-Error NodeService::serialization(SDataStream& stream, Action action) {
-    using enum Error;
-    Error ret{kSuccess};
-    if (not ret) ret = stream.bind(time_, action);
-    if (not ret) ret = stream.bind(services_, action);
-    if (not ret) ret = stream.bind(endpoint_, action);
-    return ret;
+outcome::result<void> NodeService::serialization(SDataStream& stream, Action action) {
+    auto result{stream.bind(time_, action)};
+    if (not result.has_error()) result = stream.bind(time_, action);
+    if (not result.has_error()) result = stream.bind(services_, action);
+    if (not result.has_error()) result = stream.bind(endpoint_, action);
+    return result;
 }
 
 NodeService::NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint)
     : endpoint_{endpoint.address(), endpoint.port()} {}
 
-Error VersionNodeService::serialization(SDataStream& stream, Action action) {
-    using enum Error;
-    Error ret{kSuccess};
-    if (not ret) ret = stream.bind(services_, action);
-    if (not ret) ret = stream.bind(endpoint_, action);
-    return ret;
+outcome::result<void> VersionNodeService::serialization(SDataStream& stream, Action action) {
+    auto result{stream.bind(services_, action)};
+    if (not result.has_error()) result = stream.bind(endpoint_, action);
+    return result;
 }
 }  // namespace zenpp::net
