@@ -29,8 +29,6 @@ outcome::result<void> MsgPingPongPayload::serialization(ser::SDataStream& stream
     return stream.bind(nonce_, action);
 }
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "readability-function-cognitive-complexity"
 outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, ser::Action action) {
     protocol_version_ =
         (action == Action::kSerialize) ? static_cast<decltype(protocol_version_)>(stream.get_version()) : 0U;
@@ -57,8 +55,8 @@ outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, s
             if (not result.has_error()) result = hash_stop_.deserialize(stream);
         }
     }
+    return result;
 }
-#pragma clang diagnostic pop
 
 outcome::result<void> MsgAddrPayload::serialization(SDataStream& stream, ser::Action action) {
     if (action == Action::kSerialize) {
