@@ -16,6 +16,7 @@
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
+#include <infra/network/errors.hpp>
 #include <infra/network/messages.hpp>
 #include <infra/network/payloads.hpp>
 
@@ -78,7 +79,7 @@ class Message {
     [[nodiscard]] MessageType get_type() const noexcept { return header_.get_type(); }
     [[nodiscard]] MessageHeader& header() noexcept { return header_; }
     [[nodiscard]] ser::SDataStream& data() noexcept { return ser_stream_; }
-    [[nodiscard]] outcome::result<void> parse(ByteView& input_data, ByteView network_magic = {}) noexcept;
+    [[nodiscard]] outcome::result<void> parse(ByteView& input_data, ByteView network_magic = {});
 
     //! \brief Sets the message version (generally inherited from the protocol version)
     void set_version(int version) noexcept;
@@ -89,13 +90,13 @@ class Message {
     //! \brief Validates the message header, payload and checksum
     [[nodiscard]] outcome::result<void> validate() noexcept;
 
+    [[nodiscard]] outcome::result<void> validate_checksum() noexcept;
+
     //! \brief Populates the message header and payload
     outcome::result<void> push(MessageType message_type, MessagePayload& payload, ByteView magic) noexcept;
 
   private:
     MessageHeader header_{};       // Where the message header is deserialized
     ser::SDataStream ser_stream_;  // Contains all the message raw data
-
-    [[nodiscard]] outcome::result<void> validate_checksum() noexcept;
 };
 }  // namespace zenpp::net
