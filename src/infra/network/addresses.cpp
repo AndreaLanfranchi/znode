@@ -211,14 +211,14 @@ outcome::result<IPEndpoint> IPEndpoint::from_string(const std::string& input) {
                                               std::regex_constants::icase);
 
     std::smatch matches;
-    int address_match{0};
-    int port_match{0};
+    std::smatch::size_type address_match{0};
+    std::smatch::size_type port_match{0};
     if (std::regex_match(input, matches, ipv6_ipv4_pattern)) {
-        address_match = 1;
-        port_match = 4;
+        address_match = 1U;
+        port_match = 4U;
     } else if (std::regex_match(input, matches, ipv4_pattern) or std::regex_match(input, matches, ipv6_pattern)) {
-        address_match = 1;
-        port_match = 2;
+        address_match = 1U;
+        port_match = 2U;
     } else {
         return boost::system::errc::invalid_argument;
     }

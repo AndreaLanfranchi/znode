@@ -44,6 +44,7 @@ enum class Error {
 
 class ErrorCategory : public boost::system::error_category {
   public:
+    virtual ~ErrorCategory() noexcept = default;
     const char* name() const noexcept override { return "NetworkError"; }
     std::string message(int err_code) const override {
         std::string desc{"Unknown error"};
