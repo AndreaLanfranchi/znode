@@ -48,51 +48,51 @@ class ErrorCategory : public boost::system::error_category {
     const char* name() const noexcept override { return "NetworkError"; }
     std::string message(int err_code) const override {
         std::string desc{"Unknown error"};
-        if (const auto errc = magic_enum::enum_cast<net::Error>(err_code); errc.has_value()) {
-            desc.assign(std::string(magic_enum::enum_name<net::Error>(errc.value())));
+        if (const auto enumerator = magic_enum::enum_cast<net::Error>(err_code); enumerator.has_value()) {
+            desc.assign(std::string(magic_enum::enum_name<net::Error>(enumerator.value())));
             desc.erase(0, 1);  // Remove the constant `k` prefix
         }
         return desc;
     }
     boost::system::error_condition default_error_condition(int err_code) const noexcept override {
-        const auto errc = magic_enum::enum_cast<net::Error>(err_code);
-        if (not errc.has_value()) {
+        const auto enumerator = magic_enum::enum_cast<net::Error>(err_code);
+        if (not enumerator.has_value()) {
             return {err_code, *this};  // No conversion
         }
-        switch (*errc) {
+        switch (*enumerator) {
             using enum Error;
             case kSuccess:
-                return boost::system::error_condition{boost::system::errc::success};
+                return make_error_condition(boost::system::errc::success);
             case kMessageHeaderIncomplete:
             case kMessageBodyIncomplete:
-                return boost::system::error_condition{boost::system::errc::operation_in_progress};
+                return make_error_condition(boost::system::errc::operation_in_progress);
             case kMessageHeaderOversizedPayload:
             case kMessageHeaderUndersizedPayload:
             case kMessagePayloadEmptyVector:
             case kMessagePayloadOversizedVector:
             case kMessagePayloadMismatchesVectorSize:
-                return boost::system::error_condition{boost::system::errc::message_size};
+                return make_error_condition(boost::system::errc::message_size);
             case kInvalidProtocolVersion:
             case kMessageHeaderMalformedCommand:
             case kMessageHeaderEmptyCommand:
             case kMessageUnknownCommand:
             case kMessagePayloadDuplicateVectorItems:
             case kInvalidPingPongNonce:
-                return boost::system::error_condition{boost::system::errc::invalid_argument};
+                return make_error_condition(boost::system::errc::invalid_argument);
             case kMessageHeaderIllegalCommand:
             case kMessageHeaderInvalidChecksum:
             case kMessageHeaderInvalidMagic:
-                return boost::system::error_condition{boost::system::errc::argument_out_of_domain};
+                return make_error_condition(boost::system::errc::argument_out_of_domain);
             case kMessagePushNotPermitted:
             case kMessageFloodingDetected:
             case kConnectedToSelf:
             case kUnsolicitedPong:
-                return boost::system::error_condition{boost::system::errc::operation_not_permitted};
+                return make_error_condition(boost::system::errc::operation_not_permitted);
             case kUnsupportedMessageTypeForProtocolVersion:
             case kDeprecatedMessageTypeForProtocolVersion:
             case kDuplicateProtocolHandShake:
             case kInvalidProtocolHandShake:
-                return boost::system::error_condition{boost::system::errc::protocol_error};
+                return make_error_condition(boost::system::errc::protocol_error);
             default:
                 return {err_code, *this};
         }
@@ -102,7 +102,8 @@ class ErrorCategory : public boost::system::error_category {
 // Overload the global make_error_code() free function with our
 // custom enum. It will be found via ADL by the compiler if needed.
 inline boost::system::error_code make_error_code(net::Error err_code) {
-    return {static_cast<int>(err_code), ErrorCategory()};
+    static net::ErrorCategory category{};
+    return {static_cast<int>(err_code), category};
 }
 }  // namespace zenpp::net
 

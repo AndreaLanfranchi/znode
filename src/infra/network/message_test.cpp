@@ -29,11 +29,11 @@ namespace {
         return ret;
     }
 
-    std::string as_message(ser::Error error) {
-        std::string ret{magic_enum::enum_name(error)};
-        ret.erase(0, 1);
-        return ret;
-    }
+    //    std::string as_message(ser::Error error) {
+    //        std::string ret{magic_enum::enum_name(error)};
+    //        ret.erase(0, 1);
+    //        return ret;
+    //    }
 
 }  // namespace
 
@@ -234,68 +234,63 @@ TEST_CASE("NetMessage", "[net]") {
         auto result{net_message.validate_checksum()};
         REQUIRE(result.has_error());
         REQUIRE(result.error().value() == static_cast<int>(kMessageHeaderInvalidChecksum));
-
-        outcome::result<void> result2{kMessageHeaderInvalidChecksum};
-        REQUIRE(result2.has_error());
-        REQUIRE(result2.error().value() == static_cast<int>(kMessageHeaderInvalidChecksum));
-        CHECK(result2.error().message() == as_message(kMessageHeaderInvalidChecksum));
-
         CHECK(result.error().message() == as_message(kMessageHeaderInvalidChecksum));
 
-        //        REQUIRE(net_message.validate().has_error());
-        //        std::cout << net_message.validate().error().to_string() << std::endl;
-        // REQUIRE(net_message.validate().error().message() == as_message(kMessageHeaderInvalidChecksum));
-        //
-        //         // Let's move back to begin of body and compute checksum
-        //         payload.seekg(kMessageHeaderLength);
-        //         auto digest_input{payload.read()};
-        //         REQUIRE_FALSE(digest_input.has_error());
-        //         REQUIRE(digest_input.value().size() == ser::ser_compact_sizeof(num_elements) + kInvItemSize);
-        //         crypto::Hash256 hasher(digest_input.value());
-        //         auto final_digest{hasher.finalize()};
-        //
-        //         memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
-        //         REQUIRE_FALSE(net_message.validate().has_error());
-        //
-        //         // Test maximum number of vector elements with unique items
-        //         payload.erase(kMessageHeaderLength);
-        //         num_elements = kMaxInvItems;
-        //         REQUIRE_FALSE(write_compact(payload, num_elements).has_error());
-        //         for (uint64_t i = 0; i < kMaxInvItems; ++i) {
-        //             endian::store_big_u64(data.data(), i);  // This to prevent duplicates
-        //             std::ignore = payload.write(data);
-        //         }
-        //
-        //         // Let's move back to begin of body and compute checksum
-        //         payload.seekg(kMessageHeaderLength);
-        //         header.payload_length = static_cast<uint32_t>(payload.avail());
-        //         digest_input = payload.read();
-        //         REQUIRE_FALSE(digest_input.has_error());
-        //         REQUIRE(digest_input.value().size() == ser::ser_compact_sizeof(num_elements) + (kInvItemSize *
-        //         kMaxInvItems)); hasher.init(digest_input.value()); final_digest = hasher.finalize();
-        //
-        //         memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
-        //         REQUIRE_FALSE(net_message.validate().has_error());
-        //
-        //         // Test maximum number of vector elements with duplicate items
-        //         payload.erase(kMessageHeaderLength);
-        //         num_elements = kMaxInvItems;
-        //         REQUIRE_FALSE(write_compact(payload, num_elements).has_error());
-        //         for (uint64_t i = 0; i < kMaxInvItems; ++i) {
-        //             endian::store_big_u64(data.data(), i % 1'000);  // Duplicates every 1K
-        //             std::ignore = payload.write(data);
-        //         }
-        //
-        //         // Let's move back to begin of body and compute checksum
-        //         payload.seekg(kMessageHeaderLength);
-        //         header.payload_length = static_cast<uint32_t>(payload.avail());
-        //         digest_input = payload.read();
-        //         REQUIRE_FALSE(digest_input.has_error());
-        //         REQUIRE(digest_input.value().size() == ser::ser_compact_sizeof(num_elements) + (kInvItemSize *
-        //         kMaxInvItems)); hasher.init(digest_input.value()); final_digest = hasher.finalize();
-        //
-        //         memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
-        //         REQUIRE(net_message.validate().error().message() == as_message(kMessagePayloadDuplicateVectorItems));
+        REQUIRE(net_message.validate().has_error());
+        REQUIRE(net_message.validate().error().message() == as_message(kMessageHeaderInvalidChecksum));
+
+        // Let's move back to begin of body and compute checksum
+        payload.seekg(kMessageHeaderLength);
+        auto digest_input{payload.read()};
+        REQUIRE_FALSE(digest_input.has_error());
+        REQUIRE(digest_input.value().size() == ser::ser_compact_sizeof(num_elements) + kInvItemSize);
+        crypto::Hash256 hasher(digest_input.value());
+        auto final_digest{hasher.finalize()};
+
+        memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
+        REQUIRE_FALSE(net_message.validate().has_error());
+
+        INFO("Test maximum number of vector elements with unique items");
+        payload.erase(kMessageHeaderLength);
+        num_elements = kMaxInvItems;
+        REQUIRE_FALSE(write_compact(payload, num_elements).has_error());
+        for (uint64_t i = 0; i < kMaxInvItems; ++i) {
+            endian::store_big_u64(data.data(), i);  // This to prevent duplicates
+            std::ignore = payload.write(data);
+        }
+
+        // Let's move back to begin of body and compute checksum
+        payload.seekg(kMessageHeaderLength);
+        header.payload_length = static_cast<uint32_t>(payload.avail());
+        digest_input = payload.read();
+        REQUIRE_FALSE(digest_input.has_error());
+        REQUIRE(digest_input.value().size() == ser::ser_compact_sizeof(num_elements) + (kInvItemSize * kMaxInvItems));
+        hasher.init(digest_input.value());
+        final_digest = hasher.finalize();
+
+        memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
+        REQUIRE_FALSE(net_message.validate().has_error());
+
+        INFO("Test maximum number of vector elements with duplicate items")
+        payload.erase(kMessageHeaderLength);
+        num_elements = kMaxInvItems;
+        REQUIRE_FALSE(write_compact(payload, num_elements).has_error());
+        for (uint64_t i = 0; i < kMaxInvItems; ++i) {
+            endian::store_big_u64(data.data(), i % 1'000);  // Duplicates every 1K
+            std::ignore = payload.write(data);
+        }
+
+        // Let's move back to begin of body and compute checksum
+        payload.seekg(kMessageHeaderLength);
+        header.payload_length = static_cast<uint32_t>(payload.avail());
+        digest_input = payload.read();
+        REQUIRE_FALSE(digest_input.has_error());
+        REQUIRE(digest_input.value().size() == ser::ser_compact_sizeof(num_elements) + (kInvItemSize * kMaxInvItems));
+        hasher.init(digest_input.value());
+        final_digest = hasher.finalize();
+
+        memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
+        REQUIRE(net_message.validate().error().message() == as_message(kMessagePayloadDuplicateVectorItems));
     }
 }
 

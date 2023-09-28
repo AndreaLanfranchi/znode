@@ -118,9 +118,7 @@ outcome::result<void> Message::validate() noexcept {
     // Validate payload : length and checksum
     ser_stream_.seekg(kMessageHeaderLength);  // Important : skip the header !!!
     if (auto result = validate_checksum(); result.has_error()) {
-        std::cout << "validate_checksum() failed with " << result.error().value() << std::endl;
-        std::cout << "validate_checksum() failed with " << result.error().message() << std::endl;
-        return result;
+        return result.error();
     }
     if (!message_definition.is_vectorized) return outcome::success();
 
@@ -208,20 +206,19 @@ outcome::result<void> Message::parse(ByteView& input_data, ByteView network_magi
 }
 
 outcome::result<void> Message::validate_checksum() noexcept {
-    return {Error::kMessageHeaderInvalidChecksum};
-//    const auto current_pos{ser_stream_.tellg()};
-//    if (ser_stream_.seekg(kMessageHeaderLength) != kMessageHeaderLength) return Error::kMessageHeaderIncomplete;
-//    const auto data_to_payload{gsl::finally([this, current_pos] { std::ignore = ser_stream_.seekg(current_pos); })};
-//
-//    const auto payload_view{ser_stream_.read()};
-//    if (payload_view.has_error()) return payload_view.error();
-//
-//    crypto::Hash256 payload_digest(payload_view.value());
-//    if (auto payload_hash{payload_digest.finalize()};
-//        memcmp(payload_hash.data(), header_.payload_checksum.data(), header_.payload_checksum.size()) not_eq 0) {
-//        return Error::kMessageHeaderInvalidChecksum;
-//    }
-//    return outcome::success();
+    const auto current_pos{ser_stream_.tellg()};
+    if (ser_stream_.seekg(kMessageHeaderLength) != kMessageHeaderLength) return Error::kMessageHeaderIncomplete;
+    const auto data_to_payload{gsl::finally([this, current_pos] { std::ignore = ser_stream_.seekg(current_pos); })};
+
+    const auto payload_view{ser_stream_.read()};
+    if (payload_view.has_error()) return payload_view.error();
+
+    crypto::Hash256 payload_digest(payload_view.value());
+    if (auto payload_hash{payload_digest.finalize()};
+        memcmp(payload_hash.data(), header_.payload_checksum.data(), header_.payload_checksum.size()) not_eq 0) {
+        return Error::kMessageHeaderInvalidChecksum;
+    }
+    return outcome::success();
 }
 
 void Message::set_version(int version) noexcept { ser_stream_.set_version(version); }

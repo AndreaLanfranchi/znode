@@ -29,23 +29,22 @@ class ErrorCategory final : public boost::system::error_category {
     virtual ~ErrorCategory() noexcept = default;
     const char* name() const noexcept override { return "EncodingError"; }
     std::string message(int err_code) const override {
-        const auto errc = magic_enum::enum_cast<Error>(err_code);
         std::string desc{"Unknown error"};
-        if (errc.has_value()) {
-            desc.assign(std::string(magic_enum::enum_name(*errc)));
+        if (const auto enumerator = magic_enum::enum_cast<enc::Error>(err_code); enumerator.has_value()) {
+            desc.assign(std::string(magic_enum::enum_name<enc::Error>(*enumerator)));
             desc.erase(0, 1);  // Remove the constant `k` prefix
         }
         return desc;
     }
     boost::system::error_condition default_error_condition(int err_code) const noexcept override {
-        const auto errc = magic_enum::enum_cast<Error>(err_code);
-        if (not errc.has_value()) {
+        const auto enumerator = magic_enum::enum_cast<enc::Error>(err_code);
+        if (not enumerator.has_value()) {
             return {err_code, *this};  // No conversion
         }
-        switch (*errc) {
+        switch (*enumerator) {
             using enum Error;
             case kSuccess:
-                return boost::system::error_condition{boost::system::errc::success};
+                return make_error_condition(boost::system::errc::success);
             case kIllegalHexDigit:
             case kIllegalBase58Digit:
             case kIllegalBase64Digit:
@@ -64,8 +63,9 @@ class ErrorCategory final : public boost::system::error_category {
 
 // Overload the global make_error_code() free function with our
 // custom enum. It will be found via ADL by the compiler if needed.
-inline boost::system::error_code make_error_code(Error err_code) {
-    return {static_cast<int>(err_code), ErrorCategory()};
+inline boost::system::error_code make_error_code(enc::Error err_code) {
+    static enc::ErrorCategory category{};
+    return {static_cast<int>(err_code), category};
 }
 }  // namespace zenpp::enc
 
