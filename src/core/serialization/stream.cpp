@@ -28,11 +28,13 @@ DataStream::DataStream(const std::span<value_type> data) {
 outcome::result<void> DataStream::reserve(size_type count) {
     if (count > kMaxStreamSize) return Error::kInputTooLarge;
     buffer_.reserve(count);
+    return outcome::success();
 }
 
 outcome::result<void> DataStream::resize(size_type new_size, value_type item) {
     if (new_size > kMaxStreamSize) return Error::kInputTooLarge;
     buffer_.resize(new_size, item);
+    return outcome::success();
 }
 
 outcome::result<void> DataStream::write(ByteView data) {

@@ -25,6 +25,7 @@ enum class Error {
 
 class ErrorCategory : public boost::system::error_category {
   public:
+    virtual ~ErrorCategory() noexcept = default;
     const char* name() const noexcept override { return "SerializationError"; }
     std::string message(int err_code) const override {
         const auto errc = magic_enum::enum_cast<Error>(err_code);
