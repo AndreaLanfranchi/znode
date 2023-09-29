@@ -1,6 +1,3 @@
-[submodule "third-party/expected"]
-	path = third-party/expected
-	url = https://github.com/TartanLlama/expected.git
 [submodule "third-party/libmdbx"]
 	path = third-party/libmdbx
 	url = https://gitflic.ru/project/erthink/libmdbx.git
