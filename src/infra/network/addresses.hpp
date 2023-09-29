@@ -12,7 +12,6 @@
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <gsl/gsl_util>
-#include <tl/expected.hpp>
 
 #include <core/serialization/serializable.hpp>
 
