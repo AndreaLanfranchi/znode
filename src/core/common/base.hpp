@@ -49,7 +49,9 @@ template <class T>
 concept SignedIntegral = std::is_fundamental_v<T> and std::signed_integral<T>;
 
 template <class T>
-concept Integral = UnsignedIntegral<T> or SignedIntegral<T>;
+concept Integral = (UnsignedIntegral<T> or SignedIntegral<T>);
+
+static_assert(UnsignedIntegral<uint8_t>);
 
 template <class T>
 concept BigUnsignedIntegral = std::same_as<T, uint128_t> or std::same_as<T, uint256_t>;

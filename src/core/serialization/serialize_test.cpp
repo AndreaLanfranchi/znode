@@ -167,7 +167,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
 
         stream.seekg(0);
         for (int i{0}; i < 1000; ++i) {
-            const auto returned{read_data<double>(stream)};
+            const auto returned{read_as<double>(stream)};
             REQUIRE_FALSE(returned.has_error());
             CHECK(returned.value() == double(i));
         }
@@ -188,7 +188,7 @@ TEST_CASE("Serialization of base types", "[serialization]") {
 
         stream.seekg(0);
         for (int i{0}; i < 1000; ++i) {
-            const auto returned{read_data<float>(stream)};
+            const auto returned{read_as<float>(stream)};
             REQUIRE_FALSE(returned.has_error());
             CHECK(returned.value() == float(i));
         }

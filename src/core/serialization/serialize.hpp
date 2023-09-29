@@ -47,17 +47,15 @@ inline constexpr uint32_t ser_compact_sizeof(uint64_t value) {
 //! \brief Lowest level serialization for integral arithmetic types
 template <class Stream, Integral T>
 inline outcome::result<void> write_data(Stream& stream, T obj) {
-    // TODO: Optimize using span or byteview
-    std::array<unsigned char, sizeof(obj)> bytes{};
-    std::memcpy(bytes.data(), &obj, sizeof(obj));
+    const auto bytes{std::bit_cast<std::array<uint8_t, sizeof(obj)>>(obj)};
     return stream.write(bytes.data(), bytes.size());
 }
 
 //! \brief Lowest level serialization for bool
 template <class Stream>
 inline outcome::result<void> write_data(Stream& stream, bool obj) {
-    const uint8_t out{static_cast<uint8_t>(obj ? 0x01 : 0x00)};
-    stream.push_back(out);
+    const uint8_t byte{static_cast<uint8_t>(obj ? 0x01 : 0x00)};
+    stream.push_back(byte);
     return outcome::success();
 }
 
@@ -104,35 +102,50 @@ inline outcome::result<void> write_compact(Stream& stream, uint64_t obj) {
 }
 
 //! \brief Lowest level deserialization for arithmetic types
-template <typename T, class Stream>
-requires(std::is_arithmetic_v<T> and not std::is_same_v<T, bool>) inline outcome::result<void> read_data(Stream& stream,
-                                                                                                         T& object) {
+template <class Stream, Integral T>
+inline outcome::result<void> read_data(Stream& stream, T& object) {
     const uint32_t count{ssizeof<T>};
     const auto read_result{stream.read(count)};
-    if (!read_result) return read_result.error();
+    if (read_result.has_error()) return read_result.error();
     std::memcpy(&object, read_result.value().data(), count);
+    return outcome::success();
+}
+
+//! \brief Lowest level deserialization for bool
+template <class Stream>
+inline outcome::result<void> read_data(Stream& stream, bool& object) {
+    const auto read_result{stream.read(ssizeof<bool>)};
+    if (read_result.has_error()) return read_result.error();
+    object = (read_result.value().data()[0] == 0x01);
     return outcome::success();
 }
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Stream>
-requires std::is_arithmetic_v<T>
-inline outcome::result<T> read_data(Stream& stream) {
+requires Integral<T>
+inline outcome::result<T> read_as(Stream& stream) {
     T ret{0};
-    if (const auto read_result{read_data(stream, ret)}; not read_result) {
+    if (const outcome::result<T> read_result{read_data(stream, ret)}; read_result.has_error()) {
         return read_result.error();
     }
-    return ret;
+    return outcome::success<T>(ret);
 }
 
-//! \brief Lowest level deserialization for bool
 template <typename T, class Stream>
-requires std::is_same_v<T, bool>
-inline outcome::result<void> read_data(Stream& stream, T& object) {
-    const auto read_result{stream.read(ssizeof<T>)};
-    if (!read_result) return read_result.error();
-    object = (read_result.value().data()[0] == 0x01);
-    return outcome::success();
+requires std::same_as<T, double> or std::same_as<T, float>
+inline outcome::result<T> read_as(Stream& stream) {
+    const auto bytes_to_read{ssizeof<T>};
+    const auto read_result{stream.read(bytes_to_read)};
+    if (read_result.has_error()) return read_result.error();
+    if constexpr (std::same_as<T, double>) {
+        double ret{0.0};
+        std::memcpy(&ret, read_result.value().data(), bytes_to_read);
+        return outcome::success<double>(ret);
+    } else {
+        float ret{0.0F};
+        std::memcpy(&ret, read_result.value().data(), bytes_to_read);
+        return outcome::success<float>(ret);
+    }
 }
 
 //! \brief Lowest level deserialization for compact integer
@@ -140,34 +153,32 @@ inline outcome::result<void> read_data(Stream& stream, T& object) {
 //! check is performed. When used as a generic number encoding, range_check should be set to false.
 template <class Stream>
 inline outcome::result<uint64_t> read_compact(Stream& stream, bool range_check = true) {
-    auto read_result{read_data<uint8_t>(stream)};
-    if (read_result.has_error()) return read_result.error();
+    const outcome::result<uint8_t> compact_prefix{read_as<uint8_t>(stream)};
+    if (compact_prefix.has_error()) return compact_prefix.error();
 
     uint64_t ret{0};
-    const size_t size{read_result.value()};
-
-    if (size < 253) {
-        ret = size;
-    } else if (size == 253) {
-        if (const auto read_extra_result{read_data<uint16_t>(stream)}; read_extra_result.has_error()) {
-            return read_extra_result.error();
+    if (compact_prefix.value() < 253) {
+        ret = compact_prefix.value();
+    } else if (compact_prefix.value() == 253) {
+        if (const auto read_result{read_as<uint16_t>(stream)}; read_result.has_error()) {
+            return read_result.error();
         } else {
-            if (read_extra_result.value() < 253U) return Error::kNonCanonicalCompactSize;
-            ret = read_extra_result.value();
+            if (read_result.value() < 253U) return Error::kNonCanonicalCompactSize;
+            ret = read_result.value();
         }
-    } else if (size == 254) {
-        if (const auto read_extra_result{read_data<uint32_t>(stream)}; read_extra_result.has_error()) {
-            return read_extra_result.error();
+    } else if (compact_prefix.value() == 254) {
+        if (const auto read_result{read_as<uint32_t>(stream)}; read_result.has_error()) {
+            return read_result.error();
         } else {
-            if (read_extra_result.value() < 0x10000UL) return Error::kNonCanonicalCompactSize;
-            ret = read_extra_result.value();
+            if (read_result.value() < 0x10000UL) return Error::kNonCanonicalCompactSize;
+            ret = read_result.value();
         }
-    } else if (size == 255) {
-        if (const auto read_extra_result{read_data<uint64_t>(stream)}; read_extra_result.has_error()) {
-            return read_extra_result.error();
+    } else if (compact_prefix.value() == 255) {
+        if (const auto read_result{read_as<uint64_t>(stream)}; read_result.has_error()) {
+            return read_result.error();
         } else {
-            if (read_extra_result.value() < 0x100000000ULL) return Error::kNonCanonicalCompactSize;
-            ret = read_extra_result.value();
+            if (read_result.value() < 0x100000000ULL) return Error::kNonCanonicalCompactSize;
+            ret = read_result.value();
         }
     }
     if (range_check and ret > kMaxSerializedCompactSize) return Error::kCompactSizeTooBig;

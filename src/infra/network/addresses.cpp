@@ -241,7 +241,6 @@ std::string IPEndpoint::to_string() const noexcept { return absl::StrCat(address
 
 outcome::result<void> IPEndpoint::serialization(SDataStream& stream, ser::Action action) {
     auto result{stream.bind(address_, action)};
-    if (not result.has_error()) result = stream.bind(address_, action);
     if (not result.has_error()) {
         port_ = bswap_16(port_);
         result = stream.bind(port_, action);
@@ -437,7 +436,6 @@ NodeService::NodeService(const IPEndpoint& endpoint) : endpoint_(endpoint) {}
 
 outcome::result<void> NodeService::serialization(SDataStream& stream, Action action) {
     auto result{stream.bind(time_, action)};
-    if (not result.has_error()) result = stream.bind(time_, action);
     if (not result.has_error()) result = stream.bind(services_, action);
     if (not result.has_error()) result = stream.bind(endpoint_, action);
     return result;

@@ -30,11 +30,8 @@ class DataStream {
     using size_type = typename SecureBytes::size_type;
     using difference_type = typename SecureBytes::difference_type;
     using reference = typename SecureBytes::reference;
-    using const_reference = typename SecureBytes::const_reference;
     using value_type = typename SecureBytes::value_type;
     using iterator = typename SecureBytes::iterator;
-    using const_iterator = typename SecureBytes::const_iterator;
-    using reverse_iterator = typename SecureBytes::reverse_iterator;
 
     explicit DataStream() = default;
     explicit DataStream(ByteView data);
@@ -154,23 +151,9 @@ class SDataStream : public DataStream {
     //! \remarks After this operation eof() == true
     void clear() noexcept override;
 
-    // Serialization for bool
-    [[nodiscard]] outcome::result<void> bind(bool& object, Action action) {
-        switch (action) {
-            using enum Action;
-            case kComputeSize:
-                ++computed_size_;
-                break;
-            case kSerialize:
-                return write_data(*this, object);
-            case kDeserialize:
-                return read_data(*this, object);
-        }
-        return outcome::success();
-    }
-
     // Serialization for arithmetic types
-    template <Integral T>
+    template <typename T>
+    requires Integral<T>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         switch (action) {
             using enum Action;
@@ -186,13 +169,9 @@ class SDataStream : public DataStream {
         return outcome::success();
     }
 
-    template <BigUnsignedIntegral T>
+    template <typename T>
+    requires BigUnsignedIntegral<T>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
-        /*
-         * When used at fixed precision, the size of type boost cpp_int is always one machine word larger
-         * than you would expect for an N-bit integer
-         * https://www.boost.org/doc/libs/1_81_0/libs/multiprecision/doc/html/boost_multiprecision/tut/ints/cpp_int.html
-         * */
         std::array<uint8_t, ssizeof<T>> bytes{0x0};
         switch (action) {
             using enum Action;
@@ -213,9 +192,50 @@ class SDataStream : public DataStream {
     }
 
     // Serialization for Serializable classes
-    template <class T>
+    template <typename T>
     requires std::derived_from<T, Serializable>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) { return object.serialization(*this, action); }
+
+    // Serialization for basic_string<bytes>
+    // Note ! In Bitcoin's objects variable sizes strings of bytes are
+    // a special case as they're always the last element of a structure.
+    // Due to this the size of the member is not recorded
+    template <typename T>
+    requires std::is_same_v<T, Bytes>
+    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
+        switch (action) {
+            using enum Action;
+            case kComputeSize:
+                computed_size_ += object.size();
+                break;
+            case kSerialize:
+                return write(object);
+            case kDeserialize:
+                if (auto read_result{read()}; read_result.has_error()) [[unlikely]] {
+                    return read_result.error();
+                } else {
+                    object.assign(read_result.value());
+                }
+                break;
+        }
+        return outcome::success();
+    }
+
+    // Serialization for bool
+    template <>
+    [[nodiscard]] outcome::result<void> bind(bool& object, Action action) {
+        switch (action) {
+            using enum Action;
+            case kComputeSize:
+                ++computed_size_;
+                break;
+            case kSerialize:
+                return write_data(*this, object);
+            case kDeserialize:
+                return read_data(*this, object);
+        }
+        return outcome::success();
+    }
 
     // Serialization for bytes array (fixed size)
     template <class T, std::size_t N>
@@ -235,31 +255,6 @@ class SDataStream : public DataStream {
                     return read_result.error();
                 } else {
                     std::memcpy(&object[0], read_result.value().data(), array_bytes_size);
-                }
-                break;
-        }
-        return outcome::success();
-    }
-
-    // Serialization for basic_string<bytes>
-    // Note ! In Bitcoin's objects variable sizes strings of bytes are
-    // a special case as they're always the last element of a structure.
-    // Due to this the size of the member is not recorded
-    template <class T>
-    requires std::is_same_v<T, Bytes>
-    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
-        switch (action) {
-            using enum Action;
-            case kComputeSize:
-                computed_size_ += object.size();
-                break;
-            case kSerialize:
-                return write(object);
-            case kDeserialize:
-                if (auto read_result{read()}; read_result.has_error()) [[unlikely]] {
-                    return read_result.error();
-                } else {
-                    object.assign(read_result.value());
                 }
                 break;
         }
