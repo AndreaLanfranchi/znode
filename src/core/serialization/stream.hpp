@@ -186,7 +186,7 @@ class SDataStream : public DataStream {
         return outcome::success();
     }
 
-    template <UnsignedBigIntegral T>
+    template <BigUnsignedIntegral T>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         /*
          * When used at fixed precision, the size of type boost cpp_int is always one machine word larger

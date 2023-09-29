@@ -36,7 +36,7 @@ ByteView zeroless_view(ByteView data);
 [[nodiscard]] std::string encode(ByteView bytes, bool with_prefix = false) noexcept;
 
 //! \brief Returns a string of ascii chars with the hexadecimal representation of provided unsigned big integral
-template <UnsignedBigIntegral T>
+template <BigUnsignedIntegral T>
 [[nodiscard]] std::string encode(const T value, bool with_prefix = false) noexcept {
     Bytes bytes{};
     boost::multiprecision::export_bits(value, std::back_inserter(bytes), CHAR_BIT, true);
