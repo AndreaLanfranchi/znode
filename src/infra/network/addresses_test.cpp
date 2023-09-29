@@ -130,6 +130,7 @@ TEST_CASE("IPAddress Reservations", "[infra][net][addresses]") {
     };
 
     for (const auto& [input, reservation] : test_cases) {
+        INFO("Testing " << input);
         const auto parsed{IPAddress::from_string(input)};
         REQUIRE(parsed.has_value());
         CHECK_FALSE(parsed.value().is_unspecified());
@@ -169,6 +170,7 @@ TEST_CASE("IPSubNet parsing", "[infra][net][addresses]") {
     };
 
     for (const auto& [input, expected_valid, address_type, prefix_length] : test_cases) {
+        INFO("Testing " << input);
         const auto parsed{IPSubNet::from_string(input)};
         if (expected_valid) {
             REQUIRE(parsed.has_value());
@@ -203,6 +205,7 @@ TEST_CASE("IPSubNet contains", "[infra][net][addresses]") {
     };
 
     for (const auto& test_case : test_cases) {
+        INFO("Testing " << test_case.subnet << " contains " << test_case.address);
         const auto parsed_subnet{IPSubNet::from_string(test_case.subnet)};
         REQUIRE(parsed_subnet.has_value());
         const auto& subnet{parsed_subnet.value()};

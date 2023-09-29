@@ -17,8 +17,14 @@
 #include <core/common/misc.hpp>
 
 namespace zenpp::net {
+namespace {
 
-using namespace ser;
+    const std::regex kIPv4Pattern(R"((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?)");
+    const std::regex kIPv6Pattern(R"(\[?([0-9a-f:]+)\]?(?::(\d+))?)", std::regex_constants::icase);
+    const std::regex kIPv6IPv4Pattern(R"(\[?(::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))\]?(?::(\d+))?)",
+                                      std::regex_constants::icase);
+
+}  // namespace
 
 IPAddress::IPAddress(boost::asio::ip::address address) : value_(std::move(address)) {}
 
@@ -78,7 +84,7 @@ IPAddressReservationType IPAddress::address_reservation() const noexcept {
 IPAddressReservationType IPAddress::address_v4_reservation() const noexcept {
     using enum IPAddressReservationType;
     IPAddressReservationType ret{kNotReserved};
-    if (!value_.is_v4()) return ret;
+    if (not value_.is_v4()) return ret;
 
     const auto addr_bytes = value_.to_v4().to_bytes();
 
@@ -116,7 +122,7 @@ IPAddressReservationType IPAddress::address_v4_reservation() const noexcept {
 IPAddressReservationType IPAddress::address_v6_reservation() const noexcept {
     using enum IPAddressReservationType;
     IPAddressReservationType ret{kNotReserved};
-    if (!value_.is_v6()) return ret;
+    if (not value_.is_v6()) return ret;
 
     const auto addr_bytes = value_.to_v6().to_bytes();
 
@@ -167,21 +173,30 @@ IPAddressReservationType IPAddress::address_v6_reservation() const noexcept {
     return ret;
 }
 
-outcome::result<void> IPAddress::serialization(SDataStream& stream, ser::Action action) {
+outcome::result<void> IPAddress::serialization(ser::SDataStream& stream, ser::Action action) {
     return stream.bind(value_, action);
 }
 
 outcome::result<IPAddress> IPAddress::from_string(const std::string& input) {
     if (input.empty()) return IPAddress();
-    // Try to parse as IPv4
-    boost::system::error_code error;
-    boost::asio::ip::address_v4 address_v4{boost::asio::ip::make_address_v4(input, error)};
-    if (not error) return IPAddress{address_v4};
-    // Try to parse as IPv6
-    boost::asio::ip::address_v6 address_v6{boost::asio::ip::make_address_v6(input, error)};
-    if (error) return boost::system::errc::bad_address;
-    if (address_v6.is_v4_mapped()) return IPAddress{address_v6.to_v4()};
-    return IPAddress{address_v6};
+    try {
+        std::smatch matches;
+        if (std::regex_match(input, matches, kIPv6IPv4Pattern)) {
+            const auto address{boost::asio::ip::make_address_v6(matches[1U].str())};
+            return IPAddress{address.to_v4()};
+        }
+        if (std::regex_match(input, matches, kIPv6Pattern)) {
+            const auto address{boost::asio::ip::make_address_v6(matches[1U].str())};
+            return IPAddress{address};
+        }
+        if (std::regex_match(input, matches, kIPv4Pattern)) {
+            const auto address{boost::asio::ip::make_address_v4(matches[1U].str())};
+            return IPAddress{address};
+        }
+        return boost::system::errc::bad_address;
+    } catch (const boost::exception& /*exception*/) {
+        return boost::system::errc::bad_address;
+    }
 }
 
 std::string IPAddress::to_string() const noexcept {
@@ -205,18 +220,14 @@ IPEndpoint::IPEndpoint(boost::asio::ip::address address, uint16_t port_num)
 
 outcome::result<IPEndpoint> IPEndpoint::from_string(const std::string& input) {
     if (input.empty()) return IPEndpoint();
-    static const std::regex ipv4_pattern(R"((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?)");
-    static const std::regex ipv6_pattern(R"(\[?([0-9a-f:]+)\]?(?::(\d+))?)", std::regex_constants::icase);
-    static const std::regex ipv6_ipv4_pattern(R"(\[?::ffff:((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}))\]?(?::(\d+))?)",
-                                              std::regex_constants::icase);
 
     std::smatch matches;
     std::smatch::size_type address_match{0};
     std::smatch::size_type port_match{0};
-    if (std::regex_match(input, matches, ipv6_ipv4_pattern)) {
+    if (std::regex_match(input, matches, kIPv6IPv4Pattern)) {
         address_match = 1U;
         port_match = 4U;
-    } else if (std::regex_match(input, matches, ipv4_pattern) or std::regex_match(input, matches, ipv6_pattern)) {
+    } else if (std::regex_match(input, matches, kIPv4Pattern) or std::regex_match(input, matches, kIPv6Pattern)) {
         address_match = 1U;
         port_match = 2U;
     } else {
@@ -228,7 +239,7 @@ outcome::result<IPEndpoint> IPEndpoint::from_string(const std::string& input) {
     if (matches[port_match].matched) {
         try {
             auto port_parsed{boost::lexical_cast<uint64_t>(matches[port_match].str())};
-            if (port_parsed > 65535U) return boost::system::errc::value_too_large;
+            if (port_parsed >= UINT16_MAX) return boost::system::errc::value_too_large;
             return IPEndpoint{parsed_address.value(), boost::numeric_cast<uint16_t>(port_parsed)};
         } catch (const boost::bad_lexical_cast& /*exception*/) {
             return boost::system::errc::invalid_argument;
@@ -239,7 +250,7 @@ outcome::result<IPEndpoint> IPEndpoint::from_string(const std::string& input) {
 
 std::string IPEndpoint::to_string() const noexcept { return absl::StrCat(address_.to_string(), ":", port_); }
 
-outcome::result<void> IPEndpoint::serialization(SDataStream& stream, ser::Action action) {
+outcome::result<void> IPEndpoint::serialization(ser::SDataStream& stream, ser::Action action) {
     auto result{stream.bind(address_, action)};
     if (not result.has_error()) {
         port_ = bswap_16(port_);
@@ -251,9 +262,9 @@ outcome::result<void> IPEndpoint::serialization(SDataStream& stream, ser::Action
 
 boost::asio::ip::tcp::endpoint IPEndpoint::to_endpoint() const noexcept { return {*address_, port_}; }
 
-bool IPEndpoint::is_valid() const noexcept { return ((port_ > 1 and port_ < 65535) and address_.is_valid()); }
+bool IPEndpoint::is_valid() const noexcept { return (address_.is_valid() and (port_ > 1 and port_ < UINT16_MAX)); }
 
-bool IPEndpoint::is_routable() const noexcept { return address_.is_routable() and (port_ > 1 and port_ < 65535); }
+bool IPEndpoint::is_routable() const noexcept { return is_valid() and address_.is_routable(); }
 
 bool IPEndpoint::operator==(const IPEndpoint& other) const noexcept {
     return address_ == other.address_ and port_ == other.port_;
@@ -339,8 +350,8 @@ outcome::result<uint8_t> IPSubNet::parse_prefix_length(const std::string& input)
     if (input.empty()) return boost::system::errc::invalid_argument;
 
     unsigned ret{0};
-    const std::regex decimal_notation_pattern(R"(^([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3})$)");
-    const std::regex cidr_notation_pattern(R"(^([0-9]{1,3})$)");
+    static const std::regex decimal_notation_pattern(R"(^([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3})$)");
+    static const std::regex cidr_notation_pattern(R"(^([0-9]{1,3})$)");
     std::smatch matches;
 
     if (std::regex_match(input, matches, decimal_notation_pattern)) {
@@ -434,7 +445,7 @@ NodeService::NodeService(boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(e
 
 NodeService::NodeService(const IPEndpoint& endpoint) : endpoint_(endpoint) {}
 
-outcome::result<void> NodeService::serialization(SDataStream& stream, Action action) {
+outcome::result<void> NodeService::serialization(ser::SDataStream& stream, ser::Action action) {
     auto result{stream.bind(time_, action)};
     if (not result.has_error()) result = stream.bind(services_, action);
     if (not result.has_error()) result = stream.bind(endpoint_, action);
@@ -444,7 +455,7 @@ outcome::result<void> NodeService::serialization(SDataStream& stream, Action act
 NodeService::NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint)
     : endpoint_{endpoint.address(), endpoint.port()} {}
 
-outcome::result<void> VersionNodeService::serialization(SDataStream& stream, Action action) {
+outcome::result<void> VersionNodeService::serialization(ser::SDataStream& stream, ser::Action action) {
     auto result{stream.bind(services_, action)};
     if (not result.has_error()) result = stream.bind(endpoint_, action);
     return result;
