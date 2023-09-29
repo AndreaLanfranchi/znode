@@ -214,14 +214,12 @@ class SDataStream : public DataStream {
 
     // Serialization for Serializable classes
     template <class T>
-        requires std::derived_from<T, Serializable>
-    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
-        return object.serialization(*this, action);
-    }
+    requires std::derived_from<T, Serializable>
+    [[nodiscard]] outcome::result<void> bind(T& object, Action action) { return object.serialization(*this, action); }
 
     // Serialization for bytes array (fixed size)
     template <class T, std::size_t N>
-        requires std::is_fundamental_v<T>
+    requires std::is_fundamental_v<T>
     [[nodiscard]] outcome::result<void> bind(std::array<T, N>& object, Action action) {
         const auto element_size{ser_sizeof(object[0])};
         const auto array_bytes_size{N * element_size};
@@ -248,7 +246,7 @@ class SDataStream : public DataStream {
     // a special case as they're always the last element of a structure.
     // Due to this the size of the member is not recorded
     template <class T>
-        requires std::is_same_v<T, Bytes>
+    requires std::is_same_v<T, Bytes>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         switch (action) {
             using enum Action;
@@ -270,7 +268,7 @@ class SDataStream : public DataStream {
 
     // Serialization for std::string
     template <class T>
-        requires std::is_same_v<T, std::string>
+    requires std::is_same_v<T, std::string>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         switch (action) {
             using enum Action;
@@ -299,7 +297,7 @@ class SDataStream : public DataStream {
     // Serialization for ip::address
     // see https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
     template <class T>
-        requires std::is_same_v<T, boost::asio::ip::address>
+    requires std::is_same_v<T, boost::asio::ip::address>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         std::array<uint8_t, 16> bytes{0x0};
         switch (action) {
