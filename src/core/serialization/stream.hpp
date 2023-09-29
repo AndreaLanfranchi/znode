@@ -175,7 +175,7 @@ class SDataStream : public DataStream {
         switch (action) {
             using enum Action;
             case kComputeSize:
-                computed_size_ += ser_sizeof(object);
+                computed_size_ += ssizeof<T>;
                 break;
             case kSerialize:
                 return write_data(*this, object);
@@ -193,7 +193,7 @@ class SDataStream : public DataStream {
          * than you would expect for an N-bit integer
          * https://www.boost.org/doc/libs/1_81_0/libs/multiprecision/doc/html/boost_multiprecision/tut/ints/cpp_int.html
          * */
-        std::array<uint8_t, sizeof(T) - sizeof(intptr_t)> bytes{0x0};
+        std::array<uint8_t, ssizeof<T>> bytes{0x0};
         switch (action) {
             using enum Action;
             case kComputeSize:
@@ -221,7 +221,7 @@ class SDataStream : public DataStream {
     template <class T, std::size_t N>
     requires std::is_fundamental_v<T>
     [[nodiscard]] outcome::result<void> bind(std::array<T, N>& object, Action action) {
-        const auto element_size{ser_sizeof(object[0])};
+        const auto element_size{ssizeof<T>};
         const auto array_bytes_size{N * element_size};
         switch (action) {
             using enum Action;

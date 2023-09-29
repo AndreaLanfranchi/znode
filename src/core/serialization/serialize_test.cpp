@@ -14,18 +14,20 @@
 namespace zenpp::ser {
 
 TEST_CASE("Serialization Sizes", "[serialization]") {
-    CHECK(ser_sizeof('a') == 1);
-    CHECK(ser_sizeof(uint8_t{0}) == 1);
-    CHECK(ser_sizeof(int8_t{0}) == 1);
-    CHECK(ser_sizeof(uint16_t{0}) == 2);
-    CHECK(ser_sizeof(int16_t{0}) == 2);
-    CHECK(ser_sizeof(uint32_t{0}) == 4);
-    CHECK(ser_sizeof(int32_t{0}) == 4);
-    CHECK(ser_sizeof(uint64_t{0}) == 8);
-    CHECK(ser_sizeof(int64_t{0}) == 8);
-    CHECK(ser_sizeof(float{0}) == 4);
-    CHECK(ser_sizeof(double{0}) == 8);
-    CHECK(ser_sizeof(bool{true}) == 1);
+    CHECK(ssizeof<char> == 1);
+    CHECK(ssizeof<uint8_t> == 1);
+    CHECK(ssizeof<int8_t> == 1);
+    CHECK(ssizeof<uint16_t> == 2);
+    CHECK(ssizeof<int16_t> == 2);
+    CHECK(ssizeof<uint32_t> == 4);
+    CHECK(ssizeof<int32_t> == 4);
+    CHECK(ssizeof<uint64_t> == 8);
+    CHECK(ssizeof<int64_t> == 8);
+    CHECK(ssizeof<float> == 4);
+    CHECK(ssizeof<double> == 8);
+    CHECK(ssizeof<bool> == 1);
+    CHECK(ssizeof<uint128_t> == 16);
+    CHECK(ssizeof<uint256_t> == 32);
 
     CHECK(sizeof(uint32_t) == sizeof(float));
     CHECK(sizeof(uint64_t) == sizeof(double));
@@ -118,25 +120,26 @@ TEST_CASE("Serialization of base types", "[serialization]") {
 
         uint8_t u8{0x10};
         REQUIRE_FALSE(write_data(stream, u8).has_error());
-        CHECK(stream.size() == ser_sizeof(u8));
+        CHECK(stream.size() == ssizeof<uint8_t>);
         uint16_t u16{0x10};
         REQUIRE_FALSE(write_data(stream, u16).has_error());
-        CHECK(stream.size() == ser_sizeof(u8) + ser_sizeof(u16));
+        CHECK(stream.size() == ssizeof<uint8_t> + ssizeof<uint16_t>);
         uint32_t u32{0x10};
         REQUIRE_FALSE(write_data(stream, u32).has_error());
-        CHECK(stream.size() == ser_sizeof(u8) + ser_sizeof(u16) + ser_sizeof(u32));
+        CHECK(stream.size() == ssizeof<uint8_t> + ssizeof<uint16_t> + ssizeof<uint32_t>);
         uint64_t u64{0x10};
         REQUIRE_FALSE(write_data(stream, u64).has_error());
-        CHECK(stream.size() == ser_sizeof(u8) + ser_sizeof(u16) + ser_sizeof(u32) + ser_sizeof(u64));
+        CHECK(stream.size() == ssizeof<uint8_t> + ssizeof<uint16_t> + ssizeof<uint32_t> + ssizeof<uint64_t>);
 
         float f{1.05f};
         REQUIRE_FALSE(write_data(stream, f).has_error());
-        CHECK(stream.size() == ser_sizeof(u8) + ser_sizeof(u16) + ser_sizeof(u32) + ser_sizeof(u64) + ser_sizeof(f));
+        CHECK(stream.size() ==
+              ssizeof<uint8_t> + ssizeof<uint16_t> + ssizeof<uint32_t> + ssizeof<uint64_t> + ssizeof<float>);
 
         double d{f * 2};
         REQUIRE_FALSE(write_data(stream, d).has_error());
-        CHECK(stream.size() ==
-              ser_sizeof(u8) + ser_sizeof(u16) + ser_sizeof(u32) + ser_sizeof(u64) + ser_sizeof(f) + ser_sizeof(d));
+        CHECK(stream.size() == ssizeof<uint8_t> + ssizeof<uint16_t> + ssizeof<uint32_t> + ssizeof<uint64_t> +
+                                   ssizeof<float> + ssizeof<double>);
     }
 
     SECTION("Floats serialization", "[serialization]") {

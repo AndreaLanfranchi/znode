@@ -18,32 +18,34 @@
 //! \brief All functions dedicated to objects and types serialization
 namespace zenpp::ser {
 
-//! \brief Returns the serialized size of arithmetic types
+//! \brief ssizeof stands for serialized size of. Returns the serialized size of arithmetic types
 //! \remarks Do not define serializable classes members as size_t as it might lead to wrong results on
 //! MacOS/Xcode bundles
-template <class T>
-requires std::is_arithmetic_v<T>
-inline uint32_t ser_sizeof([[maybe_unused]] T obj) { return sizeof(obj); }
-
-//! \brief Returns the serialized size of arithmetic types
-//! \remarks Specialization for bool which is stored in at least 1 byte
+//! \remarks The size of big integers derived from boost cpp_int cannot be determined by sizeof as
+//! it's always at least one machine word greater than you would expect for an N-bit integer
+//! As a result the specialization for uint128_t and uint256_t is required
+//! https://www.boost.org/doc/libs/1_81_0/libs/multiprecision/doc/html/boost_multiprecision/tut/ints/cpp_int.html
+template <typename T>
+constexpr uint32_t ssizeof = sizeof(T);
 template <>
-inline uint32_t ser_sizeof([[maybe_unused]] bool obj) {
-    return sizeof(char);
-}
+constexpr uint32_t ssizeof<bool> = 1U;
+template <>
+constexpr uint32_t ssizeof<uint128_t> = 16U;
+template <>
+constexpr uint32_t ssizeof<uint256_t> = 32U;
 
 //! \brief Returns the serialzed size of a compacted integral
 //! \remarks Mostly used in P2P messages to prepend a list of elements with the count of items to be expected.
 //! \attention Not to be confused with varint
 inline constexpr uint32_t ser_compact_sizeof(uint64_t value) {
-    if (value < 253) return 1;          // One byte only
-    if (value <= 0xffff) return 3;      // One byte prefix + 2 bytes of uint16_t
-    if (value <= 0xffffffff) return 5;  // One byte prefix + 4 bytes of uint32_t
-    return 9;                           // One byte prefix + 8 bytes of uint64_t
+    if (value < 253) return 1U;          // One byte only
+    if (value <= 0xffff) return 3U;      // One byte prefix + 2 bytes of uint16_t
+    if (value <= 0xffffffff) return 5U;  // One byte prefix + 4 bytes of uint32_t
+    return 9U;                           // One byte prefix + 8 bytes of uint64_t
 }
 
 //! \brief Lowest level serialization for integral arithmetic types
-template <class Stream, std::integral T>
+template <class Stream, Integral T>
 inline outcome::result<void> write_data(Stream& stream, T obj) {
     // TODO: Optimize using span or byteview
     std::array<unsigned char, sizeof(obj)> bytes{};
@@ -103,9 +105,9 @@ inline outcome::result<void> write_compact(Stream& stream, uint64_t obj) {
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Stream>
-requires(std::is_arithmetic_v<T> && !std::is_same_v<T, bool>) inline outcome::result<void> read_data(Stream& stream,
-                                                                                                     T& object) {
-    const uint32_t count{ser_sizeof(object)};
+requires(std::is_arithmetic_v<T> and not std::is_same_v<T, bool>) inline outcome::result<void> read_data(Stream& stream,
+                                                                                                         T& object) {
+    const uint32_t count{ssizeof<T>};
     const auto read_result{stream.read(count)};
     if (!read_result) return read_result.error();
     std::memcpy(&object, read_result.value().data(), count);
@@ -127,7 +129,7 @@ inline outcome::result<T> read_data(Stream& stream) {
 template <typename T, class Stream>
 requires std::is_same_v<T, bool>
 inline outcome::result<void> read_data(Stream& stream, T& object) {
-    const auto read_result{stream.read(1)};
+    const auto read_result{stream.read(ssizeof<T>)};
     if (!read_result) return read_result.error();
     object = (read_result.value().data()[0] == 0x01);
     return outcome::success();
