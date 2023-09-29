@@ -193,10 +193,20 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
 
 void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
     using enum log::Level;
-    const std::map<std::string, log::Level, std::less<>> level_mapping{
-        {"critical", kCritical}, {"error", kError}, {"warning", kWarning},
-        {"info", kInfo},         {"debug", kDebug}, {"trace", kTrace},
+
+    const auto level_label = [](log::Level level) -> std::string {
+        std::string ret{magic_enum::enum_name(level)};
+        ret.erase(0, 1);
+        std::transform(ret.begin(), ret.end(), ret.begin(), [](unsigned char c) { return std::tolower(c); });
+        return ret;
     };
+
+    std::map<std::string, log::Level, std::less<>> level_mapping;
+    for (const auto enumerator : magic_enum::enum_values<log::Level>()) {
+        auto label{level_label(enumerator)};
+        level_mapping.emplace(label, enumerator);
+    }
+
     auto& log_opts = *cli.add_option_group("Log", "Logging options");
     log_opts.add_option("--log.verbosity", log_settings.log_verbosity, "Sets log verbosity")
         ->capture_default_str()
