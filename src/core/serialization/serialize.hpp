@@ -26,13 +26,13 @@ namespace zenpp::ser {
 //! As a result the specialization for uint128_t and uint256_t is required
 //! https://www.boost.org/doc/libs/1_81_0/libs/multiprecision/doc/html/boost_multiprecision/tut/ints/cpp_int.html
 template <typename T>
-constexpr uint32_t ssizeof = sizeof(T);
+inline constexpr uint32_t ssizeof = sizeof(T);
 template <>
-constexpr uint32_t ssizeof<bool> = 1U;
+inline constexpr uint32_t ssizeof<bool> = 1U;
 template <>
-constexpr uint32_t ssizeof<uint128_t> = 16U;
+inline constexpr uint32_t ssizeof<uint128_t> = 16U;
 template <>
-constexpr uint32_t ssizeof<uint256_t> = 32U;
+inline constexpr uint32_t ssizeof<uint256_t> = 32U;
 
 //! \brief Returns the serialzed size of a compacted integral
 //! \remarks Mostly used in P2P messages to prepend a list of elements with the count of items to be expected.
