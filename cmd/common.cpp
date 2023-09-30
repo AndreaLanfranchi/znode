@@ -247,7 +247,7 @@ IPEndPointValidator::IPEndPointValidator(bool allow_empty, uint16_t default_port
         }
 
         auto parsed_value{net::IPEndpoint::from_string(value)};
-        if (!parsed_value) {
+        if (parsed_value.has_error()) {
             return "Value \"" + value + "\" is not a valid endpoint";
         }
         parsed_value.value().port_ = parsed_value.value().port_ == 0 ? default_port : parsed_value.value().port_;

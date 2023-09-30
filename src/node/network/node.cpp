@@ -230,8 +230,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         on_data_(DataDirectionMode::kInbound, bytes_transferred);
 
         const auto parse_result{parse_messages(bytes_transferred)};
-        if (parse_result.has_error() and
-            parse_result.error().default_error_condition() not_eq boost::system::errc::operation_in_progress) {
+        if (parse_result.has_error()) {
             const std::list<std::string> log_params{"action", __func__, "status", parse_result.error().message()};
             print_log(log::Level::kError, log_params, " Disconnecting ...");
             stop(false);
@@ -251,8 +250,8 @@ void Node::start_write() {
 
     if (outbound_message_ not_eq nullptr and outbound_message_->data().eof()) {
         // A message has been fully sent - Exclude kPing and kPong
-        const bool is_ping_pong{outbound_message_->get_type() == MessageType::kPing or
-                                outbound_message_->get_type() == MessageType::kPong};
+        const bool is_ping_pong{outbound_message_->header().get_type() == MessageType::kPing or
+                                outbound_message_->header().get_type() == MessageType::kPong};
         if (not is_ping_pong) {
             last_message_sent_time_.store(std::chrono::steady_clock::now());
             outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
@@ -275,23 +274,23 @@ void Node::start_write() {
     // If message has been just loaded into the barrel then we must check its validity
     // against protocol handshake rules
     if (outbound_message_->data().tellg() == 0) {
+        const auto msg_type{outbound_message_->header().get_type()};
         if (log::test_verbosity(log::Level::kTrace)) {
             const std::list<std::string> log_params{
                 "action",  __func__,
-                "message", std::string(magic_enum::enum_name(outbound_message_->get_type())),
+                "message", std::string(magic_enum::enum_name(outbound_message_->header().get_type())),
                 "size",    to_human_bytes(outbound_message_->data().size())};
             print_log(log::Level::kTrace, log_params);
         }
 
-        const auto result{
-            validate_message_for_protocol_handshake(DataDirectionMode::kOutbound, outbound_message_->get_type())};
+        const auto result{validate_message_for_protocol_handshake(DataDirectionMode::kOutbound, msg_type)};
         if (result.has_error()) [[unlikely]] {
             if (log::test_verbosity(log::Level::kError)) {
                 // TODO : Should we drop the connection here?
                 // Actually outgoing messages' correct sequence is local responsibility
                 // maybe we should either assert or push back the message into the queue
                 const std::list<std::string> log_params{
-                    "action", __func__,  "message", std::string(magic_enum::enum_name(outbound_message_->get_type())),
+                    "action", __func__,  "message", std::string(magic_enum::enum_name(msg_type)),
                     "status", "failure", "reason",  result.error().message()};
                 print_log(log::Level::kError, log_params, "Disconnecting peer but is local fault ...");
             }
@@ -303,7 +302,6 @@ void Node::start_write() {
 
         // Post actions to take on begin of outgoing message
         const auto now{std::chrono::steady_clock::now()};
-        const auto msg_type{outbound_message_->get_type()};
         outbound_message_metrics_[msg_type].count_++;
         outbound_message_metrics_[msg_type].bytes_ += outbound_message_->data().size();
         switch (msg_type) {
@@ -420,29 +418,25 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
 
     while (!data.empty()) {
         if (inbound_message_ == nullptr) begin_inbound_message();
-        result = inbound_message_->parse(data, app_settings_.chain_config->magic_);  // Consumes data
-        if (result.has_error()) {
-            if (result.error() == net::Error::kMessageHeaderIncomplete) {
-                // We need more data to parse the header - assume success
-                result = outcome::success();
+        result = inbound_message_->write(data, app_settings_.chain_config->magic_);  // Note! data is consumed here
+        if (result.has_error()) break;
+
+        // If we have the message type then we can validate it against protocol handshake rules
+        const auto msg_type{inbound_message_->get_type()};
+        if (msg_type.has_value()) {
+            if (const auto handshake_result{
+                    validate_message_for_protocol_handshake(DataDirectionMode::kInbound, msg_type.value())};
+                handshake_result.has_error()) {
+                result = handshake_result.error();
                 break;
             }
-            if (result.error() == net::Error::kMessageHeaderIllegalCommand) {
-                print_log(log::Level::kDebug, {"action", __func__, "error", result.error().message()},
-                          std::string(reinterpret_cast<char*>(inbound_message_->header().command.data()), 12));
-            }
-            break;
         }
 
-        if (const auto handshake_result{
-                validate_message_for_protocol_handshake(DataDirectionMode::kInbound, inbound_message_->get_type())};
-            handshake_result.has_error()) {
-            result = handshake_result.error();
-            break;
-        }
+        if (not inbound_message_->is_complete()) continue;  // We need more data
 
         // We've got the header begin timing
-        switch (inbound_message_->get_type()) {
+        ASSERT(msg_type.has_value() and "Must have a valid message type");
+        switch (msg_type.value()) {
             using enum MessageType;
             case kPing:
             case kPong:
@@ -450,11 +444,6 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
             default:
                 inbound_message_start_time_.store(std::chrono::steady_clock::now());
                 break;
-        }
-
-        if (result.has_error() and result.error() == net::Error::kMessageBodyIncomplete) {
-            result = outcome::success();
-            break;  // Can't do anything but read other data
         }
 
         if (++messages_parsed > kMaxMessagesPerRead) {
@@ -465,6 +454,7 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
         if (result = process_inbound_message(); result.has_error()) break;
         end_inbound_message();
     }
+
     receive_buffer_.consume(bytes_transferred);
     return result;
 }
@@ -474,11 +464,12 @@ outcome::result<void> Node::process_inbound_message() {
     std::string err_extended_reason{};
     bool notify_node_hub{false};
 
-    ASSERT_PRE(inbound_message_ not_eq nullptr and "Must have a valid message");
-    inbound_message_metrics_[inbound_message_->get_type()].count_++;
-    inbound_message_metrics_[inbound_message_->get_type()].bytes_ += inbound_message_->data().size();
+    ASSERT_PRE((inbound_message_ not_eq nullptr and inbound_message_->is_complete()) and "Must have a valid message");
+    const auto msg_type{inbound_message_->header().get_type()};
+    inbound_message_metrics_[msg_type].count_++;
+    inbound_message_metrics_[msg_type].bytes_ += inbound_message_->data().size();
 
-    switch (inbound_message_->get_type()) {
+    switch (msg_type) {
         using enum MessageType;
         case kVersion:
             if (result = remote_version_.deserialize(inbound_message_->data()); result.has_error()) break;
@@ -562,22 +553,19 @@ outcome::result<void> Node::process_inbound_message() {
             break;
     }
 
-    const bool is_fatal{result.has_error() and
-                        result.error().default_error_condition() not_eq boost::system::errc::operation_in_progress};
-    if (is_fatal or log::test_verbosity(log::Level::kTrace)) {
+    if (result.has_error() or log::test_verbosity(log::Level::kTrace)) {
         const std::list<std::string> log_params{
             "action",  __func__,
-            "message", std::string{magic_enum::enum_name(inbound_message_->get_type())},
+            "message", std::string{magic_enum::enum_name(msg_type)},
             "size",    to_human_bytes(inbound_message_->size()),
-            "status",  std::string(is_fatal ? result.error().message() : "success")};
-        print_log(is_fatal ? log::Level::kWarning : log::Level::kTrace, log_params, err_extended_reason);
+            "status",  std::string(result.has_error() ? result.error().message() : "success")};
+        print_log(result.has_error() ? log::Level::kWarning : log::Level::kTrace, log_params, err_extended_reason);
     }
-    if (not is_fatal and notify_node_hub) {
-        if (inbound_message_->get_type() not_eq MessageType::kPing and
-            inbound_message_->get_type() not_eq MessageType::kPong) {
+    if (not result.has_error()) {
+        if (msg_type not_eq MessageType::kPing and msg_type not_eq MessageType::kPong) {
             last_message_received_time_.store(std::chrono::steady_clock::now());
         }
-        on_message_(shared_from_this(), std::move(inbound_message_));
+        if (notify_node_hub) on_message_(shared_from_this(), std::move(inbound_message_));
     }
     return result;
 }

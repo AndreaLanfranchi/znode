@@ -52,115 +52,87 @@ struct MessageDefinition {
 };
 
 inline constexpr MessageDefinition kMessageVersion{
-    "version",              //
-    MessageType::kVersion,  //
-    false,
-    std::nullopt,  //
-    std::nullopt,  //
-    size_t{46},    //
-    size_t(1_KiB)  //
+    .command = "version",
+    .message_type = MessageType::kVersion,
+    .min_payload_length = size_t{46},
+    .max_payload_length = size_t(1_KiB),
 };
 
 inline constexpr MessageDefinition kMessageVerack{
-    "verack",              //
-    MessageType::kVerAck,  //
-    false,
-    std::nullopt,  //
-    std::nullopt,  //
-    std::nullopt,  //
-    size_t{0}      //
+    .command = "verack",
+    .message_type = MessageType::kVerAck,
+    .min_payload_length = size_t{0},
+    .max_payload_length = size_t{0},
 };
 
 inline constexpr MessageDefinition kMessageInv{
-    "inv",              //
-    MessageType::kInv,  //
-    true,
-    size_t{kMaxInvItems},
-    size_t{kInvItemSize},
-    size_t{1 + kInvItemSize},                                                       //
-    size_t{ser::ser_compact_sizeof(kMaxInvItems) + (kMaxInvItems * kInvItemSize)},  //
+    .command = "inv",
+    .message_type = MessageType::kInv,
+    .is_vectorized = true,
+    .max_vector_items = size_t{kMaxInvItems},
+    .vector_item_size = size_t{kInvItemSize},
+    .min_payload_length = size_t{1 + kInvItemSize},
+    .max_payload_length = size_t{ser::ser_compact_sizeof(kMaxInvItems) + (kMaxInvItems * kInvItemSize)},
 };
 
 inline constexpr MessageDefinition kMessageAddr{
-    "addr",              //
-    MessageType::kAddr,  //
-    true,
-    size_t{kMaxAddrItems},
-    size_t{kAddrItemSize},
-    size_t{1 + kAddrItemSize},                                                         //
-    size_t{ser::ser_compact_sizeof(kMaxAddrItems) + (kMaxAddrItems * kAddrItemSize)},  //
+    .command = "addr",
+    .message_type = MessageType::kAddr,
+    .is_vectorized = true,
+    .max_vector_items = size_t{kMaxAddrItems},
+    .vector_item_size = size_t{kAddrItemSize},
+    .min_payload_length = size_t{1 + kAddrItemSize},
+    .max_payload_length = size_t{ser::ser_compact_sizeof(kMaxAddrItems) + (kMaxAddrItems * kAddrItemSize)},
 };
 
 inline constexpr MessageDefinition kMessagePing{
-    "ping",              //
-    MessageType::kPing,  //
-    false,
-    size_t{0},
-    size_t{0},
-    size_t{sizeof(uint64_t)},  //
-    size_t{sizeof(uint64_t)},  //
+    .command = "ping",
+    .message_type = MessageType::kPing,
+    .min_payload_length = size_t{sizeof(uint64_t)},
+    .max_payload_length = size_t{sizeof(uint64_t)},
 };
 
 inline constexpr MessageDefinition kMessagePong{
-    "pong",              //
-    MessageType::kPong,  //
-    false,
-    size_t{0},
-    size_t{0},
-    size_t{sizeof(uint64_t)},  //
-    size_t{sizeof(uint64_t)},  //
+    .command = "pong",
+    .message_type = MessageType::kPong,
+    .min_payload_length = size_t{sizeof(uint64_t)},
+    .max_payload_length = size_t{sizeof(uint64_t)},
 };
 
 inline constexpr MessageDefinition kMessageGetheaders{
-    "getheaders",                                                               //
-    MessageType::kGetHeaders,                                                   //
-    true,                                                                       // vectorized
-    size_t{kMaxGetHeadersItems},                                                // max vector items
-    size_t{h256::size()},                                                       // vector item size
-    size_t{/*version*/ 4 + /*count*/ 1 + h256::size() * /* known + stop */ 2},  // min payload length
-    size_t{/*version*/ 4 + /*version*/ ser::ser_compact_sizeof(kMaxGetHeadersItems) +
-           h256::size() * (/* known + stop */ kMaxGetHeadersItems + 1)},  // max payload length
+    .command = "getheaders",
+    .message_type = MessageType::kGetHeaders,
+    .is_vectorized = true,
+    .max_vector_items = size_t{kMaxGetHeadersItems},
+    .vector_item_size = size_t{h256::size()},
+    .min_payload_length = size_t{/*version*/ 4 + /*count*/ 1 + h256::size() * /* known + stop */ 2},
+    .max_payload_length = size_t{/*version*/ 4 + /*version*/ ser::ser_compact_sizeof(kMaxGetHeadersItems) +
+                                 h256::size() * (/* known + stop */ kMaxGetHeadersItems + 1)},  // max payload length
 };
 
 inline constexpr MessageDefinition kMessageHeaders{
-    "headers",                 //
-    MessageType::kHeaders,     //
-    true,                      // vectorized
-    size_t{kMaxHeadersItems},  // max vector items
-    std::nullopt,              // vector item size
-    size_t{1 + 140},           // min payload length
-    std::nullopt,              // max payload length
+    .command = "headers",
+    .message_type = MessageType::kHeaders,
+    .is_vectorized = true,
+    .max_vector_items = size_t{kMaxHeadersItems},
+    .min_payload_length = size_t{1 + 140},
 };
 
 inline constexpr MessageDefinition kMessageGetAddr{
-    "getaddr",              //
-    MessageType::kGetAddr,  //
-    false,                  // vectorized
-    std::nullopt,           // max vector items
-    std::nullopt,           // vector item size
-    size_t{0},              // min payload length
-    size_t{0},              // max payload length
+    .command = "getaddr",
+    .message_type = MessageType::kGetAddr,
+    .min_payload_length = size_t{0},
+    .max_payload_length = size_t{0},
 };
 
 inline constexpr MessageDefinition kMessageMempool{
-    "mempool",              //
-    MessageType::kMemPool,  //
-    false,
-    std::nullopt,
-    std::nullopt,
-    size_t{0},
-    size_t{0},
+    .command = "mempool",
+    .message_type = MessageType::kMemPool,
+    .min_payload_length = size_t{0},
+    .max_payload_length = size_t{0},
 };
 
-inline constexpr MessageDefinition kMessageMissingOrUnknown{
-    nullptr,                         //
-    MessageType::kMissingOrUnknown,  //
-    false,
-    size_t{0},
-    size_t{0},
-    size_t{0},  //
-    size_t{0},  //
-};
+inline constexpr MessageDefinition kMessageMissingOrUnknown{};
 
 //! \brief List of all supported messages
 //! \attention This must be kept in same order as the MessageCommand enum

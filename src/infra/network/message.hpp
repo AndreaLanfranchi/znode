@@ -48,7 +48,7 @@ class MessageHeader : public ser::Serializable {
     [[nodiscard]] bool pristine() const noexcept;
 
     //! \brief Performs a sanity check on the header
-    [[nodiscard]] outcome::result<void> validate() noexcept;
+    [[nodiscard]] outcome::result<void> validate(int protocol_version) noexcept;
 
   private:
     MessageType message_type_{MessageType::kMissingOrUnknown};
@@ -75,28 +75,52 @@ class Message {
     Message& operator=(const Message&) = delete;
     ~Message() = default;
 
+    //! \brief Gets the overall size of the message as serialized bytes count
     [[nodiscard]] size_t size() const noexcept { return ser_stream_.size(); }
-    [[nodiscard]] MessageType get_type() const noexcept { return header_.get_type(); }
+
+    [[nodiscard]] bool is_complete() const noexcept { return complete_; }
+
+    //! \brief Returns the message type (i.e. command)
+    [[nodiscard]] std::optional<MessageType> get_type() const noexcept;
+
+    //! \brief Returns the message header
+    [[nodiscard]] const MessageHeader& header() const noexcept { return header_; }
+
     [[nodiscard]] MessageHeader& header() noexcept { return header_; }
+
     [[nodiscard]] ser::SDataStream& data() noexcept { return ser_stream_; }
-    [[nodiscard]] outcome::result<void> parse(ByteView& input_data, ByteView network_magic = {});
 
     //! \brief Sets the message version (generally inherited from the protocol version)
-    void set_version(int version) noexcept;
+    void set_version(int version) noexcept { ser_stream_.set_version(version); }
 
     //! \brief Returns the message version
-    [[nodiscard]] int get_version() const noexcept;
+    [[nodiscard]] int get_version() const noexcept { return ser_stream_.get_version(); }
 
     //! \brief Validates the message header, payload and checksum
     [[nodiscard]] outcome::result<void> validate() noexcept;
 
-    [[nodiscard]] outcome::result<void> validate_checksum() noexcept;
+    //! \brief Writes data into message buffer and tries to deserialize and validate
+    //! \remarks Input data is consumed until the message is fully validated or an error occurs
+    //! \remarks Any error returned `Error::kMessageHeaderIncomplete` or `Error::kMessageBodyIncomplete`
+    //!          must be considered fatal
+    [[nodiscard]] outcome::result<void> write(ByteView& input, ByteView network_magic = {});
 
     //! \brief Populates the message header and payload
     outcome::result<void> push(MessageType message_type, MessagePayload& payload, ByteView magic) noexcept;
 
   private:
-    MessageHeader header_{};       // Where the message header is deserialized
-    ser::SDataStream ser_stream_;  // Contains all the message raw data
+    MessageHeader header_{};        // Where the message header is deserialized
+    ser::SDataStream ser_stream_;   // Contains all the message raw data
+    bool header_validated_{false};  // Whether the header has been validated already
+    bool complete_{false};          // Whether the message is complete (header + payload + checksum)
+
+    //! \brief Validates the message header
+    [[nodiscard]] outcome::result<void> validate_header() noexcept;
+
+    //! \brief Validates the message payload
+    [[nodiscard]] outcome::result<void> validate_payload() noexcept;
+
+    //! \brief Validates the message header's checksum against the payload
+    [[nodiscard]] outcome::result<void> validate_checksum() noexcept;
 };
 }  // namespace zenpp::net

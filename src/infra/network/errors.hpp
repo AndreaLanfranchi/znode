@@ -16,20 +16,21 @@ namespace zenpp::net {
 
 enum class Error {
     kSuccess,                                   // Not actually an error
+    kMessageSizeOverflow,                       // Message size overflow
     kMessageHeaderIncomplete,                   // Message header is incomplete (need more data)
     kMessageBodyIncomplete,                     // Message body is incomplete (need more data)
     kMessageHeaderInvalidMagic,                 // Message header's magic field is invalid
     kMessageHeaderMalformedCommand,             // Message header's command field is malformed
     kMessageHeaderEmptyCommand,                 // Message header's command field is empty
     kMessageHeaderIllegalCommand,               // Message header's command field is not a valid command
-    kMessageHeaderOversizedPayload,             // Message header's payload is too large
-    kMessageHeaderUndersizedPayload,            // Message header's payload is too small
+    kMessageHeaderIllegalPayloadLength,         // Message header's payload length is not allowed
     kMessageHeaderInvalidChecksum,              // Message header's checksum is invalid
     kMessagePayloadEmptyVector,                 // Message payload's expected vectorized, but no items provided
     kMessagePayloadOversizedVector,             // Message payload's expected vectorized, but too many items provided
     kMessagePayloadMismatchesVectorSize,        // Message payload's vectorized, but size mismatches
     kMessagePayloadDuplicateVectorItems,        // Message payload's vectorized, but contains duplicate items
     kMessageUnknownCommand,                     // Message command is unknown
+    kMessageWriteNotPermitted,                  // Message write is not permitted (message is already complete)
     kMessagePushNotPermitted,                   // Message push is not permitted (already initialized header)
     kInvalidProtocolVersion,                    // Wrong protocol version detected
     kUnsupportedMessageTypeForProtocolVersion,  // Message type is not supported by the protocol version
@@ -66,8 +67,8 @@ class ErrorCategory : public boost::system::error_category {
             case kMessageHeaderIncomplete:
             case kMessageBodyIncomplete:
                 return make_error_condition(boost::system::errc::operation_in_progress);
-            case kMessageHeaderOversizedPayload:
-            case kMessageHeaderUndersizedPayload:
+            case kMessageSizeOverflow:
+            case kMessageHeaderIllegalPayloadLength:
             case kMessagePayloadEmptyVector:
             case kMessagePayloadOversizedVector:
             case kMessagePayloadMismatchesVectorSize:
