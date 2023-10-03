@@ -83,7 +83,7 @@ bool Node::start() noexcept {
 bool Node::stop(bool wait) noexcept {
     const auto ret{Stoppable::stop(wait)};
     if (ret) /* not already stopped */ {
-        ping_timer_.stop(false);
+        ping_timer_.stop(true);
         if (ssl_stream_ not_eq nullptr) {
             boost::system::error_code error_code;
             std::ignore = ssl_stream_->shutdown(error_code);
