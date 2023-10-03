@@ -16,6 +16,9 @@
 
 namespace zenpp::enc::hex {
 
+//! \brief Builds a randomized hex string of arbitrary length
+[[nodiscard]] std::string get_random(size_t length);
+
 //! \brief Whether provided string begins with "0x" prefix (case insensitive)
 //! \param [in] source : string input
 //! \return true/false
@@ -63,7 +66,6 @@ template <UnsignedIntegral T>
 }
 
 //! \brief Returns the bytes string obtained by decoding an hexadecimal ascii input
-// TODO(C++23) switch to std::expected
 outcome::result<Bytes> decode(std::string_view hex_str) noexcept;
 
 //! \brief Returns the integer value corresponding to the ascii hex digit provided

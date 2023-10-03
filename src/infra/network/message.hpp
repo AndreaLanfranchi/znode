@@ -48,7 +48,7 @@ class MessageHeader : public ser::Serializable {
     [[nodiscard]] bool pristine() const noexcept;
 
     //! \brief Performs a sanity check on the header
-    [[nodiscard]] outcome::result<void> validate(int protocol_version) noexcept;
+    [[nodiscard]] outcome::result<void> validate(int protocol_version, ByteView magic) noexcept;
 
   private:
     MessageType message_type_{MessageType::kMissingOrUnknown};
@@ -65,9 +65,12 @@ class Message {
     explicit Message(int version) : ser_stream_{ser::Scope::kNetwork, version} {};
 
     //! \brief Construct a NetMessage with network magic provided
-    explicit Message(int version, std::array<uint8_t, 4>& magic) : ser_stream_{ser::Scope::kNetwork, version} {
-        header_.network_magic = magic;
-    };
+    explicit Message(int version, const std::array<uint8_t, 4>& magic)
+        : ser_stream_{ser::Scope::kNetwork, version}, network_magic_{magic} {};
+
+    //! \brief Construct a NetMessage with network magic provided
+    explicit Message(int version, std::array<uint8_t, 4>&& magic)
+        : ser_stream_{ser::Scope::kNetwork, version}, network_magic_{magic} {};
 
     // Not movable nor copyable
     Message(const Message&) = delete;
@@ -78,7 +81,7 @@ class Message {
     //! \brief Gets the overall size of the message as serialized bytes count
     [[nodiscard]] size_t size() const noexcept { return ser_stream_.size(); }
 
-    [[nodiscard]] bool is_complete() const noexcept { return complete_; }
+    [[nodiscard]] bool is_complete() const noexcept { return header_validated_ and payload_validated_; }
 
     //! \brief Returns the message type (i.e. command)
     [[nodiscard]] std::optional<MessageType> get_type() const noexcept;
@@ -96,6 +99,9 @@ class Message {
     //! \brief Returns the message version
     [[nodiscard]] int get_version() const noexcept { return ser_stream_.get_version(); }
 
+    //! \brief Resets the message to its factory state
+    void reset() noexcept;
+
     //! \brief Validates the message header, payload and checksum
     [[nodiscard]] outcome::result<void> validate() noexcept;
 
@@ -103,16 +109,17 @@ class Message {
     //! \remarks Input data is consumed until the message is fully validated or an error occurs
     //! \remarks Any error returned `Error::kMessageHeaderIncomplete` or `Error::kMessageBodyIncomplete`
     //!          must be considered fatal
-    [[nodiscard]] outcome::result<void> write(ByteView& input, ByteView network_magic = {});
+    [[nodiscard]] outcome::result<void> write(ByteView& input);
 
     //! \brief Populates the message header and payload
-    outcome::result<void> push(MessageType message_type, MessagePayload& payload, ByteView magic) noexcept;
+    outcome::result<void> push(MessageType message_type, MessagePayload& payload) noexcept;
 
   private:
-    MessageHeader header_{};        // Where the message header is deserialized
-    ser::SDataStream ser_stream_;   // Contains all the message raw data
-    bool header_validated_{false};  // Whether the header has been validated already
-    bool complete_{false};          // Whether the message is complete (header + payload + checksum)
+    MessageHeader header_{};                     // Where the message header is deserialized
+    ser::SDataStream ser_stream_;                // Contains all the message raw data
+    std::array<uint8_t, 4> network_magic_{0x0};  // Message magic (network)
+    bool header_validated_{false};               // Whether the header has been validated already
+    bool payload_validated_{false};              // Whether the payload has been validated already
 
     //! \brief Validates the message header
     [[nodiscard]] outcome::result<void> validate_header() noexcept;
@@ -120,7 +127,10 @@ class Message {
     //! \brief Validates the message payload
     [[nodiscard]] outcome::result<void> validate_payload() noexcept;
 
+    //! \brief Validates the payload in case of vectorized contents
+    [[nodiscard]] outcome::result<void> validate_payload_vector(const MessageDefinition& message_definition) noexcept;
+
     //! \brief Validates the message header's checksum against the payload
-    [[nodiscard]] outcome::result<void> validate_checksum() noexcept;
+    [[nodiscard]] outcome::result<void> validate_payload_checksum() noexcept;
 };
 }  // namespace zenpp::net

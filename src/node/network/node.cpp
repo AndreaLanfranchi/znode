@@ -11,6 +11,7 @@
 #include <absl/strings/str_cat.h>
 #include <absl/time/clock.h>
 #include <absl/time/time.h>
+#include <boost/algorithm/clamp.hpp>
 #include <magic_enum.hpp>
 
 #include <core/common/assert.hpp>
@@ -381,12 +382,13 @@ outcome::result<void> Node::push_message(const MessageType message_type, Message
     using namespace ser;
     using enum Error;
 
-    auto new_message{std::make_unique<Message>(version_)};
-    auto result{new_message->push(message_type, payload, app_settings_.chain_config->magic_)};
+    auto new_message{std::make_unique<Message>(version_, app_settings_.chain_config->magic_)};
+    auto result{new_message->push(message_type, payload)};
     if (result.has_error()) {
         if (log::test_verbosity(log::Level::kError)) {
-            const std::list<std::string> log_params{"action",  __func__, "status",
-                                                    "failure", "reason", result.error().message()};
+            const std::list<std::string> log_params{
+                "action", __func__,  "message", std::string(magic_enum::enum_name(message_type)),
+                "status", "failure", "reason",  result.error().message()};
             print_log(log::Level::kError, log_params);
         }
         return result.error();
@@ -404,7 +406,9 @@ outcome::result<void> Node::push_message(const MessageType message_type) {
     return push_message(message_type, null_payload);
 }
 
-void Node::begin_inbound_message() { inbound_message_ = std::make_unique<Message>(version_); }
+void Node::begin_inbound_message() {
+    inbound_message_ = std::make_unique<Message>(version_, app_settings_.chain_config.value().magic_);
+}
 
 void Node::end_inbound_message() {
     inbound_message_.reset();
@@ -418,8 +422,15 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
 
     while (!data.empty()) {
         if (inbound_message_ == nullptr) begin_inbound_message();
-        result = inbound_message_->write(data, app_settings_.chain_config->magic_);  // Note! data is consumed here
-        if (result.has_error()) break;
+        result = inbound_message_->write(data);  // Note! data is consumed here
+        if (result.has_error()) {
+            if (result.error() == Error::kMessageHeaderIncomplete or result.error() == Error::kMessageBodyIncomplete) {
+                // These two guys depict a normal condition and we must continue reading
+                result = outcome::success();
+            } else {
+                break;
+            }
+        }
 
         // If we have the message type then we can validate it against protocol handshake rules
         const auto msg_type{inbound_message_->get_type()};
@@ -473,8 +484,8 @@ outcome::result<void> Node::process_inbound_message() {
         using enum MessageType;
         case kVersion:
             if (result = remote_version_.deserialize(inbound_message_->data()); result.has_error()) break;
-            if (remote_version_.protocol_version_ < kMinSupportedProtocolVersion or
-                remote_version_.protocol_version_ > kMaxSupportedProtocolVersion) {
+            if (boost::algorithm::clamp(remote_version_.protocol_version_, kMinSupportedProtocolVersion,
+                                        kMaxSupportedProtocolVersion) not_eq remote_version_.protocol_version_) {
                 result = Error::kInvalidProtocolVersion;
                 err_extended_reason =
                     absl::StrCat("Expected in range [", kMinSupportedProtocolVersion, ", ",

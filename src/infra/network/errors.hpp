@@ -27,7 +27,7 @@ enum class Error {
     kMessageHeaderInvalidChecksum,              // Message header's checksum is invalid
     kMessagePayloadEmptyVector,                 // Message payload's expected vectorized, but no items provided
     kMessagePayloadOversizedVector,             // Message payload's expected vectorized, but too many items provided
-    kMessagePayloadMismatchesVectorSize,        // Message payload's vectorized, but size mismatches
+    kMessagePayloadLengthMismatchesVectorSize,        // Message payload's vectorized, but size mismatches
     kMessagePayloadDuplicateVectorItems,        // Message payload's vectorized, but contains duplicate items
     kMessageUnknownCommand,                     // Message command is unknown
     kMessageWriteNotPermitted,                  // Message write is not permitted (message is already complete)
@@ -71,7 +71,7 @@ class ErrorCategory : public boost::system::error_category {
             case kMessageHeaderIllegalPayloadLength:
             case kMessagePayloadEmptyVector:
             case kMessagePayloadOversizedVector:
-            case kMessagePayloadMismatchesVectorSize:
+            case kMessagePayloadLengthMismatchesVectorSize:
                 return make_error_condition(boost::system::errc::message_size);
             case kInvalidProtocolVersion:
             case kMessageHeaderMalformedCommand:

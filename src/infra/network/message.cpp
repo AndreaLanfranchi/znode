@@ -18,10 +18,10 @@
 namespace zenpp::net {
 
 void MessageHeader::reset() noexcept {
-    network_magic.fill('0');
-    command.fill('0');
+    network_magic.fill(0);
+    command.fill(0);
     payload_length = 0;
-    payload_checksum.fill('0');
+    payload_checksum.fill(0);
     message_type_ = MessageType::kMissingOrUnknown;
 }
 
@@ -45,23 +45,27 @@ outcome::result<void> MessageHeader::serialization(ser::SDataStream& stream, ser
     if (not result.has_error()) result = stream.bind(command, action);
     if (not result.has_error()) result = stream.bind(payload_length, action);
     if (not result.has_error()) result = stream.bind(payload_checksum, action);
-    if (not result.has_error() and action == ser::Action::kDeserialize) result = validate(stream.get_version());
     return result;
 }
 
-outcome::result<void> MessageHeader::validate(int protocol_version) noexcept {
+outcome::result<void> MessageHeader::validate(int protocol_version, const ByteView magic) noexcept {
+    // Check the magic number is correct
+    if (magic.size() not_eq network_magic.size()) return Error::kMessageHeaderInvalidMagic;
+    if (memcmp(network_magic.data(), magic.data(), magic.size()) not_eq 0) return Error::kMessageHeaderInvalidMagic;
+
     // Check the payload length is within the allowed range
-    if ((payload_length + kMessageHeaderLength) > kMaxProtocolMessageLength)
-        return Error::kMessageHeaderIllegalPayloadLength;
+    if ((payload_length) > kMaxProtocolMessageLength) return Error::kMessageHeaderIllegalPayloadLength;
 
     // Identify the command
-    const auto get_command_label = [](const MessageType type, const size_t to_size) -> std::string {
-        std::string ret{magic_enum::enum_name(type)};
-        ret.erase(0, 1);
-        std::transform(ret.begin(), ret.end(), ret.begin(), [](unsigned char c) { return std::tolower(c); });
-        if (ret.size() < to_size) ret.append(to_size - ret.size(), 0x0);
+    const auto get_command_label = [](const MessageType type, const size_t to_size) -> Bytes {
+        std::string label{magic_enum::enum_name(type)};
+        label.erase(0, 1);
+        std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c) { return std::tolower(c); });
+        Bytes ret{label.begin(), label.end()};
+        ret.resize(to_size, 0x0);
         return ret;
     };
+
     for (const auto enumerator : magic_enum::enum_values<MessageType>()) {
         const auto command_label{get_command_label(enumerator, command.size())};
         ASSERT(command_label.size() == command.size());
@@ -110,27 +114,30 @@ std::optional<MessageType> Message::get_type() const noexcept {
     return header_.get_type();
 }
 
-outcome::result<void> Message::validate() noexcept {
-    if (ser_stream_.size() > kMaxProtocolMessageLength) return Error::kMessageSizeOverflow;
-    if (complete_) return outcome::success();
-    if (not header_validated_) {
-        if (auto validation_result{validate_header()}; validation_result.has_error()) {
-            return validation_result.error();
-        }
-        header_validated_ = true;
-        ASSERT(ser_stream_.seekg(kMessageHeaderLength) == kMessageHeaderLength);
-    }
-    return validate_payload();
+void Message::reset() noexcept {
+    header_.reset();
+    ser_stream_.clear();
+    header_validated_ = false;
+    payload_validated_ = false;
 }
 
-outcome::result<void> Message::push(const MessageType message_type, MessagePayload& payload, ByteView magic) noexcept {
+outcome::result<void> Message::validate() noexcept {
+    if (ser_stream_.size() > kMaxProtocolMessageLength) return Error::kMessageSizeOverflow;
+    if (is_complete()) return outcome::success();
+    auto result{validate_header()};
+    if (result.has_error()) return result.error();
+    result = validate_payload();
+    ASSERT(ser_stream_.seekg(kMessageHeaderLength) == kMessageHeaderLength);
+    return result;
+}
+
+outcome::result<void> Message::push(const MessageType message_type, MessagePayload& payload) noexcept {
     using enum net::Error;
 
     if (not header_.pristine()) return kMessagePushNotPermitted;  // Can't push twice
     if (message_type == MessageType::kMissingOrUnknown) return kMessageUnknownCommand;
-    if (magic.size() not_eq header_.network_magic.size()) return kMessageHeaderInvalidMagic;
     header_.set_type(message_type);
-    std::memcpy(header_.network_magic.data(), magic.data(), header_.network_magic.size());
+    std::memcpy(header_.network_magic.data(), network_magic_.data(), header_.network_magic.size());
 
     ser_stream_.clear();
     auto result{header_.serialize(ser_stream_)};
@@ -141,7 +148,7 @@ outcome::result<void> Message::push(const MessageType message_type, MessagePaylo
     header_.payload_length = static_cast<uint32_t>(ser_stream_.size() - kMessageHeaderLength);
 
     // Compute the checksum
-    ser_stream_.seekg(kMessageHeaderLength);  // Move at the beginning of the payload
+    ASSERT(ser_stream_.seekg(kMessageHeaderLength) == kMessageHeaderLength);  // Move at the beginning of the payload
     const auto payload_view{ser_stream_.read()};
     if (!payload_view) return payload_view.error();
     crypto::Hash256 payload_digest(payload_view.value());
@@ -152,12 +159,18 @@ outcome::result<void> Message::push(const MessageType message_type, MessagePaylo
     memcpy(&ser_stream_[16], &header_.payload_length, sizeof(header_.payload_length));
     memcpy(&ser_stream_[20], &header_.payload_checksum, sizeof(header_.payload_checksum));
 
-    return validate();  // Ensure the message is valid also when we push it
+    ASSERT(ser_stream_.seekg(0) == 0);  // Move at the beginning of the whole message
+    return validate();                  // Ensure the message is valid also when we push it
 }
 
-outcome::result<void> Message::write(ByteView& input, ByteView network_magic) {
+outcome::result<void> Message::write(ByteView& input) {
     outcome::result<void> result{outcome::success()};
-    if (complete_) return Error::kMessageWriteNotPermitted;  // Can't write twice
+    if (input.empty()) {
+        if (not header_validated_) return Error::kMessageHeaderIncomplete;
+        if (not payload_validated_) return Error::kMessageBodyIncomplete;
+        return outcome::success();
+    }
+    if (is_complete()) return Error::kMessageWriteNotPermitted;  // Can't write twice
     while (not input.empty()) {
         // Grab as many bytes either to have a complete header or a complete message
         const bool header_mode(ser_stream_.tellg() < kMessageHeaderLength);
@@ -169,26 +182,15 @@ outcome::result<void> Message::write(ByteView& input, ByteView network_magic) {
 
         // Validate the message
         result = validate();
-        if (not result.has_error()) {
-            complete_ = true;  // This message is fully parsed and validated
-            break;
-        }
+        if (not result.has_error()) break;
 
         // If the message is incomplete, we need to continue reading
         if (result.error() == Error::kMessageHeaderIncomplete or result.error() == Error::kMessageBodyIncomplete) {
-            result = outcome::success();
             continue;
         }
 
         // Any other error is fatal - higher code should discard pending data
         break;
-
-        // TODO: Add a check for network magic
-        //        if (result = header_.deserialize(ser_stream_); result.has_error()) return result.error();
-        //        ASSERT_PRE(network_magic.size() == header_.network_magic.size());
-        //        if (memcmp(header_.network_magic.data(), network_magic.data(), network_magic.size()) != 0) {
-        //            return Error::kMessageHeaderInvalidMagic;
-        //        }
     }
 
     return result;
@@ -197,70 +199,89 @@ outcome::result<void> Message::write(ByteView& input, ByteView network_magic) {
 outcome::result<void> Message::validate_header() noexcept {
     if (header_validated_) return outcome::success();
     if (ser_stream_.size() < kMessageHeaderLength) return Error::kMessageHeaderIncomplete;
-    if (auto result{header_.deserialize(ser_stream_)}; result.has_error()) return result.error();
-    return header().validate(ser_stream_.get_version());
+    auto result{header_.deserialize(ser_stream_)};
+    if (result.has_error()) return result.error();
+    result = header().validate(ser_stream_.get_version(), network_magic_);
+    if (not result.has_error()) {
+        header_validated_ = true;
+        payload_validated_ = header_.payload_length == 0;  // No need to check payload if empty
+    }
+    return result;
 }
 
 outcome::result<void> Message::validate_payload() noexcept {
+    if (payload_validated_) return outcome::success();
     if (not header_validated_) return Error::kMessageHeaderIncomplete;
-    if (header_.payload_length == 0) return outcome::success();
-    if (ser_stream_.avail() < header_.payload_length) return Error::kMessageBodyIncomplete;
+    const bool payload_incomplete{ser_stream_.avail() not_eq header_.payload_length};
+    const auto reset_position{gsl::finally([this] { ser_stream_.seekg(kMessageHeaderLength); })};
 
     // Validate payload in case of vectorized data
     const auto& message_definition(header_.get_definition());
-    if (not message_definition.is_vectorized) return outcome::success();
-
-    // For specific messages the vectorized data size can be known in advance
-    // e.g. inventory messages are made of 36 bytes elements hence, after the initial
-    // read of the vector size the payload size can be checked against the expected size
-    ser_stream_.seekg(kMessageHeaderLength);
-    const auto reset_position{gsl::finally([this] { ser_stream_.seekg(kMessageHeaderLength); })};
-
-    // Message `getheaders` payload does not start with the number of items
-    // rather with version. We need to skip it (4 bytes)
-    if (message_definition.message_type == MessageType::kGetHeaders) {
-        ser_stream_.ignore(4);
-    }
-
-    auto expected_vector_size{ser::read_compact(ser_stream_)};
-    if (expected_vector_size.has_error()) return expected_vector_size.error();
-    if (expected_vector_size.value() == 0U) return Error::kMessagePayloadEmptyVector;  // MUST have at least 1 element
-    if (expected_vector_size.value() > message_definition.max_vector_items.value_or(UINT32_MAX)) {
-        return Error::kMessagePayloadOversizedVector;
-    }
-    if (message_definition.vector_item_size.has_value()) {
-        // Message `getheaders` has an extra item of 32 bytes (the stop hash)
-        const uint64_t extra_item{message_definition.message_type == MessageType::kGetHeaders ? 1U : 0U};
-        const auto expected_vector_data_size{(expected_vector_size.value() + extra_item) *
-                                             *message_definition.vector_item_size};
-
-        if (ser_stream_.avail() not_eq expected_vector_data_size) return Error::kMessagePayloadMismatchesVectorSize;
-        // Look for duplicates
-        const auto payload_view{ser_stream_.read()};
-        ASSERT_POST(payload_view and "Must have a valid payload view");
-        if (const auto duplicate_count{count_duplicate_data_chunks(
-                payload_view.value(), *message_definition.vector_item_size, 1 /* one is enough */)};
-            duplicate_count > 0) {
-            return Error::kMessagePayloadDuplicateVectorItems;
+    if (message_definition.is_vectorized) {
+        auto result{validate_payload_vector(message_definition)};
+        if (result.has_error()) return result.error();
+        if (not payload_incomplete and message_definition.vector_item_size.has_value()) {
+            // Look for duplicates
+            const auto payload_view{ser_stream_.read()};
+            ASSERT_POST(payload_view and "Must have a valid payload view");
+            if (const auto duplicate_count{count_duplicate_data_chunks(
+                    payload_view.value(), *message_definition.vector_item_size, 1 /* one is enough */)};
+                duplicate_count > 0) {
+                return Error::kMessagePayloadDuplicateVectorItems;
+            }
         }
     }
 
+    if (payload_incomplete) return Error::kMessageBodyIncomplete;
+
     // Validate payload's checksum (if any)
-    ser_stream_.seekg(kMessageHeaderLength);
-    if (auto checksum_validation{validate_checksum()}; checksum_validation.has_error()) {
+    ASSERT_PRE(ser_stream_.seekg(kMessageHeaderLength) == kMessageHeaderLength);
+    if (auto checksum_validation{validate_payload_checksum()}; checksum_validation.has_error()) {
         return checksum_validation.error();
     }
 
     // Payload is formally valid
     // Syntactically valid payload is verified during deserialize
+    payload_validated_ = true;
     return outcome::success();
 }
 
-outcome::result<void> Message::validate_checksum() noexcept {
-    const auto current_pos{ser_stream_.tellg()};
-    ASSERT_PRE(current_pos == kMessageHeaderLength);
-    const auto reset_to_pos{gsl::finally([this, current_pos] { std::ignore = ser_stream_.seekg(current_pos); })};
+outcome::result<void> Message::validate_payload_vector(const MessageDefinition& message_definition) noexcept {
+    // Determine if we have enough data to read the vector size
+    // Particular cases are:
+    // - `getheaders` where the count of item vectors has an offset by 4 bytes
+    const size_t offset{message_definition.message_type == MessageType::kGetHeaders ? 4U : 0U};
+    const size_t pos{kMessageHeaderLength + offset};
+    if (ser_stream_.seekg(pos) not_eq pos or ser_stream_.avail() < 1) return Error::kMessageBodyIncomplete;
 
+    // Read the number of elements defined in the vector
+    const auto num_elements{ser::read_compact(ser_stream_)};
+    if (num_elements.has_error()) {
+        if (num_elements.error() == ser::Error::kReadOverflow) {
+            return Error::kMessageBodyIncomplete;
+        }
+        return num_elements.error();
+    }
+    if (num_elements.value() == 0U) return Error::kMessagePayloadEmptyVector;
+    if (num_elements.value() > message_definition.max_vector_items.value_or(ser::kMaxSerializedCompactSize)) {
+        return Error::kMessagePayloadOversizedVector;
+    }
+
+    if (message_definition.vector_item_size.has_value()) {
+        // Compute the expected size of the vector and compare with the actual payload length declared in the header
+        // Message `getheaders` has an extra item of 32 bytes (the stop hash)
+        auto expected_vector_data_size{num_elements.value() * message_definition.vector_item_size.value()};
+        if (message_definition.message_type == MessageType::kGetHeaders) {
+            expected_vector_data_size += message_definition.vector_item_size.value();
+        }
+        expected_vector_data_size += ser::ser_compact_sizeof(num_elements.value());
+        if (header_.payload_length not_eq (expected_vector_data_size + offset))
+            return Error::kMessagePayloadLengthMismatchesVectorSize;
+    }
+    return outcome::success();
+}
+
+outcome::result<void> Message::validate_payload_checksum() noexcept {
     const auto payload_view{ser_stream_.read()};
     if (payload_view.has_error()) return payload_view.error();
     ASSERT_POST(payload_view.value().size() == header_.payload_length);
@@ -272,5 +293,4 @@ outcome::result<void> Message::validate_checksum() noexcept {
     }
     return outcome::success();
 }
-
 }  // namespace zenpp::net

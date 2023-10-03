@@ -10,8 +10,9 @@
 
 namespace zenpp::net {
 
-inline constexpr int kDefaultProtocolVersion{170'002};                               // Our protocol version
-inline constexpr int kMinSupportedProtocolVersion{170'002};                          // Min acceptable protocol version
-inline constexpr int kMaxSupportedProtocolVersion{std::numeric_limits<int>::max()};  // Max acceptable protocol version
+static constexpr int32_t kDefaultProtocolVersion{170'002};       // Our default protocol version
+static constexpr int32_t kMinSupportedProtocolVersion{170'002};  // Min acceptable protocol version
+static constexpr int32_t kMaxSupportedProtocolVersion{
+    std::numeric_limits<int32_t>::max()};  // Max acceptable protocol version
 
 }  // namespace zenpp::net

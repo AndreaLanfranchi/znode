@@ -10,8 +10,14 @@
 #include <array>
 #include <ranges>
 
+#include <infra/common/random.hpp>  // Can be included as it's header only
+
 namespace zenpp::enc::hex {
 namespace {
+
+    constexpr std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
+                                              '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+
     // ASCII -> hex value (0xff means bad [hex] char)
     constexpr std::array<uint8_t, 256> kUnhexTable{
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -49,6 +55,16 @@ namespace {
         0xff, 0xff, 0xff, 0xff};
 }  // namespace
 
+std::string get_random(size_t length) {
+    // Adjust length to next even value
+    if (length bitand 1U) ++length;
+    std::string out(length, '0');
+    for (std::string::size_type i{0}; i < length; ++i) {
+        out[i] = kHexDigits[randomize<uint32_t>() % 16];
+    }
+    return out;
+}
+
 std::string reverse_hex(std::string_view input) noexcept {
     if (input.empty()) return {};
 
@@ -80,8 +96,6 @@ ByteView zeroless_view(ByteView data) {
 }
 
 std::string encode(ByteView bytes, bool with_prefix) noexcept {
-    static constexpr std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
-                                                     '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
     std::string out(bytes.length() * 2 + (with_prefix ? 2 : 0), 0x0);
     auto* dest{out.data()};
     const auto* src{bytes.data()};

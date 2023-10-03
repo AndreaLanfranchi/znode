@@ -13,284 +13,121 @@
 #include <core/crypto/hash256.hpp>
 #include <core/encoding/hex.hpp>
 
+#include <infra/network/protocol.hpp>
+
 namespace zenpp::net {
-
 namespace {
-
-    bool parse_hexed_data_into_stream(const std::string& hexed_data, ser::SDataStream& stream) {
-        auto data{enc::hex::decode(hexed_data)};
-        if (data.has_error()) return false;
-        return not stream.write(data.value()).has_error();
+    std::string pad_right(const std::string& str, size_t n) {
+        std::string ret{str};
+        ret.resize(n, '0');
+        return ret;
     }
+
+    std::string pad_hexed_header(const std::string& str) { return pad_right(str, kMessageHeaderLength * 2); }
 
     std::string as_message(net::Error error) {
         std::string ret{magic_enum::enum_name<net::Error>(error)};
         ret.erase(0, 1);
         return ret;
     }
-
-    //    std::string as_message(ser::Error error) {
-    //        std::string ret{magic_enum::enum_name(error)};
-    //        ret.erase(0, 1);
-    //        return ret;
-    //    }
-
 }  // namespace
 
-TEST_CASE("NetMessage", "[net]") {
-    using enum Error;
-    Message net_message{};
-    auto& header{net_message.header()};
-    auto& payload{net_message.data()};
+TEST_CASE("NetMessage write", "[net]") {
+    struct test_case {
+        std::string test_label{};
+        std::string input_data{};
+        std::optional<net::Error> expected_error;
+    };
 
-    Bytes network_magic_bytes{0x01, 0x02, 0x03, 0x04};
-    std::string hexed_header_data;
+    const std::array<uint8_t, 4> network_magic_bytes{0x01, 0x02, 0x03, 0x04};
+    Message test_message(kDefaultProtocolVersion, network_magic_bytes);
 
-    SECTION("Header only validation") {
-        CHECK(net_message.validate().error().message() == as_message(kMessageHeaderIncomplete));
+    std::vector<test_case> test_cases{
+        {"Empty Input", "", net::Error::kMessageHeaderIncomplete},
+        {"Not enough header data", std::string(8, '0'), net::Error::kMessageHeaderIncomplete},
+        {"All zeroes header data", pad_hexed_header("00"), net::Error::kMessageHeaderInvalidMagic},
+        {"Invalid network magic", pad_hexed_header("010a0a0a"), net::Error::kMessageHeaderInvalidMagic},
+        {"Invalid payload length (over max protocol)",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "000000000000000000000000" + "04000001"),
+         net::Error::kMessageHeaderIllegalPayloadLength},
+        {"Invalid command (not provided at all)",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "000000000000000000000000"),
+         net::Error::kMessageHeaderIllegalCommand},
+        {"Invalid command (v.rsion)",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "76007273696f6e0000000000"),
+         net::Error::kMessageHeaderIllegalCommand},
+        {"Valid command version / zero payload / null checksum",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "76657273696f6e0000000000"),
+         net::Error::kMessageHeaderIllegalPayloadLength},
+        {"Valid command verack / zero payload / null checksum",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "76657261636b000000000000"),
+         net::Error::kMessageHeaderInvalidChecksum},
+        {"Valid command verack / zero payload / valid checksum",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "76657261636b000000000000" + "000000005df6e0e2"),
+         std::nullopt},
+        {"Valid command inv / zero payload / valid checksum (for empty)",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" + "000000005df6e0e2"),
+         net::Error::kMessageHeaderIllegalPayloadLength},
+        {"Valid command inv / insufficient payload length / valid checksum (for empty)",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" + "01"),
+         net::Error::kMessageHeaderIllegalPayloadLength},
+        {"Valid command (inv) / correct payload length (37) / no body",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" + "25"),
+         net::Error::kMessageBodyIncomplete},
+        {"Valid command (inv) / correct payload length (37) / insufficient body",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" + "25") + "01",
+         net::Error::kMessageBodyIncomplete},
+        {"Valid command (inv) / correct payload length (37) / enough body for zero items",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" + "25") + "00",
+         net::Error::kMessagePayloadEmptyVector},
+        {"Valid command (inv) / short payload length (30) / one item in empty vector",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" + "1e") + "01",
+         net::Error::kMessageHeaderIllegalPayloadLength},
+        {"Valid command (inv) / correct payload length (37) / body signals 2 items that would exceed payload length",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" + "25") + "02",
+         net::Error::kMessagePayloadLengthMismatchesVectorSize},
+        {"Valid command (inv) / correct payload length (73) / body signals 2 items / duplicated",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" + "49") + "02" +
+             std::string(kInvItemSize * 2 * 2, '0'),
+         net::Error::kMessagePayloadDuplicateVectorItems},
+        {"Valid command (inv) / correct payload length (73) / body signals 2 items / null checksum",
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" + "49") + "02" +
+             enc::hex::get_random(kInvItemSize * 2 * 2),
+         net::Error::kMessageHeaderInvalidChecksum},
+    };
 
-        CHECK(header.pristine());
-        CHECK(magic_enum::enum_name(header.get_type()) ==
-              std::string(magic_enum::enum_name(MessageType::kMissingOrUnknown)));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderEmptyCommand));
+    // We need to create an extra test with known payload to compute the checksum
+    // and then replace the checksum in the test case
+    std::string hexed_input{pad_hexed_header(enc::hex::encode(network_magic_bytes) + "696e76000000000000000000" +
+                                             "49000000" + "00000000" /* checksum */) +
+                            "02" + enc::hex::get_random(kInvItemSize * 2 * 2)};
+    auto input_bytes{enc::hex::decode(hexed_input).value()};
+    crypto::Hash256 payload_digest(
+        input_bytes.substr(kMessageHeaderLength, input_bytes.length() - kMessageHeaderLength));
+    const auto checksum{payload_digest.finalize()};
+    memcpy(&input_bytes[kMessageHeaderLength - 4], checksum.data(), 4);
+    test_cases.emplace_back(test_case{"Valid command (inv) / correct payload length (73) / body signals 2 items",
+                                      enc::hex::encode(input_bytes), std::nullopt});
 
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "76007273696f6e0000000000"  // v.rsion.....       command
-            "00000000"                  // ....               payload length
-            "00000000";                 // ....               payload checksum
+    for (const auto& test : test_cases) {
+        INFO(test.test_label)
+        test_message.reset();
+        CHECK(test_message.header().pristine());
+        const auto data{enc::hex::decode(test.input_data)};
+        REQUIRE_FALSE(data.has_error());
+        ByteView data_view{data.value()};
+        auto write_result{test_message.write(data_view)};
 
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(header.deserialize(payload).error().message() == as_message(kMessageHeaderMalformedCommand));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderMalformedCommand));
-
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "00007273696f6e0000000000"  // ..rsion.....       command
-            "00000000"                  // ....               payload length
-            "00000000";                 // ....               payload checksum
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(header.deserialize(payload).error().message() == as_message(kMessageHeaderMalformedCommand));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderMalformedCommand));
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "76657273696f6e0065000000"  // version.e...       command
-            "00000000"                  // ....               payload length
-            "00000000";                 // ....               payload checksum
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(header.deserialize(payload).error().message() == as_message(kMessageHeaderMalformedCommand));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderMalformedCommand));
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "76767273696f6e0000000000"  // vvrsion.....       command
-            "00000000"                  // ....               payload length
-            "00000000";                 // ....               payload checksum
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(header.deserialize(payload).error().message() == as_message(kMessageHeaderIllegalCommand));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderIllegalCommand));
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "76657273696f6e0000000000"  // version.....       command
-            "00000000"                  // ....               payload length
-            "00000000";                 // ....               payload checksum
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(header.deserialize(payload).error().message() == as_message(kMessageHeaderUndersizedPayload));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderUndersizedPayload));
-        CHECK(magic_enum::enum_name(header.get_type()) == std::string(magic_enum::enum_name(MessageType::kVersion)));
-        std::ignore = payload.seekg(0);
-        CHECK(payload.to_string() == hexed_header_data);
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "76657273696f6e0000000000"  // version.....       command
-            "80000000"                  // ....               payload length
-            "00000000";                 // ....               payload checksum
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK_FALSE(header.deserialize(payload).has_error());
-        CHECK_FALSE(header.validate().has_error());
-        CHECK(magic_enum::enum_name(header.get_type()) == std::string(magic_enum::enum_name(MessageType::kVersion)));
-        CHECK(header.payload_length == 128);
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "01020304"                  // ....               network magic
-            "76657261636b000000000000"  // verack......       command
-            "00000000"                  // ....               payload length (0)
-            "00000000";                 // ....               payload checksum
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(header.deserialize(payload).error().message() == as_message(kMessageHeaderInvalidChecksum));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderInvalidChecksum));
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "01020304"                  // ....               network magic
-            "76657261636b000000000000"  // verack......       command
-            "00000000"                  // ....               payload length (0)
-            "5df6e0e2";                 // ....               payload checksum (empty)
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK_FALSE(header.deserialize(payload).has_error());
-        CHECK_FALSE(header.validate().has_error());
-        CHECK(magic_enum::enum_name(header.get_type()) == std::string(magic_enum::enum_name(MessageType::kVerAck)));
-        CHECK(header.payload_length == 0);
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "76657273696f6e0000000000"  // version.....       command
-            "01040000"                  // ....               payload length (1025)
-            "00000000";                 // ....               payload checksum
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(header.deserialize(payload).error().message() == as_message(kMessageHeaderOversizedPayload));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderOversizedPayload));
-        CHECK(header.payload_length == 1_KiB + 1);
-        CHECK(magic_enum::enum_name(header.get_type()) == std::string(magic_enum::enum_name(MessageType::kVersion)));
-        payload.clear();
-        header.reset();
-    }
-
-    SECTION("Header and body validation") {
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "696e76000000000000000000"  // inv.........       command
-            "00000000"                  // ....               payload length (0)
-            "00000000";                 // ....               payload checksum (empty)
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(header.deserialize(payload).error().message() == as_message(kMessageHeaderUndersizedPayload));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderUndersizedPayload));
-        CHECK(magic_enum::enum_name(header.get_type()) == std::string(magic_enum::enum_name(MessageType::kInv)));
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "696e76000000000000000000"  // inv.........       command
-            "01000000"                  // ....               payload length (1) not enough
-            "00000000";                 // ....               payload checksum (empty)
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK(header.deserialize(payload).error().message() == as_message(kMessageHeaderUndersizedPayload));
-        CHECK(header.validate().error().message() == as_message(kMessageHeaderUndersizedPayload));
-        CHECK(magic_enum::enum_name(header.get_type()) == std::string(magic_enum::enum_name(MessageType::kInv)));
-        payload.clear();
-        header.reset();
-
-        hexed_header_data =
-            "00000000"                  // ....               fake network magic
-            "696e76000000000000000000"  // inv.........       command
-            "25000000"                  // ....               payload length (37) 1 item
-            "00000000";                 // ....               payload checksum (empty)
-
-        CHECK(parse_hexed_data_into_stream(hexed_header_data, payload));
-        CHECK_FALSE(header.deserialize(payload).has_error());
-        CHECK_FALSE(header.validate().has_error());
-        CHECK(magic_enum::enum_name(header.get_type()) == std::string(magic_enum::enum_name(MessageType::kInv)));
-        CHECK(header.payload_length == 37);
-
-        // Put in only the size of the vector but nothing else - message validation MUST fail
-        uint64_t num_elements{1};
-        REQUIRE_FALSE(write_compact(payload, num_elements).has_error());
-        CHECK(net_message.validate().error().message() == as_message(kMessageBodyIncomplete));
-
-        // Put in the size of the vector and an incomplete first element - message validation MUST fail
-        Bytes data{0x01, 0x02, 0x03, 0x04};
-        REQUIRE_FALSE(payload.write(data).has_error());
-        REQUIRE(net_message.validate().error().message() == as_message(kMessageBodyIncomplete));
-
-        // Put in the size of the vector and a complete first element 36 bytes - message validation MUST pass
-        // sizes checks but will still fail checksum validation
-        payload.erase(kMessageHeaderLength + ser::ser_compact_sizeof(num_elements));
-        REQUIRE(payload.size() == kMessageHeaderLength + ser::ser_compact_sizeof(num_elements));
-        REQUIRE(payload.avail() == ser::ser_compact_sizeof(num_elements));
-        data.resize(kInvItemSize, '0');
-        REQUIRE_FALSE(payload.write(data).has_error());
-        REQUIRE(payload.avail() == ser::ser_compact_sizeof(num_elements) + data.size());
-
-        auto result{net_message.validate_checksum()};
-        REQUIRE(result.has_error());
-        REQUIRE(result.error().value() == static_cast<int>(kMessageHeaderInvalidChecksum));
-        CHECK(result.error().message() == as_message(kMessageHeaderInvalidChecksum));
-
-        REQUIRE(net_message.validate().has_error());
-        REQUIRE(net_message.validate().error().message() == as_message(kMessageHeaderInvalidChecksum));
-
-        // Let's move back to begin of body and compute checksum
-        payload.seekg(kMessageHeaderLength);
-        auto digest_input{payload.read()};
-        REQUIRE_FALSE(digest_input.has_error());
-        REQUIRE(digest_input.value().size() == ser::ser_compact_sizeof(num_elements) + kInvItemSize);
-        crypto::Hash256 hasher(digest_input.value());
-        auto final_digest{hasher.finalize()};
-
-        memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
-        REQUIRE_FALSE(net_message.validate().has_error());
-
-        INFO("Test maximum number of vector elements with unique items");
-        payload.erase(kMessageHeaderLength);
-        num_elements = kMaxInvItems;
-        REQUIRE_FALSE(write_compact(payload, num_elements).has_error());
-        for (uint64_t i = 0; i < kMaxInvItems; ++i) {
-            endian::store_big_u64(data.data(), i);  // This to prevent duplicates
-            std::ignore = payload.write(data);
+        if (test.expected_error.has_value()) {
+            REQUIRE(write_result.has_error());
+            CHECK(write_result.error().value() == static_cast<int>(test.expected_error.value()));
+            CHECK(write_result.error().message() == as_message(test.expected_error.value()));
+        } else {
+            REQUIRE_FALSE(write_result.has_error());
+            REQUIRE(test_message.get_type().has_value());
+            REQUIRE(test_message.get_type().value() not_eq MessageType::kMissingOrUnknown);
+            REQUIRE(test_message.is_complete());
         }
-
-        // Let's move back to begin of body and compute checksum
-        payload.seekg(kMessageHeaderLength);
-        header.payload_length = static_cast<uint32_t>(payload.avail());
-        digest_input = payload.read();
-        REQUIRE_FALSE(digest_input.has_error());
-        REQUIRE(digest_input.value().size() == ser::ser_compact_sizeof(num_elements) + (kInvItemSize * kMaxInvItems));
-        hasher.init(digest_input.value());
-        final_digest = hasher.finalize();
-
-        memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
-        REQUIRE_FALSE(net_message.validate().has_error());
-
-        INFO("Test maximum number of vector elements with duplicate items")
-        payload.erase(kMessageHeaderLength);
-        num_elements = kMaxInvItems;
-        REQUIRE_FALSE(write_compact(payload, num_elements).has_error());
-        for (uint64_t i = 0; i < kMaxInvItems; ++i) {
-            endian::store_big_u64(data.data(), i % 1'000);  // Duplicates every 1K
-            std::ignore = payload.write(data);
-        }
-
-        // Let's move back to begin of body and compute checksum
-        payload.seekg(kMessageHeaderLength);
-        header.payload_length = static_cast<uint32_t>(payload.avail());
-        digest_input = payload.read();
-        REQUIRE_FALSE(digest_input.has_error());
-        REQUIRE(digest_input.value().size() == ser::ser_compact_sizeof(num_elements) + (kInvItemSize * kMaxInvItems));
-        hasher.init(digest_input.value());
-        final_digest = hasher.finalize();
-
-        memcpy(header.payload_checksum.data(), final_digest.data(), header.payload_checksum.size());
-        REQUIRE(net_message.validate().error().message() == as_message(kMessagePayloadDuplicateVectorItems));
     }
 }
 
