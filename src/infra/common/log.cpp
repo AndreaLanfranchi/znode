@@ -16,7 +16,6 @@
 
 #include <absl/time/clock.h>
 #include <boost/algorithm/string/predicate.hpp>
-#include <boost/format.hpp>
 
 namespace zenpp::log {
 
@@ -134,7 +133,7 @@ BufferBase::BufferBase(Level level) : should_print_(level <= settings_.log_verbo
 
 BufferBase::BufferBase(Level level, std::string_view msg, const std::vector<std::string>& args) : BufferBase(level) {
     if (not should_print_) return;
-    sstream_ << boost::format("%-25s") % msg;
+    sstream_ << std::left << std::setw(25) << std::setfill(' ') << msg;
     bool left{true};
     for (const auto& arg : args) {
         sstream_ << (left ? kColorGreen : kColorWhiteHigh) << arg << kColorReset << (left ? "=" : " ") << kColorReset;
@@ -157,16 +156,8 @@ void BufferBase::flush() const {
     const std::unique_lock out_lck{out_mtx};
     auto& out = settings_.log_std_out ? std::cout : std::cerr;
     out << line << std::endl;
-    if (file_) {
-        if (file_->is_open()) [[likely]] {
-            if (colorized) {
-                line = std::regex_replace(line, color_pattern, "");
-            }
-            *file_ << line << std::endl;
-        } else {
-            file_->close();
-            file_.reset();
-        }
+    if (file_ and file_->is_open()) {
+        *file_ << (colorized ? std::regex_replace(line, color_pattern, "") : line) << std::endl;
     }
 }
 }  // namespace zenpp::log
