@@ -18,12 +18,14 @@
 
 #include <infra/common/log.hpp>
 #include <infra/filesystem/directories.hpp>
+#include <infra/nat/option.hpp>
 
 #include <node/database/mdbx.hpp>  // TODO define dbsettings here and remove this include (mdbx.hpp must include this)
 
 namespace zenpp {
 
 struct NetworkSettings {
+    nat::Option nat{};                                                                   // NAT traversal option
     std::string local_endpoint{absl::StrCat("0.0.0.0:", kMainNetConfig.default_port_)};  // Local node listen address
     bool ipv4_only{false};                            // Whether to listen/connect on IPv4 addresses only
     uint32_t max_active_connections{256};             // Maximum allowed number of connected nodes

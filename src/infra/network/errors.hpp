@@ -27,7 +27,7 @@ enum class Error {
     kMessageHeaderInvalidChecksum,              // Message header's checksum is invalid
     kMessagePayloadEmptyVector,                 // Message payload's expected vectorized, but no items provided
     kMessagePayloadOversizedVector,             // Message payload's expected vectorized, but too many items provided
-    kMessagePayloadLengthMismatchesVectorSize,        // Message payload's vectorized, but size mismatches
+    kMessagePayloadLengthMismatchesVectorSize,  // Message payload's vectorized, but size mismatches
     kMessagePayloadDuplicateVectorItems,        // Message payload's vectorized, but contains duplicate items
     kMessageUnknownCommand,                     // Message command is unknown
     kMessageWriteNotPermitted,                  // Message write is not permitted (message is already complete)

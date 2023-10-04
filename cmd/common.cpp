@@ -6,13 +6,12 @@
 */
 
 #include "common.hpp"
+#include "common/nat_validator.hpp"
 
 #include <map>
 #include <regex>
 #include <string>
 #include <thread>
-
-#include <infra/network/addresses.hpp>
 
 namespace zenpp::cmd {
 
@@ -86,6 +85,10 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         ->capture_default_str()
         ->check(IPEndPointValidator(/*allow_empty=*/true,
                                     /*default_port=*/0));
+
+    network_opts.add_option("--network.nat", network_settings.nat, "NAT traversal option")
+        ->capture_default_str()
+        ->check(common::NatOptionValidator());
 
     auto* notls_flag = network_opts.add_flag("--network.notls", "Disable TLS secure communications");
 

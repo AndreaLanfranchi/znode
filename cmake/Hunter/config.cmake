@@ -26,3 +26,11 @@ hunter_config(
         OpenSSL
         VERSION 3.1.0
 )
+
+hunter_config(
+        Boost
+        VERSION 1.83
+        URL "https://boostorg.jfrog.io/artifactory/main/release/1.83.0/source/boost_1_83_0.tar.gz"
+        SHA1 "eb5e17350b5ccd5926fd6bad9f09385c742a3352"
+        CMAKE_ARGS BOOST_ASSERT_CONFIG=ON
+)

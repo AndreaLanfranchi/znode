@@ -33,6 +33,11 @@ if (NOT PROJECT_HAS_PARENT)
         set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/toolchain/cxx20.cmake CACHE FILEPATH "" FORCE)
     endif ()
 
+    # Set the policy
+    if (POLICY CMP0135)
+        cmake_policy(SET CMP0135 NEW)
+    endif ()
+
     include(cmake/HunterGate.cmake)
     HunterGate(
             URL "https://github.com/cpp-pm/hunter/archive/v0.24.18.tar.gz"
@@ -165,8 +170,12 @@ if (NOT BUILD_CORE_ONLY)
     set(CMAKE_POLICY_DEFAULT_CMP0063 NEW) # Honor visibility properties for all target types
     set(CMAKE_POLICY_DEFAULT_CMP0074 NEW)
 
-    find_package(Boost CONFIG REQUIRED COMPONENTS context coroutine) # Boost
-    find_package(absl CONFIG REQUIRED)
+    find_package(Boost REQUIRED COMPONENTS context coroutine) # Boost
+    add_library(Boost::headers INTERFACE IMPORTED) # Hunter package does not provide headers
+    target_include_directories(Boost::headers INTERFACE ${Boost_INCLUDE_DIRS})
+
+
+    find_package(absl REQUIRED)
     find_package(CLI11 REQUIRED)
 
     # MDBX

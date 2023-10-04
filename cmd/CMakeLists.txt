@@ -22,6 +22,8 @@ if (NOT BUILD_CORE_ONLY)
             common.cpp
             common/shutdown_signal.hpp
             common/shutdown_signal.cpp
+            common/nat_validator.hpp
+            common/nat_validator.cpp
     )
 
     # The node executable itself
@@ -31,7 +33,7 @@ if (NOT BUILD_CORE_ONLY)
 
 
     # The db-tool executable
-    add_executable(${PROJECT_NAME}-dbtool "toolbox.cpp;common.hpp;common.cpp")
+    add_executable(${PROJECT_NAME}-dbtool "toolbox.cpp;${COMMON_SRC}")
     target_link_libraries(${PROJECT_NAME}-dbtool PUBLIC third-party-includes PRIVATE ${BUILD_NODE_COMPONENT} CLI11::CLI11)
     target_include_directories(${PROJECT_NAME}-dbtool PRIVATE ${BUILD_MAIN_SRC_DIR})
 

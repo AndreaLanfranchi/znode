@@ -6,10 +6,11 @@
 */
 
 #pragma once
+#include <boost/asio/awaitable.hpp>
 #include <boost/asio/this_coro.hpp>
 #include <boost/asio/use_awaitable.hpp>
 
-namespace zenpp::con {
+namespace zenpp {
 
 //! \brief Asynchronous task returned by any coroutine, i.e. asynchronous operation
 template <typename T = void>
@@ -17,4 +18,4 @@ using Task = boost::asio::awaitable<T>;
 
 namespace ThisTask = boost::asio::this_coro;
 
-}  // namespace zenpp::con
+}  // namespace zenpp

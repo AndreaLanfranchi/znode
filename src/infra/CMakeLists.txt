@@ -24,6 +24,7 @@ set(PUBLIC_LIBS
         third-party-includes
         ${BUILD_CORE_COMPONENT}
         absl::time
+        Boost::headers
         Boost::coroutine # Mind the order
         Boost::context   # of this two
         OpenSSL::SSL

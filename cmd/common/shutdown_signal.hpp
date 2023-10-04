@@ -21,7 +21,7 @@ class ShutDownSignal {
 
     using Signum = int;
     void on_signal(std::function<void(Signum)> callback);
-    zenpp::con::Task<Signum> wait();
+    Task<Signum> wait();
 
   private:
     boost::asio::signal_set signals_;
