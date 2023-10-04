@@ -20,7 +20,7 @@
 #include <string>
 #include <string_view>
 
-#include <boost/multiprecision/cpp_int.hpp>
+#include <boost/multiprecision/integer.hpp>
 #include <boost/outcome.hpp>
 #include <zenpp/buildinfo.h>
 
