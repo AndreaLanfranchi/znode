@@ -20,10 +20,11 @@ if (NOT BUILD_CORE_ONLY)
     set(COMMON_SRC
             common.hpp
             common.cpp
-            common/shutdown_signal.hpp
-            common/shutdown_signal.cpp
             common/nat_validator.hpp
             common/nat_validator.cpp
+            common/size_validator.hpp
+            common/shutdown_signal.hpp
+            common/shutdown_signal.cpp
     )
 
     # The node executable itself

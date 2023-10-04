@@ -6,7 +6,9 @@
 */
 
 #include "common.hpp"
+
 #include "common/nat_validator.hpp"
+#include "common/size_validator.hpp"
 
 #include <map>
 #include <regex>
@@ -41,21 +43,21 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
 
     cli.add_option("--chaindata.growthsize", chaindata_growth_size_str, "Chaindata database growth size.")
         ->capture_default_str()
-        ->check(HumanSizeParserValidator("64MiB"));
+        ->check(common::SizeValidator("64MiB"));
     cli.add_option("--chaindata.pagesize", chaindata_page_size_str, "Chaindata database page size. A power of 2")
         ->capture_default_str()
-        ->check(HumanSizeParserValidator("256B", {"65KiB"}));
+        ->check(common::SizeValidator("256B", {"65KiB"}));
     cli.add_option("--chaindata.maxsize", chaindata_max_size_str, "Chaindata database max size.")
         ->capture_default_str()
-        ->check(HumanSizeParserValidator("32MiB", {"128TiB"}));
+        ->check(common::SizeValidator("32MiB", {"128TiB"}));
 
     cli.add_option("--etl.buffersize", etl_buffer_size_str, "Buffer size for ETL operations")
         ->capture_default_str()
-        ->check(HumanSizeParserValidator("64MiB", {"1GiB"}));
+        ->check(common::SizeValidator("64MiB", {"1GiB"}));
 
     cli.add_option("--syncloop.batchsize", batch_size_str, "Batch size for stage execution")
         ->capture_default_str()
-        ->check(HumanSizeParserValidator("64MiB", {"16GiB"}));
+        ->check(common::SizeValidator("64MiB", {"16GiB"}));
 
     cli.add_option("--syncloop.throttle", settings.sync_loop_throttle_seconds,
                    "Sets the minimum delay between sync loop starts (in seconds)")
@@ -86,7 +88,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         ->check(IPEndPointValidator(/*allow_empty=*/true,
                                     /*default_port=*/0));
 
-    network_opts.add_option("--network.nat", network_settings.nat, "NAT traversal option")
+    network_opts.add_option("--network.nat", network_settings.nat, "")
         ->capture_default_str()
         ->check(common::NatOptionValidator());
 
@@ -197,17 +199,17 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
 void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
     using enum log::Level;
 
-    const auto level_label = [](log::Level level) -> std::string {
+    const auto level_label = [](log::Level level) {
         std::string ret{magic_enum::enum_name(level)};
         ret.erase(0, 1);
-        std::transform(ret.begin(), ret.end(), ret.begin(), [](unsigned char c) { return std::tolower(c); });
+        std::ranges::transform(ret, ret.begin(), [](unsigned char c) { return std::tolower(c); });
         return ret;
     };
 
     std::map<std::string, log::Level, std::less<>> level_mapping;
     for (const auto enumerator : magic_enum::enum_values<log::Level>()) {
         auto label{level_label(enumerator)};
-        level_mapping.emplace(label, enumerator);
+        level_mapping.try_emplace(label, enumerator);
     }
 
     auto& log_opts = *cli.add_option_group("Log", "Logging options");
@@ -231,15 +233,6 @@ void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
     log_opts.add_flag("--log.nocolor", log_settings.log_nocolor, "Disable colors on log lines");
     log_opts.add_flag("--log.threads", log_settings.log_threads, "Prints thread ids");
     log_opts.add_option("--log.file", log_settings.log_file, "Tee all log lines to given file name");
-}
-
-TimeZoneValidator::TimeZoneValidator(bool allow_empty) {
-    description("a valid IANA timezone");
-    func_ = [allow_empty](std::string& value) -> std::string {
-        if (value.empty() and allow_empty) return {};
-        if (value.empty()) value = "a value MUST be specified";
-        return {};
-    };
 }
 
 IPEndPointValidator::IPEndPointValidator(bool allow_empty, uint16_t default_port) {
