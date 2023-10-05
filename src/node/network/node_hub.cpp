@@ -499,7 +499,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
         log::BufferBase((error.empty() ? log::Level::kTrace : log::Level::kError), "Service", log_params)
             << (error.empty() ? "" : "Disconnecting ...");
         if (not error.empty()) {
-            asio::post(asio_strand_, [node]() { std::ignore = node->stop(false); });
+            node->stop(false);
         }
     }
 }
@@ -508,7 +508,7 @@ std::shared_ptr<Node> NodeHub::operator[](int node_id) const {
     const std::lock_guard<std::mutex> lock(nodes_mutex_);
     const auto iterator{nodes_.find(node_id)};
     if (iterator not_eq nodes_.end()) {
-        return iterator->second;  // Might
+        return iterator->second;
     }
     return nullptr;
 }
