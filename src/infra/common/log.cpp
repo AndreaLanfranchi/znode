@@ -29,6 +29,12 @@ namespace {
             using enum zenpp::log::Level;
             case kTrace:
                 return {"TRACE", kColorCoal};
+            case kTrace1:
+                return {" TRC1", kColorGray};
+            case kTrace2:
+                return {" TRC2", kColorGray};
+            case kTrace3:
+                return {" TRC3", kColorGray};
             case kDebug:
                 return {"DEBUG", kBackgroundPurple};
             case kInfo:

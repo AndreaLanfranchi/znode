@@ -215,7 +215,6 @@ void add_logging_options(CLI::App& cli, log::Settings& log_settings) {
     auto& log_opts = *cli.add_option_group("Log", "Logging options");
     log_opts.add_option("--log.verbosity", log_settings.log_verbosity, "Sets log verbosity")
         ->capture_default_str()
-        ->check(CLI::Range(kCritical, kTrace))
         ->transform(CLI::Transformer(level_mapping, CLI::ignore_case))
         ->default_val(log_settings.log_verbosity);
 

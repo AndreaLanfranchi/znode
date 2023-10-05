@@ -22,7 +22,10 @@ enum class Level {
     kWarning,   // Something happened and user might have the possibility to amend the situation
     kInfo,      // Info messages on regular operations
     kDebug,     // Debug information
-    kTrace      // Trace calls to functions
+    kTrace,     // Trace calls to functions
+    kTrace1,    // Trace calls to functions - but more verbose
+    kTrace2,    // Trace calls to functions - but more more verbose
+    kTrace3,    // Trace calls to functions - but more more more verbose
 };
 
 //! \brief Holds logging configuration
@@ -124,6 +127,9 @@ using Message = LogBuffer<Level::kNone>;
         zenpp::log::LogBuffer<level_>() << __func__ << " (" << __LINE__ << ") "
 
 #define LOG_TRACE LOG_BUFFER(zenpp::log::Level::kTrace)
+#define LOG_TRACE1 LOG_BUFFER(zenpp::log::Level::kTrace1)
+#define LOG_TRACE2 LOG_BUFFER(zenpp::log::Level::kTrace2)
+#define LOG_TRACE3 LOG_BUFFER(zenpp::log::Level::kTrace3)
 #define LOG_DEBUG LOG_BUFFER(zenpp::log::Level::kDebug)
 #define LOG_INFO LOG_BUFFER(zenpp::log::Level::kInfo)
 #define LOG_WARNING LOG_BUFFER(zenpp::log::Level::kWarning)
@@ -132,6 +138,9 @@ using Message = LogBuffer<Level::kNone>;
 #define LOG_MESSAGE LOG_BUFFER(zenpp::log::Level::kNone)
 
 #define LOGF_TRACE LOGF_BUFFER(zenpp::log::Level::kTrace)
+#define LOGF_TRACE1 LOGF_BUFFER(zenpp::log::Level::kTrace1)
+#define LOGF_TRACE2 LOGF_BUFFER(zenpp::log::Level::kTrace2)
+#define LOGF_TRACE3 LOGF_BUFFER(zenpp::log::Level::kTrace3)
 #define LOGF_DEBUG LOGF_BUFFER(zenpp::log::Level::kDebug)
 #define LOGF_INFO LOGF_BUFFER(zenpp::log::Level::kInfo)
 #define LOGF_WARNING LOGF_BUFFER(zenpp::log::Level::kWarning)
