@@ -34,7 +34,7 @@ Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_c
     : app_settings_(app_settings),
       connection_(connection),
       io_strand_(io_context),
-      ping_timer_(io_context, "Node_ping_timer"),
+      ping_timer_(io_context, "Node_ping_timer", true),
       socket_(std::move(socket)),
       ssl_context_(ssl_context),
       on_data_(std::move(on_data)),
@@ -115,10 +115,11 @@ void Node::on_stop_completed() noexcept {
     set_stopped();
 }
 
-uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
-    if (ping_nonce_.load() not_eq 0U) return interval_milliseconds;  // Wait for response to return
+void Node::on_ping_timer_expired(std::chrono::milliseconds& interval) noexcept {
+    using namespace std::chrono_literals;
+    if (ping_nonce_.load() not_eq 0U) return;  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
-    ping_nonce_.store(randomize<uint64_t>(uint64_t(/*min=*/1)));
+    ping_nonce_.store(randomize<uint64_t>(/*min=*/1U));
     MsgPingPongPayload pong_payload{};
     pong_payload.nonce_ = ping_nonce_.load();
     if (const auto result{push_message(MessageType::kPing, pong_payload)}; result.has_error()) {
@@ -126,9 +127,11 @@ uint32_t Node::on_ping_timer_expired(uint32_t interval_milliseconds) noexcept {
                                                 "failure", "reason", result.error().message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
         stop(false);
-        return 0U;
+        interval = 0ms;
+        return;
     }
-    return (randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.3) * 1'000U);
+    const auto random_milliseconds{randomize<uint32_t>(app_settings_.network.ping_interval_seconds * 1'000U, 0.3)};
+    interval = std::chrono::milliseconds(random_milliseconds);
 }
 
 void Node::process_ping_latency(const uint64_t latency_ms) {
@@ -633,10 +636,11 @@ void Node::on_handshake_completed() {
 
     // Lets' send out a ping immediately and start the timer
     // for subsequent pings
-    const auto ping_interval_ms{randomize<uint32_t>(app_settings_.network.ping_interval_seconds, 0.3) * 1'000U};
-    std::ignore = on_ping_timer_expired(ping_interval_ms);
+    const auto random_milliseconds{randomize<uint32_t>(app_settings_.network.ping_interval_seconds * 1'000U, 0.3)};
+    auto ping_interval = std::chrono::milliseconds(random_milliseconds);
+    on_ping_timer_expired(ping_interval);
     ping_timer_.set_autoreset(true);
-    ping_timer_.start(ping_interval_ms, [this](uint32_t interval_ms) { return on_ping_timer_expired(interval_ms); });
+    ping_timer_.start(ping_interval, [this](std::chrono::milliseconds& interval) { on_ping_timer_expired(interval); });
 }
 
 NodeIdleResult Node::is_idle() const noexcept {

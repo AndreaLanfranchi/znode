@@ -5,7 +5,7 @@ Distributed under the MIT software license, see the accompanying
 file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
-#include "asio_timer.hpp"
+#include "timer.hpp"
 
 #include <thread>
 #include <utility>
@@ -13,6 +13,7 @@ file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <absl/strings/str_cat.h>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
+#include <gsl/gsl_util>
 
 #include <infra/common/log.hpp>
 
@@ -20,20 +21,28 @@ namespace zenpp::con {
 
 using namespace boost;
 
-bool AsioTimer::start() noexcept {
-    if (interval_milliseconds_ == 0U or not call_back_ or not Stoppable::start()) return false;
+void Timer::set_callback(Timer::CallBackFunc call_back) noexcept {
+    if (not is_running()) {
+        exception_ptr_ = nullptr;
+        call_back_ = std::move(call_back);
+    }
+}
+
+bool Timer::start() noexcept {
+    if (interval_.load().count() == 0U or not call_back_ or not Stoppable::start()) return false;
     LOG_TRACE1 << "Timer[" << name_ << "]: start requested";
     asio::co_spawn(timer_.get_executor(), start_detached(), asio::detached);
     return true;
 }
 
-bool AsioTimer::start(uint32_t interval, CallBackFunc call_back) noexcept {
-    interval_milliseconds_.store(interval);
+bool Timer::start(std::chrono::milliseconds interval, CallBackFunc call_back) noexcept {
+    interval_.store(interval);
     call_back_ = std::move(call_back);
+    exception_ptr_ = nullptr;
     return start();
 }
 
-bool AsioTimer::stop(bool wait) noexcept {
+bool Timer::stop(bool wait) noexcept {
     if (not Stoppable::stop(wait)) return false;  // Already stopped
     LOG_TRACE1 << "Timer[" << name_ << "]: stop requested";
     std::ignore = timer_.cancel();
@@ -45,35 +54,41 @@ bool AsioTimer::stop(bool wait) noexcept {
     return true;
 }
 
-Task<void> AsioTimer::start_detached() noexcept {
+Task<void> Timer::start_detached() noexcept {
     try {
-        auto wait_interval = interval_milliseconds_.load();
-        while (is_running() and wait_interval not_eq 0U) {
-            timer_.expires_after(std::chrono::milliseconds(wait_interval));
+        auto wait_interval = interval_.load();
+        while (is_running() and wait_interval.count() not_eq 0U) {
+            timer_.expires_after(wait_interval);
             co_await timer_.async_wait(asio::use_awaitable);
             LOG_TRACE1 << "Timer[" << name_ << "]: expired";
-            try {
-                wait_interval = call_back_(wait_interval);
-                if (not autoreset()) break;
-            } catch (const std::exception& exception) {
-                std::ignore = log::Critical(absl::StrCat("Timer[", name_, "]"),
-                                            {"action", "callback", "error", exception.what()});
-                break;
-            } catch (...) {
-                std::ignore =
-                    log::Critical(absl::StrCat("Timer[", name_, "]"), {"action", "callback", "error", "undefined"});
-                break;
-            }
+            call_back_(wait_interval);
+            if (not autoreset_) break;
         }
     } catch (const system::system_error& error) {
         if (error.code() not_eq asio::error::operation_aborted) {
             std::ignore = log::Error(absl::StrCat("Timer[", name_, "]"),
                                      {"action", "async_wait", "error", error.code().message()});
+            exception_ptr_ = std::current_exception();
+        }
+    } catch (const std::exception& exception) {
+        std::ignore =
+            log::Critical(absl::StrCat("Timer[", name_, "]"), {"action", "callback", "error", exception.what()});
+        exception_ptr_ = std::current_exception();
+    } catch (...) {
+        std::ignore = log::Critical(absl::StrCat("Timer[", name_, "]"), {"action", "callback", "error", "undefined"});
+        try {
+            throw std::runtime_error("Undefined error");
+        } catch (...) {
+            exception_ptr_ = std::current_exception();
         }
     }
 
     set_stopped();
     stop_cv_.notify_all();
     co_return;
+}
+
+void Timer::rethrow() const {
+    if (exception_ptr_) std::rethrow_exception(exception_ptr_);
 }
 }  // namespace zenpp::con

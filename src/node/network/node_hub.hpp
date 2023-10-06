@@ -16,7 +16,7 @@
 
 #include <infra/common/random.hpp>
 #include <infra/common/stopwatch.hpp>
-#include <infra/concurrency/asio_timer.hpp>
+#include <infra/concurrency/timer.hpp>
 #include <infra/concurrency/unique_queue.hpp>
 #include <infra/network/addresses.hpp>
 
@@ -33,10 +33,10 @@ class NodeHub : public con::Stoppable {
           asio_context_{io_context},
           asio_strand_{io_context},
           socket_acceptor_{io_context},
-          service_timer_{io_context, "NodeHub_service"},
+          service_timer_{io_context, "NodeHub_service", true},
           pending_connections_{/*capacity=*/app_settings_.network.max_active_connections} {
         if (app_settings_.network.nonce == 0U) {
-            app_settings_.network.nonce = randomize<uint64_t>(uint64_t(/*min=*/1));
+            app_settings_.network.nonce = randomize<uint64_t>(/*min=*/1U);
         }
     };
 
@@ -88,7 +88,7 @@ class NodeHub : public con::Stoppable {
     //! - Check for pending connections requests and attempt to connect to them
     //! - Check disconnected nodes and remove them from the nodes_ map
     //! - Check for nodes that have been idle for too long and disconnect them
-    unsigned on_service_timer_expired(unsigned interval);
+    void on_service_timer_expired(std::chrono::milliseconds& interval);
 
     void print_network_info();  // Prints some metric data about network usage
 
@@ -104,7 +104,7 @@ class NodeHub : public con::Stoppable {
 
     boost::asio::io_context::strand asio_strand_;     // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
-    con::AsioTimer service_timer_;                    // Triggers a maintenance cycle
+    con::Timer service_timer_;                        // Triggers a maintenance cycle
 
     std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure server connections
     std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure client connections

@@ -23,7 +23,7 @@
 
 #include <core/common/base.hpp>
 
-#include <infra/concurrency/asio_timer.hpp>
+#include <infra/concurrency/timer.hpp>
 #include <infra/network/message.hpp>
 #include <infra/network/protocol.hpp>
 
@@ -161,7 +161,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Sends a ping to the remote peer on cadence
     //! \remark The interval is randomly chosen on setting's ping get_interval +/- 30%
-    uint32_t on_ping_timer_expired(uint32_t interval_milliseconds) noexcept;
+    void on_ping_timer_expired(std::chrono::milliseconds& interval) noexcept;
 
     //! \brief Computes the ping latency and updates the EMA
     //! \details Ping latency is the get_interval between the sending of a ping message and the reception of the
@@ -200,7 +200,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     const int node_id_{next_node_id()};          // Unique node id
     const IPConnection connection_;              // Whether inbound or outbound
     boost::asio::io_context::strand io_strand_;  // Serialized execution of reads and writes
-    con::AsioTimer ping_timer_;                  // To periodically send ping messages
+    con::Timer ping_timer_;                      // To periodically send ping messages
     boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
     IPEndpoint remote_endpoint_;                 // Remote endpoint
     IPEndpoint local_endpoint_;                  // Local endpoint

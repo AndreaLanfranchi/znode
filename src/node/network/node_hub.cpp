@@ -20,6 +20,7 @@
 
 namespace zenpp::net {
 
+using namespace std::chrono_literals;
 using namespace boost;
 using asio::ip::tcp;
 
@@ -48,7 +49,7 @@ bool NodeHub::start() noexcept {
     initialize_acceptor();
     info_stopwatch_.start(true);
     service_timer_.set_autoreset(true);
-    service_timer_.start(250U, [this](unsigned interval) { return on_service_timer_expired(interval); });
+    service_timer_.start(250ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
     start_accept();
     return true;
 }
@@ -74,25 +75,11 @@ bool NodeHub::stop(bool wait) noexcept {
     return ret;
 }
 
-unsigned NodeHub::on_service_timer_expired(unsigned interval) {
+void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) {
     print_network_info();  // Print info every 5 seconds
     const bool running{is_running()};
 
-    // If we have room connect to the pending connection requests
-    if (running and size() < 64U /*app_settings_.network.max_active_connections*/ and
-        not pending_connections_.empty()) {
-        bool expected{false};
-        if (async_connecting_.compare_exchange_strong(expected, true)) {
-            const auto new_connection{pending_connections_.pop()};
-            const std::lock_guard<std::mutex> lock{nodes_mutex_};
-            if (not connected_addresses_.contains(*(*new_connection).endpoint_.address_)) {
-                asio::post(asio_strand_, [this, new_connection]() { async_connect(*new_connection); });
-            }
-        }
-    }
-
-    const std::lock_guard<std::mutex> lock{nodes_mutex_};
-    current_active_connections_.store(static_cast<uint32_t>(nodes_.size()));
+    std::unique_lock<std::mutex> lock{nodes_mutex_};
     for (auto iterator{nodes_.begin()}; iterator not_eq nodes_.end(); /* !!! no increment !!! */) {
         if (iterator->second == nullptr) {
             iterator = nodes_.erase(iterator);
@@ -118,7 +105,20 @@ unsigned NodeHub::on_service_timer_expired(unsigned interval) {
         }
         ++iterator;
     }
-    return interval;
+    current_active_connections_.store(static_cast<uint32_t>(nodes_.size()));
+
+    // If we have room connect to the pending connection requests
+    if (running and nodes_.size() < 64U /*app_settings_.network.max_active_connections*/ and
+        not pending_connections_.empty()) {
+        bool expected{false};
+        if (async_connecting_.compare_exchange_strong(expected, true)) {
+            const auto new_connection{pending_connections_.pop()};
+            if (not connected_addresses_.contains(*(*new_connection).endpoint_.address_)) {
+                asio::post(asio_strand_, [this, new_connection]() { async_connect(*new_connection); });
+            }
+        }
+    }
+
 }
 
 void NodeHub::print_network_info() {
@@ -214,6 +214,8 @@ std::map<std::string, std::vector<IPEndpoint>, std::less<>> NodeHub::dns_resolve
 
 void NodeHub::async_connect(const IPConnection& connection) {
     const std::string remote{connection.endpoint_.to_string()};
+    const auto reset_connecting{
+        gsl::finally([this]() { async_connecting_.exchange(false, std::memory_order_seq_cst); })};
 
     log::Info("Service", {"name", "Node Hub", "action", "connect", "remote", remote});
     std::unique_lock<std::mutex> lock{nodes_mutex_};
@@ -223,7 +225,6 @@ void NodeHub::async_connect(const IPConnection& connection) {
         log::Error("Service",
                    {"name", "Node Hub", "action", "connect", "error", "max active connections per ip reached"});
         lock.unlock();
-        async_connecting_.exchange(false, std::memory_order_seq_cst);
         return;
     }
     lock.unlock();
@@ -261,13 +262,11 @@ void NodeHub::async_connect(const IPConnection& connection) {
         std::ignore = socket.close(socket_error_code);
         std::ignore = log::Error(
             "Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", exception.what()});
-        async_connecting_.exchange(false, std::memory_order_seq_cst);
         return;
     } catch (...) {
         std::ignore = socket.close(socket_error_code);
         std::ignore = log::Error("Service",
                                  {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", "unknown"});
-        async_connecting_.exchange(false, std::memory_order_seq_cst);
         return;
     }
 
@@ -281,7 +280,6 @@ void NodeHub::async_connect(const IPConnection& connection) {
 
     new_node->start();
     on_node_connected(new_node);
-    async_connecting_.exchange(false, std::memory_order_seq_cst);
 }
 
 void NodeHub::start_accept() {
