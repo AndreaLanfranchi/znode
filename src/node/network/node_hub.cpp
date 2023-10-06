@@ -10,7 +10,6 @@
 
 #include <absl/strings/str_cat.h>
 #include <boost/asio/ssl.hpp>
-#include <boost/lexical_cast.hpp>
 #include <gsl/gsl_util>
 
 #include <core/chain/seeds.hpp>
@@ -98,10 +97,9 @@ unsigned NodeHub::on_service_timer_expired(unsigned interval) {
         if (iterator->second == nullptr) {
             iterator = nodes_.erase(iterator);
             continue;
-        }
-        if (iterator->second->status() == Node::ComponentStatus::kNotStarted) {
-            on_node_disconnected(iterator->second);
+        } else if (not iterator->second->is_running()) {
             iterator->second.reset();
+            ++iterator;
             continue;
         }
         if (not running) {
@@ -278,7 +276,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
         app_settings_, connection, asio_context_, std::move(socket), tls_client_context_.get(),
         [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
         [this](std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
-            on_node_received_message(node, std::move(message));
+            on_node_received_message(std::move(node), std::move(message));
         }));
 
     new_node->start();
@@ -356,7 +354,7 @@ void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::
         app_settings_, connection, asio_context_, std::move(socket), tls_server_context_.get(),
         [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
         [this](std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
-            on_node_received_message(node, std::move(message));
+            on_node_received_message(std::move(node), std::move(message));
         }));
     log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local.to_string(), "remote",
                           remote.to_string(), "id", std::to_string(new_node->id())});
@@ -507,10 +505,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
 std::shared_ptr<Node> NodeHub::operator[](int node_id) const {
     const std::lock_guard<std::mutex> lock(nodes_mutex_);
     const auto iterator{nodes_.find(node_id)};
-    if (iterator not_eq nodes_.end()) {
-        return iterator->second;
-    }
-    return nullptr;
+    return iterator not_eq nodes_.end() ? iterator->second : nullptr;
 }
 
 bool NodeHub::contains(int node_id) const {

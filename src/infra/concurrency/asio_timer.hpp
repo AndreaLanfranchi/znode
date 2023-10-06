@@ -94,7 +94,7 @@ class AsioTimer : public Stoppable {
 
   private:
     //! \brief Launches async timer
-    Task<void> start_internal() noexcept;
+    Task<void> start_detached() noexcept;
 
     boost::asio::steady_timer timer_;                // The timer itself
     std::atomic_uint32_t interval_milliseconds_{0};  // Interval (in milliseconds) between triggered events
