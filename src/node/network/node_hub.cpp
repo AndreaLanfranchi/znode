@@ -118,7 +118,6 @@ void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) 
             }
         }
     }
-
 }
 
 void NodeHub::print_network_info() {
@@ -231,46 +230,24 @@ void NodeHub::async_connect(const IPConnection& connection) {
 
     // Create the socket and try to connect using a timeout
     boost::asio::ip::tcp::socket socket{asio_context_};
-    boost::system::error_code socket_error_code{asio::error::in_progress};
-
-    const auto deadline{std::chrono::steady_clock::now() +
-                        std::chrono::seconds(app_settings_.network.connect_timeout_seconds)};
+    con::Timer timer{asio_context_, "timeout", false};
+    timer.start(std::chrono::seconds(app_settings_.network.connect_timeout_seconds),
+                [&socket](std::chrono::milliseconds& /*interval*/) {
+                    boost::system::error_code local_error_code;
+                    std::ignore = socket.close(local_error_code);
+                });
 
     try {
-        socket.async_connect(
-            connection.endpoint_.to_endpoint(),
-            [&socket_error_code](const boost::system::error_code& error_code) { socket_error_code = error_code; });
-
-        while (socket_error_code == asio::error::in_progress) {
-            std::this_thread::yield();
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            if (std::chrono::steady_clock::now() > deadline) {
-                std::ignore = socket.close(socket_error_code);
-                socket_error_code = boost::asio::error::timed_out;
-                break;
-            }
-            if (not is_running()) {
-                std::ignore = socket.close(socket_error_code);
-                socket_error_code = boost::asio::error::operation_aborted;
-                break;
-            }
-        }
-
-        if (socket_error_code) throw std::runtime_error(socket_error_code.message());
+        socket.async_connect(connection.endpoint_.to_endpoint(), boost::asio::use_future).get();
+        timer.stop(true);
         set_common_socket_options(socket);
-    } catch (const std::runtime_error& exception) {
-        std::ignore = socket.close(socket_error_code);
-        std::ignore = log::Error(
-            "Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", exception.what()});
-        return;
-    } catch (...) {
-        std::ignore = socket.close(socket_error_code);
-        std::ignore = log::Error("Service",
-                                 {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", "unknown"});
+    } catch (const boost::system::system_error& exception) {
+        std::ignore = log::Error("Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error",
+                                             exception.code().message()});
         return;
     }
 
-    if (not is_running()) return;
+    if (not is_running() or not socket.is_open()) return;
     std::shared_ptr<Node> new_node(new Node(
         app_settings_, connection, asio_context_, std::move(socket), tls_client_context_.get(),
         [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
