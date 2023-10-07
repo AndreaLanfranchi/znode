@@ -8,7 +8,6 @@
 #pragma once
 #include <array>
 #include <bit>
-#include <concepts>
 #include <ranges>
 
 #include <boost/endian/conversion.hpp>
@@ -31,7 +30,7 @@ constexpr T byteswap(T value) noexcept {
     return std::bit_cast<T>(value_bytes);
 }
 }  // namespace std
-#endif // __cplusplus < 202300L
+#endif  // __cplusplus < 202300L
 
 namespace zenpp::endian {
 
