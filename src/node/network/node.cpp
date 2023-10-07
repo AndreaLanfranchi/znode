@@ -639,12 +639,11 @@ void Node::on_handshake_completed() {
     const auto random_milliseconds{randomize<uint32_t>(app_settings_.network.ping_interval_seconds * 1'000U, 0.3)};
     auto ping_interval = std::chrono::milliseconds(random_milliseconds);
     on_ping_timer_expired(ping_interval);
-    ping_timer_.set_autoreset(true);
+    ping_timer_.autoreset(true);
     ping_timer_.start(ping_interval, [this](std::chrono::milliseconds& interval) { on_ping_timer_expired(interval); });
 }
 
 NodeIdleResult Node::is_idle() const noexcept {
-
     using enum NodeIdleResult;
     using namespace std::chrono;
 

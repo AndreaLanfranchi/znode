@@ -9,7 +9,6 @@ file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <cstdint>
 #include <exception>
 #include <memory>
@@ -38,22 +37,43 @@ class Timer : public Stoppable {
     //! \remark The callback function can change the interval for next event
     using CallBackFunc = std::function<void(std::chrono::milliseconds&)>;
 
-    //! \param asio_context [in] : boost's asio context
+    //! \brief Creates a timer without interval and callback (to be set later on start)
+    //! \param executor [in] : boost's asio executor to run timer on
     //! \param name [in] : name of the timer (for logging purposes)
-    Timer(boost::asio::io_context& asio_context, std::string name, bool autoreset = false)
-        : timer_(asio_context), name_(std::move(name)), autoreset_(autoreset){};
+    //! \param autoreset [in] : whether timer is resubmitted after callback execution
+    Timer(const boost::asio::any_io_executor& executor, std::string name, bool autoreset = false)
+        : timer_(executor), name_(std::move(name)), autoreset_(autoreset){};
 
-    //! \param asio_context [in] : boost's asio context
-    //! \param interval [in] : length of wait get_interval (in milliseconds)
+    //! \brief Creates a timer with interval and callback
+    //! \param executor [in] : boost's asio executor to run timer on
     //! \param name [in] : name of the timer (for logging purposes)
+    //! \param autoreset [in] : whether timer is resubmitted after callback execution
+    //! \param interval [in] : length of interval between triggered events (in milliseconds)
     //! \param call_back [in] : the call back function to be executed when get_interval expires
-    Timer(boost::asio::io_context& asio_context, std::chrono::milliseconds interval, std::string name,
+    Timer(const boost::asio::any_io_executor& executor, std::string name, std::chrono::milliseconds interval,
           CallBackFunc call_back, bool autoreset = false)
-        : timer_(asio_context),
-          interval_(interval),
+        : timer_(executor),
           name_(std::move(name)),
           autoreset_(autoreset),
+          interval_(interval),
           call_back_(std::move(call_back)){};
+
+    //! \brief Creates a timer without interval and callback (to be set later on start)
+    //! \param asio_context [in] : boost's asio context to pull executor from
+    //! \param name [in] : name of the timer (for logging purposes)
+    //! \param autoreset [in] : whether timer is resubmitted after callback execution
+    Timer(boost::asio::io_context& context, std::string name, bool autoreset = false)
+        : Timer(context.get_executor(), std::move(name), autoreset){};
+
+    //! \brief Creates a timer with interval and callback
+    //! \param executor [in] : boost's asio executor to run timer on
+    //! \param name [in] : name of the timer (for logging purposes)
+    //! \param autoreset [in] : whether timer is resubmitted after callback execution
+    //! \param interval [in] : length of interval between triggered events (in milliseconds)
+    //! \param call_back [in] : the call back function to be executed when get_interval expires
+    Timer(boost::asio::io_context& context, std::string name, std::chrono::milliseconds interval,
+          CallBackFunc call_back, bool autoreset = false)
+        : Timer(context.get_executor(), std::move(name), interval, std::move(call_back), autoreset){};
 
     ~Timer() override = default;
 
@@ -74,9 +94,7 @@ class Timer : public Stoppable {
 
     //! \brief Sets the autoreset flag
     //! \remarks If timer is running this has no effect.
-    void set_autoreset(bool value) noexcept {
-        if (not is_running()) autoreset_.store(value);
-    }
+    void autoreset(bool value) noexcept { autoreset_.store(value); }
 
     //! \brief Sets the callback function to be executed when get_interval expires
     //! \remarks If timer is running this call produces no effects.
@@ -105,15 +123,14 @@ class Timer : public Stoppable {
 
   private:
     //! \brief Launches async timer
-    Task<void> start_detached() noexcept;
+    Task<void> work() noexcept;
 
     boost::asio::steady_timer timer_;                  // The timer itself
-    std::atomic<std::chrono::milliseconds> interval_;  // Interval between triggered events
     std::string name_{};                               // Name of the timer (for logging purposes)
     std::atomic_bool autoreset_{false};                // If true, timer is resubmitted after callback execution
+    std::atomic<std::chrono::milliseconds> interval_;  // Interval between triggered events
     std::function<void(std::chrono::milliseconds&)> call_back_;  // Function to call on triggered
-    std::condition_variable stop_cv_{};                          // Condition variable to wait for on
-    std::mutex stop_mtx_{};                                      // Mutex for conditional wait of kick
+    std::atomic_bool working_{false};                            // Whether the timer is working
     std::exception_ptr exception_ptr_{nullptr};                  // Captured exception (if any)
 };
 }  // namespace zenpp::con

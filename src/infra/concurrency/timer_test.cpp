@@ -39,7 +39,7 @@ TEST_CASE("Async Timer", "[infra][concurrency][timer]") {
 
     SECTION("Timer with no autoreset") {
         std::chrono::milliseconds interval{10};
-        Timer test_timer(context, interval, "test_timer", call_back);
+        Timer test_timer(context, "test_timer", interval, call_back);
         test_timer.start();
         context.run_for(interval * 5);  // This is blocking
         REQUIRE(counter == 1);
@@ -47,8 +47,7 @@ TEST_CASE("Async Timer", "[infra][concurrency][timer]") {
 
     SECTION("Timer with autoreset") {
         std::chrono::milliseconds interval{100};
-        Timer test_timer(context, interval, "test_timer", call_back);
-        test_timer.set_autoreset(true);
+        Timer test_timer(context, "test_timer", interval, call_back, true);
         test_timer.start();
         context.run_for((interval * 5) - 50ms);  // This is blocking
         REQUIRE(counter == 4);
@@ -56,8 +55,7 @@ TEST_CASE("Async Timer", "[infra][concurrency][timer]") {
 
     SECTION("Timer with callback throwing exception") {
         std::chrono::milliseconds interval{10};
-        Timer test_timer(context, interval, "test_timer", call_back);
-        test_timer.set_autoreset(true);
+        Timer test_timer(context, "test_timer", interval, call_back, true);
         test_timer.start();
         context.run_for(500ms);  // This is blocking
         REQUIRE(test_timer.has_exception());

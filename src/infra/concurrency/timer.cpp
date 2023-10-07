@@ -20,6 +20,7 @@ file COPYING or http://www.opensource.org/licenses/mit-license.php.
 namespace zenpp::con {
 
 using namespace boost;
+namespace chrono = std::chrono;
 
 void Timer::set_callback(Timer::CallBackFunc call_back) noexcept {
     if (not is_running()) {
@@ -29,41 +30,44 @@ void Timer::set_callback(Timer::CallBackFunc call_back) noexcept {
 }
 
 bool Timer::start() noexcept {
-    if (interval_.load().count() == 0U or not call_back_ or not Stoppable::start()) return false;
+    if (not Stoppable::start()) return false;  // Already started
+    if (interval_.load().count() == 0U or not call_back_) return false;
+    exception_ptr_ = nullptr;
     LOG_TRACE1 << "Timer[" << name_ << "]: start requested";
-    asio::co_spawn(timer_.get_executor(), start_detached(), asio::detached);
+    working_.store(true);
+    asio::co_spawn(timer_.get_executor(), work(), asio::detached);
     return true;
 }
 
-bool Timer::start(std::chrono::milliseconds interval, CallBackFunc call_back) noexcept {
-    interval_.store(interval);
-    call_back_ = std::move(call_back);
-    exception_ptr_ = nullptr;
-    return start();
+bool Timer::start(chrono::milliseconds interval, CallBackFunc call_back) noexcept {
+    if (not is_running()) {
+        interval_.store(interval);
+        call_back_ = std::move(call_back);
+        return start();
+    }
+    return false;
 }
 
 bool Timer::stop(bool wait) noexcept {
     if (not Stoppable::stop(wait)) return false;  // Already stopped
     LOG_TRACE1 << "Timer[" << name_ << "]: stop requested";
     std::ignore = timer_.cancel();
-    while (wait and status() not_eq ComponentStatus::kNotStarted) {
-        std::unique_lock lock{stop_mtx_};
-        std::ignore = stop_cv_.wait_for(lock, std::chrono::milliseconds(10));
-    }
+    if (wait) working_.wait(true);
     LOG_TRACE1 << "Timer[" << name_ << "]: stopped";
     return true;
 }
 
-Task<void> Timer::start_detached() noexcept {
+Task<void> Timer::work() noexcept {
     try {
         auto wait_interval = interval_.load();
-        while (is_running() and wait_interval.count() not_eq 0U) {
+        const auto resubmit{autoreset_.load()};
+        do {
             timer_.expires_after(wait_interval);
             co_await timer_.async_wait(asio::use_awaitable);
             LOG_TRACE1 << "Timer[" << name_ << "]: expired";
             call_back_(wait_interval);
-            if (not autoreset_) break;
-        }
+        } while (is_running() and resubmit and wait_interval.count() not_eq 0U);
+
     } catch (const system::system_error& error) {
         if (error.code() not_eq asio::error::operation_aborted) {
             std::ignore = log::Error(absl::StrCat("Timer[", name_, "]"),
@@ -84,7 +88,8 @@ Task<void> Timer::start_detached() noexcept {
     }
 
     set_stopped();
-    stop_cv_.notify_all();
+    working_.store(false);
+    working_.notify_all();
     co_return;
 }
 
