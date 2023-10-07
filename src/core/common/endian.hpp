@@ -31,7 +31,7 @@ constexpr T byteswap(T value) noexcept {
     return std::bit_cast<T>(value_bytes);
 }
 }  // namespace std
-#endif
+#endif // __cplusplus < 202300L
 
 namespace zenpp::endian {
 

@@ -11,7 +11,6 @@
 #include <core/common/preprocessor.hpp>  // Must be first
 // clang-format on
 
-#include <bit>
 #include <compare>
 #include <concepts>
 #include <cstddef>
@@ -21,16 +20,17 @@
 #include <string_view>
 
 #include <boost/multiprecision/integer.hpp>
-#include <boost/outcome.hpp>
 #include <zenpp/buildinfo.h>
 
-namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
+#include <core/common/outcome.hpp>
 
 #if defined(BOOST_NO_EXCEPTIONS)
 #include <boost/throw_exception.hpp>
 namespace boost {
+/*
 BOOST_NORETURN void throw_exception(const std::exception&);
 BOOST_NORETURN void throw_exception(const std::exception&, const boost::source_location&);
+*/
 }  // namespace boost
 #endif
 
@@ -80,22 +80,33 @@ using Bytes = std::basic_string<uint8_t>;
 //! \brief Represents a non-owning view of a byte sequence
 class ByteView : public std::basic_string_view<uint8_t> {
   public:
-    constexpr ByteView() noexcept : std::basic_string_view<uint8_t>{} {};
+    constexpr ByteView() noexcept : std::basic_string_view<uint8_t> {}
+    {};
 
-    constexpr ByteView(const std::basic_string_view<uint8_t>& other) noexcept
-        : std::basic_string_view<uint8_t>{other.data(), other.length()} {}
+    constexpr ByteView(const std::basic_string_view<uint8_t>& other) noexcept : std::basic_string_view<uint8_t> {
+        other.data(), other.length()
+    }
+    {}
 
-    constexpr ByteView(const Bytes& str) noexcept : std::basic_string_view<uint8_t>{str.data(), str.length()} {}
+    constexpr ByteView(const Bytes& str) noexcept : std::basic_string_view<uint8_t> { str.data(), str.length() }
+    {}
 
-    constexpr ByteView(const uint8_t* data, size_type length) noexcept
-        : std::basic_string_view<uint8_t>{data, length} {}
+    constexpr ByteView(const uint8_t* data, size_type length) noexcept : std::basic_string_view<uint8_t> {
+        data, length
+    }
+    {}
 
     template <std::size_t N>
-    constexpr ByteView(const uint8_t (&array)[N]) noexcept : std::basic_string_view<uint8_t>{array, N} {}
+    constexpr ByteView(const uint8_t (&array)[N]) noexcept : std::basic_string_view<uint8_t> {
+        array, N
+    }
+    {}
 
     template <std::size_t N>
-    constexpr ByteView(const std::array<uint8_t, N>& array) noexcept
-        : std::basic_string_view<uint8_t>{array.data(), N} {}
+    constexpr ByteView(const std::array<uint8_t, N>& array) noexcept : std::basic_string_view<uint8_t> {
+        array.data(), N
+    }
+    {}
 
     [[nodiscard]] bool is_null() const noexcept { return data() == nullptr; }
 };
