@@ -46,10 +46,9 @@ bool NodeHub::start() noexcept {
         tls_client_context_ = std::make_unique<asio::ssl::context>(ctx);
     }
 
-    initialize_acceptor();
     service_timer_.start(250ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
     info_timer_.start(5s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
-    start_accept();
+    asio::co_spawn(asio_context_, acceptor_work(), asio::detached);
     return true;
 }
 
@@ -73,6 +72,86 @@ bool NodeHub::stop(bool wait) noexcept {
         set_stopped();
     }
     return ret;
+}
+
+Task<void> NodeHub::acceptor_work() {
+    try {
+        initialize_acceptor();
+        while (socket_acceptor_.is_open()) {
+            try {
+                boost::asio::ip::tcp::socket socket(asio_context_);
+                co_await socket_acceptor_.async_accept(socket, boost::asio::use_awaitable);
+                std::ignore = log::Info("Service", {"name", "Node Hub", "action", "connection request", "remote",
+                                                    socket.remote_endpoint().address().to_string()});
+                socket.non_blocking(true);
+                IPEndpoint remote{socket.remote_endpoint()};
+                IPConnection connection(remote, IPConnectionType::kInbound);
+                co_await accept_socket(std::move(socket), std::move(connection));
+
+            } catch (const boost::system::system_error& error) {
+                if (error.code() not_eq boost::asio::error::operation_aborted) {
+                    std::ignore = log::Error("Service",
+                                             {"name", "Node Hub", "action", "accept", "error", error.code().message()});
+                }
+                break;
+            }
+        }
+
+    } catch (const boost::system::system_error& error) {
+        if (error.code() not_eq boost::asio::error::operation_aborted) {
+            log::Error("Service", {"name", "Node Hub", "action", "accept", "error", error.code().message()});
+        }
+    }
+
+    std::ignore = log::Info("Service", {"name", "Node Hub", "action", "acceptor_work", "status", "stopped"});
+    co_return;
+}
+
+Task<void> NodeHub::accept_socket(boost::asio::ip::tcp::socket socket, IPConnection connection) {
+    if (not is_running()) co_return;
+
+    boost::system::error_code local_error_code;
+    const auto close_socket{[&local_error_code](boost::asio::ip::tcp::socket& socket) {
+        std::ignore = socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, local_error_code);
+        socket.close();
+    }};
+
+    // Check we do not exceed the maximum number of connections
+    if (size() >= app_settings_.network.max_active_connections) {
+        ++total_rejected_connections_;
+        log::Warning("Service", {"name", "Node Hub", "action", "accept", "error", "max active connections reached"});
+        close_socket(socket);
+        co_return;
+    }
+
+    // Check we do not exceed the maximum number of connections per IP
+    std::unique_lock<std::mutex> lock{nodes_mutex_};
+    if (auto item = connected_addresses_.find(socket.remote_endpoint().address());
+        item not_eq connected_addresses_.end()) {
+        if (item->second >= app_settings_.network.max_active_connections_per_ip) {
+            ++total_rejected_connections_;
+            log::Warning("Service",
+                         {"name", "Node Hub", "action", "accept", "error", "max active connections per ip reached"});
+            close_socket(socket);
+            co_return;
+        }
+    }
+    lock.unlock();
+
+    set_common_socket_options(socket);
+    const std::shared_ptr<Node> new_node(new Node(
+        app_settings_, connection, asio_context_, std::move(socket),
+        connection.type_ == IPConnectionType::kInbound ? tls_server_context_.get() : tls_client_context_.get(),
+        [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
+        [this](std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
+            on_node_received_message(std::move(node), std::move(message));
+        }));
+    log::Info("Service", {"name", "Node Hub", "action", "accept", "remote", connection.endpoint_.to_string(), "id",
+                          std::to_string(new_node->id())});
+
+    new_node->start();
+    on_node_connected(new_node);
+    co_return;
 }
 
 void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) {
@@ -280,91 +359,10 @@ void NodeHub::async_connect(const IPConnection& connection) {
     on_node_connected(new_node);
 }
 
-void NodeHub::start_accept() {
-    if (not is_running()) return;
-    if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-        log::Trace("Service", {"name", "Node Hub", "status", "Listening for connections ..."});
-    }
-    socket_acceptor_.async_accept(
-        [this](const boost::system::error_code& error_code, boost::asio::ip::tcp::socket socket) {
-            handle_accept(error_code, std::move(socket));
-        });
-}
-
-void NodeHub::handle_accept(const boost::system::error_code& error_code, boost::asio::ip::tcp::socket socket) {
-    if (not is_running() or error_code == boost::asio::error::operation_aborted) {
-        return;
-    }
-
-    boost::system::error_code local_error_code;
-    const auto close_socket{[&local_error_code](boost::asio::ip::tcp::socket& socket) {
-        std::ignore = socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, local_error_code);
-        socket.close();
-    }};
-
-    if (error_code) {
-        log::Error("Service", {"name", "Node Hub", "action", "accept", "error", error_code.message()});
-        close_socket(socket);
-        start_accept();
-        return;
-    }
-
-    std::ignore = socket.non_blocking(true, local_error_code);
-    if (local_error_code) {
-        log::Error("Service", {"name", "Node Hub", "action", "handle", "error", local_error_code.message()});
-        close_socket(socket);
-        start_accept();
-        return;
-    }
-
-    // Check we do not exceed the maximum number of connections
-    if (size() >= app_settings_.network.max_active_connections) {
-        ++total_rejected_connections_;
-        log::Warning("Service", {"name", "Node Hub", "action", "accept", "error", "max active connections reached"});
-        close_socket(socket);
-        start_accept();
-        return;
-    }
-
-    // Check we do not exceed the maximum number of connections per IP
-    std::unique_lock<std::mutex> lock{nodes_mutex_};
-    if (auto item = connected_addresses_.find(socket.remote_endpoint().address());
-        item not_eq connected_addresses_.end()) {
-        if (item->second >= app_settings_.network.max_active_connections_per_ip) {
-            ++total_rejected_connections_;
-            log::Warning("Service",
-                         {"name", "Node Hub", "action", "accept", "error", "max active connections per ip reached"});
-            close_socket(socket);
-            start_accept();
-            return;
-        }
-    }
-    lock.unlock();
-
-    set_common_socket_options(socket);
-    const IPEndpoint remote{socket.remote_endpoint()};
-    const IPEndpoint local{socket.local_endpoint()};
-    const IPConnection connection(remote, IPConnectionType::kInbound);
-
-    const std::shared_ptr<Node> new_node(new Node(
-        app_settings_, connection, asio_context_, std::move(socket), tls_server_context_.get(),
-        [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
-        [this](std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
-            on_node_received_message(std::move(node), std::move(message));
-        }));
-    log::Info("Service", {"name", "Node Hub", "action", "accept", "local", local.to_string(), "remote",
-                          remote.to_string(), "id", std::to_string(new_node->id())});
-
-    new_node->start();
-    on_node_connected(new_node);
-    asio::post(asio_strand_, [this]() { this->start_accept(); });  // Continue listening for new connections
-}
-
 void NodeHub::initialize_acceptor() {
     auto local_endpoint{IPEndpoint::from_string(app_settings_.network.local_endpoint)};
-    if (not local_endpoint) {
-        log::Error("Service", {"name", "Node Hub", "error", "Invalid listen local endpoint"});
-        return;
+    if (local_endpoint.has_error()) {
+        throw boost::system::system_error(local_endpoint.error());
     }
     if (local_endpoint.value().port_ == 0)
         local_endpoint.value().port_ = gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_);
@@ -378,7 +376,7 @@ void NodeHub::initialize_acceptor() {
     socket_acceptor_.bind(local_endpoint.value().to_endpoint());
     socket_acceptor_.listen();
 
-    log::Info("Service", {"name", "Node Hub", "secure", (app_settings_.network.use_tls ? "yes" : "no"), "bound to",
+    log::Info("Service", {"name", "Node Hub", "secure", (app_settings_.network.use_tls ? "yes" : "no"), "listening on",
                           local_endpoint.value().to_string()});
 }
 

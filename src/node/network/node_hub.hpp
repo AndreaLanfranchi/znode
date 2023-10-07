@@ -61,9 +61,12 @@ class NodeHub : public con::Stoppable {
 
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
-    void start_accept();         // Begin async accept operation
-    void handle_accept(const boost::system::error_code& error_code,
-                       boost::asio::ip::tcp::socket socket);  // Async accept handler
+
+    //! \brief Executes the acceptor work loop asynchronously
+    Task<void> acceptor_work();
+
+    //! \brief Processes a socket connection and creates a node
+    Task<void> accept_socket(boost::asio::ip::tcp::socket socket, IPConnection connection);
 
     //! \brief Accounts data about node's socket disconnections
     //! \remarks Requires a lock on nodes_mutex_ is holding
