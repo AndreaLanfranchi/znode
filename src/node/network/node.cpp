@@ -644,10 +644,12 @@ void Node::on_handshake_completed() {
 }
 
 NodeIdleResult Node::is_idle() const noexcept {
+
     using enum NodeIdleResult;
+    using namespace std::chrono;
 
     if (!is_connected()) return kNotIdle;  // Not connected - not idle
-    using namespace std::chrono;
+
     const auto now{steady_clock::now()};
 
     // Check whether we're waiting for a ping response

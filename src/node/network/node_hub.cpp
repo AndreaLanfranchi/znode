@@ -47,9 +47,8 @@ bool NodeHub::start() noexcept {
     }
 
     initialize_acceptor();
-    info_stopwatch_.start(true);
-    service_timer_.set_autoreset(true);
     service_timer_.start(250ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
+    info_timer_.start(5s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
     start_accept();
     return true;
 }
@@ -70,15 +69,14 @@ bool NodeHub::stop(bool wait) noexcept {
             pending_nodes = size();
         }
         service_timer_.stop(true);
+        info_timer_.stop(true);
         set_stopped();
     }
     return ret;
 }
 
 void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) {
-    print_network_info();  // Print info every 5 seconds
     const bool running{is_running()};
-
     std::unique_lock<std::mutex> lock{nodes_mutex_};
     for (auto iterator{nodes_.begin()}; iterator not_eq nodes_.end(); /* !!! no increment !!! */) {
         if (iterator->second == nullptr) {
@@ -118,14 +116,13 @@ void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) 
             }
         }
     }
-
 }
 
-void NodeHub::print_network_info() {
-    // Let each cycle to last at least 5 seconds to have meaningful data and, of course, to avoid division by zero
-    const auto info_lap_duration{
-        gsl::narrow_cast<uint32_t>(duration_cast<std::chrono::seconds>(info_stopwatch_.since_start()).count())};
-    if (info_lap_duration < 5) return;
+void NodeHub::on_info_timer_expired(std::chrono::milliseconds& interval) {
+    using namespace std::chrono;
+    static uint32_t lap_duration_seconds{0};
+    lap_duration_seconds += gsl::narrow_cast<uint32_t>(duration_cast<seconds>(interval).count());
+    if (lap_duration_seconds < 5) return;
 
     const auto current_total_bytes_received{total_bytes_received_.load()};
     const auto current_total_bytes_sent{total_bytes_sent_.load()};
@@ -138,8 +135,9 @@ void NodeHub::print_network_info() {
     info_data.insert(info_data.end(), {"data i/o", absl::StrCat(to_human_bytes(current_total_bytes_received, true), " ",
                                                                 to_human_bytes(current_total_bytes_sent, true))});
 
-    auto period_bytes_received_per_second{to_human_bytes(period_total_bytes_received / info_lap_duration, true) + "s"};
-    auto period_bytes_sent_per_second{to_human_bytes(period_total_bytes_sent / info_lap_duration, true) + "s"};
+    auto period_bytes_received_per_second{to_human_bytes(period_total_bytes_received / lap_duration_seconds, true) +
+                                          "s"};
+    auto period_bytes_sent_per_second{to_human_bytes(period_total_bytes_sent / lap_duration_seconds, true) + "s"};
 
     info_data.insert(info_data.end(),
                      {"speed i/o", period_bytes_received_per_second + " " + period_bytes_sent_per_second});
@@ -147,8 +145,8 @@ void NodeHub::print_network_info() {
     last_info_total_bytes_received_.store(current_total_bytes_received);
     last_info_total_bytes_sent_.store(current_total_bytes_sent);
 
-    log::Info("Network usage", info_data);
-    info_stopwatch_.start(true);
+    std::ignore = log::Info("Network usage", info_data);
+    lap_duration_seconds = 0;  // Accumulate for another 5 seconds
 }
 
 void NodeHub::feed_connections_from_cli() {

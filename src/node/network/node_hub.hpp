@@ -33,7 +33,8 @@ class NodeHub : public con::Stoppable {
           asio_context_{io_context},
           asio_strand_{io_context},
           socket_acceptor_{io_context},
-          service_timer_{io_context, "NodeHub_service", true},
+          service_timer_{io_context, "nh_service", true},
+          info_timer_{io_context, "nh_info", true},
           pending_connections_{/*capacity=*/app_settings_.network.max_active_connections} {
         if (app_settings_.network.nonce == 0U) {
             app_settings_.network.nonce = randomize<uint64_t>(/*min=*/1U);
@@ -90,7 +91,8 @@ class NodeHub : public con::Stoppable {
     //! - Check for nodes that have been idle for too long and disconnect them
     void on_service_timer_expired(std::chrono::milliseconds& interval);
 
-    void print_network_info();  // Prints some metric data about network usage
+    //! \brief Periodically prints some metric data about network usage
+    void on_info_timer_expired(std::chrono::milliseconds& interval);
 
     void feed_connections_from_cli();  // Feed pending_connections_ from command line --network.connect
     void feed_connections_from_dns();  // Feed pending_connections_ from DNS seeds configured for chain
@@ -105,6 +107,7 @@ class NodeHub : public con::Stoppable {
     boost::asio::io_context::strand asio_strand_;     // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
     con::Timer service_timer_;                        // Triggers a maintenance cycle
+    con::Timer info_timer_;                           // Triggers printout of network info
 
     std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure server connections
     std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure client connections
@@ -125,7 +128,5 @@ class NodeHub : public con::Stoppable {
     std::atomic<size_t> total_bytes_sent_{0};
     std::atomic<size_t> last_info_total_bytes_received_{0};
     std::atomic<size_t> last_info_total_bytes_sent_{0};
-    StopWatch info_stopwatch_{/*auto_start=*/false};  // To measure the effective elapsed amongst two service_timer_
-                                                      // events (for bandwidth calculation)
 };
 }  // namespace zenpp::net
