@@ -1,8 +1,8 @@
 /*
-Copyright 2022 The Silkworm Authors
-Copyright 2023 Horizen Labs
-Distributed under the MIT software license, see the accompanying
-file COPYING or http://www.opensource.org/licenses/mit-license.php.
+   Copyright 2022 The Silkworm Authors
+   Copyright 2023 Horizen Labs
+   Distributed under the MIT software license, see the accompanying
+   file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
 
 #include "timer.hpp"
@@ -13,7 +13,6 @@ file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <absl/strings/str_cat.h>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
-#include <gsl/gsl_util>
 
 #include <infra/common/log.hpp>
 
@@ -59,7 +58,7 @@ bool Timer::stop(bool wait) noexcept {
 
 Task<void> Timer::work() noexcept {
     try {
-        auto wait_interval = interval_.load();
+        auto wait_interval{interval_.load()};
         const auto resubmit{autoreset_.load()};
         do {
             timer_.expires_after(wait_interval);
