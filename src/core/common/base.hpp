@@ -34,8 +34,6 @@ BOOST_NORETURN void throw_exception(const std::exception&, const boost::source_l
 }  // namespace boost
 #endif
 
-static_assert(std::endian::native == std::endian::little, "Target architecture MUST be little endian");
-
 namespace zenpp {
 
 using BlockNum = uint32_t;

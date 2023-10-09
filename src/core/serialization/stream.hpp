@@ -222,7 +222,8 @@ class SDataStream : public DataStream {
     }
 
     // Serialization for bool
-    template <>
+    template <typename T>
+    requires std::is_same_v<T, bool>
     [[nodiscard]] outcome::result<void> bind(bool& object, Action action) {
         switch (action) {
             using enum Action;
