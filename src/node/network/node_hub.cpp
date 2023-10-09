@@ -86,7 +86,7 @@ Task<void> NodeHub::acceptor_work() {
                 socket.non_blocking(true);
                 IPEndpoint remote{socket.remote_endpoint()};
                 IPConnection connection(remote, IPConnectionType::kInbound);
-                co_await accept_socket(std::move(socket), std::move(connection));
+                co_await accept_socket(std::move(socket), connection);
 
             } catch (const boost::system::system_error& error) {
                 if (error.code() not_eq boost::asio::error::operation_aborted) {
@@ -139,13 +139,14 @@ Task<void> NodeHub::accept_socket(boost::asio::ip::tcp::socket socket, IPConnect
     lock.unlock();
 
     set_common_socket_options(socket);
-    const std::shared_ptr<Node> new_node(new Node(
+    const auto new_node = std::make_shared<Node>(
         app_settings_, connection, asio_context_, std::move(socket),
         connection.type_ == IPConnectionType::kInbound ? tls_server_context_.get() : tls_client_context_.get(),
         [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
         [this](std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
             on_node_received_message(std::move(node), std::move(message));
-        }));
+        });
+
     log::Info("Service", {"name", "Node Hub", "action", "accept", "remote", connection.endpoint_.to_string(), "id",
                           std::to_string(new_node->id())});
 
@@ -324,36 +325,27 @@ void NodeHub::async_connect(const IPConnection& connection) {
             if (std::chrono::steady_clock::now() > deadline) {
                 std::ignore = socket.close(socket_error_code);
                 socket_error_code = boost::asio::error::timed_out;
-                break;
-            }
-            if (not is_running()) {
+            } else if (not is_running()) {
                 std::ignore = socket.close(socket_error_code);
                 socket_error_code = boost::asio::error::operation_aborted;
-                break;
             }
         }
-
-        if (socket_error_code) throw std::runtime_error(socket_error_code.message());
+        boost::asio::detail::throw_error(socket_error_code, "async_connect");
         set_common_socket_options(socket);
-    } catch (const std::runtime_error& exception) {
+    } catch (const boost::system::system_error& error) {
         std::ignore = socket.close(socket_error_code);
-        std::ignore = log::Error(
-            "Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", exception.what()});
-        return;
-    } catch (...) {
-        std::ignore = socket.close(socket_error_code);
-        std::ignore = log::Error("Service",
-                                 {"name", "Node Hub", "action", "async_connect", "remote", remote, "error", "unknown"});
+        std::ignore = log::Error("Service", {"name", "Node Hub", "action", "async_connect", "remote", remote, "error",
+                                             error.code().message()});
         return;
     }
 
     if (not is_running()) return;
-    std::shared_ptr<Node> new_node(new Node(
+    const auto new_node = std::make_shared<Node>(
         app_settings_, connection, asio_context_, std::move(socket), tls_client_context_.get(),
         [this](DataDirectionMode direction, size_t bytes_transferred) { on_node_data(direction, bytes_transferred); },
         [this](std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
             on_node_received_message(std::move(node), std::move(message));
-        }));
+        });
 
     new_node->start();
     on_node_connected(new_node);
@@ -419,12 +411,13 @@ void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
     connected_addresses_[*node->remote_endpoint().address_]++;
     ++total_connections_;
     switch (node->connection().type_) {
-        case IPConnectionType::kInbound:
+        using enum IPConnectionType;
+        case kInbound:
             ++current_active_inbound_connections_;
             break;
-        case IPConnectionType::kOutbound:
-        case IPConnectionType::kManualOutbound:
-        case IPConnectionType::kSeedOutbound:
+        case kOutbound:
+        case kManualOutbound:
+        case kSeedOutbound:
             ++current_active_outbound_connections_;
             break;
         default:
@@ -440,10 +433,11 @@ void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
 
 void NodeHub::on_node_data(net::DataDirectionMode direction, const size_t bytes_transferred) {
     switch (direction) {
-        case DataDirectionMode::kInbound:
+        using enum DataDirectionMode;
+        case kInbound:
             total_bytes_received_ += bytes_transferred;
             break;
-        case DataDirectionMode::kOutbound:
+        case kOutbound:
             total_bytes_sent_ += bytes_transferred;
             break;
         default:

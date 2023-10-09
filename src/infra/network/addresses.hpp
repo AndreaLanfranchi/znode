@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <string_view>
+#include <utility>
 
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -194,6 +195,39 @@ class IPConnection {
     IPConnection(const IPEndpoint& endpoint, IPConnectionType type) noexcept : endpoint_{endpoint}, type_{type} {
         ASSERT(type_ not_eq IPConnectionType::kNone);
     };
+
+    IPConnection(const boost::asio::ip::tcp::endpoint& endpoint, IPConnectionType type) noexcept
+        : endpoint_{endpoint}, type_{type} {
+        ASSERT(type_ not_eq IPConnectionType::kNone);
+    };
+
+    IPConnection(const boost::asio::ip::address& address, uint16_t port_num, IPConnectionType type) noexcept
+        : endpoint_{address, port_num}, type_{type} {
+        ASSERT(type_ not_eq IPConnectionType::kNone);
+    };
+
+    IPConnection(boost::asio::ip::address address, uint16_t port_num, IPConnectionType type) noexcept
+        : endpoint_{std::move(address), port_num}, type_{type} {
+        ASSERT(type_ not_eq IPConnectionType::kNone);
+    };
+
+    IPConnection(const IPConnection& other) = default;
+
+    IPConnection& operator=(const IPConnection& other) {
+        if (this != &other) {
+            endpoint_ = other.endpoint_;
+            type_ = other.type_;
+        }
+        return *this;
+    }
+
+    IPConnection& operator=(IPConnection&& other) noexcept {
+        if (this != &other) {
+            endpoint_ = other.endpoint_;
+            type_ = other.type_;
+        }
+        return *this;
+    }
 
     bool operator==(const IPConnection& other) const noexcept = default;
 
