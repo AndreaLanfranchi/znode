@@ -229,8 +229,18 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
     ssl_context.set_default_verify_paths();
 
     ssl::stream<ip::tcp::socket> ssl_stream{asio_context, ssl_context};
-    SSL_set_tlsext_host_name(static_cast<SSL*>(ssl_stream.native_handle()),
-                             const_cast<void*>(static_cast<const void*>(kTrustedDownloadHost.data())));
+
+#ifdef __GNUCC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wold-style-cast"
+#endif
+
+    // The macro uses (void*) but is better to keep its usage for readability
+    SSL_set_tlsext_host_name(static_cast<SSL*>(ssl_stream.native_handle()), kTrustedDownloadHost.data());
+
+#ifdef __GNUCC__
+#pragma GCC diagnostic pop
+#endif
 
     ip::tcp::resolver resolver{asio_context};
     const ip::tcp::resolver::query query(kTrustedDownloadHost.data(), "https");
