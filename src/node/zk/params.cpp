@@ -230,7 +230,7 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
 
     ssl::stream<ip::tcp::socket> ssl_stream{asio_context, ssl_context};
     SSL_set_tlsext_host_name(static_cast<SSL*>(ssl_stream.native_handle()),
-                             static_cast<const void*>(kTrustedDownloadHost.data()));
+                             const_cast<void*>(static_cast<const void*>(kTrustedDownloadHost.data())));
 
     ip::tcp::resolver resolver{asio_context};
     const ip::tcp::resolver::query query(kTrustedDownloadHost.data(), "https");
