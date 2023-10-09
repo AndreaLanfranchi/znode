@@ -23,6 +23,12 @@ enum class Error {
     kUnexpectedError,          // An unexpected error occurred
 };
 
+#ifdef __GNUC__
+// boost::system::error_category has overridable members but no virtual dtor
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnon-virtual-dtor"
+#endif
+
 class ErrorCategory : public boost::system::error_category {
   public:
     virtual ~ErrorCategory() noexcept = default;
@@ -57,6 +63,11 @@ class ErrorCategory : public boost::system::error_category {
         }
     }
 };
+
+#ifdef __GNUC__
+// boost::system::error_category has overridable members but no virtual dtor
+#pragma GCC diagnostic pop
+#endif
 
 // Overload the global make_error_code() free function with our
 // custom enum. It will be found via ADL by the compiler if needed.

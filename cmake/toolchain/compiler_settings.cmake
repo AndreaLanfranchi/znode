@@ -70,10 +70,10 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
 
     # Require at least GCC 12
     # see https://en.cppreference.com/w/cpp/compiler_support
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12)
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13)
         message(FATAL_ERROR
                 "\n===================================\n"
-                " Required GCC version >= 12"
+                " Required GCC version >= 13"
                 "\n===================================\n"
         )
     endif ()
