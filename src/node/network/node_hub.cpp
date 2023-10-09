@@ -125,7 +125,7 @@ Task<void> NodeHub::accept_socket(boost::asio::ip::tcp::socket socket, IPConnect
     }
 
     // Check we do not exceed the maximum number of connections per IP
-    std::unique_lock<std::mutex> lock{nodes_mutex_};
+    std::unique_lock lock{nodes_mutex_};
     if (auto item = connected_addresses_.find(socket.remote_endpoint().address());
         item not_eq connected_addresses_.end()) {
         if (item->second >= app_settings_.network.max_active_connections_per_ip) {
@@ -156,7 +156,7 @@ Task<void> NodeHub::accept_socket(boost::asio::ip::tcp::socket socket, IPConnect
 
 void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) {
     const bool running{is_running()};
-    std::unique_lock<std::mutex> lock{nodes_mutex_};
+    std::unique_lock lock{nodes_mutex_};
     for (auto iterator{nodes_.begin()}; iterator not_eq nodes_.end(); /* !!! no increment !!! */) {
         if (iterator->second == nullptr) {
             iterator = nodes_.erase(iterator);
@@ -295,7 +295,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
         gsl::finally([this]() { async_connecting_.exchange(false, std::memory_order_seq_cst); })};
 
     log::Info("Service", {"name", "Node Hub", "action", "connect", "remote", remote});
-    std::unique_lock<std::mutex> lock{nodes_mutex_};
+    std::unique_lock lock{nodes_mutex_};
     if (auto item = connected_addresses_.find(*connection.endpoint_.address_);
         item not_eq connected_addresses_.end() and
         item->second >= app_settings_.network.max_active_connections_per_ip) {
@@ -415,7 +415,7 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
 }
 
 void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
-    const std::lock_guard<std::mutex> lock(nodes_mutex_);
+    const std::lock_guard lock(nodes_mutex_);
     connected_addresses_[*node->remote_endpoint().address_]++;
     ++total_connections_;
     switch (node->connection().type_) {
@@ -497,13 +497,13 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
 }
 
 std::shared_ptr<Node> NodeHub::operator[](int node_id) const {
-    const std::lock_guard<std::mutex> lock(nodes_mutex_);
+    const std::lock_guard lock(nodes_mutex_);
     const auto iterator{nodes_.find(node_id)};
     return iterator not_eq nodes_.end() ? iterator->second : nullptr;
 }
 
 bool NodeHub::contains(int node_id) const {
-    const std::lock_guard<std::mutex> lock(nodes_mutex_);
+    const std::lock_guard lock(nodes_mutex_);
     const auto iterator{nodes_.find(node_id)};
     return iterator not_eq nodes_.end() and iterator->second not_eq nullptr;
 }

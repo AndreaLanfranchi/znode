@@ -23,13 +23,13 @@ class ObjectPool : private boost::noncopyable {
     explicit ObjectPool(bool thread_safe = false) : thread_safe_{thread_safe} {}
 
     void add(gsl::owner<T*> ptr) {
-        std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+        std::unique_lock lock(mutex_, std::defer_lock);
         if (thread_safe_) lock.lock();
         pool_.push({ptr, TDtor()});
     }
 
     gsl::owner<T*> acquire() noexcept {
-        std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+        std::unique_lock lock(mutex_, std::defer_lock);
         if (thread_safe_) lock.lock();
         if (pool_.empty()) return nullptr;
         gsl::owner<T*> ret(pool_.top().release());
@@ -38,13 +38,13 @@ class ObjectPool : private boost::noncopyable {
     }
 
     [[nodiscard]] bool empty() const noexcept {
-        std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+        std::unique_lock lock(mutex_, std::defer_lock);
         if (thread_safe_) lock.lock();
         return pool_.empty();
     }
 
     [[nodiscard]] size_t size() const noexcept {
-        std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+        std::unique_lock lock(mutex_, std::defer_lock);
         if (thread_safe_) lock.lock();
         return pool_.size();
     }
