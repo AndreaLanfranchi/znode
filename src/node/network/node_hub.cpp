@@ -111,9 +111,9 @@ Task<void> NodeHub::accept_socket(boost::asio::ip::tcp::socket socket, IPConnect
     if (not is_running()) co_return;
 
     boost::system::error_code local_error_code;
-    const auto close_socket{[&local_error_code](boost::asio::ip::tcp::socket& socket) {
-        std::ignore = socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, local_error_code);
-        socket.close();
+    const auto close_socket{[&local_error_code](boost::asio::ip::tcp::socket& _socket) {
+        std::ignore = _socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, local_error_code);
+        _socket.close();
     }};
 
     // Check we do not exceed the maximum number of connections
