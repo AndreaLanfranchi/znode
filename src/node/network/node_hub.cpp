@@ -17,6 +17,7 @@
 #include <core/common/misc.hpp>
 
 #include <infra/common/log.hpp>
+#include <infra/common/outcome_ex.hpp>
 
 namespace zenpp::net {
 
@@ -78,25 +79,15 @@ Task<void> NodeHub::acceptor_work() {
     try {
         initialize_acceptor();
         while (socket_acceptor_.is_open()) {
-            try {
-                boost::asio::ip::tcp::socket socket(asio_context_);
-                co_await socket_acceptor_.async_accept(socket, boost::asio::use_awaitable);
-                std::ignore = log::Info("Service", {"name", "Node Hub", "action", "connection request", "remote",
-                                                    socket.remote_endpoint().address().to_string()});
-                socket.non_blocking(true);
-                IPEndpoint remote{socket.remote_endpoint()};
-                IPConnection connection(remote, IPConnectionType::kInbound);
-                co_await accept_socket(std::move(socket), connection);
-
-            } catch (const boost::system::system_error& error) {
-                if (error.code() not_eq boost::asio::error::operation_aborted) {
-                    std::ignore = log::Error("Service",
-                                             {"name", "Node Hub", "action", "accept", "error", error.code().message()});
-                }
-                break;
-            }
+            boost::asio::ip::tcp::socket socket(asio_context_);
+            co_await socket_acceptor_.async_accept(socket, boost::asio::use_awaitable);
+            std::ignore = log::Info("Service", {"name", "Node Hub", "action", "connection request", "remote",
+                                                socket.remote_endpoint().address().to_string()});
+            socket.non_blocking(true);
+            IPEndpoint remote{socket.remote_endpoint()};
+            IPConnection connection(remote, IPConnectionType::kInbound);
+            co_await accept_socket(std::move(socket), connection);
         }
-
     } catch (const boost::system::system_error& error) {
         if (error.code() not_eq boost::asio::error::operation_aborted) {
             log::Error("Service", {"name", "Node Hub", "action", "accept", "error", error.code().message()});
@@ -330,7 +321,7 @@ void NodeHub::async_connect(const IPConnection& connection) {
                 socket_error_code = boost::asio::error::operation_aborted;
             }
         }
-        boost::asio::detail::throw_error(socket_error_code, "async_connect");
+        success_or_throw(socket_error_code);
         set_common_socket_options(socket);
     } catch (const boost::system::system_error& error) {
         std::ignore = socket.close(socket_error_code);
@@ -449,44 +440,49 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
     using namespace ser;
     using enum Error;
 
-    ASSERT_PRE(message not_eq nullptr);
     ASSERT_PRE(node not_eq nullptr);
+    ASSERT_PRE(message not_eq nullptr and message->is_complete());
     if (not is_running() or not node->is_running()) return;
 
-    std::string error{};
-
-    if (message->get_type() == MessageType::kAddr) {
-        MsgAddrPayload addr_payload{};
-        const auto result{addr_payload.deserialize(message->data())};
-        if (not result.has_error()) {
-            // TODO Pass it to the address manager
-            for (const auto& service : addr_payload.identifiers_) {
-                if (app_settings_.network.ipv4_only and service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
-                    continue;
-                if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
-                    log::Warning("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
-                                             service.endpoint_.to_string()})
-                        << " << Non standard port";
-                }
-                std::ignore = pending_connections_.push(IPConnection{service.endpoint_, IPConnectionType::kOutbound});
-            }
-        } else {
-            error = absl::StrCat("error ", result.error().message());
-        }
+    const auto msg_type{message->get_type().value()};
+    if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+        log::Trace("Service",
+                   {"name", "Node Hub", "action", __func__, "command", std::string{magic_enum::enum_name(msg_type)},
+                    "remote", node->to_string(), "size", std::to_string(message->size())});
     }
 
-    if (not error.empty() or log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-        const std::vector<std::string> log_params{
-            "name",    "Node Hub",
-            "action",  __func__,
-            "command", std::string{magic_enum::enum_name(message->header().get_type())},
-            "remote",  node->to_string(),
-            "status",  error.empty() ? "success" : error};
-        log::BufferBase((error.empty() ? log::Level::kTrace : log::Level::kError), "Service", log_params)
-            << (error.empty() ? "" : "Disconnecting ...");
-        if (not error.empty()) {
-            node->stop(false);
+    try {
+        switch (msg_type) {
+            using enum MessageType;
+            case kAddr: {
+                MsgAddrPayload addr_payload{};
+                success_or_throw(addr_payload.deserialize(message->data()));
+                // TODO Pass it to the address manager
+                for (const auto& service : addr_payload.identifiers_) {
+                    if (app_settings_.network.ipv4_only and
+                        service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
+                        continue;
+                    if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
+                        log::Warning("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
+                                                 service.endpoint_.to_string()})
+                            << " << Non standard port";
+                    }
+                    std::ignore =
+                        pending_connections_.push(IPConnection{service.endpoint_, IPConnectionType::kOutbound});
+                }
+            } break;
+            default:
+                break;
         }
+
+    } catch (const boost::system::system_error& error) {
+        log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote", node->to_string(),
+                               "error", error.code().message()})
+            << "Disconnecting ...";
+        node->stop(false);
+    } catch (const std::logic_error& error) {
+        log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote", node->to_string(),
+                               "error", error.what()});
     }
 }
 
