@@ -10,7 +10,9 @@
 #include <utility>
 
 #include <absl/strings/str_cat.h>
+#include <boost/asio/detached.hpp>
 
+#include <infra/common/common.hpp>
 #include <infra/common/log.hpp>
 
 namespace zenpp::con {
@@ -31,8 +33,8 @@ bool Timer2::start() noexcept {
     exception_ptr_ = nullptr;
     LOG_TRACE1 << "Timer[" << name_ << "]: start requested";
     working_.store(true);
-    asio::spawn(timer_.get_executor(),
-                [this](boost::asio::yield_context yield_context) mutable { this->work(yield_context); });
+    asio::spawn(
+        timer_.get_executor(), [&](boost::asio::yield_context yield_context) { work(std::move(yield_context)); }, asio::detached);
     return true;
 }
 
@@ -54,7 +56,7 @@ bool Timer2::stop(bool wait) noexcept {
     return true;
 }
 
-void Timer2::work(const boost::asio::yield_context& yield_context) noexcept {
+void Timer2::work(boost::asio::yield_context yield_context) noexcept {
     try {
         auto wait_interval{interval_.load()};
         const auto resubmit{autoreset_.load()};
@@ -62,34 +64,33 @@ void Timer2::work(const boost::asio::yield_context& yield_context) noexcept {
             boost::system::error_code error;
             timer_.expires_after(wait_interval);
             timer_.async_wait(yield_context[error]);
-            boost::asio::detail::throw_error(error, "async_wait");
-
+            success_or_throw(error);
             LOG_TRACE1 << "Timer[" << name_ << "]: expired";
             call_back_(wait_interval);
         } while (is_running() and resubmit and wait_interval.count() not_eq 0U);
 
-    } catch (const system::system_error& error) {
+    } catch (const boost::system::system_error& error) {
         if (error.code() not_eq asio::error::operation_aborted) {
             std::ignore = log::Error(absl::StrCat("Timer[", name_, "]"),
                                      {"action", "async_wait", "error", error.code().message()});
             exception_ptr_ = std::current_exception();
         }
+    } catch (const boost::system::error_code& error) {
+        std::ignore =
+            log::Critical(absl::StrCat("Timer[", name_, "]"), {"action", "callback", "error", error.message()});
     } catch (const std::exception& exception) {
         std::ignore =
             log::Critical(absl::StrCat("Timer[", name_, "]"), {"action", "callback", "error", exception.what()});
         exception_ptr_ = std::current_exception();
     } catch (...) {
         std::ignore = log::Critical(absl::StrCat("Timer[", name_, "]"), {"action", "callback", "error", "undefined"});
-        try {
-            throw std::runtime_error("Undefined error");
-        } catch (...) {
-            exception_ptr_ = std::current_exception();
-        }
+        exception_ptr_ = std::current_exception();
     }
 
     set_stopped();
     working_.store(false);
     working_.notify_all();
+    LOG_TRACE1 << "Timer[" << name_ << "]: stopped";
 }
 
 void Timer2::rethrow() const {
