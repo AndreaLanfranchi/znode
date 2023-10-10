@@ -10,6 +10,7 @@
 #include <csignal>
 #include <cstdlib>
 #include <iostream>
+#include <map>
 #include <utility>
 
 #include <absl/strings/str_cat.h>
@@ -81,6 +82,9 @@ namespace {
                 return "Unknown";
         }
     }
+
+    std::map<int, void (*)(int)> prev_handlers_;
+
 }  // namespace
 
 constexpr int kHandleableCodes[] {  // NOLINT(*-avoid-c-arrays)
@@ -99,24 +103,31 @@ std::atomic_uint32_t Signals::sig_count_{0};
 std::atomic_int Signals::sig_code_{0};
 std::atomic_bool Signals::signalled_{false};
 std::function<void(int)> Signals::custom_handler_;
+std::atomic_bool Signals::silent_{false};
 
-void Signals::init(std::function<void(int)> custom_handler) {
+void Signals::init(std::function<void(int)> custom_handler, bool silent) {
     for (const int sig_code : kHandleableCodes) {
-        signal(sig_code, &Signals::handle);
+        // Keep track of previous handlers (if any)
+        auto prev_handler{std::signal(sig_code, &Signals::handle)};
+        if (prev_handler not_eq SIG_ERR) {
+            prev_handlers_[sig_code] = prev_handler;
+        }
     }
     custom_handler_ = std::move(custom_handler);
+    silent_.exchange(silent);
 }
 
 void Signals::handle(int sig_code) {
     if (bool expected{false}; signalled_.compare_exchange_strong(expected, true)) {
-        sig_code_ = sig_code;
-        std::cerr << absl::StrCat("\nCaught OS signal ", sig_name(sig_code_), ", shutting down ...\n") << std::endl;
+        sig_code_.exchange(sig_code);
+        if (not silent_)
+            std::cerr << absl::StrCat("\nCaught OS signal ", sig_name(sig_code_), ", shutting down ...\n") << std::endl;
     }
     const uint32_t sig_count = ++sig_count_;
     if (sig_count >= 10) {
         std::abort();
     }
-    if (sig_count > 1) {
+    if (sig_count > 1 and not silent_) {
         std::cerr << absl::StrCat("Already shutting down. Interrupt other ", (10 - sig_count), " times to panic.")
                   << std::endl;
     }
@@ -128,8 +139,15 @@ void Signals::handle(int sig_code) {
 }
 
 void Signals::reset() noexcept {
-    signalled_ = false;
-    sig_count_ = 0;
+    signalled_.exchange(false);
+    sig_count_.exchange(0U);
+    sig_code_.exchange(0);
+    // Restore previous handlers
+    for (const int sig_code : kHandleableCodes) {
+        if (auto it{prev_handlers_.find(sig_code)}; it not_eq prev_handlers_.end()) {
+            std::signal(sig_code, it->second);
+        }
+    }
 }
 
 void Signals::throw_if_signalled() {

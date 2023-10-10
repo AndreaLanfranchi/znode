@@ -24,5 +24,6 @@ TEST_CASE("Os Signals", "[concurrency]") {
     }
     REQUIRE(expected_trow);
     Signals::reset();  // Otherwise other tests get blocked
+    REQUIRE_FALSE(Signals::signalled());
 }
 }  // namespace zenpp::os

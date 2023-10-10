@@ -27,17 +27,18 @@ class signal_exception : public std::exception {
 //! \brief Handler for OS Signals traps
 class Signals {
   public:
-    static void init(std::function<void(int)> custom_handler = {});  // Enable the hooks
-    static void handle(int sig_code);                                // Handles incoming signal
-    [[nodiscard]] static bool signalled() { return signalled_; }     // Whether a signal has been intercepted
-    static void reset() noexcept;                                    // Reset to un-signalled (see tests coverage)
-    static void throw_if_signalled();                                // Throws std::runtime_error if signalled() == true
+    static void init(std::function<void(int)> custom_handler = {}, bool silent = false);  // Enable the hooks
+    static void handle(int sig_code);                                                     // Handles incoming signal
+    [[nodiscard]] static bool signalled() { return signalled_; }  // Whether a signal has been intercepted
+    static void reset() noexcept;                                 // Reset to un-signalled (see tests coverage)
+    static void throw_if_signalled();                             // Throws signal_exception if signalled() == true
 
   private:
     static std::atomic_int sig_code_;                 // Last sig_code which raised the signalled_ state
     static std::atomic_uint32_t sig_count_;           // Number of signals intercepted
     static std::atomic_bool signalled_;               // Whether a signal has been intercepted
-    static std::function<void(int)> custom_handler_;  // Custom handling
+    static std::function<void(int)> custom_handler_;  // Custom handling of signals
+    static std::atomic_bool silent_;                  // Whether to print a message on signal interception
 };
 
 }  // namespace zenpp::os
