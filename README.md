@@ -41,7 +41,7 @@ $ git submodule update --init --recursive
 ## Building on Linux & macOS
 
 Ensure you have the following requirements installed :
-- C++20 compatible compiler and its support libraries: [GCC](https://www.gnu.org/software/gcc/) >= 12 or [Clang](https://clang.llvm.org/) >= 13 (see [here](https://en.cppreference.com/w/cpp/compiler_support) the compatibility matrix)
+- C++20 compatible compiler and its support libraries: [GCC](https://www.gnu.org/software/gcc/) >= 13 or [Clang](https://clang.llvm.org/) >= 13 (see [here](https://en.cppreference.com/w/cpp/compiler_support) the compatibility matrix)
 - [CMake] >= 3.16.12
 - [Perl](https://www.perl.org/) >= 5.x
 

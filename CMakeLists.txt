@@ -227,6 +227,10 @@ if (NOT MSVC)
         endif ()
     endif ()
 
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        add_compile_options(-Wnon-virtual-dtor)
+    endif ()
+
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_SYSTEM_NAME MATCHES "Darwin")
         add_compile_definitions(_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS)
         add_compile_options(-Wthread-safety)

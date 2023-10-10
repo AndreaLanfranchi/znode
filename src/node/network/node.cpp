@@ -367,8 +367,8 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     // If we have sent the whole message then we can start sending the next chunk
     if (send_buffer_.size() not_eq 0U) {
         auto write_handler{
-            [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
-                self->handle_write(error_code, bytes_transferred);
+            [self{shared_from_this()}](const boost::system::error_code& _error_code, const size_t _bytes_transferred) {
+                self->handle_write(_error_code, _bytes_transferred);
             }};
         if (ssl_stream_ not_eq nullptr) {
             ssl_stream_->async_write_some(send_buffer_.data(), write_handler);

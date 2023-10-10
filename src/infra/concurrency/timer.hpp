@@ -125,7 +125,7 @@ class Timer : public Stoppable {
     Task<void> work() noexcept;
 
     boost::asio::steady_timer timer_;                  // The timer itself
-    std::string name_{};                               // Name of the timer (for logging purposes)
+    const std::string name_{};                         // Name of the timer (for logging purposes)
     std::atomic_bool autoreset_{false};                // If true, timer is resubmitted after callback execution
     std::atomic<std::chrono::milliseconds> interval_;  // Interval between triggered events
     std::function<void(std::chrono::milliseconds&)> call_back_;  // Function to call on triggered

@@ -10,6 +10,8 @@
 #include <bit>
 #include <ranges>
 
+static_assert(std::endian::native == std::endian::little, "Target architecture MUST be little endian");
+
 #include <boost/endian/conversion.hpp>
 
 #include <core/common/base.hpp>
