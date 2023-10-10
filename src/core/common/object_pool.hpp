@@ -14,12 +14,6 @@
 #include <boost/noncopyable.hpp>
 #include <gsl/pointers>
 
-#define ZEN_DETAIL_OBJECT_POOL_GUARD     \
-    std::unique_lock<std::mutex> lock;   \
-    if (thread_safe_) {                  \
-        lock = std::unique_lock{mutex_}; \
-    }
-
 namespace zenpp {
 
 //! \brief A dynamic pool of objects usually expensive to create
@@ -29,27 +23,29 @@ class ObjectPool : private boost::noncopyable {
     explicit ObjectPool(bool thread_safe = false) : thread_safe_{thread_safe} {}
 
     void add(gsl::owner<T*> ptr) {
-        ZEN_DETAIL_OBJECT_POOL_GUARD
+        std::unique_lock lock(mutex_, std::defer_lock);
+        if (thread_safe_) lock.lock();
         pool_.push({ptr, TDtor()});
     }
 
     gsl::owner<T*> acquire() noexcept {
-        ZEN_DETAIL_OBJECT_POOL_GUARD
-        if (pool_.empty()) {
-            return nullptr;
-        }
+        std::unique_lock lock(mutex_, std::defer_lock);
+        if (thread_safe_) lock.lock();
+        if (pool_.empty()) return nullptr;
         gsl::owner<T*> ret(pool_.top().release());
         pool_.pop();
         return ret;
     }
 
     [[nodiscard]] bool empty() const noexcept {
-        ZEN_DETAIL_OBJECT_POOL_GUARD
+        std::unique_lock lock(mutex_, std::defer_lock);
+        if (thread_safe_) lock.lock();
         return pool_.empty();
     }
 
     [[nodiscard]] size_t size() const noexcept {
-        ZEN_DETAIL_OBJECT_POOL_GUARD
+        std::unique_lock lock(mutex_, std::defer_lock);
+        if (thread_safe_) lock.lock();
         return pool_.size();
     }
 
