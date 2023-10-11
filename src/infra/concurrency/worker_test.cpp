@@ -32,7 +32,7 @@ class TestWorker final : public Worker {
     }
 };
 
-TEST_CASE("Threaded Worker", "[concurrency]") {
+TEST_CASE("Threaded Worker", "[concurrency][worker]") {
     using namespace std::placeholders;
     using enum Stoppable::ComponentStatus;
 
@@ -82,7 +82,7 @@ TEST_CASE("Threaded Worker", "[concurrency]") {
         worker.kick();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.status() == kNotStarted);
-        CHECK(worker.stop(true) == true);
+        CHECK_FALSE(worker.stop(true));
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.status() == kNotStarted);
     }

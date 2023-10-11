@@ -40,8 +40,8 @@ bool Worker::start() noexcept {
                                      {"name", name_, "id", std::to_string(id_.load()), "exception", "Undefined error"});
         }
 
-        state_.store(ComponentStatus::kNotStarted, std::memory_order_release);
-        kicked_.store(false, std::memory_order_release);
+        state_.exchange(ComponentStatus::kNotStarted);
+        kicked_.exchange(false);
         id_.store(0);
     });
 
@@ -49,14 +49,12 @@ bool Worker::start() noexcept {
 }
 
 bool Worker::stop([[maybe_unused]] bool wait) noexcept {
-    const bool stop_already_requested{not Stoppable::stop(wait)};
-    if (stop_already_requested) return false;
-
-    kick();
+    const bool ret{Stoppable::stop(wait)};
+    if (ret) kick();
     if (thread_ not_eq nullptr) {
         // Worker thread cannot call stop on itself
         // It has to exit the work() function to be stopped
-        if (id_ == log::get_thread_id()) {
+        if (id_ not_eq 0U and id_ == log::get_thread_id()) {
             std::ignore = log::Error("Worker::stop() called from worker thread",
                                      {"name", name_, "id", std::to_string(id_.load())});
             ASSERT(false);
@@ -65,7 +63,7 @@ bool Worker::stop([[maybe_unused]] bool wait) noexcept {
         if (thread_->joinable()) thread_->join();
         thread_.reset();
     }
-    return true;
+    return ret;
 }
 
 void Worker::kick() {
