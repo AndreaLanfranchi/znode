@@ -7,6 +7,8 @@
 
 #include "context.hpp"
 
+#include <thread>
+
 #include <boost/asio/post.hpp>
 
 #include <infra/common/log.hpp>

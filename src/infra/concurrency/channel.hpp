@@ -65,9 +65,9 @@ class Channel {
     boost::asio::experimental::concurrent_channel<void(boost::system::error_code, T)> channel_;
 };
 
-class EventChannel {
+class NotifyChannel {
   public:
-    explicit EventChannel(boost::asio::any_io_executor executor) : channel_{std::move(executor), 1} {}
+    explicit NotifyChannel(boost::asio::any_io_executor executor) : channel_{std::move(executor), 1} {}
     Task<void> wait() { co_await channel_.receive(); }
     void notify() { channel_.try_send(std::monostate{}); }
 
