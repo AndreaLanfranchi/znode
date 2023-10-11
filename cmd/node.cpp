@@ -17,6 +17,7 @@
 #include <core/common/memory.hpp>
 
 #include <infra/common/stopwatch.hpp>
+#include <infra/concurrency/context.hpp>
 #include <infra/os/signals.hpp>
 
 #include <node/database/access_layer.hpp>
@@ -135,33 +136,8 @@ int main(int argc, char* argv[]) {
         auto chaindata_env{db::open_env(settings.chaindata_env_config)};
 
         // Start boost asio with the number of threads specified by the concurrency hint
-        boost::asio::io_context asio_context(static_cast<int>(settings.asio_concurrency));
-        using asio_guard_type = boost::asio::executor_work_guard<boost::asio::io_context::executor_type>;
-        auto asio_guard = std::make_unique<asio_guard_type>(asio_context.get_executor());
-        std::vector<std::thread> asio_threads;
-        for (size_t i{0}; i < settings.asio_concurrency; ++i) {
-            asio_threads.emplace_back([&asio_context, i]() {
-                const std::string thread_name{"asio-" + std::to_string(i)};
-                log::set_thread_name(thread_name);
-                std::ignore = log::Trace("Service", {"name", thread_name, "status", "starting"});
-                asio_context.run();
-                std::ignore = log::Trace("Service", {"name", thread_name, "status", "stopped"});
-            });
-        }
-
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "UnusedValue"
-        auto stop_asio{gsl::finally([&asio_guard, &asio_threads]() {
-            log::Info("Service", {"name", "asio", "status", "stopping threads"});
-            asio_guard.reset();  // Release the work guard - pending tasks will complete gracefully
-            std::ranges::for_each(asio_threads, [](auto& thread) {
-                if (thread.joinable()) thread.join();
-            });
-        })};
-#pragma clang diagnostic pop
-
-        // Let some time allow threads to properly start
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        con::Context context("main", settings.asio_concurrency);  // Initialize asio context
+        context.start();
 
         // Check required certificate and key file are present to initialize SSL context
         if (network_settings.use_tls) {
@@ -176,14 +152,14 @@ int main(int argc, char* argv[]) {
         StopWatch stop_watch(true);
         const auto zk_params_path{(*settings.data_directory)[DataDirectory::kZkParamsName].path()};
         std::ignore = log::Message("Validating ZK params", {"directory", zk_params_path.string()});
-        if (!zk::validate_param_files(asio_context, zk_params_path, settings.no_zk_checksums)) {
+        if (!zk::validate_param_files(*context, zk_params_path, settings.no_zk_checksums)) {
             throw std::filesystem::filesystem_error("Invalid ZK file params",
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }
         std::ignore = log::Message("Validated  ZK params", {"elapsed", StopWatch::format(stop_watch.since_start())});
 
         // 1) Instantiate and start a new NodeHub
-        net::NodeHub node_hub{settings, asio_context};
+        net::NodeHub node_hub{settings, *context};
         node_hub.start();
 
         // Keep waiting till sync_loop stops
@@ -196,6 +172,7 @@ int main(int argc, char* argv[]) {
         // Count how much time the node hub has been without any connection
         // If it's too long, we'll stop the node
         StopWatch node_hub_idle_sw(true);
+
 
         // TODO while (sync_loop.get_state() != Worker::ComponentStatus::kStopped) {
         while (true) {
