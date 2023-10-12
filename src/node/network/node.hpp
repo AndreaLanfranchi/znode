@@ -6,8 +6,6 @@
 
 #pragma once
 
-#include "infra/network/addresses.hpp"
-
 #include <atomic>
 #include <functional>
 #include <list>
@@ -28,6 +26,7 @@
 #include <infra/network/protocol.hpp>
 
 #include <node/common/settings.hpp>
+#include <node/network/connection.hpp>
 
 namespace zenpp::net {
 
@@ -54,7 +53,7 @@ static constexpr size_t kMaxBytesPerIO = 64_KiB;
 //! \brief A node holds a connection (and related session) to a remote peer
 class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
   public:
-    Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
+    Node(AppSettings& app_settings, Connection connection, boost::asio::io_context& io_context,
          boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
          std::function<void(DataDirectionMode, size_t)> on_data /* handles data size accounting on node-hub */,
          std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)>
@@ -85,7 +84,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] int id() const noexcept { return node_id_; }
 
     //! \brief Whether this node instance is inbound or outbound
-    [[nodiscard]] IPConnection connection() const noexcept { return connection_; }
+    [[nodiscard]] const Connection& connection() const noexcept { return connection_; }
 
     //! \brief Returns a reference to the underlying socket
     [[nodiscard]] boost::asio::ip::tcp::socket& socket() noexcept { return socket_; }
@@ -149,7 +148,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     outcome::result<void> push_message(MessageType message_type, MessagePayload& payload);
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
-    //! \remarks This a handy overload used to send messages with a null payload
+    //! \remarks This a handy overload used to async_send messages with a null payload
     outcome::result<void> push_message(MessageType message_type);
 
   private:
@@ -198,9 +197,9 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     AppSettings& app_settings_;                  // Reference to global application settings
     static std::atomic_int next_node_id_;        // Used to generate unique node ids
     const int node_id_{next_node_id()};          // Unique node id
-    const IPConnection connection_;              // Whether inbound or outbound
+    const Connection connection_;                // Whether inbound or outbound
     boost::asio::io_context::strand io_strand_;  // Serialized execution of reads and writes
-    con::Timer ping_timer_;                      // To periodically send ping messages
+    con::Timer ping_timer_;                      // To periodically async_send ping messages
     boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
     IPEndpoint remote_endpoint_;                 // Remote endpoint
     IPEndpoint local_endpoint_;                  // Local endpoint
@@ -224,8 +223,8 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     std::function<void(DataDirectionMode, size_t)> on_data_;  // To account data sizes stats at node hub
     std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)> on_message_;  // Called on inbound message
 
-    boost::asio::streambuf receive_buffer_;  // Socket receive buffer
-    boost::asio::streambuf send_buffer_;     // Socket send buffer
+    boost::asio::streambuf receive_buffer_;  // Socket async_receive buffer
+    boost::asio::streambuf send_buffer_;     // Socket async_send buffer
     std::atomic<size_t> bytes_received_{0};  // Total bytes received from the socket during the session
     std::atomic<size_t> bytes_sent_{0};      // Total bytes sent to the socket during the session
 

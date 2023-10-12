@@ -27,7 +27,7 @@ using asio::ip::tcp;
 
 std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 
-Node::Node(AppSettings& app_settings, IPConnection connection, boost::asio::io_context& io_context,
+Node::Node(AppSettings& app_settings, Connection connection, boost::asio::io_context& io_context,
            boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
            std::function<void(DataDirectionMode, size_t)> on_data,
            std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)> on_message)
@@ -174,7 +174,7 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
 
 void Node::start_ssl_handshake() {
     if (not socket_.is_open()) return;
-    const asio::ssl::stream_base::handshake_type handshake_type{connection_.type_ == IPConnectionType::kInbound
+    const asio::ssl::stream_base::handshake_type handshake_type{connection_.type_ == ConnectionType::kInbound
                                                                     ? asio::ssl::stream_base::server
                                                                     : asio::ssl::stream_base::client};
     ssl_stream_->set_verify_mode(asio::ssl::verify_none);
@@ -525,11 +525,11 @@ outcome::result<void> Node::process_inbound_message() {
             }
         } break;
         case kGetAddr:
-            if (connection_.type_ == IPConnectionType::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
+            if (connection_.type_ == ConnectionType::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
                 // Ignore the message to avoid fingerprinting
                 err_extended_reason = "Ignoring duplicate 'getaddr' message on inbound connection.";
                 break;
-            } else if (connection_.type_ == IPConnectionType::kSeedOutbound) {
+            } else if (connection_.type_ == ConnectionType::kSeedOutbound) {
                 // Disconnect from seed nodes as soon as we get some addresses from them
                 stop(false);
             }
@@ -629,12 +629,12 @@ outcome::result<void> Node::validate_message_for_protocol_handshake(const DataDi
 void Node::on_handshake_completed() {
     if (not is_running()) return;
 
-    // If this is a seeder node then we should send a `getaddr` message
-    if (connection_.type_ == IPConnectionType::kSeedOutbound) {
+    // If this is a seeder node then we should async_send a `getaddr` message
+    if (connection_.type_ == ConnectionType::kSeedOutbound) {
         std::ignore = push_message(MessageType::kGetAddr);
     }
 
-    // Lets' send out a ping immediately and start the timer
+    // Lets' async_send out a ping immediately and start the timer
     // for subsequent pings
     const auto random_milliseconds{randomize<uint32_t>(app_settings_.network.ping_interval_seconds * 1'000U, 0.3)};
     auto ping_interval = std::chrono::milliseconds(random_milliseconds);

@@ -6,7 +6,7 @@
 
 #pragma once
 #include <iostream>
-#include <map>
+#include <list>
 #include <memory>
 
 #include <boost/asio.hpp>
@@ -16,11 +16,12 @@
 
 #include <infra/common/random.hpp>
 #include <infra/common/stopwatch.hpp>
+#include <infra/concurrency/channel.hpp>
 #include <infra/concurrency/timer.hpp>
 #include <infra/concurrency/unique_queue.hpp>
-#include <infra/network/addresses.hpp>
 
 #include <node/common/settings.hpp>
+#include <node/network/connection.hpp>
 #include <node/network/node.hpp>
 #include <node/network/secure.hpp>
 
@@ -35,7 +36,8 @@ class NodeHub : public con::Stoppable {
           socket_acceptor_{io_context},
           service_timer_{io_context, "nh_service", true},
           info_timer_{io_context, "nh_info", true},
-          pending_connections_{/*capacity=*/app_settings_.network.max_active_connections} {
+          pending_connections_(io_context.get_executor(), settings.network.max_active_connections),
+          connection_requests_(io_context.get_executor(), settings.network.max_active_connections) {
         if (app_settings_.network.nonce == 0U) {
             app_settings_.network.nonce = randomize<uint64_t>(/*min=*/1U);
         }
@@ -48,10 +50,7 @@ class NodeHub : public con::Stoppable {
     NodeHub& operator=(const NodeHub&& other) = delete;
     ~NodeHub() override = default;
 
-    //! \brief Returns whether the provided identifier is known and connected
-    [[nodiscard]] bool contains(int node_id) const;  // Returns whether a node node_id is actually connected
-    [[nodiscard]] size_t size() const;               // Returns the number of nodes
-    [[nodiscard]] std::shared_ptr<Node> operator[](int node_id) const;  // Returns a shared_ptr<Node> by node_id
+    [[nodiscard]] size_t size() const;  // Returns the number of nodes
 
     [[nodiscard]] size_t bytes_sent() const noexcept { return total_bytes_sent_.load(); }
     [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
@@ -62,11 +61,18 @@ class NodeHub : public con::Stoppable {
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
 
+    //! \brief Handles new sockets originated either by the acceptor or by the connector
+    //! and creates related nodes
+    Task<void> node_factory_work();
+
+    //! \brief Executes the connector work loop asynchronously
+    Task<void> connector_work();
+
     //! \brief Executes the acceptor work loop asynchronously
     Task<void> acceptor_work();
 
     //! \brief Processes a socket connection and creates a node
-    Task<void> accept_socket(boost::asio::ip::tcp::socket socket, IPConnection connection);
+    // Task<void> accept_socket(boost::asio::ip::tcp::socket socket, Connection connection);
 
     //! \brief Accounts data about node's socket disconnections
     //! \remarks Requires a lock on nodes_mutex_ is holding
@@ -101,8 +107,8 @@ class NodeHub : public con::Stoppable {
     void feed_connections_from_dns();  // Feed pending_connections_ from DNS seeds configured for chain
     std::map<std::string, std::vector<IPEndpoint>, std::less<>> dns_resolve(const std::vector<std::string>& hosts,
                                                                             const boost::asio::ip::tcp& version);
-    void async_connect(const IPConnection& connection);  // Connects to a remote endpoint
-    std::atomic_bool async_connecting_{false};           // Whether we are currently connecting to a remote endpoint
+    void async_connect(const Connection& connection);  // Connects to a remote endpoint
+    std::atomic_bool async_connecting_{false};         // Whether we are currently connecting to a remote endpoint
 
     AppSettings& app_settings_;              // Reference to global application settings
     boost::asio::io_context& asio_context_;  // Reference to global asio context
@@ -115,12 +121,14 @@ class NodeHub : public con::Stoppable {
     std::unique_ptr<boost::asio::ssl::context> tls_server_context_{nullptr};  // For secure server connections
     std::unique_ptr<boost::asio::ssl::context> tls_client_context_{nullptr};  // For secure client connections
 
-    con::UniqueQueue<IPConnection> pending_connections_;  // Queue of pending connections to be made (outbound)
     std::atomic_uint32_t current_active_connections_{0};
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};
 
-    std::map<int, std::shared_ptr<Node>> nodes_;                        // All the connected nodes
+    con::Channel<std::shared_ptr<Connection>> pending_connections_;  // Conduit for new connections
+    con::Channel<std::shared_ptr<Connection>> connection_requests_;  // Conduit for new connection requests
+
+    std::list<std::shared_ptr<Node>> nodes_;                            // All the connected nodes
     std::map<boost::asio::ip::address, uint32_t> connected_addresses_;  // Addresses that are connected
     mutable std::mutex nodes_mutex_;                                    // Guards access to nodes_
 

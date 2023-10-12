@@ -91,7 +91,7 @@ class MessageDigest {
     void update(std::string_view data) noexcept { update(string_view_to_byte_view(data)); };
 
     //! \brief Finalizes the digest process and produces the actual digest
-    //! \remarks After this instance has called finalize() once the instance itself cannot receive new updates unless
+    //! \remarks After this instance has called finalize() once the instance itself cannot async_receive new updates unless
     //! it's recycled by init() or reset(). In case of any error the returned digest will be zero length
     [[nodiscard]] Bytes finalize(bool compress = false) noexcept {
         Bytes ret(digest_size_, 0);

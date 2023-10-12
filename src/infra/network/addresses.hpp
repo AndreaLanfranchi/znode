@@ -53,14 +53,6 @@ enum class IPAddressType : uint8_t {
     kIPv6 = 4,
 };
 
-enum class IPConnectionType : uint8_t {
-    kNone = 0U,            // Unspecified
-    kInbound = 1U,         // Dial-in
-    kOutbound = 2U,        // Dial-out
-    kManualOutbound = 3U,  // Dial-out initiated by user via CLI or RPC call
-    kSeedOutbound = 4U,    // Dial-out initiated by process to query seed nodes
-};
-
 class IPAddress : public ser::Serializable {
   public:
     using ser::Serializable::Serializable;
@@ -187,54 +179,6 @@ class IPSubNet {
   private:
 };
 
-class IPConnection {
-  public:
-    IPConnection() = default;
-    ~IPConnection() = default;
-
-    IPConnection(const IPEndpoint& endpoint, IPConnectionType type) noexcept : endpoint_{endpoint}, type_{type} {
-        ASSERT(type_ not_eq IPConnectionType::kNone);
-    };
-
-    IPConnection(const boost::asio::ip::tcp::endpoint& endpoint, IPConnectionType type) noexcept
-        : endpoint_{endpoint}, type_{type} {
-        ASSERT(type_ not_eq IPConnectionType::kNone);
-    };
-
-    IPConnection(const boost::asio::ip::address& address, uint16_t port_num, IPConnectionType type) noexcept
-        : endpoint_{address, port_num}, type_{type} {
-        ASSERT(type_ not_eq IPConnectionType::kNone);
-    };
-
-    IPConnection(boost::asio::ip::address address, uint16_t port_num, IPConnectionType type) noexcept
-        : endpoint_{std::move(address), port_num}, type_{type} {
-        ASSERT(type_ not_eq IPConnectionType::kNone);
-    };
-
-    IPConnection(const IPConnection& other) = default;
-
-    IPConnection& operator=(const IPConnection& other) {
-        if (this != &other) {
-            endpoint_ = other.endpoint_;
-            type_ = other.type_;
-        }
-        return *this;
-    }
-
-    IPConnection& operator=(IPConnection&& other) noexcept {
-        if (this != &other) {
-            endpoint_ = other.endpoint_;
-            type_ = other.type_;
-        }
-        return *this;
-    }
-
-    bool operator==(const IPConnection& other) const noexcept = default;
-
-    IPEndpoint endpoint_{};
-    IPConnectionType type_{IPConnectionType::kNone};
-};
-
 class NodeService : public ser::Serializable {
   public:
     using ser::Serializable::Serializable;
@@ -284,13 +228,4 @@ struct hash<zenpp::net::IPEndpoint> {
         return hash<zenpp::net::IPAddress>()(endpoint.address_) ^ hash<uint16_t>()(endpoint.port_);
     }
 };
-
-template <>
-struct hash<zenpp::net::IPConnection> {
-    size_t operator()(const zenpp::net::IPConnection& connection) const noexcept {
-        return hash<zenpp::net::IPEndpoint>()(connection.endpoint_) ^
-               hash<uint16_t>()(static_cast<uint16_t>(connection.type_));
-    }
-};
-
 }  // namespace std

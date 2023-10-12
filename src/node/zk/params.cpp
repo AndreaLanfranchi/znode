@@ -268,7 +268,7 @@ bool download_param_file(boost::asio::io_context& asio_context, const std::files
 
     boost::asio::write(ssl_stream, boost::asio::buffer(request), error_code);
     if (error_code) {
-        log::Error("Failed to send request",
+        log::Error("Failed to async_send request",
                    {"host", std::string(kTrustedDownloadHost), "error", error_code.message()});
         return false;
     }
