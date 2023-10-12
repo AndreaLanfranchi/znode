@@ -143,7 +143,8 @@ We adhere to [Google's C++ Style Guide] with the following differences:
 - Use `#pragma once` in the headers instead of the classic `#ifndef` guards.
 - Comments **MUST** adhere to Doxygen formats (excluding inline ones)
 - Avoid implicit conversions (e.g. `int` to `bool`)
-- Avoid `auto` when the type is not immediately obvious
+- Avoid `auto` when the type is not immediately obvious (e.g. `auto foo = get_foo()`)
+- Use `auto` when the type is immediately obvious (e.g. `auto foo = std::make_unique<Foo>()`)
 - Prefer `if(ptr == nullptr)` over `if(!ptr)` for immediate clarity
 - Prefer usage of monadic return values over simple `bool` (e.g. `std::optional<T>`, `std::variant<T, E>`, `std::expected<T, E>`)
 
@@ -157,6 +158,6 @@ While it is often tempting to write your own implementation of a well known algo
 - [OpenSSL](https://www.openssl.org/).
 
 If you can't find what you need there, maybe a quick search on [GitHub](https://github.com) might help finding a good library which already has everything you need.
-A good starting point might be this [awesome list of C++ libraries](https://gtihub.com/fffaraz/awesome-cpp).
+A good starting point might be this [awesome list of C++ libraries](https://github.com/fffaraz/awesome-cpp).
 
 Consider writing your own implementation as last resort and only if you can't find anything suitable.

@@ -178,6 +178,12 @@ Task<void> NodeHub::connector_work() {
 }
 
 Task<void> NodeHub::async_connect(Connection& connection) {
+
+    const auto protocol = connection.endpoint_.address_.get_type() == IPAddressType::kIPv4 ? boost::asio::ip::tcp::v4()
+                                                                                           : boost::asio::ip::tcp::v6();
+    connection.socket_ptr_ = std::make_shared<boost::asio::ip::tcp::socket>(asio_context_);
+    connection.socket_ptr_->open(protocol);
+
     /*
      * Calling async_connect() with a black-hole-routed destination resulted in the handler being called with
      * the error boost::asio::error::timed_out after ~380 seconds. (5 minutes !!!)
@@ -195,12 +201,16 @@ Task<void> NodeHub::async_connect(Connection& connection) {
      * the maximum number of retries.
      */
 
-    typedef boost::asio::detail::socket_option::integer<IPPROTO_TCP, TCP_SYNCNT> syncnt_option_t;
-    const auto protocol = connection.endpoint_.address_.get_type() == IPAddressType::kIPv4 ? boost::asio::ip::tcp::v4()
-                                                                                           : boost::asio::ip::tcp::v6();
-    connection.socket_ptr_ = std::make_shared<boost::asio::ip::tcp::socket>(asio_context_);
-    connection.socket_ptr_->open(protocol);
+#ifndef _WIN32
+    using syncnt_option_t = boost::asio::detail::socket_option::integer<IPPROTO_TCP, TCP_SYNCNT>;
     connection.socket_ptr_->set_option(syncnt_option_t(2));  // TODO adjust to CLI value
+#else
+    // Windows does not support TCP_SYNCNT use TCP_MAXRT instead
+    // See https://learn.microsoft.com/en-us/windows/win32/winsock/ipproto-tcp-socket-options
+    using syncnt_option_t = boost::asio::detail::socket_option::integer<IPPROTO_TCP, TCP_MAXRT>;
+    connection.socket_ptr_->set_option(syncnt_option_t(3));  // TODO adjust to CLI value
+#endif
+
     co_await connection.socket_ptr_->async_connect(connection.endpoint_.to_endpoint(), boost::asio::use_awaitable);
     set_common_socket_options(*connection.socket_ptr_);
 }
@@ -412,7 +422,7 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
             }
             break;
         default:
-            ASSERT(false && "Should not happen");
+            ASSERT(false and "Should not happen");
     }
 
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
@@ -437,7 +447,7 @@ void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
             ++current_active_outbound_connections_;
             break;
         default:
-            ASSERT(false && "Should not happen");
+            ASSERT(false and "Should not happen");
     }
     nodes_.push_back(node);
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
@@ -457,7 +467,7 @@ void NodeHub::on_node_data(net::DataDirectionMode direction, const size_t bytes_
             total_bytes_sent_ += bytes_transferred;
             break;
         default:
-            ASSERT(false && "Should not happen");
+            ASSERT(false and "Should not happen");
     }
 }
 

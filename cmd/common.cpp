@@ -104,7 +104,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         .add_option("--network.maxactiveconnections", network_settings.max_active_connections,
                     "Maximum number of concurrent connected nodes")
         ->capture_default_str()
-        ->check(CLI::Range(size_t(32), size_t(256)));
+        ->check(CLI::Range(size_t(8), size_t(128)));
 
     network_opts
         .add_option("--network.maxconnectionsperip", network_settings.max_active_connections_per_ip,
