@@ -111,7 +111,7 @@ class NodeHub : public con::Stoppable {
     std::map<std::string, std::vector<IPEndpoint>, std::less<>> dns_resolve(const std::vector<std::string>& hosts,
                                                                             const boost::asio::ip::tcp& version);
 
-    std::atomic_bool async_connecting_{false};   // Whether we are currently connecting to a remote endpoint
+    std::atomic_bool async_connecting_{false};  // Whether we are currently connecting to a remote endpoint
 
     AppSettings& app_settings_;              // Reference to global application settings
     boost::asio::io_context& asio_context_;  // Reference to global asio context

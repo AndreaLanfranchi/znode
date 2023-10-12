@@ -178,7 +178,6 @@ Task<void> NodeHub::connector_work() {
 }
 
 Task<void> NodeHub::async_connect(Connection& connection) {
-
     const auto protocol = connection.endpoint_.address_.get_type() == IPAddressType::kIPv4 ? boost::asio::ip::tcp::v4()
                                                                                            : boost::asio::ip::tcp::v6();
     connection.socket_ptr_ = std::make_shared<boost::asio::ip::tcp::socket>(asio_context_);

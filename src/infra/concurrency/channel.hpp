@@ -23,7 +23,7 @@
 
 namespace zenpp::con {
 template <typename T>
-    requires std::is_copy_constructible_v<T>
+requires std::is_copy_constructible_v<T>
 class Channel {
   public:
     //! \brief Creates an instance of channel with no buffer space
