@@ -36,8 +36,8 @@ class NodeHub : public con::Stoppable {
           socket_acceptor_{io_context},
           service_timer_{io_context, "nh_service", true},
           info_timer_{io_context, "nh_info", true},
-          pending_connections_(io_context.get_executor(), settings.network.max_active_connections),
-          connection_requests_(io_context.get_executor(), settings.network.max_active_connections) {
+          node_factory_feed_(io_context.get_executor(), settings.network.max_active_connections),
+          connector_feed_(io_context.get_executor(), settings.network.max_active_connections) {
         if (app_settings_.network.nonce == 0U) {
             app_settings_.network.nonce = randomize<uint64_t>(/*min=*/1U);
         }
@@ -67,6 +67,9 @@ class NodeHub : public con::Stoppable {
 
     //! \brief Executes the connector work loop asynchronously
     Task<void> connector_work();
+
+    //! \brief Asynchronously connects to a remoote endpoint
+    Task<void> async_connect(Connection& connection);  // Connects to a remote endpoint
 
     //! \brief Executes the acceptor work loop asynchronously
     Task<void> acceptor_work();
@@ -103,12 +106,12 @@ class NodeHub : public con::Stoppable {
     //! \brief Periodically prints some metric data about network usage
     void on_info_timer_expired(std::chrono::milliseconds& interval);
 
-    void feed_connections_from_cli();  // Feed pending_connections_ from command line --network.connect
-    void feed_connections_from_dns();  // Feed pending_connections_ from DNS seeds configured for chain
+    void feed_connections_from_cli();  // Feed node_factory_feed_ from command line --network.connect
+    void feed_connections_from_dns();  // Feed node_factory_feed_ from DNS seeds configured for chain
     std::map<std::string, std::vector<IPEndpoint>, std::less<>> dns_resolve(const std::vector<std::string>& hosts,
                                                                             const boost::asio::ip::tcp& version);
-    void async_connect(const Connection& connection);  // Connects to a remote endpoint
-    std::atomic_bool async_connecting_{false};         // Whether we are currently connecting to a remote endpoint
+
+    std::atomic_bool async_connecting_{false};   // Whether we are currently connecting to a remote endpoint
 
     AppSettings& app_settings_;              // Reference to global application settings
     boost::asio::io_context& asio_context_;  // Reference to global asio context
@@ -125,8 +128,8 @@ class NodeHub : public con::Stoppable {
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};
 
-    con::Channel<std::shared_ptr<Connection>> pending_connections_;  // Conduit for new connections
-    con::Channel<std::shared_ptr<Connection>> connection_requests_;  // Conduit for new connection requests
+    con::Channel<std::shared_ptr<Connection>> node_factory_feed_;  // Channel for new nodes to be instantiated
+    con::Channel<std::shared_ptr<Connection>> connector_feed_;     // Channel for new outgoing connections
 
     std::list<std::shared_ptr<Node>> nodes_;                            // All the connected nodes
     std::map<boost::asio::ip::address, uint32_t> connected_addresses_;  // Addresses that are connected

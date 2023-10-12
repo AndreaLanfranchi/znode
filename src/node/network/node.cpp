@@ -27,15 +27,13 @@ using asio::ip::tcp;
 
 std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 
-Node::Node(AppSettings& app_settings, Connection connection, boost::asio::io_context& io_context,
-           boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
-           std::function<void(DataDirectionMode, size_t)> on_data,
+Node::Node(AppSettings& app_settings, std::shared_ptr<Connection> connection_ptr, boost::asio::io_context& io_context,
+           boost::asio::ssl::context* ssl_context, std::function<void(DataDirectionMode, size_t)> on_data,
            std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)> on_message)
     : app_settings_(app_settings),
-      connection_(connection),
+      connection_ptr_(std::move(connection_ptr)),
       io_strand_(io_context),
       ping_timer_(io_context, "Node_ping_timer", true),
-      socket_(std::move(socket)),
       ssl_context_(ssl_context),
       on_data_(std::move(on_data)),
       on_message_(std::move(on_message)) {
@@ -44,8 +42,8 @@ Node::Node(AppSettings& app_settings, Connection connection, boost::asio::io_con
     local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork) bitor
                                static_cast<uint64_t>(NodeServicesType::kNodeGetUTXO);
     local_version_.timestamp_ = absl::ToUnixSeconds(absl::Now());
-    local_version_.recipient_service_ = VersionNodeService(socket_.remote_endpoint());
-    local_version_.sender_service_ = VersionNodeService(socket_.local_endpoint());
+    local_version_.recipient_service_ = VersionNodeService(connection_ptr_->socket_ptr_->remote_endpoint());
+    local_version_.sender_service_ = VersionNodeService(connection_ptr_->socket_ptr_->local_endpoint());
 
     // We use the same port declared in the settings or the one from the configured chain
     // if the former is not set
@@ -63,15 +61,15 @@ Node::Node(AppSettings& app_settings, Connection connection, boost::asio::io_con
 bool Node::start() noexcept {
     if (not Stoppable::start()) return false;
 
-    local_endpoint_ = IPEndpoint(socket_.local_endpoint());
-    remote_endpoint_ = IPEndpoint(socket_.remote_endpoint());
+    local_endpoint_ = IPEndpoint(connection_ptr_->socket_ptr_->local_endpoint());
+    remote_endpoint_ = IPEndpoint(connection_ptr_->socket_ptr_->remote_endpoint());
     const auto now{std::chrono::steady_clock::now()};
     last_message_received_time_.store(now);  // We don't want to disconnect immediately
     last_message_sent_time_.store(now);      // We don't want to disconnect immediately
     connected_time_.store(now);
 
     if (ssl_context_ not_eq nullptr) {
-        ssl_stream_ = std::make_unique<asio::ssl::stream<tcp::socket&>>(socket_, *ssl_context_);
+        ssl_stream_ = std::make_unique<asio::ssl::stream<tcp::socket&>>(*connection_ptr_->socket_ptr_, *ssl_context_);
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_ssl_handshake(); });
     } else {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
@@ -101,8 +99,8 @@ void Node::begin_stop() {
         // Don't reset the stream !!! There might be outstanding async operations
         // Let them gracefully complete
     } else {
-        std::ignore = socket_.shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
-        std::ignore = socket_.close(error_code);
+        std::ignore = connection_ptr_->socket_ptr_->shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
+        std::ignore = connection_ptr_->socket_ptr_->close(error_code);
     }
     asio::post(io_strand_, [self{shared_from_this()}]() { self->on_stop_completed(); });
 }
@@ -173,8 +171,8 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
 }
 
 void Node::start_ssl_handshake() {
-    if (not socket_.is_open()) return;
-    const asio::ssl::stream_base::handshake_type handshake_type{connection_.type_ == ConnectionType::kInbound
+    if (not connection_ptr_->socket_ptr_->is_open()) return;
+    const asio::ssl::stream_base::handshake_type handshake_type{connection_ptr_->type_ == ConnectionType::kInbound
                                                                     ? asio::ssl::stream_base::server
                                                                     : asio::ssl::stream_base::client};
     ssl_stream_->set_verify_mode(asio::ssl::verify_none);
@@ -211,7 +209,7 @@ void Node::start_read() {
     if (ssl_stream_ not_eq nullptr) {
         ssl_stream_->async_read_some(receive_buffer_.prepare(kMaxBytesPerIO), read_handler);
     } else {
-        socket_.async_read_some(receive_buffer_.prepare(kMaxBytesPerIO), read_handler);
+        connection_ptr_->socket_ptr_->async_read_some(receive_buffer_.prepare(kMaxBytesPerIO), read_handler);
     }
 }
 
@@ -335,7 +333,7 @@ void Node::start_write() {
     if (ssl_stream_ not_eq nullptr) {
         ssl_stream_->async_write_some(send_buffer_.data(), write_handler);
     } else {
-        socket_.async_write_some(send_buffer_.data(), write_handler);
+        connection_ptr_->socket_ptr_->async_write_some(send_buffer_.data(), write_handler);
     }
 
     // We let handle_write to deal with re-entering the write cycle
@@ -373,7 +371,7 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
         if (ssl_stream_ not_eq nullptr) {
             ssl_stream_->async_write_some(send_buffer_.data(), write_handler);
         } else {
-            socket_.async_write_some(send_buffer_.data(), write_handler);
+            connection_ptr_->socket_ptr_->async_write_some(send_buffer_.data(), write_handler);
         }
     } else {
         is_writing_.store(false);
@@ -525,11 +523,11 @@ outcome::result<void> Node::process_inbound_message() {
             }
         } break;
         case kGetAddr:
-            if (connection_.type_ == ConnectionType::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
+            if (connection_ptr_->type_ == ConnectionType::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
                 // Ignore the message to avoid fingerprinting
                 err_extended_reason = "Ignoring duplicate 'getaddr' message on inbound connection.";
                 break;
-            } else if (connection_.type_ == ConnectionType::kSeedOutbound) {
+            } else if (connection_ptr_->type_ == ConnectionType::kSeedOutbound) {
                 // Disconnect from seed nodes as soon as we get some addresses from them
                 stop(false);
             }
@@ -630,7 +628,7 @@ void Node::on_handshake_completed() {
     if (not is_running()) return;
 
     // If this is a seeder node then we should async_send a `getaddr` message
-    if (connection_.type_ == ConnectionType::kSeedOutbound) {
+    if (connection_ptr_->type_ == ConnectionType::kSeedOutbound) {
         std::ignore = push_message(MessageType::kGetAddr);
     }
 

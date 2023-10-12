@@ -53,8 +53,8 @@ static constexpr size_t kMaxBytesPerIO = 64_KiB;
 //! \brief A node holds a connection (and related session) to a remote peer
 class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
   public:
-    Node(AppSettings& app_settings, Connection connection, boost::asio::io_context& io_context,
-         boost::asio::ip::tcp::socket socket, boost::asio::ssl::context* ssl_context,
+    Node(AppSettings& app_settings, std::shared_ptr<Connection> connection_ptr, boost::asio::io_context& io_context,
+         boost::asio::ssl::context* ssl_context,
          std::function<void(DataDirectionMode, size_t)> on_data /* handles data size accounting on node-hub */,
          std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)>
              on_message /* handles connections on node-hub */);
@@ -84,10 +84,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] int id() const noexcept { return node_id_; }
 
     //! \brief Whether this node instance is inbound or outbound
-    [[nodiscard]] const Connection& connection() const noexcept { return connection_; }
-
-    //! \brief Returns a reference to the underlying socket
-    [[nodiscard]] boost::asio::ip::tcp::socket& socket() noexcept { return socket_; }
+    [[nodiscard]] const Connection& connection() const noexcept { return *connection_ptr_; }
 
     //! \brief Returns whether the connection is secure
     [[nodiscard]] bool is_secure() const noexcept { return ssl_context_ != nullptr; }
@@ -105,7 +102,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the socket is connected and the protocol handshake is completed
     [[nodiscard]] bool is_connected() const noexcept {
-        return is_running() && socket_.is_open() &&
+        return is_running() && connection_ptr_->socket_ptr_->is_open() &&
                get_protocol_handshake_status() == ProtocolHandShakeStatus::kCompleted;
     }
 
@@ -194,15 +191,14 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     void print_log(log::Level severity, const std::list<std::string>& params,
                    const std::string& extra_data = "") const noexcept;
 
-    AppSettings& app_settings_;                  // Reference to global application settings
-    static std::atomic_int next_node_id_;        // Used to generate unique node ids
-    const int node_id_{next_node_id()};          // Unique node id
-    const Connection connection_;                // Whether inbound or outbound
-    boost::asio::io_context::strand io_strand_;  // Serialized execution of reads and writes
-    con::Timer ping_timer_;                      // To periodically async_send ping messages
-    boost::asio::ip::tcp::socket socket_;        // The underlying socket (either plain or SSL)
-    IPEndpoint remote_endpoint_;                 // Remote endpoint
-    IPEndpoint local_endpoint_;                  // Local endpoint
+    AppSettings& app_settings_;                   // Reference to global application settings
+    static std::atomic_int next_node_id_;         // Used to generate unique node ids
+    const int node_id_{next_node_id()};           // Unique node id
+    std::shared_ptr<Connection> connection_ptr_;  // Connection specs
+    boost::asio::io_context::strand io_strand_;   // Serialized execution of reads and writes
+    con::Timer ping_timer_;                       // To periodically async_send ping messages
+    IPEndpoint remote_endpoint_;                  // Remote endpoint
+    IPEndpoint local_endpoint_;                   // Local endpoint
 
     boost::asio::ssl::context* ssl_context_;
     std::unique_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> ssl_stream_;  // SSL stream
