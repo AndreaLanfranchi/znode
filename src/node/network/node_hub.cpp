@@ -18,6 +18,7 @@
 
 #include <infra/common/common.hpp>
 #include <infra/common/log.hpp>
+#include <infra/nat/detector.hpp>
 
 namespace zenpp::net {
 
@@ -47,9 +48,18 @@ bool NodeHub::start() noexcept {
     service_timer_.start(250ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
     info_timer_.start(5s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
 
+    // We need to determine our network address which will be used to advertise us to other nodes
+    // If we have a NAT traversal option enabled we need to use the public address
+    auto resolve_task = asio::co_spawn(asio_context_, nat::resolve(app_settings_.network.nat), asio::use_future);
+
     asio::co_spawn(asio_context_, node_factory_work(), asio::detached);
     asio::co_spawn(asio_context_, acceptor_work(), asio::detached);
     asio::co_spawn(asio_context_, connector_work(), asio::detached);
+
+    resolve_task.wait();
+    log::Info("Service", {"name", "Node Hub", "action", "start", "advertising address",
+                          app_settings_.network.nat.address_.to_string()});
+    resolve_task._Abandon();
 
     feed_connections_from_cli();
     feed_connections_from_dns();
@@ -89,7 +99,7 @@ Task<void> NodeHub::node_factory_work() {
         boost::system::error_code error;
         std::shared_ptr<Connection> conn_ptr;
         if (not node_factory_feed_.try_receive(conn_ptr)) {
-            auto result = co_await node_factory_feed_.async_receive(error);
+            const auto& result = co_await node_factory_feed_.async_receive(error);
             if (error or not result.has_value()) continue;
             conn_ptr = std::move(result.value());
         }
@@ -140,9 +150,9 @@ Task<void> NodeHub::connector_work() {
         boost::system::error_code error;
         std::shared_ptr<Connection> conn_ptr;
         if (not connector_feed_.try_receive(conn_ptr)) {
-            auto result = co_await connector_feed_.async_receive(error);
+            const auto& result = co_await connector_feed_.async_receive(error);
             if (error or not result.has_value()) continue;
-            conn_ptr = result.value();
+            conn_ptr = std::move(result.value());
         }
 
         ASSERT_PRE(conn_ptr->socket_ptr_ == nullptr and "Socket must be null");
@@ -259,6 +269,7 @@ void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) 
             iterator = nodes_.erase(iterator);
             continue;
         } else if (not(*iterator)->is_running()) {
+            on_node_disconnected(*iterator);
             iterator->reset();
             ++iterator;
             continue;

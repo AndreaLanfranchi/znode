@@ -16,11 +16,11 @@ bool lexical_cast(const std::string& input, Option& value) {
         return true;  // default value
     }
     if (boost::algorithm::iequals(input, "none")) {
-        value._type = NatType::kNone;
+        value.type_= NatType::kNone;
         return true;
     }
     if (boost::algorithm::iequals(input, "auto")) {
-        value._type = NatType::kAuto;
+        value.type_ = NatType::kAuto;
         return true;
     }
 
@@ -29,8 +29,9 @@ bool lexical_cast(const std::string& input, Option& value) {
         std::cerr << "Value \"" << input << "\" is not a valid IP address" << std::endl;
         return false;
     }
-    value._type = NatType::kIp;
-    value._address.emplace(parsed_address.value());
+
+    value.type_ = NatType::kIp;
+    value.address_ = parsed_address.value();
     return true;
 }
 }  // namespace zenpp::nat

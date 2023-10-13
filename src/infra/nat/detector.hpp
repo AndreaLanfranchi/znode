@@ -12,6 +12,6 @@
 
 namespace zenpp::nat {
 
-Task<net::IPAddress> detect(Option& option);
+Task<void> resolve(Option& option);
 
 }  // namespace zenpp::nat

@@ -20,8 +20,8 @@ enum class NatType {
 };
 
 struct Option {
-    NatType _type{NatType::kAuto};
-    std::optional<net::IPAddress> _address{std::nullopt};
+    NatType type_{NatType::kAuto};
+    net::IPAddress address_{};
 };
 
 //! \brief Used by CLI to convert a string to a NAT Option
