@@ -517,8 +517,8 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                         service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
                         continue;
                     if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
-                        log::Warning("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
-                                                 service.endpoint_.to_string()})
+                        log::Debug("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
+                                               service.endpoint_.to_string()})
                             << " << Non standard port";
                     }
                     std::ignore = connector_feed_.try_send(
