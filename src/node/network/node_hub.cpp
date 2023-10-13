@@ -70,9 +70,11 @@ bool NodeHub::start() noexcept {
 bool NodeHub::stop(bool wait) noexcept {
     const auto ret{Stoppable::stop(wait)};
     if (ret) /* not already stopping */ {
+        
         socket_acceptor_.close();
         node_factory_feed_.close();
         connector_feed_.close();
+
         // We MUST wait for all nodes to stop before returning otherwise
         // this instance falls out of scope and the nodes call a callback
         // which points to nowhere. The burden to stop nodes is on the
@@ -80,10 +82,10 @@ bool NodeHub::stop(bool wait) noexcept {
         auto pending_nodes{size()};
         while (pending_nodes not_eq 0U) {
             log::Info("Service", {"name", "Node Hub", "action", "stop", "pending", std::to_string(pending_nodes)});
-            std::this_thread::yield();
             std::this_thread::sleep_for(std::chrono::seconds(2));
             pending_nodes = size();
         }
+
         service_timer_.stop(true);
         info_timer_.stop(true);
         set_stopped();
@@ -145,7 +147,7 @@ Task<void> NodeHub::node_factory_work() {
 
 Task<void> NodeHub::connector_work() {
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "connector", "status", "started"});
-    while (connector_feed_.is_open()) {
+    while (is_running()) {
         // Poll channel for any outstanding connection request
         boost::system::error_code error;
         std::shared_ptr<Connection> conn_ptr;
@@ -175,13 +177,20 @@ Task<void> NodeHub::connector_work() {
 
         try {
             co_await async_connect(*conn_ptr);
-            if (not node_factory_feed_.try_send(conn_ptr)) {
-                co_await node_factory_feed_.async_send(std::move(conn_ptr));
-            }
         } catch (const boost::system::system_error& ex) {
             log::Warning("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
                                      "error", ex.code().message()});
+            std::ignore = conn_ptr->socket_ptr_->close(error);
+            continue;
         }
+
+        if (not node_factory_feed_.is_open()) break;
+        if (not node_factory_feed_.try_send(conn_ptr)) {
+            error.clear();
+            co_await node_factory_feed_.async_send(error, std::move(conn_ptr));
+            if (error) break;
+        }
+
     }
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "connector", "status", "stopped"});
     co_return;

@@ -27,6 +27,7 @@ set(PUBLIC_LIBS
         Boost::headers
         Boost::coroutine # Mind the order
         Boost::context   # of this two
+        Boost::timer
         OpenSSL::SSL
         )
 

@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 
+#include <boost/timer/timer.hpp>
 #include <gsl/gsl_util>
 #include <openssl/opensslv.h>
 #include <openssl/ssl.h>
@@ -92,6 +93,7 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
 }
 
 int main(int argc, char* argv[]) {
+
     const auto start_time{std::chrono::steady_clock::now()};
     const auto* build_info(get_buildinfo());
     CLI::App cli(std::string(build_info->project_name).append(" node"));
@@ -149,14 +151,15 @@ int main(int argc, char* argv[]) {
         }
 
         // Validate mandatory zk params
-        StopWatch stop_watch(true);
+        boost::timer::cpu_timer zk_timer;
         const auto zk_params_path{(*settings.data_directory)[DataDirectory::kZkParamsName].path()};
         std::ignore = log::Message("Validating ZK params", {"directory", zk_params_path.string()});
-        if (!zk::validate_param_files(*context, zk_params_path, settings.no_zk_checksums)) {
+        if (not zk::validate_param_files(*context, zk_params_path, settings.no_zk_checksums)) {
             throw std::filesystem::filesystem_error("Invalid ZK file params",
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }
-        std::ignore = log::Message("Validated  ZK params", {"elapsed", StopWatch::format(stop_watch.since_start())});
+        zk_timer.stop();
+        std::ignore = log::Message("Validated  ZK params", {"elapsed", zk_timer.format()});
 
         // 1) Instantiate and start a new NodeHub
         net::NodeHub node_hub{settings, *context};
@@ -172,7 +175,6 @@ int main(int argc, char* argv[]) {
         // Count how much time the node hub has been without any connection
         // If it's too long, we'll stop the node
         StopWatch node_hub_idle_sw(true);
-
 
         // TODO while (sync_loop.get_state() != Worker::ComponentStatus::kStopped) {
         while (true) {
@@ -204,20 +206,12 @@ int main(int argc, char* argv[]) {
                 const auto etltmp_usage{etltmp_dir.size(true)};
                 const auto nodes_usage{nodes_dir.size(true)};
 
-                log::Info("Resource usage", {
-                                                "mem",
-                                                to_human_bytes(mem_usage, true),
-                                                "vmem",
-                                                to_human_bytes(vmem_usage, true),
-                                                std::string(DataDirectory::kChainDataName),
-                                                to_human_bytes(chaindata_usage, true),
-                                                std::string(DataDirectory::kEtlTmpName),
-                                                to_human_bytes(etltmp_usage, true),
-                                                std::string(DataDirectory::kNodesName),
-                                                to_human_bytes(nodes_usage, true),
-                                                "uptime",
-                                                StopWatch::format(total_duration),
-                                            });
+                log::Info("Resource usage",
+                          {"mem", to_human_bytes(mem_usage, true), "vmem", to_human_bytes(vmem_usage, true),
+                           std::string(DataDirectory::kChainDataName), to_human_bytes(chaindata_usage, true),
+                           std::string(DataDirectory::kEtlTmpName), to_human_bytes(etltmp_usage, true),
+                           std::string(DataDirectory::kNodesName), to_human_bytes(nodes_usage, true), "uptime",
+                           StopWatch::format(total_duration)});
             }
         }
 

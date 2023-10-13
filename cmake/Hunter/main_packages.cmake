@@ -7,5 +7,5 @@
 ]]
 
 hunter_add_package(abseil)
-hunter_add_package(Boost COMPONENTS context coroutine)
+hunter_add_package(Boost COMPONENTS context coroutine chrono timer)
 hunter_add_package(CLI11)
