@@ -27,7 +27,7 @@ class MessagePayload : public ser::Serializable {
     [[nodiscard]] MessageType type() const { return message_type_; }
 
   private:
-      MessageType message_type_{MessageType::kMissingOrUnknown};
+    MessageType message_type_{MessageType::kMissingOrUnknown};
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override = 0;
 };
@@ -77,7 +77,6 @@ class MsgPingPayload : public MessagePayload {
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
-
 class MsgPongPayload : public MessagePayload {
   public:
     MsgPongPayload() : MessagePayload(MessageType::kPing) {}
@@ -90,7 +89,6 @@ class MsgPongPayload : public MessagePayload {
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
-
 
 class MsgGetHeadersPayload : public MessagePayload {
   public:

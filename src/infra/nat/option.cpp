@@ -16,7 +16,7 @@ bool lexical_cast(const std::string& input, Option& value) {
         return true;  // default value
     }
     if (boost::algorithm::iequals(input, "none")) {
-        value.type_= NatType::kNone;
+        value.type_ = NatType::kNone;
         return true;
     }
     if (boost::algorithm::iequals(input, "auto")) {

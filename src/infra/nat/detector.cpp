@@ -8,7 +8,6 @@
 
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/udp.hpp>
-
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
@@ -74,13 +73,12 @@ namespace {
 
         } catch (const boost::system::system_error& error) {
             log::Error("Resolve public IP", {"error", error.code().message()})
-				<< "Are you sure you're connected to the internet ?";
+                << "Are you sure you're connected to the internet ?";
         } catch (const std::runtime_error& exception) {
             log::Error("Resolve public IP", {"error", exception.what()})
                 << "Are you sure you're connected to the internet ?";
         }
         co_return;
-       
     }
 
 }  // namespace

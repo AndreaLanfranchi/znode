@@ -70,7 +70,6 @@ bool NodeHub::start() noexcept {
 bool NodeHub::stop() noexcept {
     const auto ret{Stoppable::stop()};
     if (ret) /* not already stopping */ {
-        
         socket_acceptor_.close();
         node_factory_feed_.close();
         connector_feed_.close();
@@ -177,9 +176,7 @@ Task<void> NodeHub::connector_work() {
         }
         lock.unlock();
 
-        
         LOG_TRACE2 << "Connecting to " << remote;
-
 
         try {
             co_await async_connect(*conn_ptr);
@@ -196,7 +193,6 @@ Task<void> NodeHub::connector_work() {
             co_await node_factory_feed_.async_send(error, std::move(conn_ptr));
             if (error) break;
         }
-
     }
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "connector", "status", "stopped"});
     co_return;

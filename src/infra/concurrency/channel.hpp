@@ -71,10 +71,9 @@ class Channel {
 
     //! \brief Awaits for an item in the buffer or a async_send operation to provide one
     //! \remarks The operation is always rescheduled
-    //! \remarks Gets suspended when the receive would block which means there's no element ready to pull from the buffer
-    //! and as a result this will wait for a send operation to provide one
-    //! \return The received element
-    //! \throws boost::system::system_error in case of errors
+    //! \remarks Gets suspended when the receive would block which means there's no element ready to pull from the
+    //! buffer and as a result this will wait for a send operation to provide one \return The received element \throws
+    //! boost::system::system_error in case of errors
     Task<T> async_receive() {
         try {
             co_return (co_await channel_.async_receive(boost::asio::use_awaitable));
@@ -89,10 +88,9 @@ class Channel {
 
     //! \brief Awaits for an item in the buffer or a async_send operation to provide one
     //! \remarks The operation is always rescheduled
-    //! \remarks Gets suspended when the receive would block which means there's no element ready to pull from the buffer
-    //! and as a result this will wait for a send operation to provide one
-    //! \returns An optional with the received element or std::nullopt in case of errors (which are stored in the
-    //! error_code)
+    //! \remarks Gets suspended when the receive would block which means there's no element ready to pull from the
+    //! buffer and as a result this will wait for a send operation to provide one \returns An optional with the received
+    //! element or std::nullopt in case of errors (which are stored in the error_code)
     Task<std::optional<T>> async_receive(boost::system::error_code& error) {
         std::optional<T> ret{std::nullopt};
         try {

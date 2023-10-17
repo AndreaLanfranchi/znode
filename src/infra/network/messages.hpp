@@ -13,6 +13,7 @@
 #include <core/common/base.hpp>
 #include <core/serialization/serialize.hpp>
 #include <core/types/hash.hpp>
+
 #include <infra/network/protocol.hpp>
 
 namespace zenpp::net {
