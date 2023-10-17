@@ -68,7 +68,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     bool start() noexcept override;
 
     //! \brief Stops the asynchronous read/write operations and disconnects
-    bool stop(bool wait) noexcept override;
+    bool stop() noexcept override;
 
     //! \brief Flags describing the status of the protocol handshake
     enum class ProtocolHandShakeStatus : uint32_t {
@@ -142,7 +142,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] static int next_node_id() noexcept { return next_node_id_.fetch_add(1); }
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
-    outcome::result<void> push_message(MessageType message_type, MessagePayload& payload);
+    outcome::result<void> push_message(MessagePayload& payload);
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
     //! \remarks This a handy overload used to async_send messages with a null payload

@@ -25,7 +25,11 @@ outcome::result<void> MsgVersionPayload::serialization(SDataStream& stream, Acti
     return result;
 }
 
-outcome::result<void> MsgPingPongPayload::serialization(ser::SDataStream& stream, ser::Action action) {
+outcome::result<void> MsgPingPayload::serialization(ser::SDataStream& stream, ser::Action action) {
+    return stream.bind(nonce_, action);
+}
+
+outcome::result<void> MsgPongPayload::serialization(ser::SDataStream& stream, ser::Action action) {
     return stream.bind(nonce_, action);
 }
 
@@ -47,7 +51,7 @@ outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, s
             const auto expected_vector_size{read_compact(stream)};
             if (expected_vector_size.has_error()) return expected_vector_size.error();
             if (expected_vector_size.value() == 0U) return Error::kMessagePayloadEmptyVector;
-            if (expected_vector_size.value() > 2000U) return Error::kMessagePayloadOversizedVector;
+            if (expected_vector_size.value() > kMaxHeadersItems) return Error::kMessagePayloadOversizedVector;
             block_locator_hashes_.resize(expected_vector_size.value());
             for (auto& item : block_locator_hashes_) {
                 if (result = item.deserialize(stream); result.has_error()) break;

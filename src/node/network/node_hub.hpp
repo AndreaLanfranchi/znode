@@ -55,8 +55,8 @@ class NodeHub : public con::Stoppable {
     [[nodiscard]] size_t bytes_sent() const noexcept { return total_bytes_sent_.load(); }
     [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
 
-    bool start() noexcept override;          // Begins accepting connections
-    bool stop(bool wait) noexcept override;  // Stops accepting connections and stops all nodes
+    bool start() noexcept override;  // Begins accepting connections
+    bool stop() noexcept override;   // Stops accepting connections and stops all nodes
 
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint

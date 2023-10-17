@@ -112,7 +112,7 @@ class Message {
     [[nodiscard]] outcome::result<void> write(ByteView& input);
 
     //! \brief Populates the message header and payload
-    outcome::result<void> push(MessageType message_type, MessagePayload& payload) noexcept;
+    outcome::result<void> push(MessagePayload& payload) noexcept;
 
   private:
     MessageHeader header_{};                     // Where the message header is deserialized

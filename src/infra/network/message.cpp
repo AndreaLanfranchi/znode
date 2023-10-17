@@ -131,12 +131,12 @@ outcome::result<void> Message::validate() noexcept {
     return result;
 }
 
-outcome::result<void> Message::push(const MessageType message_type, MessagePayload& payload) noexcept {
+outcome::result<void> Message::push(MessagePayload& payload) noexcept {
     using enum net::Error;
 
     if (not header_.pristine()) return kMessagePushNotPermitted;  // Can't push twice
-    if (message_type == MessageType::kMissingOrUnknown) return kMessageUnknownCommand;
-    header_.set_type(message_type);
+    if (payload.type() == MessageType::kMissingOrUnknown) return kMessageUnknownCommand;
+    header_.set_type(payload.type());
     std::memcpy(header_.network_magic.data(), network_magic_.data(), header_.network_magic.size());
 
     ser_stream_.clear();

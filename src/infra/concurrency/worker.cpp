@@ -13,7 +13,7 @@
 
 namespace zenpp::con {
 
-Worker::~Worker() { stop(true); }
+Worker::~Worker() { stop(); }
 
 bool Worker::start() noexcept {
     const bool start_already_requested{not Stoppable::start()};
@@ -48,8 +48,8 @@ bool Worker::start() noexcept {
     return true;
 }
 
-bool Worker::stop([[maybe_unused]] bool wait) noexcept {
-    const bool ret{Stoppable::stop(wait)};
+bool Worker::stop() noexcept {
+    const bool ret{Stoppable::stop()};
     if (ret) kick();
     if (thread_ not_eq nullptr) {
         // Worker thread cannot call stop on itself

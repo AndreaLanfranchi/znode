@@ -215,7 +215,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        node_hub.stop(/*wait=*/true);  // 1) Stop networking server
+        node_hub.stop();  // 1) Stop networking server
 
         std::ignore = log::Message("Closing database", {"path", chaindata_dir.path().string()});
         chaindata_env.close();

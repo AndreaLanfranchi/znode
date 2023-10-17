@@ -47,11 +47,11 @@ bool Timer::start(chrono::milliseconds interval, CallBackFunc call_back) noexcep
     return false;
 }
 
-bool Timer::stop(bool wait) noexcept {
-    if (not Stoppable::stop(wait)) return false;  // Already stopped
+bool Timer::stop() noexcept {
+    if (not Stoppable::stop()) return false;  // Already stopped
     LOG_TRACE1 << "Timer[" << name_ << "]: stop requested";
     std::ignore = timer_.cancel();
-    if (wait) working_.wait(true);
+    working_.wait(true);
     LOG_TRACE1 << "Timer[" << name_ << "]: stopped";
     return true;
 }

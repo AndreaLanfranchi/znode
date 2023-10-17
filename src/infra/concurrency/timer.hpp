@@ -108,7 +108,7 @@ class Timer : public Stoppable {
     bool start(std::chrono::milliseconds interval, CallBackFunc call_back) noexcept;
 
     //! \brief Stops timer and cancels pending execution. No callback is executed and no resubmission
-    bool stop([[maybe_unused]] bool wait) noexcept override;
+    bool stop() noexcept override;
 
     //! \brief Cancels execution of awaiting callback and, if still in running state, submits timer for a new
     //! get_interval

@@ -21,7 +21,7 @@ namespace zenpp::con {
 class Context final : public Stoppable {
   public:
     explicit Context(std::string name, size_t concurrency = 1U);
-    ~Context() { std::ignore = stop(true); }
+    ~Context() { std::ignore = stop(); }
 
     // Not copyable nor movable
     Context(const Context& other) = delete;
@@ -32,7 +32,7 @@ class Context final : public Stoppable {
     [[nodiscard]] boost::asio::io_context& operator*() const { return *io_context_; }
 
     bool start() noexcept override;
-    bool stop(bool wait) noexcept override;
+    bool stop() noexcept override;
 
   private:
     const std::string name_;    // Name of the context

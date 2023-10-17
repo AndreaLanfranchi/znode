@@ -58,7 +58,7 @@ TEST_CASE("Async Timer1", "[infra][concurrency][timer]") {
         Timer test_timer(*context, "test_timer", interval, call_back, /*autoreset=*/true);
         CHECK(test_timer.start());
         std::this_thread::sleep_for(interval * 5);
-        context.stop(true);
+        context.stop();
         REQUIRE(counter == 4);
     }
 

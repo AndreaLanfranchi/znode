@@ -67,8 +67,8 @@ bool NodeHub::start() noexcept {
     return true;
 }
 
-bool NodeHub::stop(bool wait) noexcept {
-    const auto ret{Stoppable::stop(wait)};
+bool NodeHub::stop() noexcept {
+    const auto ret{Stoppable::stop()};
     if (ret) /* not already stopping */ {
         
         socket_acceptor_.close();
@@ -86,8 +86,8 @@ bool NodeHub::stop(bool wait) noexcept {
             pending_nodes = size();
         }
 
-        service_timer_.stop(true);
-        info_timer_.stop(true);
+        service_timer_.stop();
+        info_timer_.stop();
         set_stopped();
     }
     return ret;
@@ -158,9 +158,11 @@ Task<void> NodeHub::connector_work() {
         }
 
         ASSERT_PRE(conn_ptr->socket_ptr_ == nullptr and "Socket must be null");
+        if (app_settings_.network.ipv4_only and conn_ptr->endpoint_.address_.get_type() not_eq IPAddressType::kIPv4) {
+            continue;
+        }
+
         const std::string remote{conn_ptr->endpoint_.to_string()};
-        std::ignore =
-            log::Info("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote});
 
         // Verify we're not exceeding connections per IP
         std::unique_lock lock{nodes_mutex_};
@@ -174,6 +176,10 @@ Task<void> NodeHub::connector_work() {
             continue;
         }
         lock.unlock();
+
+        
+        LOG_TRACE2 << "Connecting to " << remote;
+
 
         try {
             co_await async_connect(*conn_ptr);
@@ -284,7 +290,7 @@ void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) 
             continue;
         }
         if (not running) {
-            std::ignore = (*iterator)->stop(false);
+            std::ignore = (*iterator)->stop();
             ++iterator;
             continue;
         }
@@ -295,7 +301,7 @@ void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) 
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
                                      node.to_string(), "reason", reason})
                 << "Disconnecting ...";
-            std::ignore = node.stop(false);
+            std::ignore = node.stop();
         }
         ++iterator;
     }
@@ -512,6 +518,11 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                 MsgAddrPayload addr_payload{};
                 success_or_throw(addr_payload.deserialize(message->data()));
                 // TODO Pass it to the address manager
+                if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+                    log::Trace("Service",
+                               {"name", "Node Hub", "action", __func__, "message", "addr", "remote", node->to_string(),
+                                "count", std::to_string(addr_payload.identifiers_.size())});
+                }
                 for (const auto& service : addr_payload.identifiers_) {
                     if (app_settings_.network.ipv4_only and
                         service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
@@ -533,7 +544,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
         log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote", node->to_string(),
                                "error", error.code().message()})
             << "Disconnecting ...";
-        node->stop(false);
+        node->stop();
     } catch (const std::logic_error& error) {
         log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote", node->to_string(),
                                "error", error.what()});

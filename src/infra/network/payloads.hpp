@@ -12,6 +12,7 @@
 
 #include <infra/network/addresses.hpp>
 #include <infra/network/errors.hpp>
+#include <infra/network/protocol.hpp>
 
 namespace zenpp::net {
 
@@ -20,17 +21,20 @@ namespace zenpp::net {
 //! that a NetMessage payload is expected.
 class MessagePayload : public ser::Serializable {
   public:
-    using ser::Serializable::Serializable;
+    explicit MessagePayload(MessageType message_type) : message_type_{message_type} {}
     ~MessagePayload() override = default;
 
+    [[nodiscard]] MessageType type() const { return message_type_; }
+
   private:
+      MessageType message_type_{MessageType::kMissingOrUnknown};
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override = 0;
 };
 
 class MsgNullPayload : public MessagePayload {
   public:
-    using MessagePayload::MessagePayload;
+    explicit MsgNullPayload(MessageType message_type) : MessagePayload(message_type) {}
     ~MsgNullPayload() override = default;
 
   private:
@@ -43,7 +47,7 @@ class MsgNullPayload : public MessagePayload {
 
 class MsgVersionPayload : public MessagePayload {
   public:
-    using MessagePayload::MessagePayload;
+    MsgVersionPayload() : MessagePayload(MessageType::kVersion) {}
     ~MsgVersionPayload() override = default;
 
     int32_t protocol_version_{0};
@@ -61,10 +65,10 @@ class MsgVersionPayload : public MessagePayload {
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
-class MsgPingPongPayload : public MessagePayload {
+class MsgPingPayload : public MessagePayload {
   public:
-    using MessagePayload::MessagePayload;
-    ~MsgPingPongPayload() override = default;
+    MsgPingPayload() : MessagePayload(MessageType::kPing) {}
+    ~MsgPingPayload() override = default;
 
     uint64_t nonce_{0};
 
@@ -73,9 +77,24 @@ class MsgPingPongPayload : public MessagePayload {
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
+
+class MsgPongPayload : public MessagePayload {
+  public:
+    MsgPongPayload() : MessagePayload(MessageType::kPing) {}
+    explicit MsgPongPayload(const MsgPingPayload& ping) : MessagePayload(MessageType::kPong), nonce_{ping.nonce_} {}
+    ~MsgPongPayload() override = default;
+
+    uint64_t nonce_{0};
+
+  private:
+    friend class ser::SDataStream;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
+};
+
+
 class MsgGetHeadersPayload : public MessagePayload {
   public:
-    using MessagePayload::MessagePayload;
+    MsgGetHeadersPayload() : MessagePayload(MessageType::kGetHeaders) {}
     ~MsgGetHeadersPayload() override = default;
 
     uint32_t protocol_version_{0};
@@ -89,7 +108,7 @@ class MsgGetHeadersPayload : public MessagePayload {
 
 class MsgAddrPayload : public MessagePayload {
   public:
-    using MessagePayload::MessagePayload;
+    MsgAddrPayload() : MessagePayload(MessageType::kAddr) {}
     ~MsgAddrPayload() override = default;
 
     std::vector<NodeService> identifiers_{};

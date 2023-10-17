@@ -13,31 +13,9 @@
 #include <core/common/base.hpp>
 #include <core/serialization/serialize.hpp>
 #include <core/types/hash.hpp>
+#include <infra/network/protocol.hpp>
 
 namespace zenpp::net {
-
-static constexpr size_t kMaxProtocolMessageLength{static_cast<size_t>(4_MiB)};  // Maximum length of a protocol message
-static constexpr size_t kMessageHeaderLength{24};                               // Length of a protocol message header
-static constexpr size_t kMaxInvItems{50'000};                                   // Maximum number of inventory items
-static constexpr size_t kInvItemSize{36};            // Size of an inventory item (type + hash)
-static constexpr size_t kMaxAddrItems{1'000};        // Maximum number of items in an addr message
-static constexpr size_t kAddrItemSize{30};           // Size of an address item (time + services + ip + port)
-static constexpr size_t kMaxGetHeadersItems{2'000};  // Maximum number of block headers in a getheaders message
-static constexpr size_t kMaxHeadersItems{160};       // Maximum number of block headers in a headers message
-
-enum class MessageType : uint32_t {
-    kVersion,           // Dial-out nodes async_send their version first
-    kVerAck,            // Reply by dial-in nodes to version message
-    kInv,               // Inventory message to advertise the knowledge of hashes of blocks or transactions
-    kAddr,              // Address message to advertise the knowledge of addresses of other nodes
-    kPing,              // Ping message to measure the latency of a connection
-    kPong,              // Pong message to reply to a ping message
-    kGetHeaders,        // Getheaders message to request/async_send a list of block headers
-    kHeaders,           // Headers message to async_send a list of block
-    kGetAddr,           // Getaddr message to request a list of known active peers
-    kMemPool,           // MemPool message to request/async_send a list of transactions in the mempool
-    kMissingOrUnknown,  // This must be the last entry
-};
 
 struct MessageDefinition {
     const char* command{nullptr};                              // The command string

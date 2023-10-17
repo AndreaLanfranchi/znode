@@ -51,7 +51,7 @@ TEST_CASE("Threaded Worker", "[concurrency][worker]") {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.get_increment() == 2U);
 
-        worker.stop(true);
+        worker.stop();
         CHECK(worker.status() == kNotStarted);
         CHECK(worker.get_increment() == 2);
     }
@@ -70,7 +70,7 @@ TEST_CASE("Threaded Worker", "[concurrency][worker]") {
         CHECK(worker.has_exception() == true);
         CHECK_THROWS(worker.rethrow());
         CHECK(worker.what() == "An exception");
-        worker.stop(true);
+        worker.stop();
     }
 
     SECTION("Stop when already exited") {
@@ -82,7 +82,7 @@ TEST_CASE("Threaded Worker", "[concurrency][worker]") {
         worker.kick();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.status() == kNotStarted);
-        CHECK_FALSE(worker.stop(true));
+        CHECK_FALSE(worker.stop());
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         CHECK(worker.status() == kNotStarted);
     }

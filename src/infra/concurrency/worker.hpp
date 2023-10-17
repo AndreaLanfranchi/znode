@@ -31,8 +31,7 @@ class Worker : public Stoppable, private boost::noncopyable {
     bool start() noexcept override;
 
     //! \brief Stops worker thread
-    //! \param [in] wait: Whether to wait for thread to join
-    bool stop(bool wait) noexcept override;
+    bool stop() noexcept override;
 
     //! \brief Wakes up worker thread to do work
     void kick();

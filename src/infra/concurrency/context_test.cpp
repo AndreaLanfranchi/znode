@@ -21,7 +21,7 @@ TEST_CASE("Context", "[infra][concurrency][context]") {
     REQUIRE(context.start());
     REQUIRE_FALSE(context.start());  // Already started
     std::this_thread::sleep_for(std::chrono::seconds(2));
-    REQUIRE(context.stop(true));
-    REQUIRE_FALSE(context.stop(true));  // Already stopped
+    REQUIRE(context.stop());
+    REQUIRE_FALSE(context.stop());  // Already stopped
 }
 }  // namespace zenpp::con

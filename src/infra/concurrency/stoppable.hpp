@@ -29,7 +29,7 @@ class Stoppable {
 
     //! \brief Programmatically requests the component to stop
     //! \return True if the request to stop has been stored otherwise false (i.e. already requested to stop)
-    virtual bool stop(bool wait) noexcept;
+    virtual bool stop() noexcept;
 
     //! \brief Returns the current state of the component
     [[nodiscard]] ComponentStatus status() const noexcept;

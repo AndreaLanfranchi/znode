@@ -34,8 +34,8 @@ bool Context::start() noexcept {
     }
     return true;
 }
-bool Context::stop(bool wait) noexcept {
-    if (not Stoppable::stop(wait)) return false;  // Already stopped
+bool Context::stop() noexcept {
+    if (not Stoppable::stop()) return false;  // Already stopped
     LOG_TRACE << "Stopping [" << name_ << "] context";
     work_guard_.reset();
     io_context_->stop();

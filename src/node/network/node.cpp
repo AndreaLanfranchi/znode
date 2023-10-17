@@ -73,15 +73,15 @@ bool Node::start() noexcept {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_ssl_handshake(); });
     } else {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
-        std::ignore = push_message(MessageType::kVersion, local_version_);
+        std::ignore = push_message(local_version_);
     }
     return true;
 }
 
-bool Node::stop(bool wait) noexcept {
-    const auto ret{Stoppable::stop(wait)};
+bool Node::stop() noexcept {
+    const auto ret{Stoppable::stop()};
     if (ret) /* not already stopped */ {
-        ping_timer_.stop(true);
+        ping_timer_.stop();
         if (ssl_stream_ not_eq nullptr) {
             boost::system::error_code error_code;
             std::ignore = ssl_stream_->shutdown(error_code);
@@ -118,13 +118,13 @@ void Node::on_ping_timer_expired(std::chrono::milliseconds& interval) noexcept {
     if (ping_nonce_.load() not_eq 0U) return;  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
     ping_nonce_.store(randomize<uint64_t>(/*min=*/1U));
-    MsgPingPongPayload pong_payload{};
-    pong_payload.nonce_ = ping_nonce_.load();
-    if (const auto result{push_message(MessageType::kPing, pong_payload)}; result.has_error()) {
+    MsgPingPayload ping_payload{};
+    ping_payload.nonce_ = ping_nonce_.load();
+    if (const auto result{push_message(ping_payload)}; result.has_error()) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", result.error().message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
-        stop(false);
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
         interval = 0ms;
         return;
     }
@@ -139,7 +139,7 @@ void Node::process_ping_latency(const uint64_t latency_ms) {
         log_params.insert(log_params.end(),
                           {"max", absl::StrCat(app_settings_.network.ping_timeout_milliseconds, "ms")});
         print_log(log::Level::kWarning, log_params, "Timeout! Disconnecting ...");
-        stop(false);
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
         return;
     }
 
@@ -189,7 +189,7 @@ void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
                                                     "failure", "reason", error_code.message()};
             print_log(log::Level::kWarning, log_params, "Disconnecting ...");
         }
-        stop(true);
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
         return;
     }
     if (log::test_verbosity(log::Level::kTrace)) {
@@ -197,7 +197,7 @@ void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
         print_log(log::Level::kTrace, log_params);
     }
     start_read();
-    std::ignore = push_message(MessageType::kVersion, local_version_);
+    std::ignore = push_message(local_version_);
 }
 
 void Node::start_read() {
@@ -222,7 +222,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", error_code.message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
-        stop(false);
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
         return;
     }
 
@@ -235,7 +235,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         if (parse_result.has_error()) {
             const std::list<std::string> log_params{"action", __func__, "status", parse_result.error().message()};
             print_log(log::Level::kError, log_params, " Disconnecting ...");
-            stop(false);
+            asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
             return;
         }
     }
@@ -297,8 +297,8 @@ void Node::start_write() {
                 print_log(log::Level::kError, log_params, "Disconnecting peer but is local fault ...");
             }
             outbound_message_.reset();
-            is_writing_.store(false);
-            stop(false);
+            is_writing_.exchange(false);
+            asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
             return;
         }
 
@@ -351,8 +351,8 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
                                                     "failure", "reason", error_code.message()};
             print_log(log::Level::kError, log_params, "Disconnecting ...");
         }
-        is_writing_.store(false);
-        stop(false);
+        is_writing_.exchange(false);
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
         return;
     }
 
@@ -379,16 +379,16 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     }
 }
 
-outcome::result<void> Node::push_message(const MessageType message_type, MessagePayload& payload) {
+outcome::result<void> Node::push_message(MessagePayload& payload) {
     using namespace ser;
     using enum Error;
 
     auto new_message{std::make_unique<Message>(version_, app_settings_.chain_config->magic_)};
-    auto result{new_message->push(message_type, payload)};
+    auto result{new_message->push(payload)};
     if (result.has_error()) {
         if (log::test_verbosity(log::Level::kError)) {
             const std::list<std::string> log_params{
-                "action", __func__,  "message", std::string(magic_enum::enum_name(message_type)),
+                "action", __func__,  "message", std::string(magic_enum::enum_name(payload.type())),
                 "status", "failure", "reason",  result.error().message()};
             print_log(log::Level::kError, log_params);
         }
@@ -403,8 +403,8 @@ outcome::result<void> Node::push_message(const MessageType message_type, Message
 }
 
 outcome::result<void> Node::push_message(const MessageType message_type) {
-    MsgNullPayload null_payload{};
-    return push_message(message_type, null_payload);
+    MsgNullPayload null_payload{message_type};
+    return push_message(null_payload);
 }
 
 void Node::begin_inbound_message() {
@@ -517,9 +517,10 @@ outcome::result<void> Node::process_inbound_message() {
             // and we don't need to forward the message elsewhere
             break;
         case kPing: {
-            MsgPingPongPayload ping_pong{};
-            if (result = ping_pong.deserialize(inbound_message_->data()); not result.has_error()) {
-                result = push_message(MessageType::kPong, ping_pong);
+            MsgPingPayload ping_payload{};
+            if (result = ping_payload.deserialize(inbound_message_->data()); not result.has_error()) {
+                MsgPongPayload pong_payload(ping_payload);
+                result = push_message(pong_payload);
             }
         } break;
         case kGetAddr:
@@ -529,7 +530,7 @@ outcome::result<void> Node::process_inbound_message() {
                 break;
             } else if (connection_ptr_->type_ == ConnectionType::kSeedOutbound) {
                 // Disconnect from seed nodes as soon as we get some addresses from them
-                stop(false);
+                asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
             }
             notify_node_hub = true;
             break;
@@ -540,11 +541,11 @@ outcome::result<void> Node::process_inbound_message() {
                 err_extended_reason = "Received an unrequested `pong` message.";
                 break;
             }
-            MsgPingPongPayload ping_pong{};
-            if (result = ping_pong.deserialize(inbound_message_->data()); result.has_error()) break;
-            if (ping_pong.nonce_ not_eq expected_nonce) {
+            MsgPongPayload pong_payload{};
+            if (result = pong_payload.deserialize(inbound_message_->data()); result.has_error()) break;
+            if (pong_payload.nonce_ not_eq expected_nonce) {
                 result = Error::kInvalidPingPongNonce;
-                err_extended_reason = absl::StrCat("Expected ", expected_nonce, " got ", ping_pong.nonce_, ".");
+                err_extended_reason = absl::StrCat("Expected ", expected_nonce, " got ", pong_payload.nonce_, ".");
                 break;
             }
             // Calculate ping response time in milliseconds
