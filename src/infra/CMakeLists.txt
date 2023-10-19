@@ -25,6 +25,7 @@ set(PUBLIC_LIBS
         ${BUILD_CORE_COMPONENT}
         absl::time
         Boost::headers
+        Boost::thread
         Boost::coroutine # Mind the order
         Boost::context   # of this two
         Boost::timer

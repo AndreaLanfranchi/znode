@@ -137,8 +137,12 @@ class Channel {
 class NotifyChannel {
   public:
     explicit NotifyChannel(boost::asio::any_io_executor executor) : channel_{std::move(executor), 1} {}
-    Task<void> wait() { co_await channel_.async_receive(); }
-    void notify() { channel_.try_send(std::monostate{}); }
+    Task<void> wait_one() { co_await channel_.async_receive(); }
+    bool notified() { 
+        std::monostate result;
+        return channel_.try_receive(result); 
+    }
+    void notify() { std::ignore = channel_.try_send(std::monostate{}); }
 
   private:
     Channel<std::monostate> channel_;

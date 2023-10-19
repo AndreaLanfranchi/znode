@@ -8,10 +8,11 @@
 #pragma once
 #include <atomic>
 #include <condition_variable>
+#include <optional>
 #include <thread>
 
 #include <boost/noncopyable.hpp>
-#include <boost/signals2/signal.hpp>
+#include <boost/thread.hpp>
 
 #include <infra/concurrency/stoppable.hpp>
 
@@ -22,8 +23,9 @@ namespace zenpp::con {
 class Worker : public Stoppable, private boost::noncopyable {
   public:
     Worker() : name_{"worker"} {}
-    explicit Worker(const std::string& name) : name_{name} {}
-    explicit Worker(std::string&& name) : name_{std::move(name)} {}
+    explicit Worker(const std::string& name, std::optional<size_t> stack_size = std::nullopt) : name_{name}, stack_size_{stack_size} {}
+    explicit Worker(std::string&& name, std::optional<size_t> stack_size = std::nullopt)
+        : name_{std::move(name)}, stack_size_{stack_size} {}
 
     ~Worker() override;
 
@@ -40,10 +42,7 @@ class Worker : public Stoppable, private boost::noncopyable {
     [[nodiscard]] std::string name() const { return name_; }
 
     //! \brief Returns the id of this worker (is the thread id)
-    [[nodiscard]] size_t id() const {
-        if (thread_ == nullptr) return 0;
-        return std::hash<std::thread::id>{}(thread_->get_id());
-    }
+    [[nodiscard]] uint64_t id() const { return id_; }
 
     //! \brief Whether this worker/thread has encountered an exception
     bool has_exception() const noexcept { return exception_ptr_ not_eq nullptr; }
@@ -70,8 +69,9 @@ class Worker : public Stoppable, private boost::noncopyable {
     std::string name_;
 
   private:
+    std::optional<size_t> stack_size_{};
     std::atomic_uint64_t id_{0};  // Obtained from thread_id
-    std::unique_ptr<std::thread> thread_{nullptr};
+    std::unique_ptr<boost::thread> thread_{nullptr};
     std::exception_ptr exception_ptr_{nullptr};
     virtual void work() = 0;  // Derived classes must override
 };

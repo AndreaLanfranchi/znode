@@ -104,7 +104,13 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         .add_option("--network.maxactiveconnections", network_settings.max_active_connections,
                     "Maximum number of concurrent connected nodes")
         ->capture_default_str()
-        ->check(CLI::Range(size_t(8), size_t(128)));
+        ->check(CLI::Range(size_t(16), size_t(128)));
+
+    network_opts
+        .add_option("--network.minoutgoingconnections", network_settings.min_outgoing_connections,
+                    "Minimum number of outgoing connections to remote nodes")
+        ->capture_default_str()
+        ->check(CLI::Range(size_t(0), size_t(128)));
 
     network_opts
         .add_option("--network.maxconnectionsperip", network_settings.max_active_connections_per_ip,
@@ -186,6 +192,14 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         throw std::invalid_argument("--chaindata.growthsize max value > " +
                                     to_human_bytes(mdbx_max_size_hard_limit / 2, /*binary=*/true));
     }
+
+
+    // Check number of allowed connections is consistent
+    if (settings.network.min_outgoing_connections > settings.network.max_active_connections) {
+        throw std::invalid_argument(
+            "--network.minoutgoingconnections cannot be greater than "
+            "--network.maxactiveconnections");
+    };
 
     settings.chaindata_env_config.growth_size = parsed_size.value();
     settings.data_directory = std::make_unique<DataDirectory>(data_dir_path);

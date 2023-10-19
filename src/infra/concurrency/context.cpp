@@ -9,6 +9,7 @@
 
 #include <thread>
 
+#include <absl/strings/str_cat.h>
 #include <boost/asio/post.hpp>
 
 #include <infra/common/log.hpp>
@@ -25,18 +26,21 @@ Context::Context(std::string name, size_t concurrency)
 
 bool Context::start() noexcept {
     if (not Stoppable::start()) return false;  // Already started
-    LOG_TRACE << "Starting [" << name_ << "] context with " << concurrency_ << " threads";
+    LOG_TRACE2 << "Starting [" << name_ << "] context with " << concurrency_ << " threads";
     for (size_t i{0U}; i < concurrency_; ++i) {
-        asio::post(thread_pool_, [this] {
-            LOG_TRACE << "Starting thread " << std::this_thread::get_id() << " in context ";
+        asio::post(thread_pool_, [this, i] {
+            const std::string thread_name{absl::StrCat("asio-", name_, "-", i)};
+            LOG_TRACE2 << "Starting thread " << thread_name << " in context ";
+            log::set_thread_name(thread_name);
             io_context_->run();
+            LOG_TRACE2 << "Stopping thread " << thread_name << " in context ";
         });
     }
     return true;
 }
 bool Context::stop() noexcept {
     if (not Stoppable::stop()) return false;  // Already stopped
-    LOG_TRACE << "Stopping [" << name_ << "] context";
+    LOG_TRACE2 << "Stopping [" << name_ << "] context";
     work_guard_.reset();
     io_context_->stop();
     thread_pool_.join();

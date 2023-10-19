@@ -28,8 +28,9 @@ struct NetworkSettings {
     nat::Option nat{};                                                                   // NAT traversal option
     std::string local_endpoint{absl::StrCat("0.0.0.0:", kMainNetConfig.default_port_)};  // Local node listen address
     bool ipv4_only{false};                            // Whether to listen/connect on IPv4 addresses only
-    uint32_t max_active_connections{16};              // Maximum allowed number of connected nodes
+    uint32_t max_active_connections{64};              // Maximum allowed number of connected nodes
     uint32_t max_active_connections_per_ip{1};        // Maximum allowed number of connected nodes per single IP address
+    uint32_t min_outgoing_connections{8};             // Minimum number of outgoing connections
     uint32_t protocol_handshake_timeout_seconds{10};  // Number of seconds to wait for protocol handshake completion
     uint32_t inbound_timeout_seconds{10};      // Number of seconds to wait for the completion of an inbound message
     uint32_t outbound_timeout_seconds{10};     // Number of seconds to wait for the completion of an outbound message

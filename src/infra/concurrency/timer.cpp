@@ -32,7 +32,6 @@ bool Timer::start() noexcept {
     if (not Stoppable::start()) return false;  // Already started
     if (interval_.load().count() == 0U or not call_back_) return false;
     exception_ptr_ = nullptr;
-    LOG_TRACE1 << "Timer[" << name_ << "]: start requested";
     working_.store(true);
     asio::co_spawn(timer_.get_executor(), work(), asio::detached);
     return true;
@@ -49,10 +48,8 @@ bool Timer::start(chrono::milliseconds interval, CallBackFunc call_back) noexcep
 
 bool Timer::stop() noexcept {
     if (not Stoppable::stop()) return false;  // Already stopped
-    LOG_TRACE1 << "Timer[" << name_ << "]: stop requested";
     std::ignore = timer_.cancel();
     working_.wait(true);
-    LOG_TRACE1 << "Timer[" << name_ << "]: stopped";
     return true;
 }
 
@@ -63,7 +60,6 @@ Task<void> Timer::work() noexcept {
         do {
             timer_.expires_after(wait_interval);
             co_await timer_.async_wait(asio::use_awaitable);
-            LOG_TRACE1 << "Timer[" << name_ << "]: expired";
             call_back_(wait_interval);
         } while (is_running() and resubmit and wait_interval.count() not_eq 0U);
 

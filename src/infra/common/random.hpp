@@ -51,4 +51,7 @@ T randomize(T val, double percentage) {
     const T max = ((std::numeric_limits<T>::max() - variance) > val) ? val + variance : std::numeric_limits<T>::max();
     return randomize<T>(min, max);
 }
+
+Bytes randomize_bytes(size_t size);
+
 }  // namespace zenpp

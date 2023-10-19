@@ -11,6 +11,7 @@
 #include <string>
 
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/any_io_executor.hpp>
 #include <boost/asio/thread_pool.hpp>
 
 #include <infra/concurrency/stoppable.hpp>
@@ -30,6 +31,7 @@ class Context final : public Stoppable {
     [[nodiscard]] boost::asio::io_context* get() const { return io_context_.get(); }
     [[nodiscard]] boost::asio::io_context* operator->() const { return io_context_.get(); }
     [[nodiscard]] boost::asio::io_context& operator*() const { return *io_context_; }
+    [[nodiscard]] boost::asio::any_io_executor executor() const { return io_context_->get_executor(); }
 
     bool start() noexcept override;
     bool stop() noexcept override;

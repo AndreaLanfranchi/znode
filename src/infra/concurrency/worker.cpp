@@ -23,7 +23,12 @@ bool Worker::start() noexcept {
     kicked_.store(false);
     id_.store(0);
 
-    thread_ = std::make_unique<std::thread>([this]() {
+    boost::thread::attributes attrs;
+    if (stack_size_.has_value()) {
+        attrs.set_stack_size(stack_size_.value());
+    }
+
+    thread_ = std::make_unique<boost::thread>(attrs, [this]() {
         log::set_thread_name(name_);
 
         // Retrieve the id
@@ -40,7 +45,7 @@ bool Worker::start() noexcept {
                                      {"name", name_, "id", std::to_string(id_.load()), "exception", "Undefined error"});
         }
 
-        state_.exchange(ComponentStatus::kNotStarted);
+        set_stopped();
         kicked_.exchange(false);
         id_.store(0);
     });

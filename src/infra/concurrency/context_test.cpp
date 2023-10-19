@@ -17,7 +17,7 @@ namespace zenpp::con {
 
 TEST_CASE("Context", "[infra][concurrency][context]") {
     log::SetLogVerbosityGuard guard(log::Level::kTrace);
-    Context context("test", std::thread::hardware_concurrency());
+    Context context("test", 1);
     REQUIRE(context.start());
     REQUIRE_FALSE(context.start());  // Already started
     std::this_thread::sleep_for(std::chrono::seconds(2));

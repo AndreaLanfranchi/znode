@@ -138,6 +138,10 @@ Task<void> NodeHub::node_factory_work() {
 
         new_node->start();
         on_node_connected(new_node);
+
+        if (current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+            need_connections_.notify();
+        }
     }
 
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "node_factory", "status", "stopped"});
@@ -146,6 +150,8 @@ Task<void> NodeHub::node_factory_work() {
 
 Task<void> NodeHub::connector_work() {
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "connector", "status", "started"});
+    
+    need_connections_.notify();
     while (is_running()) {
         // Poll channel for any outstanding connection request
         boost::system::error_code error;
@@ -158,6 +164,7 @@ Task<void> NodeHub::connector_work() {
 
         ASSERT_PRE(conn_ptr->socket_ptr_ == nullptr and "Socket must be null");
         if (app_settings_.network.ipv4_only and conn_ptr->endpoint_.address_.get_type() not_eq IPAddressType::kIPv4) {
+            need_connections_.notify();
             continue;
         }
 
@@ -172,6 +179,7 @@ Task<void> NodeHub::connector_work() {
                                      "error", "same IP connections overflow"})
                 << "Discarding ...";
             lock.unlock();
+            need_connections_.notify();
             continue;
         }
         lock.unlock();
@@ -184,6 +192,7 @@ Task<void> NodeHub::connector_work() {
             log::Warning("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
                                      "error", ex.code().message()});
             std::ignore = conn_ptr->socket_ptr_->close(error);
+            need_connections_.notify();
             continue;
         }
 
@@ -274,12 +283,13 @@ Task<void> NodeHub::acceptor_work() {
 
 void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) {
     const bool running{is_running()};
+    size_t stopped_nodes{0};
     std::unique_lock lock{nodes_mutex_};
     for (auto iterator{nodes_.begin()}; iterator not_eq nodes_.end(); /* !!! no increment !!! */) {
         if (*iterator == nullptr) {
             iterator = nodes_.erase(iterator);
             continue;
-        } else if (not(*iterator)->is_running()) {
+        } else if (not (*iterator)->is_running()) {
             on_node_disconnected(*iterator);
             iterator->reset();
             ++iterator;
@@ -287,18 +297,17 @@ void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) 
         }
         if (not running) {
             std::ignore = (*iterator)->stop();
+            if (++stopped_nodes == 16) break; // Otherwise too many pending actions pile up.
             ++iterator;
             continue;
         }
-
-        auto& node{*(*iterator)};
-        if (const auto idling_result{node.is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
-            const std::string reason{magic_enum::enum_name(idling_result)};
-            log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
-                                     node.to_string(), "reason", reason})
-                << "Disconnecting ...";
-            std::ignore = node.stop();
-        }
+        if (const auto idling_result{ (*iterator)->is_idle() }; idling_result not_eq NodeIdleResult::kNotIdle) {
+			const std::string reason{magic_enum::enum_name(idling_result)};
+			log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
+                									 (*iterator)->to_string(), "reason", reason})
+				<< "Disconnecting ...";
+			std::ignore = (*iterator)->stop();
+		}
         ++iterator;
     }
     current_active_connections_.store(static_cast<uint32_t>(nodes_.size()));
@@ -445,7 +454,10 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
         default:
             ASSERT(false and "Should not happen");
     }
-
+    current_active_connections_ = current_active_inbound_connections_ + current_active_outbound_connections_;
+    if (current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+        need_connections_.notify();
+    };
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service",
                    {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",
@@ -519,17 +531,20 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                                {"name", "Node Hub", "action", __func__, "message", "addr", "remote", node->to_string(),
                                 "count", std::to_string(addr_payload.identifiers_.size())});
                 }
-                for (const auto& service : addr_payload.identifiers_) {
-                    if (app_settings_.network.ipv4_only and
-                        service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
-                        continue;
-                    if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
-                        log::Debug("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
-                                               service.endpoint_.to_string()})
-                            << " << Non standard port";
+                if (need_connections_.notified()) {
+                    for (const auto& service : addr_payload.identifiers_) {
+                        if (app_settings_.network.ipv4_only and
+                            service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
+                            continue;
+                        if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
+                            log::Debug("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
+                                                   service.endpoint_.to_string()})
+                                << " << Non standard port";
+                        }
+                        std::ignore = connector_feed_.try_send(
+                            std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
+                        break;
                     }
-                    std::ignore = connector_feed_.try_send(
-                        std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
                 }
             } break;
             default:

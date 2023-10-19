@@ -36,6 +36,7 @@ class NodeHub : public con::Stoppable {
           socket_acceptor_{io_context},
           service_timer_{io_context, "nh_service", true},
           info_timer_{io_context, "nh_info", true},
+          need_connections_(io_context.get_executor()),
           node_factory_feed_(io_context.get_executor(), settings.network.max_active_connections),
           connector_feed_(io_context.get_executor(), settings.network.max_active_connections) {
         if (app_settings_.network.nonce == 0U) {
@@ -128,6 +129,7 @@ class NodeHub : public con::Stoppable {
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};
 
+    con::NotifyChannel need_connections_;  // Notify channel for new connections to be established
     con::Channel<std::shared_ptr<Connection>> node_factory_feed_;  // Channel for new nodes to be instantiated
     con::Channel<std::shared_ptr<Connection>> connector_feed_;     // Channel for new outgoing connections
 
