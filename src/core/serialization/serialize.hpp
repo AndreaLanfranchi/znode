@@ -38,10 +38,10 @@ inline constexpr uint32_t ssizeof<uint256_t> = 32U;
 //! \remarks Mostly used in P2P messages to prepend a list of elements with the count of items to be expected.
 //! \attention Not to be confused with varint
 inline constexpr uint32_t ser_compact_sizeof(uint64_t value) {
-    if (value < 253) return 1U;          // One byte only
-    if (value <= 0xffff) return 3U;      // One byte prefix + 2 bytes of uint16_t
-    if (value <= 0xffffffff) return 5U;  // One byte prefix + 4 bytes of uint32_t
-    return 9U;                           // One byte prefix + 8 bytes of uint64_t
+    if (value < (UINT8_MAX - 2U)) return 1U;  // One byte only
+    if (value <= UINT16_MAX) return 3U;       // One byte prefix + 2 bytes of uint16_t
+    if (value <= UINT32_MAX) return 5U;       // One byte prefix + 4 bytes of uint32_t
+    return 9U;                                // One byte prefix + 8 bytes of uint64_t
 }
 
 //! \brief Lowest level serialization for integral arithmetic types
@@ -122,7 +122,7 @@ inline outcome::result<void> read_data(Stream& stream, bool& object) {
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Stream>
-requires Integral<T>
+    requires Integral<T>
 inline outcome::result<T> read_as(Stream& stream) {
     T ret{0};
     if (const outcome::result<T> read_result{read_data(stream, ret)}; read_result.has_error()) {
@@ -132,7 +132,7 @@ inline outcome::result<T> read_as(Stream& stream) {
 }
 
 template <typename T, class Stream>
-requires std::same_as<T, double> or std::same_as<T, float>
+    requires std::same_as<T, double> or std::same_as<T, float>
 inline outcome::result<T> read_as(Stream& stream) {
     const auto bytes_to_read{ssizeof<T>};
     const auto read_result{stream.read(bytes_to_read)};
