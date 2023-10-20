@@ -387,8 +387,7 @@ outcome::result<void> Node::push_message(MessagePayload& payload, MessagePriorit
     using enum Error;
 
     auto new_message{std::make_unique<Message>(version_, app_settings_.chain_config->magic_)};
-    auto result{new_message->push(payload)};
-    if (result.has_error()) {
+    if (const auto result{new_message->push(payload)}; result.has_error()) {
         if (log::test_verbosity(log::Level::kError)) {
             const std::list<std::string> log_params{
                 "action", __func__,  "message", std::string(magic_enum::enum_name(payload.type())),
@@ -410,22 +409,18 @@ outcome::result<void> Node::push_message(const MessageType message_type, Message
     return push_message(null_payload, priority);
 }
 
-void Node::begin_inbound_message() {
-    inbound_message_ = std::make_unique<Message>(version_, app_settings_.chain_config.value().magic_);
-}
-
-void Node::end_inbound_message() {
-    inbound_message_.reset();
-    inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
-}
-
 outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
     size_t messages_parsed{0};
     outcome::result<void> result{outcome::success()};
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
 
     while (!data.empty()) {
-        if (inbound_message_ == nullptr) begin_inbound_message();
+
+        if (inbound_message_ == nullptr) {
+            inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
+            inbound_message_ = std::make_unique<Message>(version_, app_settings_.chain_config.value().magic_);
+        }
+
         result = inbound_message_->write(data);  // Note! data is consumed here
         if (result.has_error()) {
             if (result.error() == Error::kMessageHeaderIncomplete or result.error() == Error::kMessageBodyIncomplete) {
@@ -467,7 +462,8 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
         }
 
         if (result = process_inbound_message(); result.has_error()) break;
-        end_inbound_message();
+        inbound_message_.reset();
+        inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
     }
 
     receive_buffer_.consume(bytes_transferred);

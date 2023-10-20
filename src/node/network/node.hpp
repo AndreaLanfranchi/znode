@@ -148,9 +148,6 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     void start_ssl_handshake();
     void handle_ssl_handshake(const boost::system::error_code& error_code);
 
-    void begin_inbound_message();
-    void end_inbound_message();
-
     //! \brief Sends a ping to the remote peer on cadence
     //! \remark The interval is randomly chosen on setting's ping get_interval +/- 30%
     void on_ping_timer_expired(std::chrono::milliseconds& interval) noexcept;
@@ -209,7 +206,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     std::atomic<std::chrono::steady_clock::time_point> last_ping_sent_time_;  // Last outgoing ping tstamp
     std::atomic_uint64_t ping_nonce_{0};                                      // Last ping nonce sent
-    std::atomic_uint32_t ping_samples_count_{0};                              // Number of ping samples
+    //std::atomic_uint32_t ping_samples_count_{0};                              // Number of ping samples
     std::atomic_uint64_t min_ping_latency_{0};                                // Minimum ping latency
     std::atomic_uint64_t ema_ping_latency_{0};  // Exponential moving average of ping latency
 
