@@ -7,7 +7,6 @@
 
 #include "timer.hpp"
 
-#include <thread>
 #include <utility>
 
 #include <absl/strings/str_cat.h>
@@ -37,7 +36,7 @@ bool Timer::start() noexcept {
     return true;
 }
 
-bool Timer::start(chrono::milliseconds interval, CallBackFunc call_back) noexcept {
+bool Timer::start(duration interval, CallBackFunc call_back) noexcept {
     if (not is_running()) {
         interval_.store(interval);
         call_back_ = std::move(call_back);

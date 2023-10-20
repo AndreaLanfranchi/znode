@@ -116,7 +116,7 @@ void Node::on_stop_completed() noexcept {
     set_stopped();
 }
 
-void Node::on_ping_timer_expired(std::chrono::milliseconds& interval) noexcept {
+void Node::on_ping_timer_expired(con::Timer::duration& interval) noexcept {
     using namespace std::chrono_literals;
     if (ping_nonce_.load() not_eq 0U) return;  // Wait for response to return
     last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());

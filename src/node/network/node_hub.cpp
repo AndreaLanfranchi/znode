@@ -280,7 +280,7 @@ Task<void> NodeHub::acceptor_work() {
     co_return;
 }
 
-void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) {
+void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     const bool running{is_running()};
     size_t stopped_nodes{0};
     std::unique_lock lock{nodes_mutex_};
@@ -312,7 +312,7 @@ void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) 
     current_active_connections_.store(static_cast<uint32_t>(nodes_.size()));
 }
 
-void NodeHub::on_info_timer_expired(std::chrono::milliseconds& /*interval*/) {
+void NodeHub::on_info_timer_expired(con::Timer::duration& /*interval*/) {
     std::vector<std::string> info_data;
     info_data.insert(info_data.end(), {"peers i/o", absl::StrCat(current_active_inbound_connections_.load(), "/",
                                                                  current_active_outbound_connections_.load())});
@@ -441,7 +441,7 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
     current_active_connections_ = current_active_inbound_connections_ + current_active_outbound_connections_;
     if (current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
         need_connections_.notify();
-    };
+    }
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service",
                    {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",
@@ -509,6 +509,12 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
             case kAddr: {
                 MsgAddrPayload addr_payload{};
                 success_or_throw(addr_payload.deserialize(message->data()));
+
+                // Randomly shuffle the list of addresses
+                std::random_device rnd;
+                std::mt19937 gen(rnd());
+                std::shuffle(addr_payload.identifiers_.begin(), addr_payload.identifiers_.end(), gen);
+
                 // TODO Pass it to the address manager
                 if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
                     log::Trace("Service",

@@ -150,7 +150,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Sends a ping to the remote peer on cadence
     //! \remark The interval is randomly chosen on setting's ping get_interval +/- 30%
-    void on_ping_timer_expired(std::chrono::milliseconds& interval) noexcept;
+    void on_ping_timer_expired(con::Timer::duration& interval) noexcept;
 
     //! \brief Computes the ping latency and updates the EMA
     //! \details Ping latency is the get_interval between the sending of a ping message and the reception of the

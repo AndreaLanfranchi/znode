@@ -97,10 +97,10 @@ class NodeHub : public con::Stoppable {
     //! - Check for pending connections requests and attempt to connect to them
     //! - Check disconnected nodes and remove them from the nodes_ map
     //! - Check for nodes that have been idle for too long and disconnect them
-    void on_service_timer_expired(std::chrono::milliseconds& interval);
+    void on_service_timer_expired(con::Timer::duration& interval);
 
     //! \brief Periodically prints some metric data about network usage
-    void on_info_timer_expired(std::chrono::milliseconds& interval);
+    void on_info_timer_expired(con::Timer::duration& interval);
 
     void feed_connections_from_cli();  // Feed node_factory_feed_ from command line --network.connect
     void feed_connections_from_dns();  // Feed node_factory_feed_ from DNS seeds configured for chain
