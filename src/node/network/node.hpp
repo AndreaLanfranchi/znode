@@ -12,6 +12,8 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <queue>
+#include <utility>
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -142,11 +144,11 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     [[nodiscard]] static int next_node_id() noexcept { return next_node_id_.fetch_add(1); }
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
-    outcome::result<void> push_message(MessagePayload& payload);
+    outcome::result<void> push_message(MessagePayload& payload, MessagePriority priority = MessagePriority::kNormal);
 
     //! \brief Creates a new network message to be queued for delivery to the remote node
     //! \remarks This a handy overload used to async_send messages with a null payload
-    outcome::result<void> push_message(MessageType message_type);
+    outcome::result<void> push_message(MessageType message_type, MessagePriority priority = MessagePriority::kNormal);
 
   private:
     void start_ssl_handshake();
@@ -231,9 +233,18 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic_bool is_writing_{false};  // Whether a write operation is in progress
     std::atomic<std::chrono::steady_clock::time_point> outbound_message_start_time_{
         std::chrono::steady_clock::time_point::min()};              // Start time of outbound msg
-    std::shared_ptr<Message> outbound_message_{nullptr};            // The "next" message being sent
-    std::vector<decltype(outbound_message_)> outbound_messages_{};  // Queue of messages awaiting to be sent
-    std::mutex outbound_messages_mutex_{};                          // Lock guard for messages to be sent
+
+    using message_queue_item = std::pair<std::shared_ptr<Message>, MessagePriority>;
+    struct MessageQueueItemComparator {
+        bool operator()(const message_queue_item& lhs, const message_queue_item& rhs) const {
+            return static_cast<int>(lhs.second) < static_cast<int>(rhs.second);
+        }
+    };
+    std::priority_queue<message_queue_item, std::vector<message_queue_item>, MessageQueueItemComparator>
+        outbound_messages_queue_{};  // Queue of messages awaiting to be sent
+
+    std::shared_ptr<Message> outbound_message_{nullptr};  // The "next" message being sent
+    std::mutex outbound_messages_mutex_{};                // Lock guard for messages to be sent
 
     MsgVersionPayload local_version_{};   // Local protocol version
     MsgVersionPayload remote_version_{};  // Remote protocol version

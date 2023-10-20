@@ -120,7 +120,7 @@ void Node::on_ping_timer_expired(std::chrono::milliseconds& interval) noexcept {
     ping_nonce_.store(randomize<uint64_t>(/*min=*/1U));
     MsgPingPayload ping_payload{};
     ping_payload.nonce_ = ping_nonce_.load();
-    if (const auto result{push_message(ping_payload)}; result.has_error()) {
+    if (const auto result{push_message(ping_payload, MessagePriority::kHigh)}; result.has_error()) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", result.error().message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
@@ -264,13 +264,13 @@ void Node::start_write() {
     while (outbound_message_ == nullptr) {
         // Try to get a new message from the queue
         const std::scoped_lock lock{outbound_messages_mutex_};
-        if (outbound_messages_.empty()) {
+        if (outbound_messages_queue_.empty()) {
             is_writing_.store(false);
             return;  // Eventually next message submission to the queue will trigger a new write cycle
         }
-        outbound_message_ = std::move(outbound_messages_.front());
+        outbound_message_ = std::move(outbound_messages_queue_.top().first);
+        outbound_messages_queue_.pop();
         outbound_message_->data().seekg(0);
-        outbound_messages_.erase(outbound_messages_.begin());
     }
 
     // If message has been just loaded into the barrel then we must check its validity
@@ -379,7 +379,7 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
     }
 }
 
-outcome::result<void> Node::push_message(MessagePayload& payload) {
+outcome::result<void> Node::push_message(MessagePayload& payload, MessagePriority priority) {
     using namespace ser;
     using enum Error;
 
@@ -395,16 +395,16 @@ outcome::result<void> Node::push_message(MessagePayload& payload) {
         return result.error();
     }
     std::unique_lock lock(outbound_messages_mutex_);
-    outbound_messages_.emplace_back(new_message.release());
+    outbound_messages_queue_.push({std::move(new_message), priority});
     lock.unlock();
 
     boost::asio::post(io_strand_, [self{shared_from_this()}]() { self->start_write(); });
     return outcome::success();
 }
 
-outcome::result<void> Node::push_message(const MessageType message_type) {
+outcome::result<void> Node::push_message(const MessageType message_type, MessagePriority priority) {
     MsgNullPayload null_payload{message_type};
-    return push_message(null_payload);
+    return push_message(null_payload, priority);
 }
 
 void Node::begin_inbound_message() {
@@ -523,14 +523,18 @@ outcome::result<void> Node::process_inbound_message() {
                 result = push_message(pong_payload);
             }
         } break;
+        case kAddr:
+            if (connection_ptr_->type_ == ConnectionType::kSeedOutbound) {
+                // Disconnect from seed nodes as soon as we get some addresses from them
+                asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
+            }
+            notify_node_hub = true;
+            break;
         case kGetAddr:
             if (connection_ptr_->type_ == ConnectionType::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
                 // Ignore the message to avoid fingerprinting
                 err_extended_reason = "Ignoring duplicate 'getaddr' message on inbound connection.";
                 break;
-            } else if (connection_ptr_->type_ == ConnectionType::kSeedOutbound) {
-                // Disconnect from seed nodes as soon as we get some addresses from them
-                asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
             }
             notify_node_hub = true;
             break;
@@ -628,11 +632,6 @@ outcome::result<void> Node::validate_message_for_protocol_handshake(const DataDi
 void Node::on_handshake_completed() {
     if (not is_running()) return;
 
-    // If this is a seeder node then we should async_send a `getaddr` message
-    if (connection_ptr_->type_ == ConnectionType::kSeedOutbound) {
-        std::ignore = push_message(MessageType::kGetAddr);
-    }
-
     // Lets' async_send out a ping immediately and start the timer
     // for subsequent pings
     const auto random_milliseconds{randomize<uint32_t>(app_settings_.network.ping_interval_seconds * 1'000U, 0.3)};
@@ -640,13 +639,18 @@ void Node::on_handshake_completed() {
     on_ping_timer_expired(ping_interval);
     ping_timer_.autoreset(true);
     ping_timer_.start(ping_interval, [this](std::chrono::milliseconds& interval) { on_ping_timer_expired(interval); });
+
+    // Unless this is an inbound connection, we must request addresses
+    if (connection_ptr_->type_ not_eq ConnectionType::kInbound) {
+        std::ignore = push_message(MessageType::kGetAddr);
+    }
 }
 
 NodeIdleResult Node::is_idle() const noexcept {
     using enum NodeIdleResult;
     using namespace std::chrono;
 
-    if (!is_connected()) return kNotIdle;  // Not connected - not idle
+    if (not is_connected()) return kNotIdle;  // Not connected - not idle
 
     const auto now{steady_clock::now()};
 

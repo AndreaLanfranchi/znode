@@ -56,6 +56,12 @@ class MessageHeader : public ser::Serializable {
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
+enum class MessagePriority {
+	kHigh = 0,
+	kNormal = 1,
+	kLow = 2,
+};
+
 class Message {
   public:
     //! \brief Construct a blank NetMessage
