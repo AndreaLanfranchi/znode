@@ -23,7 +23,8 @@ namespace zenpp::con {
 class Worker : public Stoppable, private boost::noncopyable {
   public:
     Worker() : name_{"worker"} {}
-    explicit Worker(const std::string& name, std::optional<size_t> stack_size = std::nullopt) : name_{name}, stack_size_{stack_size} {}
+    explicit Worker(const std::string& name, std::optional<size_t> stack_size = std::nullopt)
+        : name_{name}, stack_size_{stack_size} {}
     explicit Worker(std::string&& name, std::optional<size_t> stack_size = std::nullopt)
         : name_{std::move(name)}, stack_size_{stack_size} {}
 

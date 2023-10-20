@@ -134,7 +134,6 @@ class NodeHub : public con::Stoppable {
     size_t total_disconnections_{0};
     size_t total_rejected_connections_{0};
 
-    net::TrafficMeter traffic_meter_{}; // Account network traffic
-
+    net::TrafficMeter traffic_meter_{};  // Account network traffic
 };
 }  // namespace zenpp::net

@@ -10,8 +10,8 @@
 #include <memory>
 #include <string>
 
-#include <boost/asio/io_context.hpp>
 #include <boost/asio/any_io_executor.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/thread_pool.hpp>
 
 #include <infra/concurrency/stoppable.hpp>

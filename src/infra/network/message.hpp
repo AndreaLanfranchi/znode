@@ -57,9 +57,9 @@ class MessageHeader : public ser::Serializable {
 };
 
 enum class MessagePriority {
-	kHigh = 0,
-	kNormal = 1,
-	kLow = 2,
+    kHigh = 0,
+    kNormal = 1,
+    kLow = 2,
 };
 
 class Message {

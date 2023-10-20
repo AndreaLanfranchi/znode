@@ -195,7 +195,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     con::Timer ping_timer_;                       // To periodically async_send ping messages
     IPEndpoint remote_endpoint_;                  // Remote endpoint
     IPEndpoint local_endpoint_;                   // Local endpoint
-    net::TrafficMeter traffic_meter_{};                  // Traffic meter
+    net::TrafficMeter traffic_meter_{};           // Traffic meter
 
     boost::asio::ssl::context* ssl_context_;
     std::unique_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> ssl_stream_;  // SSL stream

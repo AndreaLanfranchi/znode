@@ -14,8 +14,8 @@ Bytes randomize_bytes(size_t size) {
     std::mt19937 gen(rnd());
     std::uniform_int_distribution<uint16_t> dis(0, UINT8_MAX);
     for (auto& byte : bytes) {
-		byte = static_cast<uint8_t>(dis(gen));
-	}
+        byte = static_cast<uint8_t>(dis(gen));
+    }
     return bytes;
 }
 
