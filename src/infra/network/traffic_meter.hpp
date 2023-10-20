@@ -15,9 +15,9 @@ namespace zenpp::net {
 
 //! \brief A simple network traffic meter class.
 //! \remarks This class is thread-safe.
-class Meter {
+class TrafficMeter {
   public:
-    Meter() = default;
+    TrafficMeter() = default;
 
     //! \brief Updates the inbound traffic.
     void update_inbound(size_t bytes) noexcept;

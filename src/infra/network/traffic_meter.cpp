@@ -8,24 +8,24 @@
 
 namespace zenpp::net {
 
-void Meter::update_inbound(size_t bytes) noexcept {
+void TrafficMeter::update_inbound(size_t bytes) noexcept {
     const std::lock_guard lock{mutex_};
     cumulative_inbound_bytes_ += bytes;
     interval_inbound_bytes_ += bytes;
 }
 
-void Meter::update_outbound(size_t bytes) noexcept {
+void TrafficMeter::update_outbound(size_t bytes) noexcept {
     const std::lock_guard lock{mutex_};
     cumulative_outbound_bytes_ += bytes;
     interval_outbound_bytes_ += bytes;
 }
 
-std::pair<size_t, size_t> Meter::get_cumulative_bytes() const noexcept {
+std::pair<size_t, size_t> TrafficMeter::get_cumulative_bytes() const noexcept {
     const std::lock_guard lock{mutex_};
     return {cumulative_inbound_bytes_, cumulative_outbound_bytes_};
 }
 
-std::pair<size_t, size_t> Meter::get_cumulative_speed() const noexcept {
+std::pair<size_t, size_t> TrafficMeter::get_cumulative_speed() const noexcept {
     const std::lock_guard lock{mutex_};
     const auto elapsed_time{std::chrono::steady_clock::now() - start_time_};
     const auto elapsed_seconds{
@@ -34,7 +34,7 @@ std::pair<size_t, size_t> Meter::get_cumulative_speed() const noexcept {
             elapsed_seconds ? cumulative_outbound_bytes_ / elapsed_seconds : cumulative_outbound_bytes_};
 }
 
-std::pair<size_t, size_t> Meter::get_interval_bytes(bool reset_interval) noexcept {
+std::pair<size_t, size_t> TrafficMeter::get_interval_bytes(bool reset_interval) noexcept {
     const std::lock_guard lock{mutex_};
     std::pair<size_t, size_t> ret{interval_inbound_bytes_, interval_outbound_bytes_};
     if (reset_interval) {
@@ -45,7 +45,7 @@ std::pair<size_t, size_t> Meter::get_interval_bytes(bool reset_interval) noexcep
     return ret;
 }
 
-std::pair<size_t, size_t> Meter::get_interval_speed(bool reset_interval) noexcept {
+std::pair<size_t, size_t> TrafficMeter::get_interval_speed(bool reset_interval) noexcept {
     const std::lock_guard lock{mutex_};
     const auto elapsed_time{std::chrono::steady_clock::now() - interval_time_};
     const auto elapsed_seconds{
@@ -61,7 +61,7 @@ std::pair<size_t, size_t> Meter::get_interval_speed(bool reset_interval) noexcep
     return speed;
 }
 
-void Meter::reset() noexcept {
+void TrafficMeter::reset() noexcept {
     const std::lock_guard lock{mutex_};
     cumulative_inbound_bytes_ = 0;
     cumulative_outbound_bytes_ = 0;
