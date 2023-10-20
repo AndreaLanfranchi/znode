@@ -170,7 +170,7 @@ if (NOT BUILD_CORE_ONLY)
     set(CMAKE_POLICY_DEFAULT_CMP0063 NEW) # Honor visibility properties for all target types
     set(CMAKE_POLICY_DEFAULT_CMP0074 NEW)
 
-    find_package(Boost REQUIRED COMPONENTS context coroutine chrono timer thread) # Boost
+    find_package(Boost REQUIRED COMPONENTS chrono timer context coroutine thread) # Boost
     add_library(Boost::headers INTERFACE IMPORTED) # Hunter package does not provide headers
     target_include_directories(Boost::headers INTERFACE ${Boost_INCLUDE_DIRS})
 

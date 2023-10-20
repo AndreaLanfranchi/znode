@@ -11,7 +11,6 @@
 #include <stdexcept>
 
 #include <boost/timer/timer.hpp>
-#include <gsl/gsl_util>
 #include <openssl/opensslv.h>
 #include <openssl/ssl.h>
 
@@ -71,18 +70,18 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
     node_settings.chain_config = db::read_chain_config(*txn);
     if (not node_settings.chain_config.has_value() && init_if_not_configured) {
         const auto chain_config{lookup_known_chain(node_settings.network_id)};
-        if (not chain_config.has_value()) throw std::runtime_error("Unknown chain");
+        if (not chain_config.has_value()) throw std::logic_error("Unknown chain");
         db::write_chain_config(*txn, *chain_config->second);
         txn.commit(/*renew=*/true);
         node_settings.chain_config = db::read_chain_config(*txn);
     }
-    if (not node_settings.chain_config.has_value()) throw std::runtime_error("Unable to read chain config");
+    if (not node_settings.chain_config.has_value()) throw std::logic_error("Unable to read chain config");
     if (node_settings.chain_config->identifier_ != node_settings.network_id) {
         const std::string what{absl::StrCat("Incompatible chain config: requested '",
                                             lookup_known_chain_name(node_settings.network_id), "' have '",
                                             lookup_known_chain_name(node_settings.chain_config->identifier_),
                                             "'. You might want to specify a different data directory.")};
-        throw std::runtime_error(what);
+        throw std::logic_error(what);
     }
     std::ignore = log::Message("Chain", {"config", to_string(node_settings.chain_config->to_json())});
 
@@ -110,8 +109,8 @@ int main(int argc, char* argv[]) {
 
         os::Signals::init();     // Intercept OS signals
         AppSettings settings{};  // Global app settings
-        auto& network_settings = settings.network;
-        auto& log_settings = settings.log;
+        const auto& network_settings = settings.network;
+        const auto& log_settings = settings.log;
 
         // This parses and validates command line arguments
         // After return we're able to start services. Datadir has been deployed
@@ -126,8 +125,8 @@ int main(int argc, char* argv[]) {
             log::Message("Using " + std::string(get_buildinfo()->project_name), {"version", get_buildinfo_string()});
 
         // Output mdbx build info
-        auto const& mdbx_ver{mdbx::get_version()};
-        auto const& mdbx_bld{mdbx::get_build()};
+        const auto& mdbx_ver{mdbx::get_version()};
+        const auto& mdbx_bld{mdbx::get_build()};
         std::ignore = log::Message("Using libmdbx", {"version", mdbx_ver.git.describe, "build", mdbx_bld.target,
                                                      "compiler", mdbx_bld.compiler});
         // Output OpenSSL build info

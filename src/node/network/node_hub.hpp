@@ -75,9 +75,6 @@ class NodeHub : public con::Stoppable {
     //! \brief Executes the acceptor work loop asynchronously
     Task<void> acceptor_work();
 
-    //! \brief Processes a socket connection and creates a node
-    // Task<void> accept_socket(boost::asio::ip::tcp::socket socket, Connection connection);
-
     //! \brief Accounts data about node's socket disconnections
     //! \remarks Requires a lock on nodes_mutex_ is holding
     void on_node_disconnected(const std::shared_ptr<Node>& node);
@@ -111,8 +108,6 @@ class NodeHub : public con::Stoppable {
     void feed_connections_from_dns();  // Feed node_factory_feed_ from DNS seeds configured for chain
     std::map<std::string, std::vector<IPEndpoint>, std::less<>> dns_resolve(const std::vector<std::string>& hosts,
                                                                             const boost::asio::ip::tcp& version);
-
-    std::atomic_bool async_connecting_{false};  // Whether we are currently connecting to a remote endpoint
 
     AppSettings& app_settings_;              // Reference to global application settings
     boost::asio::io_context& asio_context_;  // Reference to global asio context

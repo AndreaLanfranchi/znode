@@ -59,7 +59,6 @@ bool NodeHub::start() noexcept {
     resolve_task.wait();
     log::Info("Service", {"name", "Node Hub", "action", "start", "advertising address",
                           app_settings_.network.nat.address_.to_string()});
-    resolve_task._Abandon();
 
     feed_connections_from_cli();
     feed_connections_from_dns();
@@ -102,7 +101,7 @@ Task<void> NodeHub::node_factory_work() {
         if (not node_factory_feed_.try_receive(conn_ptr)) {
             const auto& result = co_await node_factory_feed_.async_receive(error);
             if (error or not result.has_value()) continue;
-            conn_ptr = std::move(result.value());
+            conn_ptr = result.value();
         }
 
         ASSERT_PRE(conn_ptr not_eq nullptr and conn_ptr->socket_ptr_ not_eq nullptr);
@@ -157,9 +156,9 @@ Task<void> NodeHub::connector_work() {
         boost::system::error_code error;
         std::shared_ptr<Connection> conn_ptr;
         if (not connector_feed_.try_receive(conn_ptr)) {
-            const auto& result = co_await connector_feed_.async_receive(error);
+            const auto result = co_await connector_feed_.async_receive(error);
             if (error or not result.has_value()) continue;
-            conn_ptr = std::move(result.value());
+            conn_ptr = result.value();
         }
 
         ASSERT_PRE(conn_ptr->socket_ptr_ == nullptr and "Socket must be null");

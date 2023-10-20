@@ -29,7 +29,7 @@ if (NOT BUILD_CORE_ONLY)
 
     # The node executable itself
     add_executable(${PROJECT_NAME} "node.cpp;${COMMON_SRC}")
-    target_link_libraries(${PROJECT_NAME} PUBLIC third-party-includes PRIVATE Boost::chrono Boost::timer ${BUILD_NODE_COMPONENT} ${BUILDINFO_LIB} CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
+    target_link_libraries(${PROJECT_NAME} PUBLIC third-party-includes PRIVATE Boost::thread Boost::timer Boost::chrono ${BUILD_NODE_COMPONENT} ${BUILDINFO_LIB} CLI11::CLI11 $<$<BOOL:${MSVC}>:Kernel32.lib>)
     target_include_directories(${PROJECT_NAME} PRIVATE ${BUILD_MAIN_SRC_DIR})
 
 
