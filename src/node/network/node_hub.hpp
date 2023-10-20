@@ -19,6 +19,7 @@
 #include <infra/concurrency/channel.hpp>
 #include <infra/concurrency/timer.hpp>
 #include <infra/concurrency/unique_queue.hpp>
+#include <infra/network/traffic_meter.hpp>
 
 #include <node/common/settings.hpp>
 #include <node/network/connection.hpp>
@@ -52,9 +53,6 @@ class NodeHub : public con::Stoppable {
     ~NodeHub() override = default;
 
     [[nodiscard]] size_t size() const;  // Returns the number of nodes
-
-    [[nodiscard]] size_t bytes_sent() const noexcept { return total_bytes_sent_.load(); }
-    [[nodiscard]] size_t bytes_received() const noexcept { return total_bytes_received_.load(); }
 
     bool start() noexcept override;  // Begins accepting connections
     bool stop() noexcept override;   // Stops accepting connections and stops all nodes
@@ -135,9 +133,8 @@ class NodeHub : public con::Stoppable {
     size_t total_connections_{0};
     size_t total_disconnections_{0};
     size_t total_rejected_connections_{0};
-    std::atomic<size_t> total_bytes_received_{0};
-    std::atomic<size_t> total_bytes_sent_{0};
-    std::atomic<size_t> last_info_total_bytes_received_{0};
-    std::atomic<size_t> last_info_total_bytes_sent_{0};
+
+    net::Meter traffic_meter_{}; // Account network traffic
+
 };
 }  // namespace zenpp::net

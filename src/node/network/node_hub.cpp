@@ -149,7 +149,7 @@ Task<void> NodeHub::node_factory_work() {
 
 Task<void> NodeHub::connector_work() {
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "connector", "status", "started"});
-    
+
     need_connections_.notify();
     while (is_running()) {
         // Poll channel for any outstanding connection request
@@ -288,7 +288,7 @@ void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) 
         if (*iterator == nullptr) {
             iterator = nodes_.erase(iterator);
             continue;
-        } else if (not (*iterator)->is_running()) {
+        } else if (not(*iterator)->is_running()) {
             on_node_disconnected(*iterator);
             iterator->reset();
             ++iterator;
@@ -296,51 +296,36 @@ void NodeHub::on_service_timer_expired(std::chrono::milliseconds& /*interval*/) 
         }
         if (not running) {
             std::ignore = (*iterator)->stop();
-            if (++stopped_nodes == 16) break; // Otherwise too many pending actions pile up.
+            if (++stopped_nodes == 16) break;  // Otherwise too many pending actions pile up.
             ++iterator;
             continue;
         }
-        if (const auto idling_result{ (*iterator)->is_idle() }; idling_result not_eq NodeIdleResult::kNotIdle) {
-			const std::string reason{magic_enum::enum_name(idling_result)};
-			log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
-                									 (*iterator)->to_string(), "reason", reason})
-				<< "Disconnecting ...";
-			std::ignore = (*iterator)->stop();
-		}
+        if (const auto idling_result{(*iterator)->is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
+            const std::string reason{magic_enum::enum_name(idling_result)};
+            log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
+                                     (*iterator)->to_string(), "reason", reason})
+                << "Disconnecting ...";
+            std::ignore = (*iterator)->stop();
+        }
         ++iterator;
     }
     current_active_connections_.store(static_cast<uint32_t>(nodes_.size()));
 }
 
-void NodeHub::on_info_timer_expired(std::chrono::milliseconds& interval) {
-    using namespace std::chrono;
-    static uint32_t lap_duration_seconds{0};
-    lap_duration_seconds += gsl::narrow_cast<uint32_t>(duration_cast<seconds>(interval).count());
-    if (lap_duration_seconds < 5) return;
-
-    const auto current_total_bytes_received{total_bytes_received_.load()};
-    const auto current_total_bytes_sent{total_bytes_sent_.load()};
-    const auto period_total_bytes_received{current_total_bytes_received - last_info_total_bytes_received_.load()};
-    const auto period_total_bytes_sent{current_total_bytes_sent - last_info_total_bytes_sent_.load()};
-
+void NodeHub::on_info_timer_expired(std::chrono::milliseconds& /*interval*/) {
     std::vector<std::string> info_data;
     info_data.insert(info_data.end(), {"peers i/o", absl::StrCat(current_active_inbound_connections_.load(), "/",
                                                                  current_active_outbound_connections_.load())});
-    info_data.insert(info_data.end(), {"data i/o", absl::StrCat(to_human_bytes(current_total_bytes_received, true), " ",
-                                                                to_human_bytes(current_total_bytes_sent, true))});
 
-    auto period_bytes_received_per_second{to_human_bytes(period_total_bytes_received / lap_duration_seconds, true) +
-                                          "s"};
-    auto period_bytes_sent_per_second{to_human_bytes(period_total_bytes_sent / lap_duration_seconds, true) + "s"};
+    const auto [inbound_traffic, outbound_traffic]{traffic_meter_.get_cumulative_bytes()};
+    info_data.insert(info_data.end(), {"data i/o", absl::StrCat(to_human_bytes(inbound_traffic, true), " ",
+                                                                to_human_bytes(outbound_traffic, true))});
 
-    info_data.insert(info_data.end(),
-                     {"speed i/o", period_bytes_received_per_second + " " + period_bytes_sent_per_second});
-
-    last_info_total_bytes_received_.store(current_total_bytes_received);
-    last_info_total_bytes_sent_.store(current_total_bytes_sent);
+    const auto [inbound_speed, outbound_speed]{traffic_meter_.get_interval_speed(true)};
+    info_data.insert(info_data.end(), {"speed i/o", absl::StrCat(to_human_bytes(inbound_speed, true), "s ",
+                                                                 to_human_bytes(outbound_speed, true), "s")});
 
     std::ignore = log::Info("Network usage", info_data);
-    lap_duration_seconds = 0;  // Accumulate for another 5 seconds
 }
 
 void NodeHub::feed_connections_from_cli() {
@@ -493,10 +478,10 @@ void NodeHub::on_node_data(net::DataDirectionMode direction, const size_t bytes_
     switch (direction) {
         using enum DataDirectionMode;
         case kInbound:
-            total_bytes_received_ += bytes_transferred;
+            traffic_meter_.update_inbound(bytes_transferred);
             break;
         case kOutbound:
-            total_bytes_sent_ += bytes_transferred;
+            traffic_meter_.update_outbound(bytes_transferred);
             break;
         default:
             ASSERT(false and "Should not happen");

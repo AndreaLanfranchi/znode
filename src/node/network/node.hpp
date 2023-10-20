@@ -11,13 +11,12 @@
 #include <list>
 #include <map>
 #include <memory>
-#include <vector>
 #include <queue>
 #include <utility>
+#include <vector>
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
-#include <gsl/pointers>
 #include <magic_enum.hpp>
 #include <openssl/ssl.h>
 
@@ -26,6 +25,7 @@
 #include <infra/concurrency/timer.hpp>
 #include <infra/network/message.hpp>
 #include <infra/network/protocol.hpp>
+#include <infra/network/traffic_meter.hpp>
 
 #include <node/common/settings.hpp>
 #include <node/network/connection.hpp>
@@ -118,7 +118,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the remote node supports the specified service
     [[nodiscard]] bool has_service(NodeServicesType service) const noexcept {
-        return (is_connected() && (((local_version_.services_ & static_cast<uint64_t>(service)) != 0)));
+        return (is_connected() && ((local_version_.services_ & static_cast<uint64_t>(service)) != 0));
     }
 
     //! \brief Returns the average ping latency in milliseconds
@@ -130,12 +130,6 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the node as advertised himself as a relayer (Version message)
     [[nodiscard]] bool is_relayer() const noexcept { return (is_connected() && local_version_.relay_); }
-
-    //! \brief Returns the total number of bytes read from the socket
-    [[nodiscard]] size_t bytes_received() const noexcept { return bytes_received_.load(); }
-
-    //! \brief Returns the total number of bytes written to the socket
-    [[nodiscard]] size_t bytes_sent() const noexcept { return bytes_sent_.load(); }
 
     //! \return The string representation of the remote endpoint
     [[nodiscard]] std::string to_string() const noexcept;
@@ -201,6 +195,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     con::Timer ping_timer_;                       // To periodically async_send ping messages
     IPEndpoint remote_endpoint_;                  // Remote endpoint
     IPEndpoint local_endpoint_;                   // Local endpoint
+    net::Meter traffic_meter_{};                  // Traffic meter
 
     boost::asio::ssl::context* ssl_context_;
     std::unique_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> ssl_stream_;  // SSL stream
@@ -223,8 +218,6 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     boost::asio::streambuf receive_buffer_;  // Socket async_receive buffer
     boost::asio::streambuf send_buffer_;     // Socket async_send buffer
-    std::atomic<size_t> bytes_received_{0};  // Total bytes received from the socket during the session
-    std::atomic<size_t> bytes_sent_{0};      // Total bytes sent to the socket during the session
 
     std::atomic<std::chrono::steady_clock::time_point> inbound_message_start_time_{
         std::chrono::steady_clock::time_point::min()};   // Start time of inbound msg
@@ -232,7 +225,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     std::atomic_bool is_writing_{false};  // Whether a write operation is in progress
     std::atomic<std::chrono::steady_clock::time_point> outbound_message_start_time_{
-        std::chrono::steady_clock::time_point::min()};              // Start time of outbound msg
+        std::chrono::steady_clock::time_point::min()};  // Start time of outbound msg
 
     using message_queue_item = std::pair<std::shared_ptr<Message>, MessagePriority>;
     struct MessageQueueItemComparator {

@@ -110,6 +110,9 @@ void Node::on_stop_completed() noexcept {
         const std::list<std::string> log_params{"action", __func__, "status", "success"};
         print_log(log::Level::kTrace, log_params);
     }
+    const auto [inbound_bytes, outbound_bytes]{traffic_meter_.get_cumulative_bytes()};
+    log::Info("Node", {"id", std::to_string(node_id_), "remote", to_string(), "status", "disconnected", "data i/o",
+                       absl::StrCat(to_human_bytes(inbound_bytes, true), " ", to_human_bytes(outbound_bytes, true))});
     set_stopped();
 }
 
@@ -228,7 +231,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
 
     if (bytes_transferred not_eq 0) {
         receive_buffer_.commit(bytes_transferred);
-        bytes_received_ += bytes_transferred;
+        traffic_meter_.update_inbound(bytes_transferred);
         on_data_(DataDirectionMode::kInbound, bytes_transferred);
 
         const auto parse_result{parse_messages(bytes_transferred)};
@@ -268,7 +271,7 @@ void Node::start_write() {
             is_writing_.store(false);
             return;  // Eventually next message submission to the queue will trigger a new write cycle
         }
-        outbound_message_ = std::move(outbound_messages_queue_.top().first);
+        outbound_message_ = outbound_messages_queue_.top().first;
         outbound_messages_queue_.pop();
         outbound_message_->data().seekg(0);
     }
@@ -358,7 +361,7 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
 
     if (bytes_transferred > 0U) {
         send_buffer_.consume(bytes_transferred);
-        bytes_sent_ += bytes_transferred;
+        traffic_meter_.update_outbound(bytes_transferred);
         on_data_(DataDirectionMode::kOutbound, bytes_transferred);
     }
 
@@ -395,7 +398,7 @@ outcome::result<void> Node::push_message(MessagePayload& payload, MessagePriorit
         return result.error();
     }
     std::unique_lock lock(outbound_messages_mutex_);
-    outbound_messages_queue_.push({std::move(new_message), priority});
+    outbound_messages_queue_.emplace(std::move(new_message), priority);
     lock.unlock();
 
     boost::asio::post(io_strand_, [self{shared_from_this()}]() { self->start_write(); });
