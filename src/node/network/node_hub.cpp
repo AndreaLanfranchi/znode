@@ -248,7 +248,7 @@ Task<void> NodeHub::acceptor_work() {
     try {
         initialize_acceptor();
         while (socket_acceptor_.is_open()) {
-            auto socket_ptr = std::make_shared<boost::asio::ip::tcp::socket>(asio_context_);
+            auto socket_ptr = std::make_shared<boost::asio::ip::tcp::socket>(socket_acceptor_.get_executor());
             co_await socket_acceptor_.async_accept(*socket_ptr, boost::asio::use_awaitable);
 
             {

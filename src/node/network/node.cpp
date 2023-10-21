@@ -140,7 +140,7 @@ void Node::start_ssl_handshake() {
     const asio::ssl::stream_base::handshake_type handshake_type{connection_ptr_->type_ == ConnectionType::kInbound
                                                                     ? asio::ssl::stream_base::server
                                                                     : asio::ssl::stream_base::client};
-    ssl_stream_->set_verify_mode(asio::ssl::verify_none);
+    ssl_stream_->set_verify_mode(asio::ssl::verify_none); // TODO : Set verify mode according to settings
     ssl_stream_->async_handshake(handshake_type,
                                  [self{shared_from_this()}](const boost::system::error_code& error_code) {
                                      self->handle_ssl_handshake(error_code);
