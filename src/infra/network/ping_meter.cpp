@@ -15,24 +15,24 @@ using namespace std::chrono_literals;
 
 PingMeter::PingMeter(float alpha) : alpha_{alpha} { ASSERT(alpha > 0.0F and alpha < 1.0F); }
 
-void PingMeter::start_sample() {
+void PingMeter::start_sample() noexcept {
     const std::lock_guard lock{mutex_};
-    if (ping_in_progress_) throw std::logic_error{"PingMeter: ping sample already in progress"};
-    ping_in_progress_ = true;
+    if (ping_in_progress_) return;
     ping_start_ = steady_clock::now();
+    ping_in_progress_ = true;
 }
 
-void PingMeter::end_sample() {
+void PingMeter::end_sample() noexcept {
     const auto time_now{std::chrono::steady_clock::now()};
     const std::lock_guard lock{mutex_};
-    if (!ping_in_progress_) throw std::logic_error{"PingMeter: no ping sample in progress"};
+    if (not ping_in_progress_) return;
     ping_in_progress_ = false;
 
     ASSERT(time_now >= ping_start_);
     const auto ping_duration_ms = duration_cast<milliseconds>(std::chrono::steady_clock::now() - ping_start_);
 
     ping_start_ = std::chrono::steady_clock::time_point::min();
-    ping_nonce_ = std::nullopt;
+    ping_nonce_.reset();
     if (ping_duration_ms < 0ms) return;  // Irrelevant sample
 
     if (ping_duration_ms_ema_ == 0ms) {

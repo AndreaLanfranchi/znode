@@ -31,7 +31,7 @@ bool Timer::start() noexcept {
     if (not Stoppable::start()) return false;  // Already started
     if (interval_.load().count() == 0U or not call_back_) return false;
     exception_ptr_ = nullptr;
-    working_.store(true);
+    working_.exchange(true);
     asio::co_spawn(timer_.get_executor(), work(), asio::detached);
     return true;
 }
@@ -48,7 +48,7 @@ bool Timer::start(duration interval, CallBackFunc call_back) noexcept {
 bool Timer::stop() noexcept {
     if (not Stoppable::stop()) return false;  // Already stopped
     std::ignore = timer_.cancel();
-    working_.wait(true);
+    working_.wait(/*old=*/true);
     return true;
 }
 
@@ -82,7 +82,7 @@ Task<void> Timer::work() noexcept {
     }
 
     set_stopped();
-    working_.store(false);
+    working_.exchange(false);
     working_.notify_all();
     co_return;
 }

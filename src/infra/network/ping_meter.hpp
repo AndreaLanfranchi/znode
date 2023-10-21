@@ -23,12 +23,12 @@ class PingMeter {
     explicit PingMeter(float alpha = 0.65F);
 
     //! \brief Begins the recording of a new ping sample.
-    //! \remarks If a ping sample is already in progress, the function throws.
-    void start_sample();
+    //! \remarks If a ping sample is already in progress, the function does nothing.
+    void start_sample() noexcept;
 
     //! \brief Ends the recording of a ping sample.
     //! \remarks If no ping sample is in progress, the function throws.
-    void end_sample();
+    void end_sample() noexcept;
 
     //! \brief Sets the nonce for the next ping sample.
     void set_nonce(uint64_t nonce) noexcept;
