@@ -12,7 +12,7 @@
 
 namespace zenpp {
 
-//! \brief Generates a random value of type T in a provided (min, max) range
+//! \brief Generates a random value of type T in a provided [min..max] range
 template <Integral T>
 T randomize(const T min, const T max) {
     ZEN_THREAD_LOCAL std::random_device rnd;
@@ -21,13 +21,13 @@ T randomize(const T min, const T max) {
     return dis(gen);
 }
 
-//! \brief Generates a random value of type T in range (min,std::numeric_limits<T>::max())
+//! \brief Generates a random value of type T in range [min..std::numeric_limits<T>::max()]
 template <Integral T>
 T randomize(const T min) {
     return randomize<T>(static_cast<T>(min), std::numeric_limits<T>::max());
 }
 
-//! \brief Generates a random value of type T in range (std::numeric_limits<T>::max(),std::numeric_limits<T>::max())
+//! \brief Generates a random value of type T in range [std::numeric_limits<T>::max()..std::numeric_limits<T>::max()]
 template <Integral T>
 T randomize() {
     return randomize<T>(std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
@@ -44,7 +44,7 @@ T randomize(T val, double percentage) {
     if constexpr (std::is_signed_v<T>) {
         abs_value = static_cast<T>(val < 0 ? -val : val);
     }
-    const auto variance = static_cast<T>(abs_value * percentage);
+    const zenpp::Integral auto variance = static_cast<T>(abs_value * percentage);
     if (variance == T(0)) return val;
     const T min =
         (val > (std::numeric_limits<T>::lowest() + variance)) ? val - variance : std::numeric_limits<T>::lowest();
@@ -52,6 +52,6 @@ T randomize(T val, double percentage) {
     return randomize<T>(min, max);
 }
 
-Bytes randomize_bytes(size_t size);
+Bytes get_random_bytes(size_t size);
 
 }  // namespace zenpp

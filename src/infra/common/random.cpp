@@ -6,9 +6,12 @@
 
 #include "random.hpp"
 
+#include <stdexcept>
+
 namespace zenpp {
 
-Bytes randomize_bytes(size_t size) {
+Bytes get_random_bytes(size_t size) {
+    if (size == 0U) throw std::invalid_argument("Size cannot be 0");
     Bytes bytes(size, 0);
     std::random_device rnd;
     std::mt19937 gen(rnd());
@@ -18,5 +21,4 @@ Bytes randomize_bytes(size_t size) {
     }
     return bytes;
 }
-
 }  // namespace zenpp
