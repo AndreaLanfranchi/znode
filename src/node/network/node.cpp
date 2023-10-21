@@ -118,11 +118,10 @@ void Node::on_stop_completed() noexcept {
 
 void Node::on_ping_timer_expired(con::Timer::duration& interval) noexcept {
     using namespace std::chrono_literals;
-    if (ping_nonce_.load() not_eq 0U) return;  // Wait for response to return
-    last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
-    ping_nonce_.store(randomize<uint64_t>(/*min=*/1U));
+    if (ping_meter_.pending_sample()) return;  // Wait for response to return
+    const auto nonce{randomize<uint64_t>(/*min=*/1U)};
     MsgPingPayload ping_payload{};
-    ping_payload.nonce_ = ping_nonce_.load();
+    ping_payload.nonce_ = nonce;
     if (const auto result{push_message(ping_payload, MessagePriority::kHigh)}; result.has_error()) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", result.error().message()};
@@ -131,46 +130,9 @@ void Node::on_ping_timer_expired(con::Timer::duration& interval) noexcept {
         interval = 0ms;
         return;
     }
+    ping_meter_.set_nonce(nonce);
     const auto random_milliseconds{randomize<uint32_t>(app_settings_.network.ping_interval_seconds * 1'000U, 0.3)};
     interval = std::chrono::milliseconds(random_milliseconds);
-}
-
-void Node::process_ping_latency(const uint64_t latency_ms) {
-    std::list<std::string> log_params{"action", __func__, "latency", absl::StrCat(latency_ms, "ms")};
-
-    if (latency_ms > app_settings_.network.ping_timeout_milliseconds) {
-        log_params.insert(log_params.end(),
-                          {"max", absl::StrCat(app_settings_.network.ping_timeout_milliseconds, "ms")});
-        print_log(log::Level::kWarning, log_params, "Timeout! Disconnecting ...");
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
-        return;
-    }
-
-    const auto tmp_min_latency{min_ping_latency_.load()};
-    if (tmp_min_latency == 0U) [[unlikely]] {
-        min_ping_latency_.store(latency_ms);
-    } else {
-        min_ping_latency_.store(std::min(tmp_min_latency, latency_ms));
-    }
-
-    const auto tmp_ema_latency{ema_ping_latency_.load()};
-    if (tmp_ema_latency == 0U) [[unlikely]] {
-        ema_ping_latency_.store(latency_ms);
-    } else {
-        // Compute the EMA
-        const auto alpha{0.65F};  // Newer values are more important
-        const auto ema{alpha * static_cast<float>(latency_ms) + (1.0F - alpha) * static_cast<float>(tmp_ema_latency)};
-        ema_ping_latency_.store(static_cast<uint64_t>(ema));
-    }
-
-    if (log::test_verbosity(log::Level::kTrace)) {
-        log_params.insert(log_params.end(), {"min", absl::StrCat(min_ping_latency_.load(), "ms"), "ema",
-                                             absl::StrCat(ema_ping_latency_.load(), "ms")});
-        print_log(log::Level::kTrace, log_params);
-    }
-
-    ping_nonce_.store(0);
-    last_ping_sent_time_.store(std::chrono::steady_clock::time_point::min());
 }
 
 void Node::start_ssl_handshake() {
@@ -254,13 +216,8 @@ void Node::start_write() {
     }
 
     if (outbound_message_ not_eq nullptr and outbound_message_->data().eof()) {
-        // A message has been fully sent - Exclude kPing and kPong
-        const bool is_ping_pong{outbound_message_->header().get_type() == MessageType::kPing or
-                                outbound_message_->header().get_type() == MessageType::kPong};
-        if (not is_ping_pong) {
-            last_message_sent_time_.store(std::chrono::steady_clock::now());
-            outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
-        }
+        last_message_sent_time_.store(std::chrono::steady_clock::now());
+        outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
         outbound_message_.reset();
     }
 
@@ -312,10 +269,8 @@ void Node::start_write() {
         switch (msg_type) {
             using enum MessageType;
             case kPing:
-                last_ping_sent_time_.store(std::chrono::steady_clock::now());
+                ping_meter_.start_sample();
                 [[fallthrough]];
-            case kPong:
-                break;
             default:
                 outbound_message_start_time_.store(now);
                 break;
@@ -415,7 +370,6 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
 
     while (!data.empty()) {
-
         if (inbound_message_ == nullptr) {
             inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
             inbound_message_ = std::make_unique<Message>(version_, app_settings_.chain_config.value().magic_);
@@ -513,7 +467,7 @@ outcome::result<void> Node::process_inbound_message() {
             break;
         case kVerAck:
             // This actually requires no action. Handshake flags already set
-            // and we don't need to forward the message elsewhere
+            // We don't need to forward the message elsewhere
             break;
         case kPing: {
             MsgPingPayload ping_payload{};
@@ -538,29 +492,21 @@ outcome::result<void> Node::process_inbound_message() {
             notify_node_hub = true;
             break;
         case kPong: {
-            const auto expected_nonce{ping_nonce_.load()};
-            if (expected_nonce == 0U) {
+            const auto expected_nonce{ping_meter_.get_nonce()};
+            if (not ping_meter_.pending_sample() or not expected_nonce.has_value()) {
                 result = Error::kUnsolicitedPong;
                 err_extended_reason = "Received an unrequested `pong` message.";
                 break;
             }
             MsgPongPayload pong_payload{};
             if (result = pong_payload.deserialize(inbound_message_->data()); result.has_error()) break;
-            if (pong_payload.nonce_ not_eq expected_nonce) {
+            if (pong_payload.nonce_ not_eq expected_nonce.value()) {
                 result = Error::kInvalidPingPongNonce;
-                err_extended_reason = absl::StrCat("Expected ", expected_nonce, " got ", pong_payload.nonce_, ".");
+                err_extended_reason =
+                    absl::StrCat("Expected ", expected_nonce.value(), " got ", pong_payload.nonce_, ".");
                 break;
             }
-            // Calculate ping response time in milliseconds
-            const auto time_now{std::chrono::steady_clock::now()};
-            const auto ping_response_duration{time_now - last_ping_sent_time_.load()};
-            const auto ping_response_time{
-                std::chrono::duration_cast<std::chrono::milliseconds>(ping_response_duration)};
-
-            // If the response time in milliseconds is greater than settings' threshold
-            // this won't reset the timers and the nonce and let idle checks do their tasks
-            process_ping_latency(static_cast<uint64_t>(ping_response_time.count()));
-
+            ping_meter_.end_sample();
         } break;
         default:
             // Notify node-hub of the inbound message which will eventually take ownership of it
@@ -649,22 +595,20 @@ NodeIdleResult Node::is_idle() const noexcept {
     using enum NodeIdleResult;
     using namespace std::chrono;
 
-    if (not is_connected()) return kNotIdle;  // Not connected - not idle
+    if (not fully_connected()) return kNotIdle;  // Not connected - not idle
 
     const auto now{steady_clock::now()};
 
     // Check whether we're waiting for a ping response
-    if (ping_nonce_.load() not_eq 0) {
-        const auto ping_duration{duration_cast<milliseconds>(now - last_ping_sent_time_.load()).count()};
-        if (ping_duration > app_settings_.network.ping_timeout_milliseconds) {
-            const std::list<std::string> log_params{
-                "action",  __func__,
-                "status",  "ping timeout",
-                "latency", absl::StrCat(ping_duration, "ms"),
-                "max",     absl::StrCat(app_settings_.network.ping_timeout_milliseconds, "ms")};
-            print_log(log::Level::kDebug, log_params, "Disconnecting ...");
-            return kPingTimeout;
-        }
+    if (const auto ping_duration{ping_meter_.pending_sample_duration().count()};
+        ping_duration > app_settings_.network.ping_timeout_milliseconds) {
+        const std::list<std::string> log_params{
+            "action",  __func__,
+            "status",  "ping timeout",
+            "latency", absl::StrCat(ping_duration, "ms"),
+            "max",     absl::StrCat(app_settings_.network.ping_timeout_milliseconds, "ms")};
+        print_log(log::Level::kDebug, log_params, "Disconnecting ...");
+        return kPingTimeout;
     }
 
     // Check we've at least completed protocol handshake in a reasonable time

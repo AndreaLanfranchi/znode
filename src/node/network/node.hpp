@@ -24,6 +24,7 @@
 
 #include <infra/concurrency/timer.hpp>
 #include <infra/network/message.hpp>
+#include <infra/network/ping_meter.hpp>
 #include <infra/network/protocol.hpp>
 #include <infra/network/traffic_meter.hpp>
 
@@ -97,15 +98,10 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Returns the local endpoint
     [[nodiscard]] IPEndpoint local_endpoint() const noexcept { return local_endpoint_; }
 
-    //! \brief The actual status of the protocol handshake
-    [[nodiscard]] ProtocolHandShakeStatus get_protocol_handshake_status() const noexcept {
-        return protocol_handshake_status_.load();
-    }
-
     //! \brief Returns whether the socket is connected and the protocol handshake is completed
-    [[nodiscard]] bool is_connected() const noexcept {
+    [[nodiscard]] bool fully_connected() const noexcept {
         return is_running() && connection_ptr_->socket_ptr_->is_open() &&
-               get_protocol_handshake_status() == ProtocolHandShakeStatus::kCompleted;
+               protocol_handshake_status_.load() == ProtocolHandShakeStatus::kCompleted;
     }
 
     //! \brief Returns the total duration of current connection
@@ -118,18 +114,18 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the remote node supports the specified service
     [[nodiscard]] bool has_service(NodeServicesType service) const noexcept {
-        return (is_connected() && ((local_version_.services_ & static_cast<uint64_t>(service)) != 0));
+        return (fully_connected() && ((local_version_.services_ & static_cast<uint64_t>(service)) != 0));
     }
 
     //! \brief Returns the average ping latency in milliseconds
-    [[nodiscard]] uint64_t ping_latency() const noexcept { return ema_ping_latency_.load(); }
+    [[nodiscard]] std::chrono::milliseconds ping_latency() const noexcept { return ping_meter_.get_ema(); }
 
     //! \brief Returns whether the node (i.e. the remote) has been inactive/unresponsive beyond the amounts
     //! of time specified in network settings
     [[nodiscard]] NodeIdleResult is_idle() const noexcept;
 
     //! \brief Returns whether the node as advertised himself as a relayer (Version message)
-    [[nodiscard]] bool is_relayer() const noexcept { return (is_connected() && local_version_.relay_); }
+    [[nodiscard]] bool is_relayer() const noexcept { return (fully_connected() && local_version_.relay_); }
 
     //! \return The string representation of the remote endpoint
     [[nodiscard]] std::string to_string() const noexcept;
@@ -151,11 +147,6 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     //! \brief Sends a ping to the remote peer on cadence
     //! \remark The interval is randomly chosen on setting's ping get_interval +/- 30%
     void on_ping_timer_expired(con::Timer::duration& interval) noexcept;
-
-    //! \brief Computes the ping latency and updates the EMA
-    //! \details Ping latency is the get_interval between the sending of a ping message and the reception of the
-    //! corresponding pong message
-    void process_ping_latency(uint64_t latency_ms);
 
     void start_read();
     void handle_read(const boost::system::error_code& error_code, size_t bytes_transferred);
@@ -193,6 +184,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     IPEndpoint remote_endpoint_;                  // Remote endpoint
     IPEndpoint local_endpoint_;                   // Local endpoint
     net::TrafficMeter traffic_meter_{};           // Traffic meter
+    net::PingMeter ping_meter_{};                 // Ping meter
 
     boost::asio::ssl::context* ssl_context_;
     std::unique_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> ssl_stream_;  // SSL stream
@@ -203,12 +195,6 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     std::atomic<std::chrono::steady_clock::time_point> connected_time_;  // Time of connection
     std::atomic<std::chrono::steady_clock::time_point> last_message_received_time_;  // Last fully "in" message tstamp
     std::atomic<std::chrono::steady_clock::time_point> last_message_sent_time_;      // Last fully "out" message
-
-    std::atomic<std::chrono::steady_clock::time_point> last_ping_sent_time_;  // Last outgoing ping tstamp
-    std::atomic_uint64_t ping_nonce_{0};                                      // Last ping nonce sent
-    //std::atomic_uint32_t ping_samples_count_{0};                              // Number of ping samples
-    std::atomic_uint64_t min_ping_latency_{0};                                // Minimum ping latency
-    std::atomic_uint64_t ema_ping_latency_{0};  // Exponential moving average of ping latency
 
     std::function<void(DataDirectionMode, size_t)> on_data_;  // To account data sizes stats at node hub
     std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)> on_message_;  // Called on inbound message

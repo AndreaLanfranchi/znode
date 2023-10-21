@@ -321,9 +321,15 @@ void NodeHub::on_info_timer_expired(con::Timer::duration& /*interval*/) {
     info_data.insert(info_data.end(), {"data i/o", absl::StrCat(to_human_bytes(inbound_traffic, true), " ",
                                                                 to_human_bytes(outbound_traffic, true))});
 
-    const auto [inbound_speed, outbound_speed]{traffic_meter_.get_interval_speed(true)};
-    info_data.insert(info_data.end(), {"speed i/o", absl::StrCat(to_human_bytes(inbound_speed, true), "s ",
-                                                                 to_human_bytes(outbound_speed, true), "s")});
+    const auto [cumulative_speed_in, cumulative_speed_out]{traffic_meter_.get_cumulative_speed()};
+    info_data.insert(info_data.end(),
+                     {"overall speed i/o", absl::StrCat(to_human_bytes(cumulative_speed_in, true), "s ",
+                                                        to_human_bytes(cumulative_speed_out, true), "s")});
+
+    const auto [instant_speed_in, instant_speed_out]{traffic_meter_.get_interval_speed(true)};
+    info_data.insert(info_data.end(),
+                     {"instant speed i/o", absl::StrCat(to_human_bytes(instant_speed_in, true), "s ",
+                                                        to_human_bytes(instant_speed_out, true), "s")});
 
     std::ignore = log::Info("Network usage", info_data);
 }
