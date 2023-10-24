@@ -41,6 +41,8 @@ enum class Error {
     kConnectedToSelf,                           // Connected to self
     kUnsolicitedPong,                           // Unsolicited pong message
     kInvalidPingPongNonce,                      // Ping nonce mismatch
+    kMessagePayloadInvalidLastBlockHeight,      // Message payload's last block height is invalid (Version Message)
+    kMessagePayloadInvalidTimestamp,            // Message payload's timestamp is invalid (Version Message)
 };
 
 #ifdef __GNUC__
@@ -89,6 +91,8 @@ class ErrorCategory : public boost::system::error_category {
             case kMessageHeaderIllegalCommand:
             case kMessageHeaderInvalidChecksum:
             case kMessageHeaderInvalidMagic:
+            case kMessagePayloadInvalidLastBlockHeight:
+            case kMessagePayloadInvalidTimestamp:
                 return make_error_condition(boost::system::errc::argument_out_of_domain);
             case kMessagePushNotPermitted:
             case kMessageFloodingDetected:

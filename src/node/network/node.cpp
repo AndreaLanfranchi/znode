@@ -54,8 +54,8 @@ Node::Node(AppSettings& app_settings, std::shared_ptr<Connection> connection_ptr
 
     local_version_.nonce_ = app_settings_.network.nonce;
     local_version_.user_agent_ = get_buildinfo_string();
-    local_version_.last_block_height_ = 0;  // TODO Set this value to the current blockchain height
-    local_version_.relay_ = true;           // TODO Set this value from command line options
+    local_version_.last_block_height_ = -1;  // TODO Set this value to the current blockchain height
+    local_version_.relay_ = true;            // TODO Set this value from command line options
 }
 
 bool Node::start() noexcept {
@@ -82,27 +82,18 @@ bool Node::stop() noexcept {
     const auto ret{Stoppable::stop()};
     if (ret) /* not already stopped */ {
         ping_timer_.stop();
+        boost::system::error_code error_code;
         if (ssl_stream_ not_eq nullptr) {
-            boost::system::error_code error_code;
             std::ignore = ssl_stream_->shutdown(error_code);
+            std::ignore = ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
+            std::ignore = ssl_stream_->lowest_layer().close(error_code);
+        } else {
+            std::ignore = connection_ptr_->socket_ptr_->shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
+            std::ignore = connection_ptr_->socket_ptr_->close(error_code);
         }
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->begin_stop(); });
+        asio::post(io_strand_, [self{shared_from_this()}]() { self->on_stop_completed(); });
     }
     return ret;
-}
-
-void Node::begin_stop() {
-    boost::system::error_code error_code;
-    if (ssl_stream_ not_eq nullptr) {
-        std::ignore = ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
-        std::ignore = ssl_stream_->lowest_layer().close(error_code);
-        // Don't reset the stream !!! There might be outstanding async operations
-        // Let them gracefully complete
-    } else {
-        std::ignore = connection_ptr_->socket_ptr_->shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
-        std::ignore = connection_ptr_->socket_ptr_->close(error_code);
-    }
-    asio::post(io_strand_, [self{shared_from_this()}]() { self->on_stop_completed(); });
 }
 
 void Node::on_stop_completed() noexcept {
@@ -140,7 +131,7 @@ void Node::start_ssl_handshake() {
     const asio::ssl::stream_base::handshake_type handshake_type{connection_ptr_->type_ == ConnectionType::kInbound
                                                                     ? asio::ssl::stream_base::server
                                                                     : asio::ssl::stream_base::client};
-    ssl_stream_->set_verify_mode(asio::ssl::verify_none); // TODO : Set verify mode according to settings
+    ssl_stream_->set_verify_mode(asio::ssl::verify_none);  // TODO : Set verify mode according to settings
     ssl_stream_->async_handshake(handshake_type,
                                  [self{shared_from_this()}](const boost::system::error_code& error_code) {
                                      self->handle_ssl_handshake(error_code);

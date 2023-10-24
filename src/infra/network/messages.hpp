@@ -37,7 +37,7 @@ inline constexpr MessageDefinition kMessageVersion{
     .max_payload_length = size_t(1_KiB),
 };
 
-inline constexpr MessageDefinition kMessageVerack{
+inline constexpr MessageDefinition kMessageVerAck{
     .command = "verack",
     .message_type = MessageType::kVerAck,
     .min_payload_length = size_t{0},
@@ -117,7 +117,7 @@ inline constexpr MessageDefinition kMessageMissingOrUnknown{};
 //! \attention This must be kept in same order as the MessageCommand enum
 inline constexpr std::array<MessageDefinition, 11> kMessageDefinitions{
     kMessageVersion,           // 0
-    kMessageVerack,            // 1
+    kMessageVerAck,            // 1
     kMessageInv,               // 2
     kMessageAddr,              // 3
     kMessagePing,              // 4

@@ -5,6 +5,7 @@
 */
 
 #pragma once
+#include <chrono>
 #include <cstdint>
 #include <limits>
 
@@ -21,6 +22,9 @@ static constexpr size_t kMaxAddrItems{1'000};        // Maximum number of items 
 static constexpr size_t kAddrItemSize{30};           // Size of an address item (time + services + ip + port)
 static constexpr size_t kMaxGetHeadersItems{2'000};  // Maximum number of block headers in a getheaders message
 static constexpr size_t kMaxHeadersItems{160};       // Maximum number of block headers in a headers message
+
+static constexpr std::chrono::hours kLocalAddressAvgBroadcastInterval{24};  // Interval between local address broadcasts
+static constexpr std::chrono::seconds kAddressAvgBroadcastInterval{30};     // Interval between addresses broadcasts
 
 enum class MessageType : uint32_t {
     kVersion,           // Dial-out nodes async_send their version first

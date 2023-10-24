@@ -10,6 +10,7 @@
 
 #include <absl/strings/str_cat.h>
 #include <boost/asio/ssl.hpp>
+#include <boost/timer/timer.hpp>
 #include <gsl/gsl_util>
 
 #include <core/chain/seeds.hpp>
@@ -537,11 +538,20 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                                                    service.endpoint_.to_string()})
                                 << " << Non standard port";
                         }
-                        std::ignore = connector_feed_.try_send(
-                            std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
+//                        std::ignore = connector_feed_.try_send(
+//                            std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
                         break;
                     }
                 }
+            } break;
+            case kGetHeaders: {
+                boost::timer::cpu_timer deserialization_timer;
+                MsgGetHeadersPayload get_headers_payload{};
+                success_or_throw(get_headers_payload.deserialize(message->data()));
+                deserialization_timer.stop();
+                log::Debug("Service", {"name", "Node Hub", "action", __func__, "message", "getheaders", "count",
+                                       std::to_string(get_headers_payload.block_locator_hashes_.size())})
+                    << deserialization_timer.format();
             } break;
             default:
                 break;

@@ -22,6 +22,10 @@ outcome::result<void> MsgVersionPayload::serialization(SDataStream& stream, Acti
     if (not result.has_error()) result = stream.bind(user_agent_, action);
     if (not result.has_error()) result = stream.bind(last_block_height_, action);
     if (not result.has_error()) result = stream.bind(relay_, action);
+    if (action == Action::kDeserialize) {
+        if (timestamp_ < 0) return Error::kMessagePayloadInvalidTimestamp;
+        if (last_block_height_ < 0) return Error::kMessagePayloadInvalidLastBlockHeight;
+    }
     return result;
 }
 
@@ -41,7 +45,7 @@ outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, s
         if (action == Action::kSerialize) {
             const auto vector_size = block_locator_hashes_.size();
             if (vector_size == 0U) return Error::kMessagePayloadEmptyVector;
-            if (vector_size > 2000U) return Error::kMessagePayloadOversizedVector;
+            if (vector_size > kMaxGetHeadersItems) return Error::kMessagePayloadOversizedVector;
             if (result = write_compact(stream, vector_size); result.has_error()) return result.error();
             for (auto& item : block_locator_hashes_) {
                 if (result = item.serialize(stream); result.has_error()) break;

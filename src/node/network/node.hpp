@@ -168,7 +168,6 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     void start_write();  // Begin writing to the socket asynchronously
     void handle_write(const boost::system::error_code& error_code, size_t bytes_transferred);  // Async write handler
 
-    void begin_stop();                  // Initiates the stop process
     void on_stop_completed() noexcept;  // Called when the node is stopped
 
     //! \brief Local facility to print log lines in unified format
