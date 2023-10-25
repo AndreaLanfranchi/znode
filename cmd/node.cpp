@@ -10,14 +10,17 @@
 #include <iostream>
 #include <stdexcept>
 
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/timer/timer.hpp>
 #include <openssl/opensslv.h>
 #include <openssl/ssl.h>
 
 #include <core/common/memory.hpp>
 
+#include <infra/common/common.hpp>
 #include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/context.hpp>
+#include <infra/network/time.hpp>
 #include <infra/os/signals.hpp>
 
 #include <node/database/access_layer.hpp>
@@ -92,7 +95,6 @@ void prepare_chaindata_env(AppSettings& node_settings, [[maybe_unused]] bool ini
 }
 
 int main(int argc, char* argv[]) {
-
     const auto start_time{std::chrono::steady_clock::now()};
     const auto* build_info(get_buildinfo());
     CLI::App cli(std::string(build_info->project_name).append(" node"));
@@ -140,6 +142,11 @@ int main(int argc, char* argv[]) {
         con::Context context("main", settings.asio_concurrency);  // Initialize asio context
         context.start();
 
+        // Check we're in sync with NTP server
+        auto check_time_result{
+            zenpp::net::check_system_time(context->get_executor(), "time.nist.gov", /*max_skew_seconds=*/2U)};
+        success_or_throw(check_time_result);
+
         // Check required certificate and key file are present to initialize SSL context
         if (network_settings.use_tls) {
             auto const ssl_data{(*settings.data_directory)[DataDirectory::kSSLCertName].path()};
@@ -158,7 +165,8 @@ int main(int argc, char* argv[]) {
                                                     std::make_error_code(std::errc::no_such_file_or_directory));
         }
         zk_timer.stop();
-        std::ignore = log::Message("Validated  ZK params", {"elapsed", zk_timer.format()});
+        std::ignore = log::Message("Validated  ZK params",
+                                   {"elapsed", boost::replace_all_copy(std::string(zk_timer.format()), "\n", "")});
 
         // 1) Instantiate and start a new NodeHub
         net::NodeHub node_hub{settings, *context};
@@ -223,25 +231,25 @@ int main(int argc, char* argv[]) {
     } catch (const CLI::ParseError& ex) {
         return cli.exit(ex);
     } catch (const boost::system::error_code& ec) {
-        LOG_ERROR << "Boost error code :" << ec.message();
+        LOG_CRITICAL << "Boost error code :" << ec.message();
         return -1;
     } catch (const std::filesystem::filesystem_error& ex) {
-        LOG_ERROR << "Filesystem error :" << ex.what();
+        LOG_CRITICAL << "Filesystem error :" << ex.what();
         return -2;
     } catch (const std::invalid_argument& ex) {
-        LOG_ERROR << "Invalid argument :" << ex.what();
+        LOG_CRITICAL << "Invalid argument :" << ex.what();
         return -3;
     } catch (const db::Exception& ex) {
-        LOG_ERROR << "Unexpected db error : " << ex.what();
+        LOG_CRITICAL << "Unexpected db error : " << ex.what();
         return -4;
     } catch (const std::runtime_error& ex) {
-        LOG_ERROR << "Unexpected runtime error : " << ex.what();
+        LOG_CRITICAL << "Unexpected runtime error : " << ex.what();
         return -1;
     } catch (const std::exception& ex) {
-        LOG_ERROR << "Unexpected error : " << ex.what();
+        LOG_CRITICAL << "Unexpected error : " << ex.what();
         return -5;
     } catch (...) {
-        LOG_ERROR << "Unexpected undefined error";
+        LOG_CRITICAL << "Unexpected undefined error";
         return -99;
     }
 

@@ -43,6 +43,8 @@ enum class Error {
     kInvalidPingPongNonce,                      // Ping nonce mismatch
     kMessagePayloadInvalidLastBlockHeight,      // Message payload's last block height is invalid (Version Message)
     kMessagePayloadInvalidTimestamp,            // Message payload's timestamp is invalid (Version Message)
+    kInvalidNtpResponse,                        // Invalid NTP response
+    kInvalidSystemTime,                         // Invalid system time
 };
 
 #ifdef __GNUC__
@@ -93,6 +95,7 @@ class ErrorCategory : public boost::system::error_category {
             case kMessageHeaderInvalidMagic:
             case kMessagePayloadInvalidLastBlockHeight:
             case kMessagePayloadInvalidTimestamp:
+            case kInvalidSystemTime:
                 return make_error_condition(boost::system::errc::argument_out_of_domain);
             case kMessagePushNotPermitted:
             case kMessageFloodingDetected:
@@ -103,6 +106,7 @@ class ErrorCategory : public boost::system::error_category {
             case kDeprecatedMessageTypeForProtocolVersion:
             case kDuplicateProtocolHandShake:
             case kInvalidProtocolHandShake:
+            case kInvalidNtpResponse:
                 return make_error_condition(boost::system::errc::protocol_error);
             default:
                 return {err_code, *this};
