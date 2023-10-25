@@ -87,4 +87,54 @@ outcome::result<void> MsgAddrPayload::serialization(SDataStream& stream, ser::Ac
     }
     return outcome::success();
 }
+
+outcome::result<void> MsgRejectPayload::serialization(SDataStream& stream, ser::Action action) {
+    outcome::result<void> result = outcome::success();
+    if (action == Action::kSerialize) {
+        if (rejected_command_.empty() or rejected_command_.size() > 12) {
+            return Error::kMessageHeaderIllegalCommand;
+        }
+        if (reason_.size() > 256) {
+            return ser::Error::kStringTooBig;
+        }
+        result = stream.bind(rejected_command_, action);
+        if (not result.has_error()) {
+            auto code = static_cast<int8_t>(rejection_code_);
+            result = stream.bind(code, action);
+        }
+        if (not result.has_error()) result = stream.bind(reason_, action);
+        if (not result.has_error() and extra_data_.has_value()) result = stream.bind(extra_data_.value(), action);
+
+    } else {
+        result = stream.bind(rejected_command_, action);
+        if (not result.has_error()) {
+            int8_t code{0};
+            result = stream.bind(code, action);
+            if (not result.has_error()) {
+                auto enumerator = magic_enum::enum_cast<RejectionCode>(code);
+                if (not enumerator.has_value()) {
+                    return ser::Error::kInvalidRejectionCode;
+                }
+            }
+        }
+        if (not result.has_error()) result = stream.bind(reason_, action);
+        if (not result.has_error()) {
+            if (reason_.size() > 256) {
+                return ser::Error::kStringTooBig;
+            }
+            if (stream.avail() >= h256::size()) {
+                h256 extra_data_value{};
+                result = stream.bind(extra_data_value, action);
+                if (not result.has_error()) {
+                    extra_data_.emplace(std::move(extra_data_value));
+                }
+            }
+        }
+        if (not result.has_error() and stream.avail() > 0) {
+            return ser::Error::kInputTooLarge;
+        }
+    }
+
+    return result;
+}
 }  // namespace zenpp::net

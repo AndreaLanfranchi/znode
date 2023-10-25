@@ -21,6 +21,8 @@ enum class Error {
     kNonCanonicalCompactSize,  // The compact size is not canonical
     kCompactSizeTooBig,        // The compact size is too big
     kUnexpectedError,          // An unexpected error occurred
+    kStringTooBig,             // The string is too big
+    kInvalidRejectionCode,     // The rejection code is not valid
 };
 
 #ifdef __GNUC__
@@ -52,6 +54,7 @@ class ErrorCategory : public boost::system::error_category {
                 return make_error_condition(boost::system::errc::success);
             case kInputTooLarge:
             case kReadOverflow:
+            case kStringTooBig:
                 return make_error_condition(boost::system::errc::value_too_large);
             case kNonCanonicalCompactSize:
             case kCompactSizeTooBig:

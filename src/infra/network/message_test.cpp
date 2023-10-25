@@ -48,7 +48,7 @@ TEST_CASE("NetMessage write", "[net]") {
         {"All zeroes header data", pad_hexed_header("00"), net::Error::kMessageHeaderInvalidMagic},
         {"Invalid network magic", pad_hexed_header("010a0a0a"), net::Error::kMessageHeaderInvalidMagic},
         {"Invalid payload length (over max protocol)",
-         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "000000000000000000000000" + "04000001"),
+         pad_hexed_header(enc::hex::encode(network_magic_bytes) + "76657261636b000000000000" + "04000001"),
          net::Error::kMessageHeaderIllegalPayloadLength},
         {"Invalid command (not provided at all)",
          pad_hexed_header(enc::hex::encode(network_magic_bytes) + "000000000000000000000000"),
@@ -124,8 +124,7 @@ TEST_CASE("NetMessage write", "[net]") {
             CHECK(write_result.error().message() == as_message(test.expected_error.value()));
         } else {
             REQUIRE_FALSE(write_result.has_error());
-            REQUIRE(test_message.get_type().has_value());
-            REQUIRE(test_message.get_type().value() not_eq MessageType::kMissingOrUnknown);
+            REQUIRE(test_message.get_type() not_eq MessageType::kMissingOrUnknown);
             REQUIRE(test_message.is_complete());
         }
     }

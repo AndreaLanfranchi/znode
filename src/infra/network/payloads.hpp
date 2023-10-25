@@ -6,6 +6,7 @@
 
 #pragma once
 #include <cstdint>
+#include <optional>
 
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
@@ -115,4 +116,20 @@ class MsgAddrPayload : public MessagePayload {
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
+
+class MsgRejectPayload : public MessagePayload {
+  public:
+    MsgRejectPayload() : MessagePayload(MessageType::kReject) {}
+    ~MsgRejectPayload() override = default;
+
+    std::string rejected_command_{};
+    RejectionCode rejection_code_{RejectionCode::kOk};
+    std::string reason_{};              // Human readable reason for rejection
+    std::optional<h256> extra_data_{};  // Optional extra data provided by the peer
+
+  private:
+    friend class ser::SDataStream;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
+};
+
 }  // namespace zenpp::net

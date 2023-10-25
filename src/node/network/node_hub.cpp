@@ -503,7 +503,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
     ASSERT_PRE(message not_eq nullptr and message->is_complete());
     if (not is_running() or not node->is_running()) return;
 
-    const auto msg_type{message->get_type().value()};
+    const auto msg_type{message->get_type()};
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service",
                    {"name", "Node Hub", "action", __func__, "command", std::string{magic_enum::enum_name(msg_type)},
@@ -538,8 +538,9 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                                                    service.endpoint_.to_string()})
                                 << " << Non standard port";
                         }
-//                        std::ignore = connector_feed_.try_send(
-//                            std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
+                        //                        std::ignore = connector_feed_.try_send(
+                        //                            std::make_shared<Connection>(service.endpoint_,
+                        //                            ConnectionType::kOutbound));
                         break;
                     }
                 }

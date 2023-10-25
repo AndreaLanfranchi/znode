@@ -54,8 +54,8 @@ Node::Node(AppSettings& app_settings, std::shared_ptr<Connection> connection_ptr
 
     local_version_.nonce_ = app_settings_.network.nonce;
     local_version_.user_agent_ = get_buildinfo_string();
-    local_version_.last_block_height_ = -1;  // TODO Set this value to the current blockchain height
-    local_version_.relay_ = true;            // TODO Set this value from command line options
+    local_version_.last_block_height_ = 0;  // TODO Set this value to the current blockchain height
+    local_version_.relay_ = true;           // TODO Set this value from command line options
 }
 
 bool Node::start() noexcept {
@@ -102,8 +102,9 @@ void Node::on_stop_completed() noexcept {
         print_log(log::Level::kTrace, log_params);
     }
     const auto [inbound_bytes, outbound_bytes]{traffic_meter_.get_cumulative_bytes()};
-    log::Info("Node", {"id", std::to_string(node_id_), "remote", to_string(), "status", "disconnected", "data i/o",
-                       absl::StrCat(to_human_bytes(inbound_bytes, true), " ", to_human_bytes(outbound_bytes, true))});
+    std::ignore = log::Info(
+        "Node", {"id", std::to_string(node_id_), "remote", to_string(), "status", "disconnected", "data i/o",
+                 absl::StrCat(to_human_bytes(inbound_bytes, true), " ", to_human_bytes(outbound_bytes, true))});
     set_stopped();
 }
 
@@ -362,25 +363,28 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
 
     while (!data.empty()) {
         if (inbound_message_ == nullptr) {
-            inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
+            inbound_message_start_time_.store(std::chrono::steady_clock::now());
             inbound_message_ = std::make_unique<Message>(version_, app_settings_.chain_config.value().magic_);
         }
 
         result = inbound_message_->write(data);  // Note! data is consumed here
+        const auto msg_type{inbound_message_->get_type()};
         if (result.has_error()) {
             if (result.error() == Error::kMessageHeaderIncomplete or result.error() == Error::kMessageBodyIncomplete) {
                 // These two guys depict a normal condition and we must continue reading
                 result = outcome::success();
             } else {
+                log::Error("Node", {"id", std::to_string(node_id_), "remote", to_string(), "command",
+                                    std::string(magic_enum::enum_name(msg_type)), "status", "failure", "reason",
+                                    result.error().message()});
                 break;
             }
         }
 
         // If we have the message type then we can validate it against protocol handshake rules
-        const auto msg_type{inbound_message_->get_type()};
-        if (msg_type.has_value()) {
+        if (msg_type not_eq MessageType::kMissingOrUnknown) {
             if (const auto handshake_result{
-                    validate_message_for_protocol_handshake(DataDirectionMode::kInbound, msg_type.value())};
+                    validate_message_for_protocol_handshake(DataDirectionMode::kInbound, msg_type)};
                 handshake_result.has_error()) {
                 result = handshake_result.error();
                 break;
@@ -390,16 +394,7 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
         if (not inbound_message_->is_complete()) continue;  // We need more data
 
         // We've got the header begin timing
-        ASSERT(msg_type.has_value() and "Must have a valid message type");
-        switch (msg_type.value()) {
-            using enum MessageType;
-            case kPing:
-            case kPong:
-                break;
-            default:
-                inbound_message_start_time_.store(std::chrono::steady_clock::now());
-                break;
-        }
+        ASSERT(msg_type not_eq MessageType::kMissingOrUnknown and "Must have a valid message type");
 
         if (++messages_parsed > kMaxMessagesPerRead) {
             result = net::Error::kMessageFloodingDetected;
@@ -499,6 +494,8 @@ outcome::result<void> Node::process_inbound_message() {
             }
             ping_meter_.end_sample();
         } break;
+        case kReject:
+            // TODO : Decide how to handle
         default:
             // Notify node-hub of the inbound message which will eventually take ownership of it
             // As a result we can safely reset it which is done after this function returns
@@ -536,7 +533,14 @@ outcome::result<void> Node::validate_message_for_protocol_handshake(const DataDi
             if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) return kDuplicateProtocolHandShake;
             break;  // Continue with validation
         default:
-            if (protocol_handshake_status_ not_eq ProtocolHandShakeStatus::kCompleted) return kInvalidProtocolHandShake;
+            if (protocol_handshake_status_ not_eq ProtocolHandShakeStatus::kCompleted) {
+                const std::list<std::string> log_params{"action",  __func__,
+                                                        "command", std::string{magic_enum::enum_name(message_type)},
+                                                        "size",    to_human_bytes(inbound_message_->size()),
+                                                        "status",  "unexpected message while handshake in progress"};
+                print_log(log::Level::kError, log_params);
+                return kInvalidProtocolHandShake;
+            }
             return outcome::success();
     }
 

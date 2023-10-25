@@ -53,9 +53,6 @@ outcome::result<void> MessageHeader::validate(int protocol_version, const ByteVi
     if (magic.size() not_eq network_magic.size()) return Error::kMessageHeaderInvalidMagic;
     if (memcmp(network_magic.data(), magic.data(), magic.size()) not_eq 0) return Error::kMessageHeaderInvalidMagic;
 
-    // Check the payload length is within the allowed range
-    if ((payload_length) > kMaxProtocolMessageLength) return Error::kMessageHeaderIllegalPayloadLength;
-
     // Identify the command
     const auto get_command_label = [](const MessageType type, const size_t to_size) -> Bytes {
         std::string label{magic_enum::enum_name(type)};
@@ -76,6 +73,11 @@ outcome::result<void> MessageHeader::validate(int protocol_version, const ByteVi
     }
     if (message_type_ == MessageType::kMissingOrUnknown) return Error::kMessageHeaderIllegalCommand;
 
+    // Check the payload length is within the allowed range
+    if ((payload_length) > kMaxProtocolMessageLength) {
+        return Error::kMessageHeaderIllegalPayloadLength;
+    }
+
     // Verify message command is allowed by protocol version
     const auto& message_definition{get_definition()};
     if (message_definition.min_protocol_version.has_value() &&
@@ -89,8 +91,8 @@ outcome::result<void> MessageHeader::validate(int protocol_version, const ByteVi
 
     // Verify payload size falls within the allowed range
     if (boost::algorithm::clamp(static_cast<size_t>(payload_length),
-                                get_definition().min_payload_length.value_or(size_t(0U)),
-                                get_definition().max_payload_length.value_or(kMaxProtocolMessageLength)) not_eq
+                                message_definition.min_payload_length.value_or(size_t(0U)),
+                                message_definition.max_payload_length.value_or(kMaxProtocolMessageLength)) not_eq
         static_cast<size_t>(payload_length)) {
         return Error::kMessageHeaderIllegalPayloadLength;
     }
@@ -109,10 +111,7 @@ const MessageDefinition& MessageHeader::get_definition() const noexcept {
     return kMessageDefinitions[static_cast<decltype(kMessageDefinitions)::size_type>(message_type_)];
 }
 
-std::optional<MessageType> Message::get_type() const noexcept {
-    if (not header_validated_) return std::nullopt;
-    return header_.get_type();
-}
+MessageType Message::get_type() const noexcept { return header_.get_type(); }
 
 void Message::reset() noexcept {
     header_.reset();
@@ -275,8 +274,9 @@ outcome::result<void> Message::validate_payload_vector(const MessageDefinition& 
             expected_vector_data_size += message_definition.vector_item_size.value();
         }
         expected_vector_data_size += ser::ser_compact_sizeof(num_elements.value());
-        if (header_.payload_length not_eq (expected_vector_data_size + offset))
+        if (header_.payload_length not_eq (expected_vector_data_size + offset)) {
             return Error::kMessagePayloadLengthMismatchesVectorSize;
+        }
     }
     return outcome::success();
 }

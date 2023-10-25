@@ -90,7 +90,7 @@ class Message {
     [[nodiscard]] bool is_complete() const noexcept { return header_validated_ and payload_validated_; }
 
     //! \brief Returns the message type (i.e. command)
-    [[nodiscard]] std::optional<MessageType> get_type() const noexcept;
+    [[nodiscard]] MessageType get_type() const noexcept;
 
     //! \brief Returns the message header
     [[nodiscard]] const MessageHeader& header() const noexcept { return header_; }
