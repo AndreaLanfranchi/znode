@@ -9,6 +9,7 @@
 #include <utility>
 
 #include <absl/strings/str_cat.h>
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/timer/timer.hpp>
 #include <gsl/gsl_util>
@@ -538,9 +539,8 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                                                    service.endpoint_.to_string()})
                                 << " << Non standard port";
                         }
-                        //                        std::ignore = connector_feed_.try_send(
-                        //                            std::make_shared<Connection>(service.endpoint_,
-                        //                            ConnectionType::kOutbound));
+                        std::ignore = connector_feed_.try_send(
+                            std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
                         break;
                     }
                 }
@@ -552,7 +552,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                 deserialization_timer.stop();
                 log::Debug("Service", {"name", "Node Hub", "action", __func__, "message", "getheaders", "count",
                                        std::to_string(get_headers_payload.block_locator_hashes_.size())})
-                    << deserialization_timer.format();
+                    << boost::replace_all_copy(std::string(deserialization_timer.format()), "\n", "");
             } break;
             default:
                 break;

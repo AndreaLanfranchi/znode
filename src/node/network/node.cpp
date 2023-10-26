@@ -422,35 +422,37 @@ outcome::result<void> Node::process_inbound_message() {
 
     switch (msg_type) {
         using enum MessageType;
-        case kVersion:
-            if (result = remote_version_.deserialize(inbound_message_->data()); result.has_error()) break;
-            if (boost::algorithm::clamp(remote_version_.protocol_version_, kMinSupportedProtocolVersion,
-                                        kMaxSupportedProtocolVersion) not_eq remote_version_.protocol_version_) {
+        case kVersion: {
+            MsgVersionPayload remote_version_payload{};
+            if (result = remote_version_payload.deserialize(inbound_message_->data()); result.has_error()) break;
+            if (boost::algorithm::clamp(remote_version_payload.protocol_version_, kMinSupportedProtocolVersion,
+                                        kMaxSupportedProtocolVersion) not_eq remote_version_payload.protocol_version_) {
                 result = Error::kInvalidProtocolVersion;
                 err_extended_reason =
                     absl::StrCat("Expected in range [", kMinSupportedProtocolVersion, ", ",
                                  kMaxSupportedProtocolVersion, "] got", remote_version_.protocol_version_, ".");
                 break;
             }
-            {
-                version_.store(std::min(local_version_.protocol_version_, remote_version_.protocol_version_));
-                const std::list<std::string> log_params{
-                    "agent",    remote_version_.user_agent_,
-                    "version",  std::to_string(remote_version_.protocol_version_),
-                    "services", std::to_string(remote_version_.services_),
-                    "relay",    (remote_version_.relay_ ? "true" : "false"),
-                    "block",    std::to_string(remote_version_.last_block_height_),
-                    "him",      remote_version_.sender_service_.endpoint_.to_string(),
-                    "me",       remote_version_.recipient_service_.endpoint_.to_string()};
-                if (remote_version_.nonce_ not_eq local_version_.nonce_) {
-                    print_log(log::Level::kInfo, log_params);
-                    result = push_message(MessageType::kVerAck);
-                } else {
-                    result = Error::kConnectedToSelf;
-                    err_extended_reason = "Connected to self ? (same nonce)";
-                }
+            if (remote_version_payload.nonce_ == local_version_.nonce_) {
+                result = Error::kConnectedToSelf;
+                err_extended_reason = "Connected to self ? (same nonce)";
+                break;
             }
-            break;
+
+            std::swap(remote_version_, remote_version_payload);
+            version_.store(std::min(local_version_.protocol_version_, remote_version_.protocol_version_));
+            const std::list<std::string> log_params{
+                "agent",    remote_version_.user_agent_,
+                "version",  std::to_string(remote_version_.protocol_version_),
+                "services", std::to_string(remote_version_.services_),
+                "relay",    (remote_version_.relay_ ? "true" : "false"),
+                "block",    std::to_string(remote_version_.last_block_height_),
+                "him",      remote_version_.sender_service_.endpoint_.to_string(),
+                "me",       remote_version_.recipient_service_.endpoint_.to_string()};
+
+            result = push_message(MessageType::kVerAck, MessagePriority::kHigh);
+            print_log(log::Level::kInfo, log_params);
+        } break;
         case kVerAck:
             // This actually requires no action. Handshake flags already set
             // We don't need to forward the message elsewhere
@@ -459,7 +461,7 @@ outcome::result<void> Node::process_inbound_message() {
             MsgPingPayload ping_payload{};
             if (result = ping_payload.deserialize(inbound_message_->data()); not result.has_error()) {
                 MsgPongPayload pong_payload(ping_payload);
-                result = push_message(pong_payload);
+                result = push_message(pong_payload, MessagePriority::kHigh);
             }
         } break;
         case kAddr:

@@ -71,6 +71,10 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
         "Time Sync", {time_server, boost::replace_all_copy(std::string(std::asctime(transmitted_time_tm)), "\n", ""),
                       "system time", boost::replace_all_copy(std::string(std::asctime(system_time_tm)), "\n", "")});
 
+    if (max_skew_seconds == 0) {
+        return outcome::success();
+    }
+
     const auto delta_time = std::abs(system_time_t - transmitted_time_t);
     if (delta_time > max_skew_seconds) {
         return Error::kInvalidSystemTime;

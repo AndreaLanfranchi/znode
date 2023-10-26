@@ -15,6 +15,9 @@
 namespace zenpp::net {
 
 //! \brief Check if system time is synchronized with a time server
+//! \param executor [in] The executor to use for async operations
+//! \param time_server [in] The time server to use for the check (time.nist.gov is used if empty)
+//! \param max_skew_seconds [in] The maximum allowed skew in seconds (0 means no check)
 outcome::result<void> check_system_time(boost::asio::any_io_executor executor, const std::string& time_server,
                                         uint32_t max_skew_seconds = 0);
 
