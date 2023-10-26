@@ -445,6 +445,14 @@ NodeService::NodeService(boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(e
 
 NodeService::NodeService(const IPEndpoint& endpoint) : endpoint_(endpoint) {}
 
+nlohmann::json NodeService::to_json() const noexcept {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    ret["time"] = time_;
+    ret["services"] = services_;
+    ret["endpoint"] = endpoint_.to_string();
+    return ret;
+}
+
 outcome::result<void> NodeService::serialization(ser::SDataStream& stream, ser::Action action) {
     auto result{stream.bind(time_, action)};
     if (not result.has_error()) result = stream.bind(services_, action);
@@ -454,6 +462,13 @@ outcome::result<void> NodeService::serialization(ser::SDataStream& stream, ser::
 
 NodeService::NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint)
     : endpoint_{endpoint.address(), endpoint.port()} {}
+
+nlohmann::json VersionNodeService::to_json() const noexcept {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    ret["services"] = services_;
+    ret["endpoint"] = endpoint_.to_string();
+    return ret;
+}
 
 outcome::result<void> VersionNodeService::serialization(ser::SDataStream& stream, ser::Action action) {
     auto result{stream.bind(services_, action)};

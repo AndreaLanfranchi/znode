@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <optional>
 
+#include <nlohmann/json.hpp>
+
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
@@ -26,6 +28,7 @@ class MessagePayload : public ser::Serializable {
     ~MessagePayload() override = default;
 
     [[nodiscard]] MessageType type() const { return message_type_; }
+    [[nodiscard]] virtual nlohmann::json to_json() const = 0;
 
   private:
     MessageType message_type_{MessageType::kMissingOrUnknown};
@@ -37,6 +40,8 @@ class MsgNullPayload : public MessagePayload {
   public:
     explicit MsgNullPayload(MessageType message_type) : MessagePayload(message_type) {}
     ~MsgNullPayload() override = default;
+
+    [[nodiscard]] nlohmann::json to_json() const override { return {}; }
 
   private:
     friend class ser::SDataStream;
@@ -61,6 +66,8 @@ class MsgVersionPayload : public MessagePayload {
     int32_t last_block_height_{0};
     bool relay_{false};
 
+    [[nodiscard]] nlohmann::json to_json() const override;
+
   private:
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
@@ -72,6 +79,8 @@ class MsgPingPayload : public MessagePayload {
     ~MsgPingPayload() override = default;
 
     uint64_t nonce_{0};
+
+    [[nodiscard]] nlohmann::json to_json() const override;
 
   private:
     friend class ser::SDataStream;
@@ -85,6 +94,8 @@ class MsgPongPayload : public MessagePayload {
     ~MsgPongPayload() override = default;
 
     uint64_t nonce_{0};
+
+    [[nodiscard]] nlohmann::json to_json() const override;
 
   private:
     friend class ser::SDataStream;
@@ -100,6 +111,8 @@ class MsgGetHeadersPayload : public MessagePayload {
     std::vector<h256> block_locator_hashes_{};
     h256 hash_stop_{};
 
+    [[nodiscard]] nlohmann::json to_json() const override;
+
   private:
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
@@ -111,6 +124,8 @@ class MsgAddrPayload : public MessagePayload {
     ~MsgAddrPayload() override = default;
 
     std::vector<NodeService> identifiers_{};
+
+    [[nodiscard]] nlohmann::json to_json() const override;
 
   private:
     friend class ser::SDataStream;
@@ -127,9 +142,10 @@ class MsgRejectPayload : public MessagePayload {
     std::string reason_{};              // Human readable reason for rejection
     std::optional<h256> extra_data_{};  // Optional extra data provided by the peer
 
+    [[nodiscard]] nlohmann::json to_json() const override;
+
   private:
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
-
 }  // namespace zenpp::net

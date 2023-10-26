@@ -28,13 +28,38 @@ outcome::result<void> MsgVersionPayload::serialization(SDataStream& stream, Acti
     }
     return result;
 }
+nlohmann::json MsgVersionPayload::to_json() const {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    ret["protocol_version"] = protocol_version_;
+    ret["services"] = services_;
+    ret["timestamp"] = timestamp_;
+    ret["recipient_service"] = recipient_service_.to_json();
+    ret["sender_service"] = sender_service_.to_json();
+    ret["nonce"] = nonce_;
+    ret["user_agent"] = user_agent_;
+    ret["last_block_height"] = last_block_height_;
+    ret["relay"] = relay_;
+    return ret;
+}
 
 outcome::result<void> MsgPingPayload::serialization(ser::SDataStream& stream, ser::Action action) {
     return stream.bind(nonce_, action);
 }
 
+nlohmann::json MsgPingPayload::to_json() const {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    ret["nonce"] = nonce_;
+    return ret;
+}
+
 outcome::result<void> MsgPongPayload::serialization(ser::SDataStream& stream, ser::Action action) {
     return stream.bind(nonce_, action);
+}
+
+nlohmann::json MsgPongPayload::to_json() const {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    ret["nonce"] = nonce_;
+    return ret;
 }
 
 outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, ser::Action action) {
@@ -65,6 +90,17 @@ outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, s
     }
     return result;
 }
+nlohmann::json MsgGetHeadersPayload::to_json() const {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    ret["protocol_version"] = protocol_version_;
+    nlohmann::json hashes(nlohmann::json::value_t::array);
+    for (auto& item : block_locator_hashes_) {
+        hashes.push_back(item.to_string());
+    }
+    ret["hashes"] = std::move(hashes);
+    ret["hash_stop"] = hash_stop_.to_string();
+    return ret;
+}
 
 outcome::result<void> MsgAddrPayload::serialization(SDataStream& stream, ser::Action action) {
     if (action == Action::kSerialize) {
@@ -86,6 +122,15 @@ outcome::result<void> MsgAddrPayload::serialization(SDataStream& stream, ser::Ac
         }
     }
     return outcome::success();
+}
+nlohmann::json MsgAddrPayload::to_json() const {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    nlohmann::json identifiers(nlohmann::json::value_t::array);
+    for (auto& item : identifiers_) {
+        identifiers.push_back(item.to_json());
+    }
+    ret["identifiers"] = std::move(identifiers);
+    return ret;
 }
 
 outcome::result<void> MsgRejectPayload::serialization(SDataStream& stream, ser::Action action) {
@@ -136,5 +181,15 @@ outcome::result<void> MsgRejectPayload::serialization(SDataStream& stream, ser::
     }
 
     return result;
+}
+nlohmann::json MsgRejectPayload::to_json() const {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    ret["rejected_command"] = rejected_command_;
+    ret["rejection_code"] = magic_enum::enum_name(rejection_code_);
+    ret["reason"] = reason_;
+    if (extra_data_.has_value()) {
+        ret["extra_data"] = extra_data_.value().to_string();
+    }
+    return ret;
 }
 }  // namespace zenpp::net

@@ -58,6 +58,11 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
         return Error::kInvalidNtpResponse;
     }
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4996)  // Gmttime and asctime maybe insecure
+#endif
+
     // Interpret the ntp packet
     uint32_t transmitted_time = endian::load_big_u32(&recv_buf[40]);
     transmitted_time -= 2208988800U;  // NTP time starts in 1900, UNIX in 1970
@@ -70,6 +75,10 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
     std::ignore = log::Info(
         "Time Sync", {time_server, boost::replace_all_copy(std::string(std::asctime(transmitted_time_tm)), "\n", ""),
                       "system time", boost::replace_all_copy(std::string(std::asctime(system_time_tm)), "\n", "")});
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
     if (max_skew_seconds == 0) {
         return outcome::success();

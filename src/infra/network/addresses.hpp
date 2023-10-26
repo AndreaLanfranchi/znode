@@ -13,6 +13,7 @@
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <gsl/gsl_util>
+#include <nlohmann/json.hpp>
 
 #include <core/serialization/serializable.hpp>
 
@@ -195,6 +196,8 @@ class NodeService : public ser::Serializable {
     uint64_t services_{0};   // services mask (OR'ed from NetworkServicesType) 8 bytes
     IPEndpoint endpoint_{};  // ipv4/ipv6 address and port 18 bytes
 
+    [[nodiscard]] virtual nlohmann::json to_json() const noexcept;
+
   private:
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
@@ -206,6 +209,8 @@ class VersionNodeService : public NodeService {
   public:
     using NodeService::NodeService;
     ~VersionNodeService() override = default;
+
+    [[nodiscard]] nlohmann::json to_json() const noexcept override;
 
   private:
     friend class ser::SDataStream;
