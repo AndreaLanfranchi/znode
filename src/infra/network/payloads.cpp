@@ -31,7 +31,17 @@ outcome::result<void> MsgVersionPayload::serialization(SDataStream& stream, Acti
 nlohmann::json MsgVersionPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
     ret["protocol_version"] = protocol_version_;
-    ret["services"] = services_;
+
+    nlohmann::json services_array(nlohmann::json::value_t::array);
+    for (auto& item : magic_enum::enum_values<NodeServicesType>()) {
+        const auto item_value = static_cast<uint64_t>(item);
+        if (item_value == 0) continue;
+        if (services_ bitand item_value) {
+            services_array.push_back(std::string(magic_enum::enum_name(item)).substr(1 /* skip k */));
+        }
+    }
+
+    ret["services"] = services_array;
     ret["timestamp"] = timestamp_;
     ret["recipient_service"] = recipient_service_.to_json();
     ret["sender_service"] = sender_service_.to_json();
