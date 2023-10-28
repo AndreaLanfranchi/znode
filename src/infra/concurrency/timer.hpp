@@ -72,8 +72,8 @@ class Timer : public Stoppable {
     //! \param autoreset [in] : whether timer is resubmitted after callback execution
     //! \param interval [in] : length of interval between triggered events
     //! \param call_back [in] : the call back function to be executed when interval expires
-    Timer(boost::asio::io_context& context, std::string name, duration interval,
-          CallBackFunc call_back, bool autoreset = false)
+    Timer(boost::asio::io_context& context, std::string name, duration interval, CallBackFunc call_back,
+          bool autoreset = false)
         : Timer(context.get_executor(), std::move(name), interval, std::move(call_back), autoreset){};
 
     ~Timer() override = default;

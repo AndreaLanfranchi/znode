@@ -30,6 +30,8 @@ class MessagePayload : public ser::Serializable {
     [[nodiscard]] MessageType type() const { return message_type_; }
     [[nodiscard]] virtual nlohmann::json to_json() const = 0;
 
+    [[nodiscard]] static std::shared_ptr<MessagePayload> from_type(MessageType type);
+
   private:
     MessageType message_type_{MessageType::kMissingOrUnknown};
     friend class ser::SDataStream;
@@ -89,7 +91,7 @@ class MsgPingPayload : public MessagePayload {
 
 class MsgPongPayload : public MessagePayload {
   public:
-    MsgPongPayload() : MessagePayload(MessageType::kPing) {}
+    MsgPongPayload() : MessagePayload(MessageType::kPong) {}
     explicit MsgPongPayload(const MsgPingPayload& ping) : MessagePayload(MessageType::kPong), nonce_{ping.nonce_} {}
     ~MsgPongPayload() override = default;
 
@@ -148,4 +150,5 @@ class MsgRejectPayload : public MessagePayload {
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
+
 }  // namespace zenpp::net

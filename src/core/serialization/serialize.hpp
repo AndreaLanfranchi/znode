@@ -122,7 +122,7 @@ inline outcome::result<void> read_data(Stream& stream, bool& object) {
 
 //! \brief Lowest level deserialization for arithmetic types
 template <typename T, class Stream>
-    requires Integral<T>
+requires Integral<T>
 inline outcome::result<T> read_as(Stream& stream) {
     T ret{0};
     if (const outcome::result<T> read_result{read_data(stream, ret)}; read_result.has_error()) {
@@ -132,7 +132,7 @@ inline outcome::result<T> read_as(Stream& stream) {
 }
 
 template <typename T, class Stream>
-    requires std::same_as<T, double> or std::same_as<T, float>
+requires std::same_as<T, double> or std::same_as<T, float>
 inline outcome::result<T> read_as(Stream& stream) {
     const auto bytes_to_read{ssizeof<T>};
     const auto read_result{stream.read(bytes_to_read)};

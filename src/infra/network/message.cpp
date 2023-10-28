@@ -53,24 +53,7 @@ outcome::result<void> MessageHeader::validate(int protocol_version, const ByteVi
     if (magic.size() not_eq network_magic.size()) return Error::kMessageHeaderInvalidMagic;
     if (memcmp(network_magic.data(), magic.data(), magic.size()) not_eq 0) return Error::kMessageHeaderInvalidMagic;
 
-    // Identify the command
-    const auto get_command_label = [](const MessageType type, const size_t to_size) -> Bytes {
-        std::string label{magic_enum::enum_name(type)};
-        label.erase(0, 1);
-        std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c) { return std::tolower(c); });
-        Bytes ret{label.begin(), label.end()};
-        ret.resize(to_size, 0x0);
-        return ret;
-    };
-
-    for (const auto enumerator : magic_enum::enum_values<MessageType>()) {
-        const auto command_label{get_command_label(enumerator, command.size())};
-        ASSERT(command_label.size() == command.size());
-        if (memcmp(command_label.data(), command.data(), command.size()) == 0) {
-            message_type_ = enumerator;
-            break;
-        }
-    }
+    message_type_ = message_type_from_command(command);
     if (message_type_ == MessageType::kMissingOrUnknown) return Error::kMessageHeaderIllegalCommand;
 
     // Check the payload length is within the allowed range

@@ -12,6 +12,8 @@
 #include <absl/time/clock.h>
 #include <absl/time/time.h>
 #include <boost/algorithm/clamp.hpp>
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/timer/timer.hpp>
 #include <magic_enum.hpp>
 
 #include <core/common/assert.hpp>
@@ -29,7 +31,7 @@ std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 
 Node::Node(AppSettings& app_settings, std::shared_ptr<Connection> connection_ptr, boost::asio::io_context& io_context,
            boost::asio::ssl::context* ssl_context, std::function<void(DataDirectionMode, size_t)> on_data,
-           std::function<void(std::shared_ptr<Node>, std::shared_ptr<Message>)> on_message)
+           std::function<void(std::shared_ptr<Node>, std::shared_ptr<MessagePayload>)> on_message)
     : app_settings_(app_settings),
       connection_ptr_(std::move(connection_ptr)),
       io_strand_(io_context),
@@ -361,7 +363,7 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
     outcome::result<void> result{outcome::success()};
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
 
-    while (!data.empty()) {
+    while (not result.has_error() and not data.empty()) {
         if (inbound_message_ == nullptr) {
             inbound_message_start_time_.store(std::chrono::steady_clock::now());
             inbound_message_ = std::make_unique<Message>(version_, app_settings_.chain_config.value().magic_);
@@ -371,37 +373,77 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
         const auto msg_type{inbound_message_->get_type()};
         if (result.has_error()) {
             if (result.error() == Error::kMessageHeaderIncomplete or result.error() == Error::kMessageBodyIncomplete) {
-                // These two guys depict a normal condition and we must continue reading
+                // These two guys depict a normal condition: we must continue reading data from socket
                 result = outcome::success();
-            } else {
+                continue;
+            }
+
+            log::Error("Node", {"id", std::to_string(node_id_), "remote", to_string(), "command",
+                                std::string(magic_enum::enum_name(msg_type)), "status", "failure", "reason",
+                                result.error().message()});
+        }
+
+        if (not result.has_error())
+            result = validate_message_for_protocol_handshake(DataDirectionMode::kInbound, msg_type);
+
+        // Message is complete and we can deserialize it
+        ASSERT(msg_type not_eq MessageType::kMissingOrUnknown and "Must have a valid message type");
+        if (not result.has_error()) {
+            // Validate deserialization
+
+            boost::timer::cpu_timer deserialization_timer;
+            auto payload_ptr{MessagePayload::from_type(msg_type)};
+            if (not payload_ptr) {
                 log::Error("Node", {"id", std::to_string(node_id_), "remote", to_string(), "command",
                                     std::string(magic_enum::enum_name(msg_type)), "status", "failure", "reason",
-                                    result.error().message()});
+                                    "Message payload type not supported."});
+                result = Error::kMessagePayLoadUnhandleable;
                 break;
             }
-        }
 
-        // If we have the message type then we can validate it against protocol handshake rules
-        if (msg_type not_eq MessageType::kMissingOrUnknown) {
-            if (const auto handshake_result{
-                    validate_message_for_protocol_handshake(DataDirectionMode::kInbound, msg_type)};
-                handshake_result.has_error()) {
-                result = handshake_result.error();
-                break;
+            result = payload_ptr->deserialize(inbound_message_->data());
+            deserialization_timer.stop();
+
+            if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+                const std::list<std::string> log_params{
+                    "action",
+                    __func__,
+                    "message",
+                    std::string(magic_enum::enum_name(msg_type)),
+                    "size",
+                    to_human_bytes(inbound_message_->data().size()),
+                    "deserialization time",
+                    boost::replace_all_copy(std::string(deserialization_timer.format()), "\n", "")};
+                print_log(log::Level::kTrace, log_params);
+            }
+
+            if (not result.has_error() and not inbound_message_->data().eof()) {
+                result = Error::kMessagePayloadExtraData;  // Mismatch between payload size and actual data
+            }
+
+            // Check we're not under flooding condition
+            if (not result.has_error() and ++messages_parsed > kMaxMessagesPerRead) {
+                result = net::Error::kMessageFloodingDetected;
+            }
+
+            // Deliver payload for local processing and eventually forward it to higher level code
+            ASSERT(payload_ptr);
+            if (not result.has_error()) result = process_inbound_message(payload_ptr);
+            if (not result.has_error()) {
+                inbound_message_metrics_[msg_type].count_++;
+                inbound_message_metrics_[msg_type].bytes_ += inbound_message_->data().size();
+
+                // Reset the message barrel for the next message
+                inbound_message_.reset();
+                inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
             }
         }
+    }
 
-        if (not inbound_message_->is_complete()) continue;  // We need more data
-
-        // We've got the header begin timing
-        ASSERT(msg_type not_eq MessageType::kMissingOrUnknown and "Must have a valid message type");
-
-        if (++messages_parsed > kMaxMessagesPerRead) {
-            result = net::Error::kMessageFloodingDetected;
-            break;
-        }
-
-        if (result = process_inbound_message(); result.has_error()) break;
+    // We can get here for two reasons:
+    // 1. We have read all the data from the socket but the message is still incomplete (no errors)
+    // 2. An error has occurred in the loop hence we discard all
+    if (result.has_error()) {
         inbound_message_.reset();
         inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
     }
@@ -410,21 +452,17 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
     return result;
 }
 
-outcome::result<void> Node::process_inbound_message() {
+outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePayload> payload_ptr) {
     outcome::result<void> result{outcome::success()};
     std::string err_extended_reason{};
     bool notify_node_hub{false};
 
-    ASSERT_PRE((inbound_message_ not_eq nullptr and inbound_message_->is_complete()) and "Must have a valid message");
-    const auto msg_type{inbound_message_->header().get_type()};
-    inbound_message_metrics_[msg_type].count_++;
-    inbound_message_metrics_[msg_type].bytes_ += inbound_message_->data().size();
-
+    ASSERT(payload_ptr not_eq nullptr);
+    const auto msg_type{payload_ptr->type()};
     switch (msg_type) {
         using enum MessageType;
         case kVersion: {
-            MsgVersionPayload remote_version_payload{};
-            if (result = remote_version_payload.deserialize(inbound_message_->data()); result.has_error()) break;
+            auto& remote_version_payload = dynamic_cast<MsgVersionPayload&>(*payload_ptr);
             if (boost::algorithm::clamp(remote_version_payload.protocol_version_, kMinSupportedProtocolVersion,
                                         kMaxSupportedProtocolVersion) not_eq remote_version_payload.protocol_version_) {
                 result = Error::kInvalidProtocolVersion;
@@ -458,36 +496,26 @@ outcome::result<void> Node::process_inbound_message() {
             // We don't need to forward the message elsewhere
             break;
         case kPing: {
-            MsgPingPayload ping_payload{};
-            if (result = ping_payload.deserialize(inbound_message_->data()); not result.has_error()) {
-                MsgPongPayload pong_payload(ping_payload);
-                result = push_message(pong_payload, MessagePriority::kHigh);
-            }
+            auto& ping_payload = dynamic_cast<MsgPingPayload&>(*payload_ptr);
+            MsgPongPayload pong_payload(ping_payload);
+            result = push_message(pong_payload, MessagePriority::kHigh);
         } break;
-        case kAddr:
-            if (connection_ptr_->type_ == ConnectionType::kSeedOutbound) {
-                // Disconnect from seed nodes as soon as we get some addresses from them
-                asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
-            }
-            notify_node_hub = true;
-            break;
         case kGetAddr:
             if (connection_ptr_->type_ == ConnectionType::kInbound and inbound_message_metrics_[kGetAddr].count_ > 1U) {
                 // Ignore the message to avoid fingerprinting
                 err_extended_reason = "Ignoring duplicate 'getaddr' message on inbound connection.";
-                break;
+            } else {
+                notify_node_hub = true;
             }
-            notify_node_hub = true;
             break;
         case kPong: {
+            auto& pong_payload = dynamic_cast<MsgPongPayload&>(*payload_ptr);
             const auto expected_nonce{ping_meter_.get_nonce()};
             if (not ping_meter_.pending_sample() or not expected_nonce.has_value()) {
                 result = Error::kUnsolicitedPong;
                 err_extended_reason = "Received an unrequested `pong` message.";
                 break;
             }
-            MsgPongPayload pong_payload{};
-            if (result = pong_payload.deserialize(inbound_message_->data()); result.has_error()) break;
             if (pong_payload.nonce_ not_eq expected_nonce.value()) {
                 result = Error::kInvalidPingPongNonce;
                 err_extended_reason =
@@ -508,8 +536,7 @@ outcome::result<void> Node::process_inbound_message() {
     if (result.has_error() or log::test_verbosity(log::Level::kTrace)) {
         const std::list<std::string> log_params{
             "action",  __func__,
-            "message", std::string{magic_enum::enum_name(msg_type)},
-            "size",    to_human_bytes(inbound_message_->size()),
+            "command", std::string{magic_enum::enum_name(msg_type)},
             "status",  std::string(result.has_error() ? result.error().message() : "success")};
         print_log(result.has_error() ? log::Level::kWarning : log::Level::kTrace, log_params, err_extended_reason);
     }
@@ -517,7 +544,7 @@ outcome::result<void> Node::process_inbound_message() {
         if (msg_type not_eq MessageType::kPing and msg_type not_eq MessageType::kPong) {
             last_message_received_time_.store(std::chrono::steady_clock::now());
         }
-        if (notify_node_hub) on_message_(shared_from_this(), std::move(inbound_message_));
+        if (notify_node_hub) on_message_(shared_from_this(), payload_ptr);
     }
     return result;
 }

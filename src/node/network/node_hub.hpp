@@ -88,7 +88,7 @@ class NodeHub : public con::Stoppable {
     //! \details This function behaves as a collector of messages from nodes and will route them to the
     //! appropriate workers/handlers. Messages pertaining to node session itself MUST NOT reach here
     //! as they SHOULD be handled by the node itself.
-    void on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<Message> message);
+    void on_node_received_message(std::shared_ptr<Node> node_ptr, std::shared_ptr<MessagePayload> payload_ptr);
 
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options
 

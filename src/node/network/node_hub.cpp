@@ -9,9 +9,7 @@
 #include <utility>
 
 #include <absl/strings/str_cat.h>
-#include <boost/algorithm/string/replace.hpp>
 #include <boost/asio/ssl.hpp>
-#include <boost/timer/timer.hpp>
 #include <gsl/gsl_util>
 
 #include <core/chain/seeds.hpp>
@@ -130,8 +128,8 @@ Task<void> NodeHub::node_factory_work() {
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
             },
-            [this](std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
-                on_node_received_message(std::move(node), std::move(message));
+            [this](std::shared_ptr<Node> node_ptr, std::shared_ptr<MessagePayload> payload_ptr) {
+                on_node_received_message(std::move(node_ptr), std::move(payload_ptr));
             });
 
         log::Info("Service", {"name", "Node Hub", "action", "accept", "remote", conn_ptr->endpoint_.to_string(), "id",
@@ -496,27 +494,25 @@ void NodeHub::on_node_data(net::DataDirectionMode direction, const size_t bytes_
     }
 }
 
-void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_ptr<Message> message) {
+void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shared_ptr<MessagePayload> payload_ptr) {
     using namespace ser;
     using enum Error;
 
-    ASSERT_PRE(node not_eq nullptr);
-    ASSERT_PRE(message not_eq nullptr and message->is_complete());
-    if (not is_running() or not node->is_running()) return;
+    ASSERT_PRE(node_ptr not_eq nullptr);
+    ASSERT_PRE(payload_ptr not_eq nullptr);
+    if (not is_running() or not node_ptr->is_running()) return;
 
-    const auto msg_type{message->get_type()};
+    const auto msg_type{payload_ptr->type()};
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-        log::Trace("Service",
-                   {"name", "Node Hub", "action", __func__, "command", std::string{magic_enum::enum_name(msg_type)},
-                    "remote", node->to_string(), "size", std::to_string(message->size())});
+        log::Trace("Service", {"name", "Node Hub", "action", __func__, "command",
+                               std::string{magic_enum::enum_name(msg_type)}, "remote", node_ptr->to_string()});
     }
 
     try {
         switch (msg_type) {
             using enum MessageType;
             case kAddr: {
-                MsgAddrPayload addr_payload{};
-                success_or_throw(addr_payload.deserialize(message->data()));
+                auto& addr_payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
 
                 // Randomly shuffle the list of addresses
                 std::random_device rnd;
@@ -526,8 +522,8 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                 // TODO Pass it to the address manager
                 if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
                     log::Trace("Service",
-                               {"name", "Node Hub", "action", __func__, "message", "addr", "remote", node->to_string(),
-                                "count", std::to_string(addr_payload.identifiers_.size())});
+                               {"name", "Node Hub", "action", __func__, "message", "addr", "remote",
+                                node_ptr->to_string(), "count", std::to_string(addr_payload.identifiers_.size())});
                 }
                 if (need_connections_.notified()) {
                     for (const auto& service : addr_payload.identifiers_) {
@@ -539,6 +535,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                                                    service.endpoint_.to_string()})
                                 << " << Non standard port";
                         }
+                        LOGF_TRACE << "Feeding connector with new address " << service.endpoint_.to_string();
                         std::ignore = connector_feed_.try_send(
                             std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
                         break;
@@ -546,26 +543,25 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node, std::shared_p
                 }
             } break;
             case kGetHeaders: {
-                boost::timer::cpu_timer deserialization_timer;
-                MsgGetHeadersPayload get_headers_payload{};
-                success_or_throw(get_headers_payload.deserialize(message->data()));
-                deserialization_timer.stop();
-                log::Debug("Service", {"name", "Node Hub", "action", __func__, "message", "getheaders", "count",
-                                       std::to_string(get_headers_payload.block_locator_hashes_.size())})
-                    << boost::replace_all_copy(std::string(deserialization_timer.format()), "\n", "");
+                auto& get_headers_payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
+                if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+                    log::Trace("Service", {"name", "Node Hub", "action", __func__, "message", "getheaders", "remote",
+                                           node_ptr->to_string(), "count",
+                                           std::to_string(get_headers_payload.block_locator_hashes_.size())});
+                }
             } break;
             default:
                 break;
         }
 
     } catch (const boost::system::system_error& error) {
-        log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote", node->to_string(),
-                               "error", error.code().message()})
+        log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote",
+                               node_ptr->to_string(), "error", error.code().message()})
             << "Disconnecting ...";
-        node->stop();
+        node_ptr->stop();
     } catch (const std::logic_error& error) {
-        log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote", node->to_string(),
-                               "error", error.what()});
+        log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote",
+                               node_ptr->to_string(), "error", error.what()});
     }
 }
 

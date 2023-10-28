@@ -5,9 +5,12 @@
 */
 
 #pragma once
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <limits>
+
+#include <core/common/base.hpp>
 
 namespace zenpp::net {
 
@@ -15,8 +18,15 @@ static constexpr int32_t kDefaultProtocolVersion{170'002};                      
 static constexpr int32_t kMinSupportedProtocolVersion{kDefaultProtocolVersion};  // Min acceptable protocol version
 static constexpr int32_t kMaxSupportedProtocolVersion{kDefaultProtocolVersion};  // Max acceptable protocol version
 static constexpr size_t kMaxProtocolMessageLength{static_cast<size_t>(4_MiB)};   // Maximum length of a protocol message
-static constexpr size_t kMessageHeaderLength{24};                                // Length of a protocol message header
-static constexpr size_t kMaxInvItems{50'000};                                    // Maximum number of inventory items
+
+static constexpr size_t kMessageHeaderMagicLength{4};     // Message Header's magic length
+static constexpr size_t kMessageHeaderCommandLength{12};  // Message Header's command length
+static constexpr size_t kMessageHeaderChecksumLength{4};  // Message Header's checksum length
+static constexpr size_t kMessageHeaderLength{kMessageHeaderMagicLength + kMessageHeaderCommandLength +
+                                             sizeof(uint32_t) +
+                                             kMessageHeaderChecksumLength};  // Length of a protocol message header
+
+static constexpr size_t kMaxInvItems{50'000};        // Maximum number of inventory items
 static constexpr size_t kInvItemSize{36};            // Size of an inventory item (type + hash)
 static constexpr size_t kMaxAddrItems{1'000};        // Maximum number of items in an addr message
 static constexpr size_t kAddrItemSize{30};           // Size of an address item (time + services + ip + port)
@@ -64,4 +74,11 @@ enum class RejectionCode : int8_t {
     kActiveCertDataHash = 0x4c,
     kTooManyCswInputsForSideChain = 0x4d,
 };
+
+//! \brief Returns the command type from the corresponding message header field
+MessageType message_type_from_command(const std::array<uint8_t, kMessageHeaderCommandLength>& command);
+
+//! \brief Whether the provided command string is a valid and known command
+bool is_known_command(const std::string& command) noexcept;
+
 }  // namespace zenpp::net

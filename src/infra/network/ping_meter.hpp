@@ -40,7 +40,7 @@ class PingMeter {
     [[nodiscard]] bool pending_sample() const noexcept;
 
     //! \brief Returns how long the current ping sample has been in progress.
-    [[nodiscard]] std::chrono::milliseconds pending_sample_duration () const noexcept;
+    [[nodiscard]] std::chrono::milliseconds pending_sample_duration() const noexcept;
 
     //! \brief Returns the EMA of the ping time across samples.
     [[nodiscard]] std::chrono::milliseconds get_ema() const noexcept;

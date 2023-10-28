@@ -26,10 +26,12 @@ class MessageHeader : public ser::Serializable {
   public:
     MessageHeader() : Serializable(){};
 
-    std::array<uint8_t, 4> network_magic{};     // Message magic (origin network)
-    std::array<uint8_t, 12> command{};          // ASCII string identifying the packet content, NULL padded
-    uint32_t payload_length{0};                 // Length of payload in bytes
-    std::array<uint8_t, 4> payload_checksum{};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
+    std::array<uint8_t, kMessageHeaderMagicLength> network_magic{};  // Message magic (origin network)
+    std::array<uint8_t, kMessageHeaderCommandLength>
+        command{};               // ASCII string identifying the packet content, NULL padded
+    uint32_t payload_length{0};  // Length of payload in bytes
+    std::array<uint8_t, kMessageHeaderChecksumLength>
+        payload_checksum{};  // First 4 bytes of sha256(sha256(payload)) in internal byte order
 
     //! \brief Returns the message definition
     [[nodiscard]] const MessageDefinition& get_definition() const noexcept;
@@ -121,11 +123,11 @@ class Message {
     outcome::result<void> push(MessagePayload& payload) noexcept;
 
   private:
-    MessageHeader header_{};                     // Where the message header is deserialized
-    ser::SDataStream ser_stream_;                // Contains all the message raw data
-    std::array<uint8_t, 4> network_magic_{0x0};  // Message magic (network)
-    bool header_validated_{false};               // Whether the header has been validated already
-    bool payload_validated_{false};              // Whether the payload has been validated already
+    MessageHeader header_{};                                             // Where the message header is deserialized
+    ser::SDataStream ser_stream_;                                        // Contains all the message raw data
+    std::array<uint8_t, kMessageHeaderMagicLength> network_magic_{0x0};  // Message magic (network)
+    bool header_validated_{false};   // Whether the header has been validated already
+    bool payload_validated_{false};  // Whether the payload has been validated already
 
     //! \brief Validates the message header
     [[nodiscard]] outcome::result<void> validate_header() noexcept;

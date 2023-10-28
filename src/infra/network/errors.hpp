@@ -29,6 +29,8 @@ enum class Error {
     kMessagePayloadOversizedVector,             // Message payload's expected vectorized, but too many items provided
     kMessagePayloadLengthMismatchesVectorSize,  // Message payload's vectorized, but size mismatches
     kMessagePayloadDuplicateVectorItems,        // Message payload's vectorized, but contains duplicate items
+    kMessagePayloadExtraData,                   // Message payload contains unparseable extra data
+    kMessagePayLoadUnhandleable,                // Message payload is unhandleable (we're missing a handler)
     kMessageUnknownCommand,                     // Message command is unknown
     kMessageWriteNotPermitted,                  // Message write is not permitted (message is already complete)
     kMessagePushNotPermitted,                   // Message push is not permitted (already initialized header)
@@ -41,6 +43,7 @@ enum class Error {
     kConnectedToSelf,                           // Connected to self
     kUnsolicitedPong,                           // Unsolicited pong message
     kInvalidPingPongNonce,                      // Ping nonce mismatch
+    kUnknownRejectedCommand,                    // A rejection message rejects an unknown command
     kMessagePayloadInvalidLastBlockHeight,      // Message payload's last block height is invalid (Version Message)
     kMessagePayloadInvalidTimestamp,            // Message payload's timestamp is invalid (Version Message)
     kInvalidNtpResponse,                        // Invalid NTP response

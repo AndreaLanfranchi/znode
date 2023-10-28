@@ -6,11 +6,40 @@
 
 #include "payloads.hpp"
 
-#include <infra/network/messages.hpp>
+#include <absl/strings/str_cat.h.>
+
+#include <core/common/assert.hpp>
 
 namespace zenpp::net {
 
 using namespace ser;
+
+std::shared_ptr<MessagePayload> MessagePayload::from_type(MessageType type) {
+    switch (type) {
+        using enum MessageType;
+        case kVersion:
+            return std::make_shared<MsgVersionPayload>();
+        case kPing:
+            return std::make_shared<MsgPingPayload>();
+        case kPong:
+            return std::make_shared<MsgPongPayload>();
+        case kGetHeaders:
+            return std::make_shared<MsgGetHeadersPayload>();
+        case kAddr:
+            return std::make_shared<MsgAddrPayload>();
+        case kReject:
+            return std::make_shared<MsgRejectPayload>();
+
+            /* Following do not have a payload */
+
+        case kVerAck:
+        case kMemPool:
+        case kMissingOrUnknown:
+            return std::make_shared<MsgNullPayload>(type);
+        default:
+            return nullptr;
+    }
+}
 
 outcome::result<void> MsgVersionPayload::serialization(SDataStream& stream, Action action) {
     auto result{stream.bind(protocol_version_, action)};
@@ -145,9 +174,7 @@ nlohmann::json MsgAddrPayload::to_json() const {
 outcome::result<void> MsgRejectPayload::serialization(SDataStream& stream, ser::Action action) {
     outcome::result<void> result = outcome::success();
     if (action == Action::kSerialize) {
-        if (rejected_command_.empty() or rejected_command_.size() > 12) {
-            return Error::kMessageHeaderIllegalCommand;
-        }
+        if (not is_known_command(rejected_command_)) return Error::kUnknownRejectedCommand;
         if (reason_.size() > 256) {
             return ser::Error::kStringTooBig;
         }
@@ -161,6 +188,7 @@ outcome::result<void> MsgRejectPayload::serialization(SDataStream& stream, ser::
 
     } else {
         result = stream.bind(rejected_command_, action);
+        if (not result.has_error() and not is_known_command(rejected_command_)) return Error::kUnknownRejectedCommand;
         if (not result.has_error()) {
             int8_t code{0};
             result = stream.bind(code, action);
@@ -183,9 +211,6 @@ outcome::result<void> MsgRejectPayload::serialization(SDataStream& stream, ser::
                     extra_data_.emplace(std::move(extra_data_value));
                 }
             }
-        }
-        if (not result.has_error() and stream.avail() > 0) {
-            return ser::Error::kInputTooLarge;
         }
     }
 
