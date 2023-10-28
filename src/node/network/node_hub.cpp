@@ -508,60 +508,56 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
                                std::string{magic_enum::enum_name(msg_type)}, "remote", node_ptr->to_string()});
     }
 
-    try {
-        switch (msg_type) {
-            using enum MessageType;
-            case kAddr: {
-                auto& addr_payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
+    switch (msg_type) {
+        using enum MessageType;
+        case kAddr: {
+            auto& addr_payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
 
-                // Randomly shuffle the list of addresses
-                std::random_device rnd;
-                std::mt19937 gen(rnd());
-                std::shuffle(addr_payload.identifiers_.begin(), addr_payload.identifiers_.end(), gen);
+            // Randomly shuffle the list of addresses
+            std::random_device rnd;
+            std::mt19937 gen(rnd());
+            std::shuffle(addr_payload.identifiers_.begin(), addr_payload.identifiers_.end(), gen);
 
-                // TODO Pass it to the address manager
-                if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-                    log::Trace("Service",
-                               {"name", "Node Hub", "action", __func__, "message", "addr", "remote",
-                                node_ptr->to_string(), "count", std::to_string(addr_payload.identifiers_.size())});
-                }
-                if (need_connections_.notified()) {
-                    for (const auto& service : addr_payload.identifiers_) {
-                        if (app_settings_.network.ipv4_only and
-                            service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
-                            continue;
-                        if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
-                            log::Debug("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
-                                                   service.endpoint_.to_string()})
-                                << " << Non standard port";
-                        }
-                        LOGF_TRACE << "Feeding connector with new address " << service.endpoint_.to_string();
-                        std::ignore = connector_feed_.try_send(
-                            std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
-                        break;
+            // TODO Pass it to the address manager
+            if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+                log::Trace("Service",
+                           {"name", "Node Hub", "action", __func__, "message", "addr", "remote",
+                            node_ptr->to_string(), "count", std::to_string(addr_payload.identifiers_.size())});
+            }
+            if (need_connections_.notified()) {
+                for (const auto& service : addr_payload.identifiers_) {
+                    if (app_settings_.network.ipv4_only and
+                        service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
+                        continue;
+                    if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
+                        log::Debug("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
+                                               service.endpoint_.to_string()})
+                            << " << Non standard port";
                     }
+                    LOGF_TRACE << "Feeding connector with new address " << service.endpoint_.to_string();
+                    std::ignore = connector_feed_.try_send(
+                        std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
+                    break;
                 }
-            } break;
-            case kGetHeaders: {
-                auto& get_headers_payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
-                if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-                    log::Trace("Service", {"name", "Node Hub", "action", __func__, "message", "getheaders", "remote",
-                                           node_ptr->to_string(), "count",
-                                           std::to_string(get_headers_payload.block_locator_hashes_.size())});
-                }
-            } break;
-            default:
-                break;
-        }
-
-    } catch (const boost::system::system_error& error) {
-        log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote",
-                               node_ptr->to_string(), "error", error.code().message()})
-            << "Disconnecting ...";
-        node_ptr->stop();
-    } catch (const std::logic_error& error) {
-        log::Error("Service", {"name", "Node Hub", "action", "on_node_received_message", "remote",
-                               node_ptr->to_string(), "error", error.what()});
+            }
+        } break;
+        case kGetHeaders: {
+            auto& get_headers_payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
+            if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+                log::Trace("Service", {"name", "Node Hub", "action", __func__, "message", "getheaders", "remote",
+                                       node_ptr->to_string(), "count",
+                                       std::to_string(get_headers_payload.block_locator_hashes_.size())});
+            }
+        } break;
+        case kInv: {
+            auto& inv_payload = dynamic_cast<MsgInventoryPayload&>(*payload_ptr);
+            if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+                log::Trace("Service", {"name", "Node Hub", "action", __func__, "message", "inv", "remote",
+                                       node_ptr->to_string(), "count", std::to_string(inv_payload.items_.size())});
+            }
+        } break;
+        default:
+            break;
     }
 }
 

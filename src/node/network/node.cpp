@@ -114,8 +114,7 @@ void Node::on_ping_timer_expired(con::Timer::duration& interval) noexcept {
     using namespace std::chrono_literals;
     if (ping_meter_.pending_sample()) return;  // Wait for response to return
     const auto nonce{randomize<uint64_t>(/*min=*/1U)};
-    MsgPingPayload ping_payload{};
-    ping_payload.nonce_ = nonce;
+    MsgPingPongPayload ping_payload{MessageType::kPing, nonce};
     if (const auto result{push_message(ping_payload, MessagePriority::kHigh)}; result.has_error()) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", result.error().message()};
@@ -496,8 +495,8 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
             // We don't need to forward the message elsewhere
             break;
         case kPing: {
-            auto& ping_payload = dynamic_cast<MsgPingPayload&>(*payload_ptr);
-            MsgPongPayload pong_payload(ping_payload);
+            auto& ping_payload = dynamic_cast<MsgPingPongPayload&>(*payload_ptr);
+            MsgPingPongPayload pong_payload(MessageType::kPong, ping_payload.nonce_);
             result = push_message(pong_payload, MessagePriority::kHigh);
         } break;
         case kGetAddr:
@@ -509,7 +508,7 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
             }
             break;
         case kPong: {
-            auto& pong_payload = dynamic_cast<MsgPongPayload&>(*payload_ptr);
+            auto& pong_payload = dynamic_cast<MsgPingPongPayload&>(*payload_ptr);
             const auto expected_nonce{ping_meter_.get_nonce()};
             if (not ping_meter_.pending_sample() or not expected_nonce.has_value()) {
                 result = Error::kUnsolicitedPong;

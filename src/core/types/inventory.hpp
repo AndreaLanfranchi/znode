@@ -7,29 +7,37 @@
 */
 
 #pragma once
+#include <nlohmann/json.hpp>
+
 #include <core/common/base.hpp>
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
 namespace zenpp {
 
-static constexpr size_t kBlockHeaderSerializedSize{140};  // Excluding Equihash solution
-
-class BlockHeader : public ser::Serializable {
+class InventoryItem : public ser::Serializable {
   public:
     using ser::Serializable::Serializable;
 
-    int32_t version{0};  // 4 bytes
-    h256 parent_hash{};  // 32 bytes
-    h256 merkle_root{};  // 32 bytes
-    h256 scct_root{};    // 32 bytes
-    uint32_t time{0};    // 4 bytes
-    uint32_t bits{0};    // 4 bytes
-    uint256_t nonce{0};  // 32 bytes Total: 140 bytes
-    Bytes solution{};
+    enum class Type : uint32_t {
+        kError = 0,
+        kTx = 1,
+        kBlock = 2,
+        kFilteredBlock = 3,
+        // TODO Not supported yet kCmpactBlock = 4,
+        // TODO Not supported yet kWitnessTx = 0x40000001,
+        // TODO Not supported yet kWitnessBlock = 0x40000002,
+        // TODO Not supported yet kFilteredWitnessBlock = 0x40000003
+    };
+
+    Type type_{Type::kError};
+    h256 identifier_{};
 
     //! \brief Reset the object to its default state
     void reset();
+
+    //! \brief Return a JSON representation of the object
+    [[nodiscard]] nlohmann::json to_json() const noexcept;
 
   private:
     friend class ser::SDataStream;

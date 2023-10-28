@@ -19,14 +19,19 @@ std::shared_ptr<MessagePayload> MessagePayload::from_type(MessageType type) {
         using enum MessageType;
         case kVersion:
             return std::make_shared<MsgVersionPayload>();
+
+            /* Same Payload for both Ping and Pong */
+
         case kPing:
-            return std::make_shared<MsgPingPayload>();
         case kPong:
-            return std::make_shared<MsgPongPayload>();
+            return std::make_shared<MsgPingPongPayload>(type);
+
         case kGetHeaders:
             return std::make_shared<MsgGetHeadersPayload>();
         case kAddr:
             return std::make_shared<MsgAddrPayload>();
+        case kInv:
+            return std::make_shared<MsgInventoryPayload>();
         case kReject:
             return std::make_shared<MsgRejectPayload>();
 
@@ -80,24 +85,14 @@ nlohmann::json MsgVersionPayload::to_json() const {
     return ret;
 }
 
-outcome::result<void> MsgPingPayload::serialization(ser::SDataStream& stream, ser::Action action) {
-    return stream.bind(nonce_, action);
-}
-
-nlohmann::json MsgPingPayload::to_json() const {
+nlohmann::json MsgPingPongPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
     ret["nonce"] = nonce_;
     return ret;
 }
 
-outcome::result<void> MsgPongPayload::serialization(ser::SDataStream& stream, ser::Action action) {
+outcome::result<void> MsgPingPongPayload::serialization(ser::SDataStream& stream, ser::Action action) {
     return stream.bind(nonce_, action);
-}
-
-nlohmann::json MsgPongPayload::to_json() const {
-    nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["nonce"] = nonce_;
-    return ret;
 }
 
 outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, ser::Action action) {
@@ -168,6 +163,38 @@ nlohmann::json MsgAddrPayload::to_json() const {
         identifiers.push_back(item.to_json());
     }
     ret["identifiers"] = std::move(identifiers);
+    return ret;
+}
+
+outcome::result<void> MsgInventoryPayload::serialization(SDataStream& stream, ser::Action action) {
+    if (action == Action::kSerialize) {
+        const auto vector_size = items_.size();
+        if (vector_size == 0U) return Error::kMessagePayloadEmptyVector;
+        if (vector_size > kMaxInvItems) return Error::kMessagePayloadOversizedVector;
+        if (auto result = write_compact(stream, vector_size); result.has_error()) return result.error();
+        for (auto& item : items_) {
+            if (auto result{item.serialize(stream)}; result.has_error()) return result.error();
+        }
+    } else {
+        const auto expected_vector_size = read_compact(stream);
+        if (expected_vector_size.has_error()) return expected_vector_size.error();
+        if (expected_vector_size.value() == 0U) return Error::kMessagePayloadEmptyVector;
+        if (expected_vector_size.value() > kMaxInvItems) return Error::kMessagePayloadOversizedVector;
+        items_.resize(expected_vector_size.value());
+        for (auto& item : items_) {
+            if (auto result = item.deserialize(stream); result.has_error()) return result.error();
+        }
+    }
+    return outcome::success();
+}
+
+nlohmann::json MsgInventoryPayload::to_json() const {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    nlohmann::json inventory_items(nlohmann::json::value_t::array);
+    for (auto& item : items_) {
+        inventory_items.push_back(item.to_json());
+    }
+    ret["inventory_items"] = std::move(inventory_items);
     return ret;
 }
 

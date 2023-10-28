@@ -23,6 +23,7 @@ enum class Error {
     kUnexpectedError,          // An unexpected error occurred
     kStringTooBig,             // The string is too big
     kInvalidRejectionCode,     // The rejection code is not valid
+    kInvalidInventoryType,     // The inventory type is not valid
 };
 
 #ifdef __GNUC__

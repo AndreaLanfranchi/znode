@@ -12,6 +12,7 @@
 
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
+#include <core/types/inventory.hpp>
 
 #include <infra/network/addresses.hpp>
 #include <infra/network/errors.hpp>
@@ -75,25 +76,13 @@ class MsgVersionPayload : public MessagePayload {
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
-class MsgPingPayload : public MessagePayload {
+class MsgPingPongPayload : public MessagePayload {
   public:
-    MsgPingPayload() : MessagePayload(MessageType::kPing) {}
-    ~MsgPingPayload() override = default;
-
-    uint64_t nonce_{0};
-
-    [[nodiscard]] nlohmann::json to_json() const override;
-
-  private:
-    friend class ser::SDataStream;
-    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
-};
-
-class MsgPongPayload : public MessagePayload {
-  public:
-    MsgPongPayload() : MessagePayload(MessageType::kPong) {}
-    explicit MsgPongPayload(const MsgPingPayload& ping) : MessagePayload(MessageType::kPong), nonce_{ping.nonce_} {}
-    ~MsgPongPayload() override = default;
+    explicit MsgPingPongPayload(MessageType message_type, uint64_t nonce = 0U)
+        : MessagePayload(message_type), nonce_{nonce} {
+        ASSERT_PRE(message_type == MessageType::kPing or message_type == MessageType::kPong);
+    }
+    ~MsgPingPongPayload() override = default;
 
     uint64_t nonce_{0};
 
@@ -106,7 +95,9 @@ class MsgPongPayload : public MessagePayload {
 
 class MsgGetHeadersPayload : public MessagePayload {
   public:
-    MsgGetHeadersPayload() : MessagePayload(MessageType::kGetHeaders) {}
+    MsgGetHeadersPayload() : MessagePayload(MessageType::kGetHeaders) {
+        block_locator_hashes_.reserve(kMaxGetHeadersItems);
+    }
     ~MsgGetHeadersPayload() override = default;
 
     uint32_t protocol_version_{0};
@@ -126,6 +117,24 @@ class MsgAddrPayload : public MessagePayload {
     ~MsgAddrPayload() override = default;
 
     std::vector<NodeService> identifiers_{};
+
+    [[nodiscard]] nlohmann::json to_json() const override;
+
+  private:
+    friend class ser::SDataStream;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
+};
+
+class MsgInventoryPayload : public MessagePayload {
+  public:
+    explicit MsgInventoryPayload(MessageType message_type) : MessagePayload(message_type) {
+        ASSERT_PRE(message_type == MessageType::kInv or message_type == MessageType::kGetData);
+        items_.reserve(kMaxInvItems);
+    }
+    MsgInventoryPayload() : MessagePayload(MessageType::kInv) {}
+    ~MsgInventoryPayload() override = default;
+
+    std::vector<InventoryItem> items_{};
 
     [[nodiscard]] nlohmann::json to_json() const override;
 

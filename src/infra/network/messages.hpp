@@ -54,6 +54,16 @@ inline constexpr MessageDefinition kMessageInv{
     .max_payload_length = size_t{ser::ser_compact_sizeof(kMaxInvItems) + (kMaxInvItems * kInvItemSize)},
 };
 
+inline constexpr MessageDefinition kMessageGetData{
+    .command = "getdata",
+    .message_type = MessageType::kGetData,
+    .is_vectorized = true,
+    .max_vector_items = size_t{kMaxInvItems},
+    .vector_item_size = size_t{kInvItemSize},
+    .min_payload_length = size_t{1 + kInvItemSize},
+    .max_payload_length = size_t{ser::ser_compact_sizeof(kMaxInvItems) + (kMaxInvItems * kInvItemSize)},
+};
+
 inline constexpr MessageDefinition kMessageAddr{
     .command = "addr",
     .message_type = MessageType::kAddr,
@@ -122,7 +132,7 @@ inline constexpr MessageDefinition kMessageMissingOrUnknown{};
 
 //! \brief List of all supported messages
 //! \attention This must be kept in same order as the MessageCommand enum
-inline constexpr std::array<MessageDefinition, 12> kMessageDefinitions{
+inline constexpr std::array<MessageDefinition, 13> kMessageDefinitions{
     kMessageVersion,           // 0
     kMessageVerAck,            // 1
     kMessageInv,               // 2
@@ -134,7 +144,8 @@ inline constexpr std::array<MessageDefinition, 12> kMessageDefinitions{
     kMessageGetAddr,           // 8
     kMessageMempool,           // 9
     kMessageReject,            // 10
-    kMessageMissingOrUnknown,  // 11
+    kMessageGetData,           // 11
+    kMessageMissingOrUnknown,  // 12
 };
 
 static_assert(kMessageDefinitions.size() == static_cast<size_t>(MessageType::kMissingOrUnknown) + 1,
