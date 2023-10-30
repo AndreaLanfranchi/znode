@@ -44,7 +44,7 @@ class MsgNullPayload : public MessagePayload {
     explicit MsgNullPayload(MessageType message_type) : MessagePayload(message_type) {}
     ~MsgNullPayload() override = default;
 
-    [[nodiscard]] nlohmann::json to_json() const override { return {}; }
+    [[nodiscard]] nlohmann::json to_json() const override { return {nlohmann::json::value_t::object}; }
 
   private:
     friend class ser::SDataStream;
@@ -118,6 +118,8 @@ class MsgAddrPayload : public MessagePayload {
 
     std::vector<NodeService> identifiers_{};
 
+    void shuffle() noexcept;
+
     [[nodiscard]] nlohmann::json to_json() const override;
 
   private:
@@ -131,7 +133,6 @@ class MsgInventoryPayload : public MessagePayload {
         ASSERT_PRE(message_type == MessageType::kInv or message_type == MessageType::kGetData);
         items_.reserve(kMaxInvItems);
     }
-    MsgInventoryPayload() : MessagePayload(MessageType::kInv) {}
     ~MsgInventoryPayload() override = default;
 
     std::vector<InventoryItem> items_{};
@@ -150,7 +151,7 @@ class MsgRejectPayload : public MessagePayload {
 
     std::string rejected_command_{};
     RejectionCode rejection_code_{RejectionCode::kOk};
-    std::string reason_{};              // Human readable reason for rejection
+    std::string reason_{};              // Human-readable reason for rejection
     std::optional<h256> extra_data_{};  // Optional extra data provided by the peer
 
     [[nodiscard]] nlohmann::json to_json() const override;

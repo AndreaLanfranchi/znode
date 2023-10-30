@@ -448,7 +448,14 @@ NodeService::NodeService(const IPEndpoint& endpoint) : endpoint_(endpoint) {}
 nlohmann::json NodeService::to_json() const noexcept {
     nlohmann::json ret(nlohmann::json::value_t::object);
     ret["time"] = time_;
-    ret["services"] = services_;
+    ret["services"] = nlohmann::json::array();
+    auto& services{ret["services"]};
+    for (auto enumerator : magic_enum::enum_values<NodeServicesType>()) {
+        if (static_cast<uint64_t>(enumerator) == 0U or enumerator == NodeServicesType::kNodeNetworkAll) continue;
+        if (services_ bitand static_cast<uint64_t>(enumerator)) {
+            services.push_back(std::string(magic_enum::enum_name(enumerator).substr(1)));
+        }
+    }
     ret["endpoint"] = endpoint_.to_string();
     return ret;
 }
@@ -465,7 +472,14 @@ NodeService::NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::
 
 nlohmann::json VersionNodeService::to_json() const noexcept {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["services"] = services_;
+    ret["services"] = nlohmann::json::array();
+    auto& services{ret["services"]};
+    for (auto enumerator : magic_enum::enum_values<NodeServicesType>()) {
+        if (static_cast<uint64_t>(enumerator) == 0U or enumerator == NodeServicesType::kNodeNetworkAll) continue;
+        if (services_ bitand static_cast<uint64_t>(enumerator)) {
+            services.push_back(std::string(magic_enum::enum_name(enumerator).substr(1)));
+        }
+    }
     ret["endpoint"] = endpoint_.to_string();
     return ret;
 }

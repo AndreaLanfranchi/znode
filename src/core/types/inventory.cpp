@@ -18,10 +18,10 @@ void InventoryItem::reset() {
 }
 
 nlohmann::json InventoryItem::to_json() const noexcept {
-    nlohmann::json json{nlohmann::json::value_t::object};
-    json["type"] = std::string(magic_enum::enum_name(type_)).substr(1);
-    json["identifier"] = identifier_.to_hex();
-    return json;
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    ret["type"] = std::string(magic_enum::enum_name(type_).substr(1));
+    ret["identifier"] = identifier_.to_hex(/*reverse=*/true, /*with_prefix=*/true);
+    return ret;
 }
 
 outcome::result<void> InventoryItem::serialization(ser::SDataStream& stream, ser::Action action) {

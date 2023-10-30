@@ -503,29 +503,20 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
     if (not is_running() or not node_ptr->is_running()) return;
 
     const auto msg_type{payload_ptr->type()};
-    if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-        log::Trace("Service", {"name", "Node Hub", "action", __func__, "command",
-                               std::string{magic_enum::enum_name(msg_type)}, "remote", node_ptr->to_string()});
-    }
-
     switch (msg_type) {
         using enum MessageType;
         case kAddr: {
-            auto& addr_payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
-
-            // Randomly shuffle the list of addresses
-            std::random_device rnd;
-            std::mt19937 gen(rnd());
-            std::shuffle(addr_payload.identifiers_.begin(), addr_payload.identifiers_.end(), gen);
+            auto& payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
+            payload.shuffle();
+            if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+                log::Trace("Service", {"name", "Node Hub", "action", __func__, "remote", node_ptr->to_string(),
+                                       "message", "addr", "count", std::to_string(payload.identifiers_.size())})
+                    << (log::test_verbosity(log::Level::kTrace2) ? payload.to_json().dump(4) : "");
+            }
 
             // TODO Pass it to the address manager
-            if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-                log::Trace("Service",
-                           {"name", "Node Hub", "action", __func__, "message", "addr", "remote",
-                            node_ptr->to_string(), "count", std::to_string(addr_payload.identifiers_.size())});
-            }
             if (need_connections_.notified()) {
-                for (const auto& service : addr_payload.identifiers_) {
+                for (const auto& service : payload.identifiers_) {
                     if (app_settings_.network.ipv4_only and
                         service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
                         continue;
@@ -542,18 +533,20 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
             }
         } break;
         case kGetHeaders: {
-            auto& get_headers_payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
+            auto& payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
             if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-                log::Trace("Service", {"name", "Node Hub", "action", __func__, "message", "getheaders", "remote",
-                                       node_ptr->to_string(), "count",
-                                       std::to_string(get_headers_payload.block_locator_hashes_.size())});
+                log::Trace("Service",
+                           {"name", "Node Hub", "action", __func__, "remote", node_ptr->to_string(), "message",
+                            "getheaders", "count", std::to_string(payload.block_locator_hashes_.size())})
+                    << (log::test_verbosity(log::Level::kTrace2) ? payload.to_json().dump(4) : "");
             }
         } break;
         case kInv: {
-            auto& inv_payload = dynamic_cast<MsgInventoryPayload&>(*payload_ptr);
+            auto& payload = dynamic_cast<MsgInventoryPayload&>(*payload_ptr);
             if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-                log::Trace("Service", {"name", "Node Hub", "action", __func__, "message", "inv", "remote",
-                                       node_ptr->to_string(), "count", std::to_string(inv_payload.items_.size())});
+                log::Trace("Service", {"name", "Node Hub", "action", __func__, "remote", node_ptr->to_string(),
+                                       "message", "inv", "count", std::to_string(payload.items_.size())})
+                    << (log::test_verbosity(log::Level::kTrace2) ? payload.to_json().dump(4) : "");
             }
         } break;
         default:

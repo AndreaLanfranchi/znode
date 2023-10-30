@@ -6,6 +6,8 @@
 
 #include "payloads.hpp"
 
+#include <random>
+
 #include <absl/strings/str_cat.h.>
 
 #include <core/common/assert.hpp>
@@ -31,7 +33,8 @@ std::shared_ptr<MessagePayload> MessagePayload::from_type(MessageType type) {
         case kAddr:
             return std::make_shared<MsgAddrPayload>();
         case kInv:
-            return std::make_shared<MsgInventoryPayload>();
+        case kGetData:
+            return std::make_shared<MsgInventoryPayload>(type);
         case kReject:
             return std::make_shared<MsgRejectPayload>();
 
@@ -62,11 +65,17 @@ outcome::result<void> MsgVersionPayload::serialization(SDataStream& stream, Acti
     }
     return result;
 }
+
 nlohmann::json MsgVersionPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["protocol_version"] = protocol_version_;
+    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
 
-    nlohmann::json services_array(nlohmann::json::value_t::array);
+    ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
+    auto& data = ret["data"];
+
+    data["protocol_version"] = protocol_version_;
+    data["services"] = nlohmann::json(nlohmann::json::value_t::array);
+    auto& services_array = data["services"];
     for (auto& item : magic_enum::enum_values<NodeServicesType>()) {
         const auto item_value = static_cast<uint64_t>(item);
         if (item_value == 0 or item_value == static_cast<uint64_t>(NodeServicesType::kNodeNetworkAll)) continue;
@@ -74,20 +83,24 @@ nlohmann::json MsgVersionPayload::to_json() const {
             services_array.push_back(std::string(magic_enum::enum_name(item)).substr(1 /* skip k */));
         }
     }
-    ret["services"] = std::move(services_array);
-    ret["timestamp"] = timestamp_;
-    ret["recipient_service"] = recipient_service_.to_json();
-    ret["sender_service"] = sender_service_.to_json();
-    ret["nonce"] = nonce_;
-    ret["user_agent"] = user_agent_;
-    ret["last_block_height"] = last_block_height_;
-    ret["relay"] = relay_;
+
+    data["timestamp"] = timestamp_;
+    data["recipient_service"] = recipient_service_.to_json();
+    data["sender_service"] = sender_service_.to_json();
+    data["nonce"] = nonce_;
+    data["user_agent"] = user_agent_;
+    data["last_block_height"] = last_block_height_;
+    data["relay"] = relay_;
+
     return ret;
 }
 
 nlohmann::json MsgPingPongPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["nonce"] = nonce_;
+    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
+    auto& data = ret["data"];
+    data["nonce"] = nonce_;
     return ret;
 }
 
@@ -125,13 +138,17 @@ outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, s
 }
 nlohmann::json MsgGetHeadersPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["protocol_version"] = protocol_version_;
-    nlohmann::json hashes(nlohmann::json::value_t::array);
+    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
+    auto& data = ret["data"];
+
+    data["protocol_version"] = protocol_version_;
+    data["hashes"] = nlohmann::json(nlohmann::json::value_t::array);
+    auto& hashes = data["hashes"];
     for (auto& item : block_locator_hashes_) {
-        hashes.push_back(item.to_string());
+        hashes.push_back(item.to_hex(/*reverse=*/true, /*with_prefix=*/true));
     }
-    ret["hashes"] = std::move(hashes);
-    ret["hash_stop"] = hash_stop_.to_string();
+    data["hash_stop"] = hash_stop_.to_hex(/*reverse=*/true, /*with_prefix=*/true);
     return ret;
 }
 
@@ -158,12 +175,21 @@ outcome::result<void> MsgAddrPayload::serialization(SDataStream& stream, ser::Ac
 }
 nlohmann::json MsgAddrPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    nlohmann::json identifiers(nlohmann::json::value_t::array);
+    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
+    auto& data = ret["data"];
+    data["identifiers"] = nlohmann::json(nlohmann::json::value_t::array);
+    auto& identifiers = data["identifiers"];
     for (auto& item : identifiers_) {
         identifiers.push_back(item.to_json());
     }
-    ret["identifiers"] = std::move(identifiers);
     return ret;
+}
+
+void MsgAddrPayload::shuffle() noexcept {
+    std::random_device rnd;
+    std::mt19937 gen(rnd());
+    std::shuffle(identifiers_.begin(), identifiers_.end(), gen);
 }
 
 outcome::result<void> MsgInventoryPayload::serialization(SDataStream& stream, ser::Action action) {
@@ -190,11 +216,14 @@ outcome::result<void> MsgInventoryPayload::serialization(SDataStream& stream, se
 
 nlohmann::json MsgInventoryPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    nlohmann::json inventory_items(nlohmann::json::value_t::array);
+    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
+    auto& data = ret["data"];
+    data["items"] = nlohmann::json(nlohmann::json::value_t::array);
+    auto& items = data["items"];
     for (auto& item : items_) {
-        inventory_items.push_back(item.to_json());
+        items.push_back(item.to_json());
     }
-    ret["inventory_items"] = std::move(inventory_items);
     return ret;
 }
 
@@ -243,13 +272,17 @@ outcome::result<void> MsgRejectPayload::serialization(SDataStream& stream, ser::
 
     return result;
 }
+
 nlohmann::json MsgRejectPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["rejected_command"] = rejected_command_;
-    ret["rejection_code"] = magic_enum::enum_name(rejection_code_);
-    ret["reason"] = reason_;
+    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
+    auto& data = ret["data"];
+    data["rejected_command"] = rejected_command_;
+    data["rejection_code"] = std::string(magic_enum::enum_name(rejection_code_)).substr(1);
+    data["reason"] = reason_;
     if (extra_data_.has_value()) {
-        ret["extra_data"] = extra_data_.value().to_string();
+        data["extra_data"] = extra_data_.value().to_string();
     }
     return ret;
 }
