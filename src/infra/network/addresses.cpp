@@ -462,6 +462,7 @@ nlohmann::json NodeService::to_json() const noexcept {
 
 outcome::result<void> NodeService::serialization(ser::SDataStream& stream, ser::Action action) {
     auto result{stream.bind(time_, action)};
+    // TODO : validate time_ value
     if (not result.has_error()) result = stream.bind(services_, action);
     if (not result.has_error()) result = stream.bind(endpoint_, action);
     return result;
