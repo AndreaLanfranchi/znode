@@ -18,7 +18,7 @@
 
 #include <infra/common/random.hpp>  // Can be included as it's header only
 
-namespace zenpp {
+namespace znode {
 
 std::string abridge(std::string_view input, size_t length) {
     if (input.length() <= length) return std::string(input);
@@ -126,4 +126,4 @@ size_t count_duplicate_data_chunks(ByteView data, const size_t chunk_size, const
     }
     return count;
 }
-}  // namespace zenpp
+}  // namespace znode

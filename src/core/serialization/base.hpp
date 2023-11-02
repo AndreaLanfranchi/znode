@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <ranges>
 
-namespace zenpp::ser {
+namespace znode::ser {
 
 static constexpr uint32_t kMaxSerializedCompactSize{0x02000000};
 static constexpr size_t kMaxStreamSize{512_MiB};  // As safety precaution
@@ -27,4 +27,4 @@ enum class Action : uint32_t {
     kSerialize = (1 << 1),    // Actually performs serialization
     kDeserialize = (1 << 2)   // Deserializes data into object
 };
-}  // namespace zenpp::ser
+}  // namespace znode::ser

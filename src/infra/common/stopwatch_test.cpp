@@ -11,7 +11,7 @@
 
 #include <infra/common/stopwatch.hpp>
 
-namespace zenpp {
+namespace znode {
 TEST_CASE("Stop Watch", "[infra][common][stopwatch]") {
     using namespace std::chrono_literals;
 
@@ -67,4 +67,4 @@ TEST_CASE("Stop Watch", "[infra][common][stopwatch]") {
     CHECK(sw1.laps().empty());  // No more laps
     CHECK_FALSE(sw1);           // Not started
 }
-}  // namespace zenpp
+}  // namespace znode

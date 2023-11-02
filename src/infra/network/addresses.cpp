@@ -16,7 +16,7 @@
 
 #include <core/common/misc.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 namespace {
 
     const std::regex kIPv4Pattern(R"((\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(?::(\d+))?)");
@@ -490,4 +490,4 @@ outcome::result<void> VersionNodeService::serialization(ser::SDataStream& stream
     if (not result.has_error()) result = stream.bind(endpoint_, action);
     return result;
 }
-}  // namespace zenpp::net
+}  // namespace znode::net

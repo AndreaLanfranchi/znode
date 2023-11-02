@@ -8,7 +8,7 @@
 
 #include <core/common/cast.hpp>
 
-namespace zenpp::crypto {
+namespace znode::crypto {
 
 Hash160::Hash160(ByteView data) : hasher_(data) {}
 
@@ -31,4 +31,4 @@ Bytes Hash160::finalize() noexcept {
     Ripemd160 outer(data);
     return outer.finalize();
 }
-}  // namespace zenpp::crypto
+}  // namespace znode::crypto

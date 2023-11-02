@@ -23,7 +23,7 @@
 #include <byteswap.h>
 #endif
 
-namespace zenpp::ser {
+namespace znode::ser {
 
 //! \brief Public interface all serializable objects must implement
 class Serializable {
@@ -51,4 +51,4 @@ class Serializable {
   private:
     virtual outcome::result<void> serialization(SDataStream& stream, Action action) = 0;
 };
-}  // namespace zenpp::ser
+}  // namespace znode::ser

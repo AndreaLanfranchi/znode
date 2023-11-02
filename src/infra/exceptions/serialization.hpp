@@ -14,7 +14,7 @@
 
 #include <core/serialization/base.hpp>
 
-namespace zenpp::ser {
+namespace znode::ser {
 
 class Exception : public std::logic_error {
   public:
@@ -25,4 +25,4 @@ class Exception : public std::logic_error {
     }
 };
 
-}  // namespace zenpp::ser
+}  // namespace znode::ser

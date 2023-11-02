@@ -8,7 +8,7 @@
 #pragma once
 #include <atomic>
 
-namespace zenpp::con {
+namespace znode::con {
 
 //! \brief An interface providing stoppability for active components
 //! \remarks It applies to in-thread components as well as to components living in their own thread
@@ -47,4 +47,4 @@ class Stoppable {
     std::atomic<ComponentStatus> state_{ComponentStatus::kNotStarted};  // The state of the component
 };
 
-}  // namespace zenpp::con
+}  // namespace znode::con

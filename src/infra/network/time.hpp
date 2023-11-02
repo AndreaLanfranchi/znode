@@ -12,7 +12,7 @@
 
 #include <core/common/outcome.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 //! \brief Check if system time is synchronized with a time server
 //! \param executor [in] The executor to use for async operations
@@ -21,4 +21,4 @@ namespace zenpp::net {
 outcome::result<void> check_system_time(boost::asio::any_io_executor executor, const std::string& time_server,
                                         uint32_t max_skew_seconds = 0);
 
-}  // namespace zenpp::net
+}  // namespace znode::net

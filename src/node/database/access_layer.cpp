@@ -9,7 +9,7 @@
 
 #include <core/common/assert.hpp>
 
-namespace zenpp::db {
+namespace znode::db {
 
 std::optional<Version> read_schema_version(mdbx::txn& txn) {
     Cursor config(txn, db::tables::kConfig);
@@ -58,4 +58,4 @@ void write_chain_config(mdbx::txn& txn, const ChainConfig& config) {
     Cursor config_cursor(txn, db::tables::kConfig);
     config_cursor.upsert(to_slice(tables::kConfigChainKey), to_slice(json_str));
 }
-}  // namespace zenpp::db
+}  // namespace znode::db

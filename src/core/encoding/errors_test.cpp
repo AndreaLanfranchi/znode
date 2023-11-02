@@ -9,7 +9,7 @@
 #include <core/common/base.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zenpp::enc {
+namespace znode::enc {
 namespace {
     std::string to_string(enc::Error error) { return std::string(magic_enum::enum_name<Error>(error)).erase(0, 1); }
 
@@ -45,4 +45,4 @@ TEST_CASE("Encoding errors", "[enc][errors]") {
         REQUIRE(result.error().message() == label);
     }
 }
-}  // namespace zenpp::enc
+}  // namespace znode::enc

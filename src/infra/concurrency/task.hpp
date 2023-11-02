@@ -14,7 +14,7 @@
 #include <boost/asio/this_coro.hpp>
 #include <boost/asio/use_awaitable.hpp>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief Asynchronous task returned by any coroutine, i.e. asynchronous operation
 template <typename T = void, typename Executor = boost::asio::any_io_executor>
@@ -22,4 +22,4 @@ using Task = boost::asio::awaitable<T, Executor>;
 
 namespace ThisTask = boost::asio::this_coro;
 
-}  // namespace zenpp
+}  // namespace znode

@@ -16,7 +16,7 @@
 #include <core/common/assert.hpp>
 #include <core/common/base.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 namespace {
 
     Bytes get_command_from_message_type(MessageType message_type) noexcept {
@@ -55,4 +55,4 @@ bool is_known_command(const std::string& command) noexcept {
     std::copy(command.begin(), command.end(), command_bytes.begin());
     return message_type_from_command(command_bytes) not_eq MessageType::kMissingOrUnknown;
 }
-}  // namespace zenpp::net
+}  // namespace znode::net

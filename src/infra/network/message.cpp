@@ -15,7 +15,7 @@
 #include <boost/algorithm/clamp.hpp>
 #include <gsl/gsl_util>
 
-namespace zenpp::net {
+namespace znode::net {
 
 void MessageHeader::reset() noexcept {
     network_magic.fill(0);
@@ -276,4 +276,4 @@ outcome::result<void> Message::validate_payload_checksum() noexcept {
     }
     return outcome::success();
 }
-}  // namespace zenpp::net
+}  // namespace znode::net

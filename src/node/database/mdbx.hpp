@@ -19,7 +19,7 @@
 #include <core/common/base.hpp>
 #include <core/common/object_pool.hpp>
 
-namespace zenpp::db {
+namespace znode::db {
 
 inline constexpr std::string_view kDbDataFileName{"mdbx.dat"};
 inline constexpr size_t kMdbxMaxPages{0x80000000ULL};
@@ -306,4 +306,4 @@ size_t cursor_erase(::mdbx::cursor& cursor, ByteView set_key,
 //! \param [in] prefix : Delete keys starting with this prefix
 size_t cursor_erase_prefix(::mdbx::cursor& cursor, ByteView prefix);
 
-}  // namespace zenpp::db
+}  // namespace znode::db

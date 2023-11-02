@@ -17,7 +17,7 @@
 #include <infra/common/log.hpp>
 #include <infra/network/errors.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 outcome::result<void> check_system_time(boost::asio::any_io_executor executor, const std::string& time_server,
                                         uint32_t max_skew_seconds) {
@@ -91,4 +91,4 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
 
     return outcome::success();
 }
-}  // namespace zenpp::net
+}  // namespace znode::net

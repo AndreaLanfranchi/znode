@@ -11,7 +11,7 @@
 
 #include <infra/common/log.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 
 Worker::~Worker() { stop(); }
 
@@ -112,4 +112,4 @@ void Worker::rethrow() const {
         std::rethrow_exception(exception_ptr_);
     }
 }
-}  // namespace zenpp::con
+}  // namespace znode::con

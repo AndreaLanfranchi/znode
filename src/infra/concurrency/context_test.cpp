@@ -13,7 +13,7 @@
 
 #include <infra/common/log_test.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 
 TEST_CASE("Context", "[infra][concurrency][context]") {
     log::SetLogVerbosityGuard guard(log::Level::kTrace);
@@ -24,4 +24,4 @@ TEST_CASE("Context", "[infra][concurrency][context]") {
     REQUIRE(context.stop());
     REQUIRE_FALSE(context.stop());  // Already stopped
 }
-}  // namespace zenpp::con
+}  // namespace znode::con

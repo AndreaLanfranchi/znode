@@ -22,7 +22,7 @@
 #include <infra/common/log.hpp>
 #include <infra/common/random.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 using namespace boost;
 using asio::ip::tcp;
@@ -702,4 +702,4 @@ void Node::print_log(const log::Level severity, const std::list<std::string>& pa
     log::BufferBase(severity, "Node", log_params) << extra_data;
 }
 
-}  // namespace zenpp::net
+}  // namespace znode::net

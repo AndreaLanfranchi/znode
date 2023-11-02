@@ -10,8 +10,8 @@
 
 #include <infra/nat/option.hpp>
 
-namespace zenpp::cmd::common {
+namespace znode::cmd::common {
 struct NatOptionValidator : public CLI::Validator {
     explicit NatOptionValidator();
 };
-} // namespace zenpp::cmd::common
+} // namespace znode::cmd::common

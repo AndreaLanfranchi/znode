@@ -10,7 +10,7 @@
 
 #include <core/common/base.hpp>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief Type-Safe wrapper class for token amounts
 class Amount {
@@ -72,4 +72,4 @@ class FeeRate : public Amount {
     auto operator<=>(const FeeRate& rhs) const noexcept = default;
 };
 
-}  // namespace zenpp
+}  // namespace znode

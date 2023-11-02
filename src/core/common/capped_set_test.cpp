@@ -11,7 +11,7 @@
 #include <core/common/base.hpp>
 #include <core/common/capped_set.hpp>
 
-namespace zenpp {
+namespace znode {
 TEST_CASE("Capped Set", "[memory]") {
     static const std::size_t kContainerSize{5'000};
     CappedSet<int> mrset(kContainerSize);
@@ -73,4 +73,4 @@ TEST_CASE("Capped Set", "[memory]") {
     mrset.clear();
     CHECK(mrset.empty());
 }
-}  // namespace zenpp
+}  // namespace znode

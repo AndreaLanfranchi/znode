@@ -13,7 +13,7 @@
 
 #include <core/common/cast.hpp>
 
-namespace zenpp::enc::base64 {
+namespace znode::enc::base64 {
 
 // Inspired by https://stackoverflow.com/questions/5288076/base64-encoding-and-decoding-with-openssl
 
@@ -47,7 +47,7 @@ outcome::result<std::string> encode(ByteView bytes) noexcept {
 }
 
 outcome::result<std::string> encode(std::string_view data) noexcept {
-    return encode(zenpp::string_view_to_byte_view(data));
+    return encode(znode::string_view_to_byte_view(data));
 }
 
 outcome::result<Bytes> decode(std::string_view input) noexcept {
@@ -63,4 +63,4 @@ outcome::result<Bytes> decode(std::string_view input) noexcept {
     ret.resize(static_cast<std::string::size_type>(effective_len));
     return ret;
 }
-}  // namespace zenpp::enc::base64
+}  // namespace znode::enc::base64

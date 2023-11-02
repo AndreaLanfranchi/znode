@@ -10,7 +10,7 @@
 
 #include <core/common/assert.hpp>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief  An STL-like set container capped in size
 //! \details When container reaches capacity every insertion evicts the oldest element (FIFO)
@@ -63,4 +63,4 @@ class CappedSet {
     std::queue<iterator_t> items_queue_;
 };
 
-}  // namespace zenpp
+}  // namespace znode

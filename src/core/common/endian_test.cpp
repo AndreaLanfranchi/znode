@@ -10,7 +10,7 @@
 #include <core/common/endian.hpp>
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::endian {
+namespace znode::endian {
 
 TEST_CASE("16 bit", "[endianness]") {
     uint8_t bytes[2];
@@ -73,4 +73,4 @@ TEST_CASE("Byte swapping", "[endianness]") {
     CHECK(enc::hex::reverse_hex(enc::hex::encode(value, true)) == "0xf0debc9a78563412");
 }
 
-}  // namespace zenpp::endian
+}  // namespace znode::endian

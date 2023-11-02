@@ -11,7 +11,7 @@
 #include <core/common/cast.hpp>
 #include <core/encoding/base64.hpp>
 
-namespace zenpp::enc::base64 {
+namespace znode::enc::base64 {
 
 namespace {
     // See https://www.rfc-editor.org/rfc/rfc4648#section-10
@@ -47,4 +47,4 @@ TEST_CASE("Base64 decoding", "[encoding]") {
     const auto decoded_output{decode(invalid_input)};
     REQUIRE_FALSE(decoded_output);
 }
-}  // namespace zenpp::enc::base64
+}  // namespace znode::enc::base64

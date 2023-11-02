@@ -22,7 +22,7 @@
 
 #include <node/database/mdbx.hpp>  // TODO define dbsettings here and remove this include (mdbx.hpp must include this)
 
-namespace zenpp {
+namespace znode {
 
 struct NetworkSettings {
     nat::Option nat{};                                                                   // NAT traversal option
@@ -60,4 +60,4 @@ struct AppSettings {
     NetworkSettings network{};                        // Network related settings
     log::Settings log{};                              // Log related settings
 };
-}  // namespace zenpp
+}  // namespace znode

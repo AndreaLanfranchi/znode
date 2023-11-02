@@ -8,7 +8,7 @@
 
 #include "block.hpp"
 
-namespace zenpp {
+namespace znode {
 
 void BlockHeader::reset() {
     version = 0;
@@ -33,4 +33,4 @@ outcome::result<void> BlockHeader::serialization(ser::SDataStream& stream, ser::
     if (not result.has_error()) result = stream.bind(solution, action);
     return result;
 }
-}  // namespace zenpp
+}  // namespace znode

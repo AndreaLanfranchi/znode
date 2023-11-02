@@ -15,7 +15,7 @@
 
 #include <infra/network/protocol.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 namespace {
     std::string pad_right(const std::string& str, size_t n) {
         std::string ret{str};
@@ -130,4 +130,4 @@ TEST_CASE("NetMessage write", "[net]") {
     }
 }
 
-}  // namespace zenpp::net
+}  // namespace znode::net

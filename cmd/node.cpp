@@ -28,7 +28,7 @@
 #include <node/network/node_hub.hpp>
 #include <node/zk/params.hpp>
 
-using namespace zenpp;
+using namespace znode;
 using namespace std::chrono;
 
 //! \brief Ensures database is ready and consistent with command line arguments
@@ -144,7 +144,7 @@ int main(int argc, char* argv[]) {
 
         // Check we're in sync with NTP server
         auto check_time_result{
-            zenpp::net::check_system_time(context->get_executor(), "time.nist.gov", /*max_skew_seconds=*/2U)};
+            znode::net::check_system_time(context->get_executor(), "time.nist.gov", /*max_skew_seconds=*/2U)};
         success_or_throw(check_time_result);
 
         // Check required certificate and key file are present to initialize SSL context

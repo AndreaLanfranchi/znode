@@ -10,7 +10,7 @@
 #include <core/crypto/md.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zenpp::enc::base58 {
+namespace znode::enc::base58 {
 
 //! \brief Returns a string of ascii chars with the base58 representation of input
 //! \remark If provided an empty input the return string is empty as well
@@ -28,4 +28,4 @@ namespace zenpp::enc::base58 {
 //! \remark If provided an empty input the return string is empty as well
 [[nodiscard]] outcome::result<Bytes> decode_check(std::string_view input) noexcept;
 
-}  // namespace zenpp::enc::base58
+}  // namespace znode::enc::base58

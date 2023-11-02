@@ -12,7 +12,7 @@
 
 #include <infra/concurrency/task.hpp>
 
-namespace zenpp::cmd::common {
+namespace znode::cmd::common {
 
 class ShutDownSignal {
   public:
@@ -27,4 +27,4 @@ class ShutDownSignal {
     boost::asio::signal_set signals_;
 };
 
-}  // namespace zenpp::cmd::common
+}  // namespace znode::cmd::common

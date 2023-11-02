@@ -14,7 +14,7 @@
 
 #include <infra/common/log.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 
 using namespace boost;
 Context::Context(std::string name, size_t concurrency)
@@ -47,4 +47,4 @@ bool Context::stop() noexcept {
     set_stopped();
     return true;
 }
-}  // namespace zenpp::con
+}  // namespace znode::con

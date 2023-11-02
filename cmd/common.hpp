@@ -17,7 +17,7 @@
 
 #include <node/common/settings.hpp>
 
-namespace zenpp::cmd {
+namespace znode::cmd {
 
 //! \brief Parses command line arguments for node instance
 void parse_node_command_line(CLI::App& cli, int argc, char* argv[], AppSettings& settings);
@@ -29,4 +29,4 @@ struct IPEndPointValidator : public CLI::Validator {
 //! \brief Set up options to populate log settings after cli.parse()
 void add_logging_options(CLI::App& cli, log::Settings& log_settings);
 
-}  // namespace zenpp::cmd
+}  // namespace znode::cmd

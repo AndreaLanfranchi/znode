@@ -10,8 +10,8 @@
 
 #include <infra/concurrency/task.hpp>
 
-namespace zenpp::nat {
+namespace znode::nat {
 
 Task<void> resolve(Option& option);
 
-}  // namespace zenpp::nat
+}  // namespace znode::nat

@@ -15,7 +15,7 @@
 #include <string>
 #include <thread>
 
-namespace zenpp::cmd {
+namespace znode::cmd {
 
 void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& settings) {
     auto& network_settings = settings.network;
@@ -265,4 +265,4 @@ IPEndPointValidator::IPEndPointValidator(bool allow_empty, uint16_t default_port
     };
 }
 
-}  // namespace zenpp::cmd
+}  // namespace znode::cmd

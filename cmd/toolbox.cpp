@@ -24,7 +24,7 @@
 #include <node/database/mdbx.hpp>
 
 namespace fs = std::filesystem;
-using namespace zenpp;
+using namespace znode;
 using namespace std::placeholders;
 
 struct dbTableEntry {

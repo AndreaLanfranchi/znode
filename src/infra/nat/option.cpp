@@ -9,7 +9,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-namespace zenpp::nat {
+namespace znode::nat {
 
 bool lexical_cast(const std::string& input, Option& value) {
     if (input.empty()) {
@@ -34,4 +34,4 @@ bool lexical_cast(const std::string& input, Option& value) {
     value.address_ = parsed_address.value();
     return true;
 }
-}  // namespace zenpp::nat
+}  // namespace znode::nat

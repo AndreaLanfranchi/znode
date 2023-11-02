@@ -17,7 +17,7 @@
 #include <core/common/assert.hpp>
 #include <core/common/base.hpp>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief The amount of memory currently being used by this process, in bytes.
 //! \remarks if resident=true it will report the resident set in RAM (if supported specific OS) otherwise returns the
@@ -187,4 +187,4 @@ bool unlock_object_memory(const T& obj) {
     memory_cleanse(ptr, sizeof(obj));
     return LockedPagesManager::instance().unlock_range(ptr, sizeof(obj));
 }
-}  // namespace zenpp
+}  // namespace znode

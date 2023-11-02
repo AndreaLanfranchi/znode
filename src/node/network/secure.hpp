@@ -16,7 +16,7 @@
 #include <infra/common/log.hpp>
 #include <infra/filesystem/directories.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 static constexpr size_t kCertificateKeyLength{4096};
 static constexpr size_t kCertificateValidityDays{3650};  // 10 years
@@ -83,4 +83,4 @@ SSL_CTX* generate_tls_context(TLSContextType type, const std::filesystem::path& 
 //! agrees, generates them
 bool validate_tls_requirements(const std::filesystem::path& directory_path, const std::string& key_password);
 
-}  // namespace zenpp::net
+}  // namespace znode::net

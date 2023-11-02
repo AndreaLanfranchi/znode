@@ -16,7 +16,7 @@
 #include <core/serialization/errors.hpp>
 
 //! \brief All functions dedicated to objects and types serialization
-namespace zenpp::ser {
+namespace znode::ser {
 
 //! \brief ssizeof stands for serialized size of. Returns the serialized size of arithmetic types
 //! \remarks Do not define serializable classes members as size_t as it might lead to wrong results on
@@ -184,4 +184,4 @@ inline outcome::result<uint64_t> read_compact(Stream& stream, bool range_check =
     if (range_check and ret > kMaxSerializedCompactSize) return Error::kCompactSizeTooBig;
     return ret;
 }
-}  // namespace zenpp::ser
+}  // namespace znode::ser

@@ -12,7 +12,7 @@
 #include <node/common/version.hpp>
 #include <node/database/mdbx.hpp>
 
-namespace zenpp::db::tables {
+namespace znode::db::tables {
 
 //! \brief Specifies the schema version we're compatible with
 //! \remarks This is also used in checking whether the database needs an ugrade migration
@@ -63,4 +63,4 @@ void deploy_tables(mdbx::txn& txn, const std::array<db::MapConfig, N> tables) {
         std::ignore = txn.create_map(table.name, table.key_mode, table.value_mode);
     });
 }
-}  // namespace zenpp::db::tables
+}  // namespace znode::db::tables

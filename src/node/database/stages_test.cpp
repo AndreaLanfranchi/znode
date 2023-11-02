@@ -11,7 +11,7 @@
 
 #include <node/database/stages.hpp>
 
-namespace zenpp::db {
+namespace znode::db {
 
 TEST_CASE("Stages Progresses", "[database]") {
     const TempDirectory tmp_dir{};
@@ -36,4 +36,4 @@ TEST_CASE("Stages Progresses", "[database]") {
 
     CHECK_THROWS((void)stages::read_stage_progress(*txn, "UnknownStageName"));
 }
-}  // namespace zenpp::db
+}  // namespace znode::db

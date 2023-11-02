@@ -11,7 +11,7 @@
 
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 TEST_CASE("IPAddress Parsing", "[infra][net][addresses]") {
     auto address{IPAddress::from_string("127.0.0.1")};
@@ -295,4 +295,4 @@ TEST_CASE("Network Service Serialization", "[infra][net][addresses][serializatio
     CHECK(service2.services_ == service.services_);
     CHECK(service2.endpoint_ == service.endpoint_);
 }
-}  // namespace zenpp::net
+}  // namespace znode::net

@@ -11,7 +11,7 @@
 #include <core/crypto/md.hpp>
 #include <core/types/hash.hpp>
 
-namespace zenpp::crypto {
+namespace znode::crypto {
 //! \brief A hasher class for Bitcoin's 160-bit hash (SHA-256 + RIPEMD-160)
 class Hash160 : private boost::noncopyable {
   public:
@@ -39,4 +39,4 @@ class Hash160 : private boost::noncopyable {
     Sha256 hasher_;
 };
 
-}  // namespace zenpp::crypto
+}  // namespace znode::crypto

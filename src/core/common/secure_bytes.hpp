@@ -14,7 +14,7 @@
 
 #include <core/common/memory.hpp>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief Custom allocator that ensures allocated memory is wiped out on deallocation and also locked against page-out
 template <typename T>
@@ -48,4 +48,4 @@ struct secure_allocator : public std::allocator<T>, private boost::noncopyable {
 
 //! \brief This is exactly like Bytes, but with a custom locked and secure allocator.
 using SecureBytes = std::basic_string<uint8_t, std::char_traits<uint8_t>, secure_allocator<uint8_t>>;
-}  // namespace zenpp
+}  // namespace znode

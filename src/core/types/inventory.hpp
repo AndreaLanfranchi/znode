@@ -13,7 +13,7 @@
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
-namespace zenpp {
+namespace znode {
 
 class InventoryItem : public ser::Serializable {
   public:
@@ -43,4 +43,4 @@ class InventoryItem : public ser::Serializable {
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
-}  // namespace zenpp
+}  // namespace znode

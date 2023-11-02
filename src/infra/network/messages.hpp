@@ -16,7 +16,7 @@
 
 #include <infra/network/protocol.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 struct MessageDefinition {
     const char* command{nullptr};                              // The command string
@@ -151,4 +151,4 @@ inline constexpr std::array<MessageDefinition, 13> kMessageDefinitions{
 static_assert(kMessageDefinitions.size() == static_cast<size_t>(MessageType::kMissingOrUnknown) + 1,
               "kMessageDefinitions must be kept in same order as the MessageCommand enum");
 
-}  // namespace zenpp::net
+}  // namespace znode::net

@@ -7,7 +7,7 @@
 
 #include "stoppable.hpp"
 
-namespace zenpp::con {
+namespace znode::con {
 
 bool Stoppable::start() noexcept {
     ComponentStatus expected{ComponentStatus::kNotStarted};
@@ -26,4 +26,4 @@ bool Stoppable::is_running() const noexcept { return status() == ComponentStatus
 
 void Stoppable::set_stopped() noexcept { state_.exchange(ComponentStatus::kNotStarted); }
 
-}  // namespace zenpp::con
+}  // namespace znode::con

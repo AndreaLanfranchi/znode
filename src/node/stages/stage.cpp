@@ -9,7 +9,7 @@
 
 #include <node/database/stages.hpp>
 
-namespace zenpp::stages {
+namespace znode::stages {
 
 Stage::Stage(SyncContext* sync_context, const char* stage_name, AppSettings* node_settings)
     : sync_context_{sync_context}, stage_name_{stage_name}, node_settings_{node_settings} {}
@@ -33,4 +33,4 @@ void Stage::check_block_sequence(BlockNum actual, BlockNum expected) {
 void Stage::throw_if_stopping() {
     if (not is_running()) throw StageError(Stage::Result::kAborted);
 }
-}  // namespace zenpp::stages
+}  // namespace znode::stages

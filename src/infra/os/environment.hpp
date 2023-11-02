@@ -9,7 +9,7 @@
 
 #include <core/common/base.hpp>
 
-namespace zenpp::env {
+namespace znode::env {
 
 //! \brief Get environment variable value
 std::optional<std::string> get(const std::string& name) noexcept;
@@ -20,4 +20,4 @@ std::optional<std::string> get_default_storage_path();
 //! \brief Set environment variable value
 void set(const std::string& name, const std::string& value);
 
-}  // namespace zenpp::env
+}  // namespace znode::env

@@ -8,7 +8,7 @@
 
 #include <core/common/cast.hpp>
 
-namespace zenpp::crypto {
+namespace znode::crypto {
 
 Hash256::Hash256(ByteView data) : hasher_(data), ingested_size_{data.size()} {}
 
@@ -46,4 +46,4 @@ Bytes Hash256::finalize() noexcept {
     hasher_.init(data);             // 2nd pass
     return hasher_.finalize();
 }
-}  // namespace zenpp::crypto
+}  // namespace znode::crypto

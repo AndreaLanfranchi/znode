@@ -11,7 +11,7 @@
 #include <core/common/misc.hpp>
 #include <core/crypto/md.hpp>
 
-namespace zenpp::crypto {
+namespace znode::crypto {
 
 static constexpr size_t kMinInputSize{64};
 static constexpr size_t kMaxInputSize{4_MiB};
@@ -56,4 +56,4 @@ BENCHMARK(bench_sha1)->RangeMultiplier(kInputSizeMultiplier)->Range(kMinInputSiz
 BENCHMARK(bench_sha256)->RangeMultiplier(kInputSizeMultiplier)->Range(kMinInputSize, kMaxInputSize);
 BENCHMARK(bench_sha512)->RangeMultiplier(kInputSizeMultiplier)->Range(kMinInputSize, kMaxInputSize);
 
-}  // namespace zenpp::crypto
+}  // namespace znode::crypto

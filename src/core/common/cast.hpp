@@ -12,7 +12,7 @@
 
 // Utilities for type casting
 
-namespace zenpp {
+namespace znode {
 
 // Cast between pointers to char and unsigned char (i.e. uint8_t)
 
@@ -28,4 +28,4 @@ inline ByteView string_view_to_byte_view(std::string_view view) { return {byte_p
 
 inline std::string_view byte_view_to_string_view(ByteView view) { return {byte_ptr_cast(view.data()), view.length()}; }
 
-}  // namespace zenpp
+}  // namespace znode

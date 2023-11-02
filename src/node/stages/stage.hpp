@@ -17,7 +17,7 @@
 
 #include <node/common/settings.hpp>
 
-namespace zenpp::stages {
+namespace znode::stages {
 
 class StageError;
 
@@ -140,4 +140,4 @@ inline ZEN_ALWAYS_INLINE void success_or_throw(Stage::Result code) {
         throw StageError(code);
     }
 }
-}  // namespace zenpp::stages
+}  // namespace znode::stages

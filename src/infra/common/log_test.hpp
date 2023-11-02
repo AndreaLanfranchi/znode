@@ -9,7 +9,7 @@
 
 #include <infra/common/log.hpp>
 
-namespace zenpp::log {
+namespace znode::log {
 
 //! \brief Utility class using RAII to change the log verbosity level (necessary to make tests work in shuffled order)
 class SetLogVerbosityGuard {
@@ -31,4 +31,4 @@ inline std::ostream& null_stream() {
     } null_strm;
     return null_strm;
 }
-}  // namespace zenpp::log
+}  // namespace znode::log

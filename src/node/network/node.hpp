@@ -31,7 +31,7 @@
 #include <node/common/settings.hpp>
 #include <node/network/connection.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 enum class NodeIdleResult {
     kNotIdle,                   // Node is not idle
@@ -232,4 +232,4 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     std::map<MessageType, MessageMetrics> inbound_message_metrics_{};   // Stats for each message type
     std::map<MessageType, MessageMetrics> outbound_message_metrics_{};  // Stats for each message type
 };
-}  // namespace zenpp::net
+}  // namespace znode::net

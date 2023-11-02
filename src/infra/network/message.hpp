@@ -20,7 +20,7 @@
 #include <infra/network/messages.hpp>
 #include <infra/network/payloads.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 class MessageHeader : public ser::Serializable {
   public:
@@ -141,4 +141,4 @@ class Message {
     //! \brief Validates the message header's checksum against the payload
     [[nodiscard]] outcome::result<void> validate_payload_checksum() noexcept;
 };
-}  // namespace zenpp::net
+}  // namespace znode::net

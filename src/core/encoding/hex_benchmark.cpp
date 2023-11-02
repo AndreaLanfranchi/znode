@@ -13,7 +13,7 @@
 #include <core/common/misc.hpp>
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::enc::hex {
+namespace znode::enc::hex {
 
 static constexpr size_t kInputSize{8_KiB};
 
@@ -33,4 +33,4 @@ void bench_hex(benchmark::State& state) {
 
 BENCHMARK(bench_hex)->Arg(10'000);
 
-}  // namespace zenpp::enc::hex
+}  // namespace znode::enc::hex

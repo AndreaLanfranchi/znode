@@ -12,7 +12,7 @@
 #include <core/common/misc.hpp>
 #include <core/common/object_pool.hpp>
 
-namespace zenpp {
+namespace znode {
 
 class PooledObject {
   public:
@@ -92,4 +92,4 @@ TEST_CASE("Object pool", "[memory]") {
         REQUIRE_FALSE(id2 == obj1.object()->data());
     }
 }
-}  // namespace zenpp
+}  // namespace znode

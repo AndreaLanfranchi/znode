@@ -14,7 +14,7 @@
 
 #include <boost/noncopyable.hpp>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief Returns the path to OS provided temporary storage location
 std::filesystem::path get_os_temporary_path();
@@ -122,4 +122,4 @@ class DataDirectory final : public Directory {
         std::ignore = operator[](kSSLCertName);
     }
 };
-}  // namespace zenpp
+}  // namespace znode

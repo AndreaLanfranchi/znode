@@ -15,7 +15,7 @@
 
 #include <infra/common/log.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 
 using namespace boost;
 namespace chrono = std::chrono;
@@ -90,4 +90,4 @@ Task<void> Timer::work() noexcept {
 void Timer::rethrow() const {
     if (exception_ptr_) std::rethrow_exception(exception_ptr_);
 }
-}  // namespace zenpp::con
+}  // namespace znode::con

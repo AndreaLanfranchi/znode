@@ -14,7 +14,7 @@
 
 #include <infra/common/log.hpp>
 
-namespace zenpp::nat {
+namespace znode::nat {
 namespace {
 
     Task<void> resolve_local(Option& option) {
@@ -97,4 +97,4 @@ Task<void> resolve(Option& option) {
     }
     co_return;
 }
-}  // namespace zenpp::nat
+}  // namespace znode::nat

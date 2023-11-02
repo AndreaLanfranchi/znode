@@ -11,7 +11,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <magic_enum.hpp>
 
-namespace zenpp {
+namespace znode {
 
 namespace {
     const std::vector<std::pair<std::string, const ChainConfig*>> kKnownChainConfigs{
@@ -105,4 +105,4 @@ std::map<std::string, uint32_t> get_known_chains_map() noexcept {
     return ret;
 }
 
-}  // namespace zenpp
+}  // namespace znode

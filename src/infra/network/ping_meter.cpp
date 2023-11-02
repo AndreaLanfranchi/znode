@@ -8,7 +8,7 @@
 
 #include <core/common/assert.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 using namespace std::chrono;
 using namespace std::chrono_literals;
@@ -84,4 +84,4 @@ std::chrono::milliseconds PingMeter::get_max() const noexcept {
     const std::lock_guard lock{mutex_};
     return ping_duration_ms_max_;
 }
-}  // namespace zenpp::net
+}  // namespace znode::net

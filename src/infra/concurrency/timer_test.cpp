@@ -14,7 +14,7 @@
 #include <infra/concurrency/context.hpp>
 #include <infra/concurrency/timer.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 
 using namespace std::chrono_literals;
 
@@ -70,4 +70,4 @@ TEST_CASE("Async Timer1", "[infra][concurrency][timer]") {
         REQUIRE(test_timer.has_exception());
     }
 }
-}  // namespace zenpp::con
+}  // namespace znode::con

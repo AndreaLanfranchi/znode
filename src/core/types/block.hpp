@@ -11,7 +11,7 @@
 #include <core/serialization/serializable.hpp>
 #include <core/types/hash.hpp>
 
-namespace zenpp {
+namespace znode {
 
 static constexpr size_t kBlockHeaderSerializedSize{140};  // Excluding Equihash solution
 
@@ -35,4 +35,4 @@ class BlockHeader : public ser::Serializable {
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
-}  // namespace zenpp
+}  // namespace znode

@@ -20,7 +20,7 @@
 #include <boost/system/error_code.hpp>
 #include <boost/system/system_error.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 template <typename T>
 requires std::is_copy_constructible_v<T>
 class Channel {
@@ -148,4 +148,4 @@ class NotifyChannel {
     Channel<std::monostate> channel_;
 };
 
-}  // namespace zenpp::con
+}  // namespace znode::con

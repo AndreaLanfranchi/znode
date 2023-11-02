@@ -20,16 +20,16 @@ using source_location = std::experimental::source_location;
 
 #include <core/common/preprocessor.hpp>
 
-namespace zenpp {
+namespace znode {
 [[noreturn]] void abort_due_to_assertion_failure(std::string_view message, const std::source_location& location);
-}  // namespace zenpp
+}  // namespace znode
 
 //! \brief Always aborts program execution on assertion failure, even when NDEBUG is defined.
 #define ASSERT(expr)          \
     if ((expr)) [[likely]]    \
         static_cast<void>(0); \
     else                      \
-        ::zenpp::abort_due_to_assertion_failure(#expr, std::source_location::current())
+        abort_due_to_assertion_failure(#expr, std::source_location::current())
 
 //! \brief An alias for ASSERT with semantic emphasis on pre-condition validation.
 #define ASSERT_PRE(expr) ASSERT(expr)

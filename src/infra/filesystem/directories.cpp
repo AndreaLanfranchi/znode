@@ -22,7 +22,7 @@
 
 #include <infra/os/environment.hpp>
 
-namespace zenpp {
+namespace znode {
 
 std::filesystem::path get_os_temporary_path() { return std::filesystem::temp_directory_path(); }
 
@@ -146,4 +146,4 @@ std::filesystem::path DataDirectory::default_path() {
 
     return base_dir_path;
 }
-}  // namespace zenpp
+}  // namespace znode

@@ -9,7 +9,7 @@
 
 #include <node/common/version.hpp>
 
-namespace zenpp {
+namespace znode {
 TEST_CASE("Versions", "[misc]") {
     const Version ver0{};
     const Version ver1{0, 0, 1};
@@ -18,4 +18,4 @@ TEST_CASE("Versions", "[misc]") {
     REQUIRE(ver0.to_string() == "0.0.0");
     REQUIRE(ver1.to_string() == "0.0.1");
 }
-}  // namespace zenpp
+}  // namespace znode

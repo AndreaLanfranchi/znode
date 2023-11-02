@@ -11,7 +11,7 @@
 
 #include <core/common/endian.hpp>
 
-namespace zenpp::db::stages {
+namespace znode::db::stages {
 
 namespace {
 
@@ -90,4 +90,4 @@ bool is_known_stage(const char* name) {
     }
     return false;
 }
-}  // namespace zenpp::db::stages
+}  // namespace znode::db::stages

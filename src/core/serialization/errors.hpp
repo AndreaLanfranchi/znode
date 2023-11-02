@@ -12,7 +12,7 @@
 #include <boost/system/error_code.hpp>
 #include <magic_enum.hpp>
 
-namespace zenpp::ser {
+namespace znode::ser {
 
 enum class Error {
     kSuccess,                  // Not actually an error
@@ -79,11 +79,11 @@ inline boost::system::error_code make_error_code(ser::Error err_code) {
     static ser::ErrorCategory category{};
     return {static_cast<int>(err_code), category};
 }
-}  // namespace zenpp::ser
+}  // namespace znode::ser
 
 namespace boost::system {
 // Tell the C++ 11 STL metaprogramming that our enums are registered with the
 // error code system
 template <>
-struct is_error_code_enum<zenpp::ser::Error> : public std::true_type {};
+struct is_error_code_enum<znode::ser::Error> : public std::true_type {};
 }  // namespace boost::system

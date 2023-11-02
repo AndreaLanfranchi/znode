@@ -12,7 +12,7 @@
 #include <core/common/cast.hpp>
 #include <core/common/misc.hpp>
 
-namespace zenpp {
+namespace znode {
 
 TEST_CASE("Parse Human Bytes", "[misc]") {
     auto parsed = parse_human_bytes("");
@@ -94,4 +94,4 @@ TEST_CASE("abridge", "[misc]") {
     CHECK(abridge("Hello World", 5) == "Hello...");
     CHECK(abridge("Hello World", 7) == "Hello W...");
 }
-}  // namespace zenpp
+}  // namespace znode

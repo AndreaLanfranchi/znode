@@ -10,7 +10,7 @@
 #include <limits>
 #include <random>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief Generates a random value of type T in a provided [min..max] range
 template <Integral T>
@@ -44,7 +44,7 @@ T randomize(T val, double percentage) {
     if constexpr (std::is_signed_v<T>) {
         abs_value = static_cast<T>(val < 0 ? -val : val);
     }
-    const zenpp::Integral auto variance = static_cast<T>(abs_value * percentage);
+    const znode::Integral auto variance = static_cast<T>(abs_value * percentage);
     if (variance == T(0)) return val;
     const T min =
         (val > (std::numeric_limits<T>::lowest() + variance)) ? val - variance : std::numeric_limits<T>::lowest();
@@ -54,4 +54,4 @@ T randomize(T val, double percentage) {
 
 Bytes get_random_bytes(size_t size);
 
-}  // namespace zenpp
+}  // namespace znode

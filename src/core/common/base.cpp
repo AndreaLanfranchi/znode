@@ -21,7 +21,7 @@ void throw_exception(const std::exception& /*unused*/, const boost::source_locat
 }  // namespace boost
 #endif
 
-namespace zenpp {
+namespace znode {
 
 //! \brief Portable strnlen_s
 #if !defined(_MSC_VER)
@@ -32,7 +32,7 @@ unsigned long long strnlen_s(const char* str, size_t strsz) noexcept {
 }
 #endif
 
-const buildinfo* get_buildinfo() noexcept { return zenpp_get_buildinfo(); }
+const buildinfo* get_buildinfo() noexcept { return znode_get_buildinfo(); }
 
 std::string get_buildinfo_string() noexcept {
     std::string ret{};
@@ -52,4 +52,4 @@ std::string get_buildinfo_string() noexcept {
     ret.append(build_info->compiler_version);
     return ret;
 }
-}  // namespace zenpp
+}  // namespace znode

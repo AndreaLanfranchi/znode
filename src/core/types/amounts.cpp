@@ -15,7 +15,7 @@
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 
-namespace zenpp {
+namespace znode {
 
 bool Amount::valid_money() const noexcept { return value_ >= 0 && value_ <= Amount::kMax; }
 
@@ -110,4 +110,4 @@ Amount FeeRate::fee(size_t bytes_size) const {
     if (ret == 0U) return Amount(this->operator*());
     return Amount(ret);
 }
-}  // namespace zenpp
+}  // namespace znode

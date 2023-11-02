@@ -15,7 +15,7 @@
 #include <utility>
 #include <vector>
 
-namespace zenpp {
+namespace znode {
 //! \brief Mimics the behavior of a wrist stopwatch. Used to measure timings of operations.
 class StopWatch {
   public:
@@ -67,4 +67,4 @@ class StopWatch {
     TimePoint start_time_{};
     std::vector<std::pair<TimePoint, Duration>> laps_{};
 };
-}  // namespace zenpp
+}  // namespace znode

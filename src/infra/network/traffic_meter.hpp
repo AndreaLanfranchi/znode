@@ -11,7 +11,7 @@
 #include <mutex>
 #include <utility>
 
-namespace zenpp::net {
+namespace znode::net {
 
 //! \brief A simple network traffic meter class.
 //! \remarks This class is thread-safe.
@@ -54,4 +54,4 @@ class TrafficMeter {
     size_t interval_outbound_bytes_{0};
 };
 
-}  // namespace zenpp::net
+}  // namespace znode::net

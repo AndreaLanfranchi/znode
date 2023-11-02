@@ -16,7 +16,7 @@
 #include <core/encoding/hex.hpp>
 #include <core/serialization/serializable.hpp>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief A Hash is a fixed size sequence of bytes
 template <uint32_t BITS>
@@ -119,4 +119,4 @@ class Hash : public ser::Serializable {
 using h160 = Hash<160>;
 using h256 = Hash<256>;
 
-}  // namespace zenpp
+}  // namespace znode

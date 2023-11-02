@@ -27,7 +27,7 @@
 #include <infra/concurrency/stoppable.hpp>
 #include <infra/concurrency/task.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 //! \brief Implementation of an asynchronous timer relying on boost:asio
 class Timer : public Stoppable {
   public:
@@ -135,4 +135,4 @@ class Timer : public Stoppable {
     std::atomic_bool working_{false};            // Whether the timer is working
     std::exception_ptr exception_ptr_{nullptr};  // Captured exception (if any)
 };
-}  // namespace zenpp::con
+}  // namespace znode::con

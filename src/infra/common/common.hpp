@@ -9,7 +9,7 @@
 
 #include <core/common/outcome.hpp>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief Throws exception if result has error or exception
 template <typename T>
@@ -25,4 +25,4 @@ inline void success_or_throw(const boost::system::error_code& error) {
         throw boost::system::system_error(error);
     }
 }
-}  // namespace zenpp
+}  // namespace znode

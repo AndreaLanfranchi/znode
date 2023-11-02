@@ -9,7 +9,7 @@
 #include <core/common/base.hpp>
 #include <core/encoding/errors.hpp>
 
-namespace zenpp::enc::base64 {
+namespace znode::enc::base64 {
 
 //! \brief Returns a string of ascii chars with the base64 representation of input
 //! \remark If provided an empty input the return string is empty as well
@@ -23,4 +23,4 @@ namespace zenpp::enc::base64 {
 //! \remark If provided an empty input the returned bytes are empty as well
 [[nodiscard]] outcome::result<Bytes> decode(std::string_view input) noexcept;
 
-}  // namespace zenpp::enc::base64
+}  // namespace znode::enc::base64

@@ -13,7 +13,7 @@
 #include <core/common/memory.hpp>
 #include <core/common/misc.hpp>
 
-namespace zenpp {
+namespace znode {
 
 TEST_CASE("Memory Usage", "[memory]") {
     size_t memory_usage_resident{get_memory_usage(true)};
@@ -138,4 +138,4 @@ TEST_CASE("Lock object", "[memory]") {
     CHECK(LockedPagesManager::instance().empty());
 }
 
-}  // namespace zenpp
+}  // namespace znode

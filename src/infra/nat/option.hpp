@@ -11,7 +11,7 @@
 
 #include <infra/network/addresses.hpp>
 
-namespace zenpp::nat {
+namespace znode::nat {
 
 enum class NatType {
     kNone,  // No network address translation: local IP as public IP
@@ -27,4 +27,4 @@ struct Option {
 //! \brief Used by CLI to convert a string to a NAT Option
 bool lexical_cast(const std::string& input, Option& value);
 
-}  // namespace zenpp::nat
+}  // namespace znode::nat

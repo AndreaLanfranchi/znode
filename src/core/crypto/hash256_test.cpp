@@ -11,7 +11,7 @@
 #include <core/crypto/hash256.hpp>
 #include <core/crypto/md_test.hpp>
 
-namespace zenpp::crypto {
+namespace znode::crypto {
 
 TEST_CASE("Bitcoin Hash256", "[crypto]") {
     // See https://github.com/nayuki/Bitcoin-Cryptography-Library/blob/master/cpp/Sha256Test.cpp
@@ -36,4 +36,4 @@ TEST_CASE("Bitcoin Hash256", "[crypto]") {
     Hash256 hasher;
     run_hasher_tests(hasher, inputs, digests);
 }
-}  // namespace zenpp::crypto
+}  // namespace znode::crypto

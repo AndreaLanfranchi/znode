@@ -10,7 +10,7 @@
 
 #include <infra/network/addresses.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 enum class ConnectionType : uint8_t {
     kNone = 0U,            // Unspecified
@@ -69,4 +69,4 @@ class Connection {
     std::shared_ptr<boost::asio::ip::tcp::socket> socket_ptr_{nullptr};
 };
 
-}  // namespace zenpp::net
+}  // namespace znode::net

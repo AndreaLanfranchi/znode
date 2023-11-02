@@ -14,7 +14,7 @@
 #include <boost/noncopyable.hpp>
 #include <gsl/pointers>
 
-namespace zenpp {
+namespace znode {
 
 //! \brief A dynamic pool of objects usually expensive to create
 template <class T, class TDtor = std::default_delete<T>>
@@ -56,4 +56,4 @@ class ObjectPool : private boost::noncopyable {
     mutable std::mutex mutex_;
 };
 
-}  // namespace zenpp
+}  // namespace znode

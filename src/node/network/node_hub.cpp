@@ -20,7 +20,7 @@
 #include <infra/common/log.hpp>
 #include <infra/nat/detector.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 using namespace std::chrono_literals;
 using namespace boost;
@@ -567,4 +567,4 @@ void NodeHub::set_common_socket_options(tcp::socket& socket) {
     socket.set_option(boost::asio::socket_base::receive_buffer_size(gsl::narrow_cast<int>(64_KiB)));
     socket.set_option(boost::asio::socket_base::send_buffer_size(gsl::narrow_cast<int>(64_KiB)));
 }
-}  // namespace zenpp::net
+}  // namespace znode::net

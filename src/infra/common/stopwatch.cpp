@@ -9,7 +9,7 @@
 
 #include <tuple>
 
-namespace zenpp {
+namespace znode {
 
 StopWatch::TimePoint StopWatch::start(bool with_reset) noexcept {
     using namespace std::chrono_literals;
@@ -117,4 +117,4 @@ std::string StopWatch::format(Duration duration) noexcept {
     return ostream.str();
 }
 
-}  // namespace zenpp
+}  // namespace znode

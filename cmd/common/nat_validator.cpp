@@ -8,7 +8,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-namespace zenpp::cmd::common {
+namespace znode::cmd::common {
 
 NatOptionValidator::NatOptionValidator() {
     description(
@@ -37,4 +37,4 @@ NatOptionValidator::NatOptionValidator() {
         return {};
     };
 }
-}  // namespace zenpp::cmd::common
+}  // namespace znode::cmd::common

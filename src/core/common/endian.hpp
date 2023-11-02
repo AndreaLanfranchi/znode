@@ -34,7 +34,7 @@ constexpr T byteswap(T value) noexcept {
 }  // namespace std
 #endif  // __cplusplus < 202300L
 
-namespace zenpp::endian {
+namespace znode::endian {
 
 const auto load_big_u16 = boost::endian::load_big_u16;
 const auto load_big_u32 = boost::endian::load_big_u32;
@@ -52,4 +52,4 @@ const auto store_little_u16 = boost::endian::store_little_u16;
 const auto store_little_u32 = boost::endian::store_little_u32;
 const auto store_little_u64 = boost::endian::store_little_u64;
 
-}  // namespace zenpp::endian
+}  // namespace znode::endian

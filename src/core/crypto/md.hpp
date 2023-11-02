@@ -16,7 +16,7 @@
 #include <core/common/endian.hpp>
 #include <core/common/object_pool.hpp>
 
-namespace zenpp::crypto {
+namespace znode::crypto {
 
 //! \brief Explicit deleter for EVP_MD_CTXes
 struct MDContextDeleter {
@@ -142,4 +142,4 @@ using Sha1 = MessageDigest<"SHA1">;
 using Sha256 = MessageDigest<"SHA256">;
 using Sha512 = MessageDigest<"SHA512">;
 
-}  // namespace zenpp::crypto
+}  // namespace znode::crypto

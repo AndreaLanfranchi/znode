@@ -21,7 +21,7 @@
 #include <core/serialization/errors.hpp>
 #include <core/serialization/serialize.hpp>
 
-namespace zenpp::ser {
+namespace znode::ser {
 
 class Serializable;
 
@@ -332,4 +332,4 @@ class SDataStream : public DataStream {
     size_type computed_size_{0};  // Total accrued size (for size computing)
 };
 
-}  // namespace zenpp::ser
+}  // namespace znode::ser

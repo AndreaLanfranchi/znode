@@ -17,7 +17,7 @@
 
 #include <core/serialization/serializable.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 enum class NodeServicesType : uint64_t {
     kNone = 0,                      // No services
@@ -216,21 +216,21 @@ class VersionNodeService : public NodeService {
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
-}  // namespace zenpp::net
+}  // namespace znode::net
 
 namespace std {
 
 template <>
-struct hash<zenpp::net::IPAddress> {
-    size_t operator()(const zenpp::net::IPAddress& address) const noexcept {
+struct hash<znode::net::IPAddress> {
+    size_t operator()(const znode::net::IPAddress& address) const noexcept {
         return hash<boost::asio::ip::address>()(*address);
     }
 };
 
 template <>
-struct hash<zenpp::net::IPEndpoint> {
-    size_t operator()(const zenpp::net::IPEndpoint& endpoint) const noexcept {
-        return hash<zenpp::net::IPAddress>()(endpoint.address_) ^ hash<uint16_t>()(endpoint.port_);
+struct hash<znode::net::IPEndpoint> {
+    size_t operator()(const znode::net::IPEndpoint& endpoint) const noexcept {
+        return hash<znode::net::IPAddress>()(endpoint.address_) ^ hash<uint16_t>()(endpoint.port_);
     }
 };
 }  // namespace std

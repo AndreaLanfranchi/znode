@@ -9,7 +9,7 @@
 
 #include <iostream>
 
-namespace zenpp {
+namespace znode {
 void abort_due_to_assertion_failure(std::string_view message, const std::source_location& location) {
     std::cerr << "\n!! Assertion failed !!\n"
               << "   Expression: " << message << "\n"
@@ -19,4 +19,4 @@ void abort_due_to_assertion_failure(std::string_view message, const std::source_
               << std::endl;
     std::abort();
 }
-}  // namespace zenpp
+}  // namespace znode

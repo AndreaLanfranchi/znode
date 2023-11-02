@@ -17,7 +17,7 @@
 
 #include <nlohmann/json.hpp>
 
-namespace zenpp {
+namespace znode {
 
 enum class SealEngineType {
     kNoProof,
@@ -70,4 +70,4 @@ std::optional<std::pair<const std::string, const ChainConfig*>> lookup_known_cha
 //! \brief Returns a map known chains names mapped to their respective chain ids
 std::map<std::string, uint32_t> get_known_chains_map() noexcept;
 
-}  // namespace zenpp
+}  // namespace znode

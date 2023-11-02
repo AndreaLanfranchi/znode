@@ -11,7 +11,7 @@
 #include <mutex>
 #include <optional>
 
-namespace zenpp::net {
+namespace znode::net {
 
 //! \brief A simple network ping meter class.
 //! \remarks This class is thread-safe.
@@ -62,4 +62,4 @@ class PingMeter {
     std::chrono::milliseconds ping_duration_ms_max_{0};
 };
 
-}  // namespace zenpp::net
+}  // namespace znode::net

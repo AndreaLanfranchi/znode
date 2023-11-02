@@ -16,7 +16,7 @@
 
 #include <infra/concurrency/stoppable.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 
 //! \brief An active component living in its own thread with stoppable features
 //! \remarks Can also stay im non-busy wait for new work to be done
@@ -77,4 +77,4 @@ class Worker : public Stoppable, private boost::noncopyable {
     virtual void work() = 0;  // Derived classes must override
 };
 
-}  // namespace zenpp::con
+}  // namespace znode::con

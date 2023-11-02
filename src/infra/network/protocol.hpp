@@ -12,7 +12,7 @@
 
 #include <core/common/base.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 static constexpr int32_t kDefaultProtocolVersion{170'002};                       // Our default protocol version
 static constexpr int32_t kMinSupportedProtocolVersion{kDefaultProtocolVersion};  // Min acceptable protocol version
@@ -82,4 +82,4 @@ MessageType message_type_from_command(const std::array<uint8_t, kMessageHeaderCo
 //! \brief Whether the provided command string is a valid and known command
 bool is_known_command(const std::string& command) noexcept;
 
-}  // namespace zenpp::net
+}  // namespace znode::net

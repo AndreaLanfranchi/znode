@@ -8,7 +8,7 @@
 
 #include <core/types/block.hpp>
 
-namespace zenpp {
+namespace znode {
 
 TEST_CASE("Block Serialization", "[serialization]") {
     BlockHeader header;
@@ -24,4 +24,4 @@ TEST_CASE("Block Serialization", "[serialization]") {
     CHECK(header == header2);
     CHECK(stream.eof());
 }
-}  // namespace zenpp
+}  // namespace znode

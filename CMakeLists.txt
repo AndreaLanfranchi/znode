@@ -67,7 +67,7 @@ HunterGate(
 (You can update the Hunter version, but keep the FILEPATH option.)
 ]]
 
-project(zenpp)
+project(znode)
 
 # Execute git command to get the latest tag
 execute_process(

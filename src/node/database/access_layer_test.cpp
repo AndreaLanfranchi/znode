@@ -11,7 +11,7 @@
 
 #include <node/database/access_layer.hpp>
 
-namespace zenpp::db {
+namespace znode::db {
 
 TEST_CASE("Schema version", "[database]") {
     const TempDirectory tmp_dir{};
@@ -49,4 +49,4 @@ TEST_CASE("Deploy Tables", "[database]") {
         CHECK(has_map(*txn, table.name));
     }
 }
-}  // namespace zenpp::db
+}  // namespace znode::db

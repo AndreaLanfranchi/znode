@@ -12,7 +12,7 @@
 #include <core/common/cast.hpp>
 #include <core/crypto/md.hpp>
 
-namespace zenpp::crypto {
+namespace znode::crypto {
 
 //! \brief Wrapper around Hash-based Message Authentication Code
 //! \remarks Need implementation of SHA_xxx wrappers
@@ -69,4 +69,4 @@ class Hmac : private boost::noncopyable {
 using Hmac256 = Hmac<Sha256>;
 using Hmac512 = Hmac<Sha512>;
 
-}  // namespace zenpp::crypto
+}  // namespace znode::crypto

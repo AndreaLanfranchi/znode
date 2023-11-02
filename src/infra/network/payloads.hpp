@@ -18,7 +18,7 @@
 #include <infra/network/errors.hpp>
 #include <infra/network/protocol.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 //! \brief This class represents the payload of a NetMessage.
 //! \details Is basically an abstract placeholder type to make semantically evident in function signatures
@@ -161,4 +161,4 @@ class MsgRejectPayload : public MessagePayload {
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 
-}  // namespace zenpp::net
+}  // namespace znode::net

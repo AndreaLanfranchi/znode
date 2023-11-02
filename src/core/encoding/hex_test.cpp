@@ -12,7 +12,7 @@
 
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::enc::hex {
+namespace znode::enc::hex {
 namespace {
     struct TestCaseDecodeHex {
         std::string hexstring;
@@ -110,4 +110,4 @@ TEST_CASE("Hex encoding big integrals", "[encoding]][hex]") {
     uint256_t decoded_value{decoded_bytes.value()};
     CHECK(decoded_value == value);
 }
-}  // namespace zenpp::enc::hex
+}  // namespace znode::enc::hex

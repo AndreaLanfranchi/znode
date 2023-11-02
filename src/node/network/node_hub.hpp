@@ -26,7 +26,7 @@
 #include <node/network/node.hpp>
 #include <node/network/secure.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 class NodeHub : public con::Stoppable {
   public:
@@ -136,4 +136,4 @@ class NodeHub : public con::Stoppable {
 
     net::TrafficMeter traffic_meter_{};  // Account network traffic
 };
-}  // namespace zenpp::net
+}  // namespace znode::net

@@ -14,7 +14,7 @@
 #include <core/crypto/md.hpp>
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::crypto {
+namespace znode::crypto {
 template <typename Hasher>
 void run_hasher_tests(Hasher& hasher, const std::vector<std::string>& inputs, const std::vector<std::string>& digests) {
     REQUIRE(inputs.size() == digests.size());
@@ -77,4 +77,4 @@ void run_hasher_tests(Hasher& hasher, const std::vector<std::pair<std::string, s
         }
     }
 }
-}  // namespace zenpp::crypto
+}  // namespace znode::crypto

@@ -13,7 +13,7 @@
 
 #include <core/encoding/hex.hpp>
 
-namespace zenpp::ser {
+namespace znode::ser {
 
 DataStream::DataStream(const ByteView data) {
     buffer_.reserve(data.size());
@@ -146,4 +146,4 @@ void SDataStream::clear() noexcept {
     DataStream::clear();
     computed_size_ = 0;
 }
-}  // namespace zenpp::ser
+}  // namespace znode::ser

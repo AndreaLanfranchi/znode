@@ -16,7 +16,7 @@
 
 #include <infra/concurrency/stoppable.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 
 //! \brief Context is a wrapper around boost::asio::io_context
 class Context final : public Stoppable {
@@ -44,4 +44,4 @@ class Context final : public Stoppable {
     boost::asio::thread_pool thread_pool_;
 };
 
-}  // namespace zenpp::con
+}  // namespace znode::con

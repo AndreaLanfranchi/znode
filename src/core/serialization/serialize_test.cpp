@@ -11,7 +11,7 @@
 #include <core/serialization/serialize.hpp>
 #include <core/serialization/stream.hpp>
 
-namespace zenpp::ser {
+namespace znode::ser {
 
 TEST_CASE("Serialization Sizes", "[serialization]") {
     CHECK(ssizeof<char> == 1);
@@ -338,4 +338,4 @@ TEST_CASE("Serialization of base types", "[serialization]") {
         CHECK(value.error().value() == static_cast<int>(Error::kCompactSizeTooBig));
     }
 }
-}  // namespace zenpp::ser
+}  // namespace znode::ser

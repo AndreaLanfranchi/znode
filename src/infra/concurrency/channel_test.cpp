@@ -12,7 +12,7 @@
 
 #include <infra/common/log_test.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 
 TEST_CASE("Channel", "[infra][concurrency][channel]") {
     Context context("test");
@@ -23,4 +23,4 @@ TEST_CASE("Channel", "[infra][concurrency][channel]") {
         CHECK_FALSE(channel.try_send(value));
     }
 }
-}  // namespace zenpp::con
+}  // namespace znode::con

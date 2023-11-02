@@ -8,7 +8,7 @@
 
 #include <core/common/assert.hpp>
 
-namespace zenpp {
+namespace znode {
 
 namespace {
 
@@ -44,4 +44,4 @@ const std::vector<std::string>& get_chain_seeds(const ChainConfig& chain_config)
             ASSERT(false);  // Should not happen
     }
 }
-}  // namespace zenpp
+}  // namespace znode

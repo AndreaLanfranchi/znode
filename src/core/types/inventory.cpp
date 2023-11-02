@@ -10,7 +10,7 @@
 
 #include <magic_enum.hpp>
 
-namespace zenpp {
+namespace znode {
 
 void InventoryItem::reset() {
     type_ = Type::kError;
@@ -42,4 +42,4 @@ outcome::result<void> InventoryItem::serialization(ser::SDataStream& stream, ser
     }
     return result;
 }
-}  // namespace zenpp
+}  // namespace znode

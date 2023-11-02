@@ -10,7 +10,7 @@
 #include <functional>
 #include <string>
 
-namespace zenpp::os {
+namespace znode::os {
 
 //! \brief Specific exception for
 class signal_exception : public std::exception {
@@ -41,4 +41,4 @@ class Signals {
     static std::atomic_bool silent_;                  // Whether to print a message on signal interception
 };
 
-}  // namespace zenpp::os
+}  // namespace znode::os

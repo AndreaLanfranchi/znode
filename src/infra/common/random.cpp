@@ -8,7 +8,7 @@
 
 #include <stdexcept>
 
-namespace zenpp {
+namespace znode {
 
 Bytes get_random_bytes(size_t size) {
     if (size == 0U) throw std::invalid_argument("Size cannot be 0");
@@ -21,4 +21,4 @@ Bytes get_random_bytes(size_t size) {
     }
     return bytes;
 }
-}  // namespace zenpp
+}  // namespace znode

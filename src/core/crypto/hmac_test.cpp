@@ -10,7 +10,7 @@
 #include <core/crypto/hmac.hpp>
 #include <core/crypto/md_test.hpp>
 
-namespace zenpp::crypto {
+namespace znode::crypto {
 
 TEST_CASE("Hmac test vectors", "[crypto]") {
     // See https://www.rfc-editor.org/rfc/rfc4231
@@ -67,4 +67,4 @@ TEST_CASE("Hmac test vectors", "[crypto]") {
         run_hasher_tests(hasher, inputs, digests);
     }
 }
-}  // namespace zenpp::crypto
+}  // namespace znode::crypto

@@ -12,7 +12,7 @@
 
 #include <infra/common/random.hpp>  // Can be included as it's header only
 
-namespace zenpp::enc::hex {
+namespace znode::enc::hex {
 namespace {
 
     constexpr std::array<char, 16> kHexDigits{'0', '1', '2', '3', '4', '5', '6', '7',
@@ -168,4 +168,4 @@ outcome::result<unsigned> decode_digit(const char input) noexcept {
     if (value == 0xff) return Error::kIllegalHexDigit;
     return value;
 }
-}  // namespace zenpp::enc::hex
+}  // namespace znode::enc::hex

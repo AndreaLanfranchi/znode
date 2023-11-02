@@ -17,7 +17,7 @@
 #include <absl/time/clock.h>
 #include <boost/algorithm/string/predicate.hpp>
 
-namespace zenpp::log {
+namespace znode::log {
 
 namespace {
     Settings settings_{};
@@ -26,7 +26,7 @@ namespace {
 
     std::pair<const char*, const char*> get_level_settings(Level level) {
         switch (level) {
-            using enum zenpp::log::Level;
+            using enum Level;
             case kTrace:
                 return {"TRACE", kColorCoal};
             case kTrace1:
@@ -166,4 +166,4 @@ void BufferBase::flush() const {
         *file_ << (colorized ? std::regex_replace(line, color_pattern, "") : line) << std::endl;
     }
 }
-}  // namespace zenpp::log
+}  // namespace znode::log

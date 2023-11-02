@@ -12,7 +12,7 @@
 #include <boost/asio/use_future.hpp>
 #include <catch2/catch.hpp>
 
-namespace zenpp::con {
+namespace znode::con {
 
 Task<int> f42() { co_return 42; }
 
@@ -44,4 +44,4 @@ TEST_CASE("Coroutine co_return", "[infra][concurrency][coroutine]") {
     } while (work_count > 0);
     CHECK(task.get() == 42);
 }
-}  // namespace zenpp::con
+}  // namespace znode::con

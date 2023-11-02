@@ -15,7 +15,7 @@
 
 #include <absl/strings/str_cat.h>
 
-namespace zenpp::os {
+namespace znode::os {
 
 namespace {
     const char* sig_name(int sig_code) {
@@ -160,4 +160,4 @@ signal_exception::signal_exception(int code)
     : sig_code_{code}, message_{absl::StrCat("Caught OS signal ", sig_name(code))} {}
 const char* signal_exception::what() const noexcept { return message_.c_str(); }
 
-}  // namespace zenpp::os
+}  // namespace znode::os

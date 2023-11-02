@@ -10,7 +10,7 @@
 
 #include <infra/os/signals.hpp>
 
-namespace zenpp::os {
+namespace znode::os {
 
 TEST_CASE("Os Signals", "[concurrency]") {
     Signals::init();  // Enable the hooks
@@ -26,4 +26,4 @@ TEST_CASE("Os Signals", "[concurrency]") {
     Signals::reset();  // Otherwise other tests get blocked
     REQUIRE_FALSE(Signals::signalled());
 }
-}  // namespace zenpp::os
+}  // namespace znode::os

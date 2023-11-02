@@ -13,7 +13,7 @@
 #include <openssl/pem.h>
 #include <openssl/rand.h>
 
-namespace zenpp::net {
+namespace znode::net {
 
 void print_ssl_error(unsigned long err, const log::Level severity) {
     if (err == 0U) return;
@@ -422,4 +422,4 @@ bool validate_tls_requirements(const std::filesystem::path& directory_path, cons
 
     return true;
 }
-}  // namespace zenpp::net
+}  // namespace znode::net

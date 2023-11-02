@@ -16,7 +16,7 @@
 
 #include <node/database/mdbx_tables.hpp>
 
-namespace zenpp::db {
+namespace znode::db {
 
 class Exception : public std::exception {
   public:
@@ -41,4 +41,4 @@ std::optional<ChainConfig> read_chain_config(mdbx::txn& txn);
 //! \brief Upserts chain config into Config table
 void write_chain_config(mdbx::txn& txn, const ChainConfig& config);
 
-}  // namespace zenpp::db
+}  // namespace znode::db

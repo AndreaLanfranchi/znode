@@ -8,7 +8,7 @@
 
 #include <boost/process/environment.hpp>
 
-namespace zenpp::env {
+namespace znode::env {
 
 std::optional<std::string> get(const std::string& name) noexcept {
     auto environment{boost::this_process::environment()};
@@ -34,4 +34,4 @@ void set(const std::string& name, const std::string& value) {
     environment[name] = value;
 }
 
-}  // namespace zenpp::env
+}  // namespace znode::env

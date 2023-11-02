@@ -11,7 +11,7 @@
 
 #include <core/common/misc.hpp>
 
-namespace zenpp::db {
+namespace znode::db {
 
 namespace {
     //! \brief Returns data of current cursor position or moves it to the beginning or the end of the table based on
@@ -340,4 +340,4 @@ size_t cursor_erase(mdbx::cursor& cursor, const ByteView set_key, const CursorMo
     }
     return ret;
 }
-}  // namespace zenpp::db
+}  // namespace znode::db

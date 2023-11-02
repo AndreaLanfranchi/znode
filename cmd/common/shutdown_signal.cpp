@@ -9,7 +9,7 @@
 
 #include <infra/common/log.hpp>
 
-namespace zenpp::cmd::common {
+namespace znode::cmd::common {
 
 namespace {
     void log_signal(int signum) { log::Warning() << "Caught OS signal : " << std::to_string(signum); }
@@ -32,4 +32,4 @@ Task<ShutDownSignal::Signum> ShutDownSignal::wait() {
     co_return signal_number;
 }
 
-}  // namespace zenpp::cmd::common
+}  // namespace znode::cmd::common

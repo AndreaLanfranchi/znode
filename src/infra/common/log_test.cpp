@@ -12,7 +12,7 @@
 
 #include <infra/common/log_test.hpp>
 
-namespace zenpp::log {
+namespace znode::log {
 // Custom LogBuffer just for testing to access buffered content
 template <Level level>
 class TestLogBuffer : public LogBuffer<level> {
@@ -48,7 +48,7 @@ TEST_CASE("LogBuffer", "[infra][common][log]") {
     StreamSwap cout_swap{std::cout, null_stream()};
     StreamSwap cerr_swap{std::cerr, null_stream()};
 
-    using enum zenpp::log::Level;
+    using enum znode::log::Level;
     SECTION("LogBuffer stores nothing for verbosity higher than default") {
         check_log_empty<kDebug>(true);
         check_log_empty<kTrace>(true);
@@ -101,4 +101,4 @@ TEST_CASE("LogBuffer", "[infra][common][log]") {
         CHECK(log_buffer3.content().find(thread_id_stream.str()) == std::string::npos);
     }
 }
-}  // namespace zenpp::log
+}  // namespace znode::log

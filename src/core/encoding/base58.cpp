@@ -6,7 +6,7 @@
 
 #include "base58.hpp"
 
-namespace zenpp::enc::base58 {
+namespace znode::enc::base58 {
 
 /*
  * A note about the implementation
@@ -110,4 +110,4 @@ outcome::result<Bytes> decode_check(std::string_view input) noexcept {
     }
     return Bytes(original);
 }
-}  // namespace zenpp::enc::base58
+}  // namespace znode::enc::base58

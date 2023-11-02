@@ -6,7 +6,7 @@
 
 #include "traffic_meter.hpp"
 
-namespace zenpp::net {
+namespace znode::net {
 
 void TrafficMeter::update_inbound(size_t bytes) noexcept {
     const std::lock_guard lock{mutex_};
@@ -70,4 +70,4 @@ void TrafficMeter::reset() noexcept {
     start_time_ = std::chrono::steady_clock::now();
     interval_time_ = start_time_;
 }
-}  // namespace zenpp::net
+}  // namespace znode::net

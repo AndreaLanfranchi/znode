@@ -14,7 +14,7 @@
 
 #include <core/common/misc.hpp>
 
-namespace zenpp::cmd::common {
+namespace znode::cmd::common {
 
 struct SizeValidator : public CLI::Validator {
     template <typename T>
@@ -42,4 +42,4 @@ struct SizeValidator : public CLI::Validator {
         };
     }
 };
-}  // namespace zenpp::cmd::common
+}  // namespace znode::cmd::common

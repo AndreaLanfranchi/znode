@@ -12,7 +12,7 @@
 
 #include <core/common/assert.hpp>
 
-namespace zenpp::net {
+namespace znode::net {
 
 using namespace ser;
 
@@ -286,4 +286,4 @@ nlohmann::json MsgRejectPayload::to_json() const {
     }
     return ret;
 }
-}  // namespace zenpp::net
+}  // namespace znode::net
