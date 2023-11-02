@@ -6,7 +6,7 @@
 - [Code tree map](#code-tree-map)
 
 ## System Requirements
-To run an archive node on `zenpp` we recommend the following minimum system requirements:
+To run an archive node on `znode` we recommend the following minimum system requirements:
 - 4+ CPU cores
 - 16+ GiB RAM
 - 500+ GiB available storage space (SSD recommended, NVMe optimal)

@@ -38,24 +38,24 @@ All command line arguments are already set to default values we have found to be
 As a result you can just run the following command to start the node:
 
 ```bash
-$ ./<build_dir>/zenpp
+$ ./<build_dir>/znode
 ```
 
 where `<build_dir>` is the directory where the node was built.
-If you have downloaded a pre-built binary, you can just run `zenpp` from the directory where it was extracted.
+If you have downloaded a pre-built binary, you can just run `znode` from the directory where it was extracted.
 
-_For Windows users the binary is named `zenpp.exe`_
+_For Windows users the binary is named `znode.exe`_
 
 However, if you want to change some of the default values, you have always the option to pass them as command line
 arguments.
 To see the full list of available arguments, you can run the following command:
 
 ```bash
-$ ./zenpp --help
+$ ./znode --help
 ```
 
 An argument name is always preceded by two dashes (`--`) and an explicative name. When argument names contain dots (`.`)
-they indicate the are related to a scope.
+it means they are related to a scope.
 For example all arguments related to the settings for chaindata db parameters are prefixed with `--chaindata.`.
 Arguments are divided in two categories:
 
@@ -97,13 +97,13 @@ This argument specifies the directory where the node will store all the data and
 found.
 By default the value of datadir is OS dependent and is determined in this way:
 
-- Windows: `%LOCALAPPDATA%\.zenpp` (aka `%APPDATA%\Local\.zenpp`)
-- Linux: `$HOME/.local/share/.zenpp`
-- Mac: `$HOME/Library/Application Support/.zenpp`
+- Windows: `%LOCALAPPDATA%\.znode` (aka `%APPDATA%\Local\.znode`)
+- Linux: `$HOME/.local/share/.znode`
+- Mac: `$HOME/Library/Application Support/.znode`
   The structure of the zen directory is the following:
 
 ```
-<root> (usually ~/.local/share/.zenpp)
+<root> (usually ~/.local/share/.znode)
 ├── chaindata    // where the blockchain data (in MDBX format) is stored
 ├── etl-tmp      // where temporary ETL files are stored
 ├── nodes        // where the nodes information (in MDBX format) is stored
@@ -121,22 +121,22 @@ If you don't have enough space there, or simply want to have the data directory 
 change the location of the data directory path by passing the `--data-dir` argument such as:
 
 ```bash
-$ ./zenpp [...] --data-dir=/path/to/parent/dir
+$ ./znode [...] --data-dir=/path/to/parent/dir
 ```
 
 where `/path/to/parent/dir` is the path to the directory where you want to store all the data handled by the
 application.
-The argument can also be specified as relative to the directory of the `zenpp` binary:
+The argument can also be specified as relative to the directory of the `znode` binary:
 
 ```bash
-$ ./zenpp [...] --data-dir=../<whatever>
+$ ./znode [...] --data-dir=../<whatever>
 ```
 
-**Warning. `zenpp` is a quite intensive IO application and it is recommended to have access to a storage directory on a
+**Warning. `znode` is a quite intensive IO application and it is recommended to have access to a storage directory on a
 directly attached support. For decent performance SSD is recommended. NVMe is even better. Avoid usage of network
 attached supports: IO throughput is not as important as access latency (a lot of random accesses are performed on the
 database).
-If you intend to install and run `zenpp` on an AWS instance be advised that using gp2/gp3 storage performances might
+If you intend to install and run `znode` on an AWS instance be advised that using gp2/gp3 storage performances might
 result disappointing**
 
 ## Chaindata
@@ -145,7 +145,7 @@ In this section we analyze all the arguments related to the chaindata db paramet
 
 ### `--chaindata.exlusive`
 
-This argument is a flag. When set the chaindata db is opened in exclusive mode: this means that only `zenpp` process can
+This argument is a flag. When set the chaindata db is opened in exclusive mode: this means that only `znode` process can
 access the chaindata db.
 
 ### `--chaindata.readahead`
@@ -162,7 +162,7 @@ However you can restart the node setting a larger value if you have space availa
 The default value is 1TiB. If you want to change this value you can pass the argument such as:
 
 ```bash
-$ ./zenpp [...] --chaindata.maxsize=2TiB
+$ ./znode [...] --chaindata.maxsize=2TiB
 ```
 
 where `2TiB` is the new maximum size of the chaindata db you're willing to allow.
@@ -175,7 +175,7 @@ space it will extend the database file by this amount of bytes.
 If you want to change this value you can pass the argument such as:
 
 ```bash
-$ ./zenpp [...] --chaindata.growthsize=4GiB
+$ ./znode [...] --chaindata.growthsize=4GiB
 ```
 
 **Warning. The extension of the database file is a costly operation: in particular on Windows it requires the whole
@@ -199,7 +199,7 @@ by modern OSes**.
 If you want to change this value you can pass the argument such as:
 
 ```bash
-$ ./zenpp [...] --chaindata.pagesize=8KiB
+$ ./znode [...] --chaindata.pagesize=8KiB
 ```
 
 where `8KiB` is the new page size you're willing to use.
@@ -214,7 +214,7 @@ This argument is a flag. When set the node will limit network activity to IPv4 a
 To enable the limitation you can pass the argument such as:
 
 ```bash
-$ ./zenpp [...] --network.ipv4only
+$ ./znode [...] --network.ipv4only
 ```
 
 ### `--network.maxactiveconnections`
@@ -225,7 +225,7 @@ The default value is 256. Acceptable values are in range (32, 256). If you want 
 argument such as:
 
 ```bash
-$ ./zenpp [...] --network.maxactiveconnections 64
+$ ./znode [...] --network.maxactiveconnections 64
 ```
 
 where `64` is the new maximum number of active concurrent connections you're willing to allow.
@@ -241,7 +241,7 @@ The default value is 1. Acceptable values are in range (1, 16). If you want to c
 argument such as:
 
 ```bash
-$ ./zenpp [...] --network.maxconnectionsperip 2
+$ ./znode [...] --network.maxconnectionsperip 2
 ```
 
 where `2` is the new maximum number of concurrent connections you're willing to allow with a single peer from the same
@@ -256,7 +256,7 @@ The default value is 10. Acceptable values are in range (5, 30). If you want to 
 argument such as:
 
 ```bash
-$ ./zenpp [...] --network.handshaketimeout 15
+$ ./znode [...] --network.handshaketimeout 15
 ```
 
 where `15` is the new maximum amount of time, in seconds, the node waits for a peer to complete the handshake process.
@@ -272,7 +272,7 @@ The default value is 10. Acceptable values are in range (5, 30). If you want to 
 argument such as:
 
 ```bash
-$ ./zenpp [...] --network.inboundtimeout 15
+$ ./znode [...] --network.inboundtimeout 15
 ```
 
 where `15` is the new maximum amount of time, in seconds, an inbound message can take to be fully received.
@@ -287,7 +287,7 @@ The default value is 10. Acceptable values are in range (5, 30). If you want to 
 argument such as:
 
 ```bash
-$ ./zenpp [...] --network.outboundtimeout 15
+$ ./znode [...] --network.outboundtimeout 15
 ```
 
 where `15` is the new maximum amount of time, in seconds, an outbound message can take to be fully transmitted.
@@ -302,7 +302,7 @@ The default value is 300. Acceptable values are in range (30, 3600). If you want
 argument such as:
 
 ```bash
-$ ./zenpp [...] --network.idletimeout 600
+$ ./znode [...] --network.idletimeout 600
 ```
 
 where `600` is the new maximum amount of time, in seconds, a connection can stay idle before being closed.
@@ -317,7 +317,7 @@ The default value is 120. Acceptable values are in range (30, 3600). If you want
 argument such as:
 
 ```bash
-$ ./zenpp [...] --network.pinginterval 240
+$ ./znode [...] --network.pinginterval 240
 ```
 
 where `240` is the new get_interval, in seconds, between `ping` messages the node sends out to connected peers to evaluate
@@ -333,7 +333,7 @@ The default value is 500. Acceptable values are in range (100, 5000). If you wan
 argument such as:
 
 ```bash
-$ ./zenpp [...] --network.pingtimeout 1000
+$ ./znode [...] --network.pingtimeout 1000
 ```
 
 where `1000` is the new maximum amount of time, in milliseconds, the node waits for a `pong` reply in response to
@@ -350,7 +350,7 @@ available nodes from DNS seeds.
 To specify an endpoint you can pass the argument such as:
 
 ```bash
-$ ./zenpp [...] --network.connect=[<ip>:<port> <ip>:<port>,...]
+$ ./znode [...] --network.connect=[<ip>:<port> <ip>:<port>,...]
 ```
 
 where `<ip>` is the IP address of the peer and `<port>` is the port number the peer is listening to.
@@ -371,7 +371,7 @@ The default value is 2. Acceptable values are in range (1, 5). If you want to ch
 argument such as:
 
 ```bash
-$ ./zenpp [...] --network.connecttimeout 3
+$ ./znode [...] --network.connecttimeout 3
 ```
 
 where `3` is the new maximum amount of time, in seconds, the node waits for a dial-out connection to be successfully
@@ -400,7 +400,7 @@ the temporary etl files are deleted.
 The default value is 256MiB. If you want to change this value you can pass the argument such as:
 
 ```bash
-$ ./zenpp [...] --etl.buffersize=128MiB
+$ ./znode [...] --etl.buffersize=128MiB
 ```
 
 where `128MiB` is the new maximum amount of ETL data you're willing to allow in memory.
@@ -419,7 +419,7 @@ the database.
 The default value is 512MiB. If you want to change this value you can pass the argument such as:
 
 ```bash
-$ ./zenpp [...] --syncloop.batchsize=256MiB
+$ ./znode [...] --syncloop.batchsize=256MiB
 ```
 
 where `256MiB` is the new maximum amount of bytes you're willing to process before committing to the database.
@@ -438,7 +438,7 @@ chain you're connecting to.
 If you want to change this value you can pass the argument such as:
 
 ```bash
-$ ./zenpp [...] --syncloop.throttle=10
+$ ./znode [...] --syncloop.throttle=10
 ```
 
 where `10` is the new minimum delay, in seconds, between sync loop starts.
@@ -451,7 +451,7 @@ The default value is 30. Reducing this value might result in very verbose logs.
 If you want to change this value you can pass the argument such as:
 
 ```bash
-$ ./zenpp [...] --syncloop.loginterval=60
+$ ./znode [...] --syncloop.loginterval=60
 ```
 
 ## `--fakepow`
@@ -465,9 +465,9 @@ On tesnets instead can help speed up the sync process.
 ## `--zk.nochecksums`
 
 This argument is a flag.
-As `zenpp` requires the presence of some zkSNARKs parameters files to be able to verify certain transaction types, it is
+As `znode` requires the presence of some zkSNARKs parameters files to be able to verify certain transaction types, it is
 essential that those files are not corrupted.
-Due to this reason, `zenpp` checks the checksum of the parameters files before loading them and if the test fails it
+Due to this reason, `znode` checks the checksum of the parameters files before loading them and if the test fails it
 attempts to download them again from a trusted location.
 The verification of the checksum requires a few seconds (~10) to complete and it is performed every time the node
 starts.
@@ -475,7 +475,7 @@ If you are sure that the parameters files you have are not corrupted you can ski
 this flag as:
 
 ```bash
-$ ./zenpp [...] --zk.nochecksums
+$ ./znode [...] --zk.nochecksums
 ```
 
 **Note. If the files are missing, or they don't match the expected size, they get downloaded anyway and the checksums

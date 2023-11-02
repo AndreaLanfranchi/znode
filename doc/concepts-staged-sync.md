@@ -13,7 +13,7 @@ The concept has been firstly introduced by [Alexey Akhunov](https://uk.linkedin.
 of the Ethereum's client known under the name of [Erigon] (formerly known as Turbo-Geth).
 You can read more about the original design [here](https://github.com/ledgerwatch/erigon/blob/devel/eth/stagedsync/README.md).
 
-Traditional implementations derived from Bitcoin's code base (like [Zcash](https://github.com/zk/zk) and, of course [Zen](https://github.com/HorizenOfficial/zen)) embrace a linear approach:
+Traditional implementations derived from Bitcoin's code base (like [Zcash](https://github.com/zcash/zcash) and [Zen](https://github.com/HorizenOfficial/zen)) embrace a linear approach:
 basically they replay the whole history of the chain from block 0 (aka genesis) to block _N_ in a ordered linear sequence and for each block they update the state.
 This causes a very high pressure on I/O layer as, for each block, the previous state must be retrieved, modified and eventually persisted again to allow the restart of the synchronization process in case it gets interrupted for any reason.
 Due to this a lot of unneeded information get persisted in the database even if there is no actually need for that.

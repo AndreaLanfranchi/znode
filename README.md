@@ -1,10 +1,8 @@
-# Moria - C++ Zen Node Implementation
-
-C++ Implementation of ZEN node based on Thorax Architecture
+# Znode - C++20 Bitcoin like node implementation
 
 ## Table of Contents
 
-- [About Moria](#about-moria)
+- [About Znode](#about-Znode)
 - [Obtaining source code](#obtaining-source-code)
 - [Building on Linux & macOS](#building-on-linux--macos)
 - [Building on Windows](#building-on-windows)
@@ -20,19 +18,20 @@ C++ Implementation of ZEN node based on Thorax Architecture
 [CLion]: https://www.jetbrains.com/clion/download/
 [submodules]: https://git-scm.com/book/en/v2/Git-Tools-Submodules
 
-## About Moria
+## About Znode
 
-Moria is a semi-greenfield C++ implementation of the ZEN protocol.  
-It aims to be the fastest Zen node implementation while maintaining high quality and readability of its source code.
-Moria uses [libmdbx] as the internal database engine.
+Znode is mostly a greenfield C++(20+) implementation for a bitcoin-like node. The "Z" depicts most of the inspiration is taken from [Zcash](https://z.cash/) and [Horizen](https://www.horizen.io/) (for which I used to work).  
+Main purpose of this work is to chase the efficiency frontier leveraging, at maximum extent possible, parallel programming and multitasking
+while, at the same time, maintaining high software quality standards, coherent coding styles, and maximum readability.
+Znode uses [libmdbx] as the internal database engine.
 This project is under active development and hasn't reached the alpha phase yet. For this reason there are no releases so far.
 
 ## Obtaining Source Code
 
 To obtain the source code for the first time you need to install [Git](https://git-scm.com/) on your computer and
 ```shell
-$ git clone --recurse-submodules https://github.com/HorizenLabs/moria.git
-$ cd moria
+$ git clone --recurse-submodules https://github.com/AndreaLanfranchi/znode.git
+$ cd Znode
 ```
 We use some git [submodules] (which may eventually have their own submodules) : so after you've updated to the latest code with `git pull` remember to also update [submodules] with
 ```shell
@@ -68,7 +67,7 @@ Additional CMAKE options (specify with `-D<OPTION_NAME[:type]>=<value>`):
 
 | OPTION_NAME            | Description                                        | Default |
 |:-----------------------|:---------------------------------------------------|:-------:|
-| `BUILD_CORE_ONLY`      | Only build ZEN Core components                     |  `OFF`  |
+| `BUILD_CORE_ONLY`      | Only build Znode Core components                   |  `OFF`  |
 | `BUILD_CLANG_COVERAGE` | **Clang** (only) instrumentation for code coverage |  `OFF`  |
 | `BUILD_SANITIZE`       | Build instrumentation for sanitizers               |  `OFF`  |
 | `BUILD_TESTS`          | Build unit / consensus tests                       |  `ON`   |
@@ -80,18 +79,18 @@ $ make -j
 _Note about parallel builds using `-j`: if not specified the exact number of parallel tasks, the compiler will spawn as many
 as the cores available. That may cause OOM errors if the build is executed on a host with a large number of cores but a relatively
 small amount of RAM. To work around this, either specify `-jn` where `n` is the number of parallel tasks you want to allow or
-remove `-j` completely. Typically, for Moria each compiler job requires up to 4GB of RAM. So if, for example, your total RAM is 16GB
-then `-j4` should be OK, while `-j8` is probably not. It also means that you need a machine with at least 4GB RAM to compile Moria._
+remove `-j` completely. Typically, for Znode each compiler job requires up to 4GB of RAM. So if, for example, your total RAM is 16GB
+then `-j4` should be OK, while `-j8` is probably not. It also means that you need a machine with at least 4GB RAM to compile Znode._
 
 Now you can run the unit tests (if you have chosen to build them). There's one for `core` and one for `node`.
 ```shell
-$ ./cmd/test/zenpp-core-test
-$ ./cmd/test/zenpp-main-test
+$ ./cmd/test/znode-core-test
+$ ./cmd/test/znode-main-test
 ```
 Along with tests also benchmarks are built. If you want to play with them run
 ```shell
-$ ./cmd/benckmark/zenpp-core-benchmarks
-$ ./cmd/benchmark/zenpp-core-benchmarks
+$ ./cmd/benckmark/znode-core-benchmarks
+$ ./cmd/benchmark/znode-infra-benchmarks
 ```
 
 ## Building on Windows
