@@ -128,11 +128,21 @@ inline constexpr MessageDefinition kMessageReject{
     .max_payload_length = size_t{/*rejected command*/ 12 + /*code*/ 1 + /*reason*/ 256 + /*extra_data*/ 32},
 };
 
+inline constexpr MessageDefinition kMessageNotFound{
+    .command = "notfound",
+    .message_type = MessageType::kNotFound,
+    .is_vectorized = true,
+    .max_vector_items = size_t{kMaxInvItems},
+    .vector_item_size = size_t{kInvItemSize},
+    .min_payload_length = size_t{1 + kInvItemSize},
+    .max_payload_length = size_t{ser::ser_compact_sizeof(kMaxInvItems) + (kMaxInvItems * kInvItemSize)},
+};
+
 inline constexpr MessageDefinition kMessageMissingOrUnknown{};
 
 //! \brief List of all supported messages
 //! \attention This must be kept in same order as the MessageCommand enum
-inline constexpr std::array<MessageDefinition, 13> kMessageDefinitions{
+inline constexpr std::array<MessageDefinition, 14> kMessageDefinitions{
     kMessageVersion,           // 0
     kMessageVerAck,            // 1
     kMessageInv,               // 2
@@ -145,7 +155,8 @@ inline constexpr std::array<MessageDefinition, 13> kMessageDefinitions{
     kMessageMempool,           // 9
     kMessageReject,            // 10
     kMessageGetData,           // 11
-    kMessageMissingOrUnknown,  // 12
+    kMessageNotFound,          // 12
+    kMessageMissingOrUnknown,  // 13
 };
 
 static_assert(kMessageDefinitions.size() == static_cast<size_t>(MessageType::kMissingOrUnknown) + 1,

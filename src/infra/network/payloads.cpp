@@ -34,6 +34,7 @@ std::shared_ptr<MessagePayload> MessagePayload::from_type(MessageType type) {
             return std::make_shared<MsgAddrPayload>();
         case kInv:
         case kGetData:
+        case kNotFound:
             return std::make_shared<MsgInventoryPayload>(type);
         case kReject:
             return std::make_shared<MsgRejectPayload>();

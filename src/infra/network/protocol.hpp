@@ -50,6 +50,7 @@ enum class MessageType : uint32_t {
     kMemPool,           // MemPool message to request/async_send a list of transactions in the mempool
     kReject,            // Reject message to signal that a previous message was rejected
     kGetData,           // Getdata message to request a list of blocks or transactions
+    kNotFound,          // Notfound message to signal that a previous getdata message was not found
     kMissingOrUnknown,  // This must be the last entry
 };
 

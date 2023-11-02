@@ -31,7 +31,7 @@ This project is under active development and hasn't reached the alpha phase yet.
 To obtain the source code for the first time you need to install [Git](https://git-scm.com/) on your computer and
 ```shell
 $ git clone --recurse-submodules https://github.com/AndreaLanfranchi/znode.git
-$ cd Znode
+$ cd znode
 ```
 We use some git [submodules] (which may eventually have their own submodules) : so after you've updated to the latest code with `git pull` remember to also update [submodules] with
 ```shell

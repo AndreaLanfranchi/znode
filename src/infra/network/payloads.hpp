@@ -130,7 +130,8 @@ class MsgAddrPayload : public MessagePayload {
 class MsgInventoryPayload : public MessagePayload {
   public:
     explicit MsgInventoryPayload(MessageType message_type) : MessagePayload(message_type) {
-        ASSERT_PRE(message_type == MessageType::kInv or message_type == MessageType::kGetData);
+        ASSERT_PRE(message_type == MessageType::kInv or message_type == MessageType::kGetData or
+                   message_type == MessageType::kNotFound);
         items_.reserve(kMaxInvItems);
     }
     ~MsgInventoryPayload() override = default;
