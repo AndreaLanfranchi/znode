@@ -1,7 +1,7 @@
 /*
    Copyright 2009-2010 Satoshi Nakamoto
    Copyright 2009-2013 The Bitcoin Core developers
-   Copyright 2023 Horizen Labs
+   Copyright 2023 The Znode Authors
    Distributed under the MIT software license, see the accompanying
    file COPYING or http://www.opensource.org/licenses/mit-license.php.
 */
