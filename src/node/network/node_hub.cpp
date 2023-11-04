@@ -119,8 +119,8 @@ Task<void> NodeHub::node_factory_work() {
         if (not conn_ptr->socket_ptr_->is_open()) continue;  // Remotely closed meanwhile ?
 
         boost::system::error_code local_error_code;
-        const auto close_socket{[&local_error_code](boost::asio::ip::tcp::socket& _socket) {
-            std::ignore = _socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, local_error_code);
+        const auto close_socket{[&local_error_code](tcp::socket& _socket) {
+            std::ignore = _socket.shutdown(tcp::socket::shutdown_both, local_error_code);
             _socket.close();
         }};
 
@@ -217,9 +217,8 @@ Task<void> NodeHub::connector_work() {
 }
 
 Task<void> NodeHub::async_connect(Connection& connection) {
-    const auto protocol = connection.endpoint_.address_.get_type() == IPAddressType::kIPv4 ? boost::asio::ip::tcp::v4()
-                                                                                           : boost::asio::ip::tcp::v6();
-    connection.socket_ptr_ = std::make_shared<boost::asio::ip::tcp::socket>(asio_context_);
+    const auto protocol = connection.endpoint_.address_.get_type() == IPAddressType::kIPv4 ? tcp::v4() : tcp::v6();
+    connection.socket_ptr_ = std::make_shared<tcp::socket>(asio_context_);
     connection.socket_ptr_->open(protocol);
 
     /*
@@ -258,7 +257,7 @@ Task<void> NodeHub::acceptor_work() {
     try {
         initialize_acceptor();
         while (socket_acceptor_.is_open()) {
-            auto socket_ptr = std::make_shared<boost::asio::ip::tcp::socket>(socket_acceptor_.get_executor());
+            auto socket_ptr = std::make_shared<tcp::socket>(socket_acceptor_.get_executor());
             co_await socket_acceptor_.async_accept(*socket_ptr, boost::asio::use_awaitable);
 
             {
@@ -362,8 +361,8 @@ void NodeHub::feed_connections_from_dns() {
     // the resolver will try IPv4 first and then IPv6. Problem is if an entry does not have an IPv4
     // address, the resolver will return immediately "host not found" without trying IPv6.
     // So we need to resolve the hostname for IPv4 and IPv6 separately.
-    for (const auto& version : {boost::asio::ip::tcp::v4(), boost::asio::ip::tcp::v6()}) {
-        if (app_settings_.network.ipv4_only and version == boost::asio::ip::tcp::v6()) break;
+    for (const auto& version : {tcp::v4(), tcp::v6()}) {
+        if (app_settings_.network.ipv4_only and version == tcp::v6()) break;
         auto resolved_hosts{dns_resolve(hosts, version)};
         host_to_endpoints.merge(resolved_hosts);
     }
@@ -387,7 +386,7 @@ void NodeHub::feed_connections_from_dns() {
 std::map<std::string, std::vector<IPEndpoint>, std::less<>> NodeHub::dns_resolve(const std::vector<std::string>& hosts,
                                                                                  const tcp& version) {
     std::map<std::string, std::vector<IPEndpoint>, std::less<>> ret{};
-    boost::asio::ip::tcp::resolver resolver(asio_context_);
+    tcp::resolver resolver(asio_context_);
     const auto network_port = gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_);
     for (const auto& host : hosts) {
         if (not is_running()) break;
@@ -512,17 +511,16 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
     ASSERT_PRE(payload_ptr not_eq nullptr);
     if (not is_running() or not node_ptr->is_running()) return;
 
+    auto logger = log::Trace("Service", {"name", "Node Hub", "action", __func__, "remote", node_ptr->to_string(),
+                                         "message", std::string(magic_enum::enum_name(payload_ptr->type()))});
+
     const auto msg_type{payload_ptr->type()};
     switch (msg_type) {
         using enum MessageType;
         case kAddr: {
             auto& payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
             payload.shuffle();
-            if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-                log::Trace("Service", {"name", "Node Hub", "action", __func__, "remote", node_ptr->to_string(),
-                                       "message", "addr", "count", std::to_string(payload.identifiers_.size())})
-                    << (log::test_verbosity(log::Level::kTrace2) ? payload.to_json().dump(4) : "");
-            }
+            logger << "count=" << std::to_string(payload.identifiers_.size());
 
             // TODO Pass it to the address manager
             if (need_connections_.notified()) {
@@ -535,7 +533,6 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
                                                service.endpoint_.to_string()})
                             << " << Non standard port";
                     }
-                    LOGF_TRACE << "Feeding connector with new address " << service.endpoint_.to_string();
                     std::ignore = connector_feed_.try_send(
                         std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
                     break;
@@ -544,20 +541,11 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
         } break;
         case kGetHeaders: {
             auto& payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
-            if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-                log::Trace("Service",
-                           {"name", "Node Hub", "action", __func__, "remote", node_ptr->to_string(), "message",
-                            "getheaders", "count", std::to_string(payload.block_locator_hashes_.size())})
-                    << (log::test_verbosity(log::Level::kTrace2) ? payload.to_json().dump(4) : "");
-            }
+            logger << "count=" << std::to_string(payload.block_locator_hashes_.size());
         } break;
         case kInv: {
             auto& payload = dynamic_cast<MsgInventoryPayload&>(*payload_ptr);
-            if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-                log::Trace("Service", {"name", "Node Hub", "action", __func__, "remote", node_ptr->to_string(),
-                                       "message", "inv", "count", std::to_string(payload.items_.size())})
-                    << (log::test_verbosity(log::Level::kTrace2) ? payload.to_json().dump(4) : "");
-            }
+            logger << "count=" << std::to_string(payload.items_.size());
         } break;
         default:
             break;
