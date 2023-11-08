@@ -628,7 +628,7 @@ NodeIdleResult Node::is_idle() const noexcept {
     using enum NodeIdleResult;
     using namespace std::chrono;
 
-    if (not fully_connected()) return kNotIdle;  // Not connected - not idle
+    if (not is_running() or not connection_ptr_->socket_ptr_->is_open()) return kNotIdle;  // Not connected - not idle
 
     const auto now{steady_clock::now()};
 
