@@ -85,7 +85,11 @@ bool Node::start() noexcept {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_ssl_handshake(); });
     } else {
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_read(); });
-        std::ignore = push_message(local_version_);
+        // If connection is inbound we wait for the remote to send its version message first
+        // Otherwise we present ourselves first
+        if (connection_ptr_->type_ not_eq ConnectionType::kInbound) {
+            std::ignore = push_message(local_version_);
+        }
     }
     return true;
 }
@@ -165,7 +169,12 @@ void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
         print_log(log::Level::kTrace, log_params);
     }
     start_read();
-    std::ignore = push_message(local_version_);
+
+    // If connection is inbound we wait for the remote to send its version message first
+    // Otherwise we present ourselves first
+    if (connection_ptr_->type_ not_eq ConnectionType::kInbound) {
+        std::ignore = push_message(local_version_);
+    }
 }
 
 void Node::start_read() {
@@ -497,7 +506,12 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
                 "him",      remote_version_.sender_service_.endpoint_.to_string(),
                 "me",       remote_version_.recipient_service_.endpoint_.to_string()};
 
-            result = push_message(MessageType::kVerAck, MessagePriority::kHigh);
+            // Should send our version message if not done already
+            if (not(static_cast<uint32_t>(protocol_handshake_status_.load()) bitand
+                    static_cast<uint32_t>(ProtocolHandShakeStatus::kLocalVersionSent))) {
+                std::ignore = push_message(local_version_, MessagePriority::kHigh);
+            }
+            std::ignore = push_message(MessageType::kVerAck, MessagePriority::kHigh);
             print_log(log::Level::kInfo, log_params);
         } break;
         case kVerAck:
