@@ -53,6 +53,7 @@ std::shared_ptr<MessagePayload> MessagePayload::from_type(MessageType type) {
 
         case kVerAck:
         case kMemPool:
+        case kGetAddr:
         case kMissingOrUnknown:
             return std::make_shared<MsgNullPayload>(type);
         default:

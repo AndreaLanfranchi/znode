@@ -51,7 +51,10 @@ class MessagePayload : public ser::Serializable {
 
 class MsgNullPayload : public MessagePayload {
   public:
-    explicit MsgNullPayload(MessageType message_type) : MessagePayload(message_type) {}
+    explicit MsgNullPayload(MessageType message_type) : MessagePayload(message_type) {
+        ASSERT_PRE(message_type == MessageType::kVerAck or message_type == MessageType::kMemPool or
+                   message_type == MessageType::kGetAddr);
+    }
     ~MsgNullPayload() override = default;
 
     [[nodiscard]] nlohmann::json to_json() const override { return {nlohmann::json::value_t::object}; }
