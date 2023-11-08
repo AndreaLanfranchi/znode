@@ -65,4 +65,9 @@ bool is_known_command(const std::string& command) noexcept {
     std::copy(command.begin(), command.end(), command_bytes.begin());
     return message_type_from_command(command_bytes) not_eq MessageType::kMissingOrUnknown;
 }
+
+std::string command_from_message_type(MessageType message_type) noexcept {
+    auto command{get_command_from_message_type(message_type)};
+    return std::string{command.begin(), command.end()};
+}
 }  // namespace znode::net

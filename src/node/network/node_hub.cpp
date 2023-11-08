@@ -512,7 +512,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
     if (not is_running() or not node_ptr->is_running()) return;
 
     auto logger = log::Trace("Service", {"name", "Node Hub", "action", __func__, "remote", node_ptr->to_string(),
-                                         "message", std::string(magic_enum::enum_name(payload_ptr->type()))});
+                                         "command", command_from_message_type(payload_ptr->type())});
 
     const auto msg_type{payload_ptr->type()};
     switch (msg_type) {

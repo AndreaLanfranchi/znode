@@ -228,7 +228,11 @@ void Node::start_write() {
     }
 
     if (outbound_message_ not_eq nullptr and outbound_message_->data().eof()) {
-        last_message_sent_time_.store(std::chrono::steady_clock::now());
+        // Don't time ping pong messages
+        if (outbound_message_->get_type() not_eq MessageType::kPing and
+            outbound_message_->get_type() not_eq MessageType::kPong) {
+            last_message_sent_time_.store(std::chrono::steady_clock::now());
+        }
         outbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
         outbound_message_.reset();
     }
@@ -396,9 +400,9 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
                 continue;
             }
 
-            log::Error("Node", {"id", std::to_string(node_id_), "remote", to_string(), "command",
-                                std::string(magic_enum::enum_name(msg_type)), "status", "failure", "reason",
-                                result.error().message()});
+            log::Error("Node",
+                       {"id", std::to_string(node_id_), "remote", to_string(), "command",
+                        command_from_message_type(msg_type), "status", "failure", "reason", result.error().message()});
         }
 
         if (not result.has_error())
@@ -413,7 +417,7 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
             auto payload_ptr{MessagePayload::from_type(msg_type)};
             if (not payload_ptr) {
                 log::Error("Node", {"id", std::to_string(node_id_), "remote", to_string(), "command",
-                                    std::string(magic_enum::enum_name(msg_type)), "status", "failure", "reason",
+                                    command_from_message_type(msg_type), "status", "failure", "reason",
                                     "Message payload type not supported."});
                 result = Error::kMessagePayLoadUnhandleable;
                 break;
@@ -426,8 +430,8 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
                 const std::list<std::string> log_params{
                     "action",
                     __func__,
-                    "message",
-                    std::string(magic_enum::enum_name(msg_type)),
+                    "command",
+                    command_from_message_type(msg_type),
                     "size",
                     to_human_bytes(inbound_message_->data().size()),
                     "deserialization time",
@@ -477,6 +481,7 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
 
     ASSERT(payload_ptr not_eq nullptr);
     const auto msg_type{payload_ptr->type()};
+    const auto command{command_from_message_type(msg_type)};
     switch (msg_type) {
         using enum MessageType;
         case kVersion: {
@@ -558,9 +563,8 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
 
     if (result.has_error() or log::test_verbosity(log::Level::kTrace)) {
         const std::list<std::string> log_params{
-            "action",  __func__,
-            "command", std::string{magic_enum::enum_name(msg_type)},
-            "status",  std::string(result.has_error() ? result.error().message() : "success")};
+            "action", __func__, "command",
+            command,  "status", std::string(result.has_error() ? result.error().message() : "success")};
         print_log(result.has_error() ? log::Level::kWarning : log::Level::kTrace, log_params, err_extended_reason);
     }
     if (not result.has_error()) {
@@ -700,7 +704,8 @@ NodeIdleResult Node::is_idle() const noexcept {
         }
     }
 
-    // Check whether there's been any activity
+    // Check whether there's been any activity over the wire
+    // Note ! Ping / Pong messages are not accounted
     const auto most_recent_activity_time{std::max(last_message_received_time_.load(), last_message_sent_time_.load())};
     const auto idle_seconds{duration_cast<seconds>(now - most_recent_activity_time).count()};
     if (static_cast<uint32_t>(idle_seconds) >= app_settings_.network.idle_timeout_seconds) {
