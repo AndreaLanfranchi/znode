@@ -28,7 +28,6 @@
 #include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/channel.hpp>
 #include <infra/concurrency/timer.hpp>
-#include <infra/concurrency/unique_queue.hpp>
 #include <infra/network/traffic_meter.hpp>
 
 #include <node/common/settings.hpp>
@@ -63,9 +62,8 @@ class NodeHub : public con::Stoppable {
     ~NodeHub() override = default;
 
     [[nodiscard]] size_t size() const;  // Returns the number of nodes
-
-    bool start() noexcept override;  // Begins accepting connections
-    bool stop() noexcept override;   // Stops accepting connections and stops all nodes
+    bool start() noexcept override;     // Begins accepting connections
+    bool stop() noexcept override;      // Stops accepting connections and stops all nodes
 
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
@@ -97,7 +95,7 @@ class NodeHub : public con::Stoppable {
     //! \brief Handles a message received from a node
     //! \details This function behaves as a collector of messages from nodes and will route them to the
     //! appropriate workers/handlers. Messages pertaining to node session itself MUST NOT reach here
-    //! as they SHOULD be handled by the node itself.
+    //! as they SHOULD be handled by the node itself. (i.e. version, verack, ping, pong)
     void on_node_received_message(std::shared_ptr<Node> node_ptr, std::shared_ptr<MessagePayload> payload_ptr);
 
     static void set_common_socket_options(boost::asio::ip::tcp::socket& socket);  // Sets common socket options
@@ -117,9 +115,8 @@ class NodeHub : public con::Stoppable {
     std::map<std::string, std::vector<IPEndpoint>, std::less<>> dns_resolve(const std::vector<std::string>& hosts,
                                                                             const boost::asio::ip::tcp& version);
 
-    AppSettings& app_settings_;              // Reference to global application settings
-    boost::asio::io_context& asio_context_;  // Reference to global asio context
-
+    AppSettings& app_settings_;                       // Reference to global application settings
+    boost::asio::io_context& asio_context_;           // Reference to global asio context
     boost::asio::io_context::strand asio_strand_;     // Serialized execution of handlers
     boost::asio::ip::tcp::acceptor socket_acceptor_;  // The listener socket
     con::Timer service_timer_;                        // Triggers a maintenance cycle

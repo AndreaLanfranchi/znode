@@ -511,6 +511,11 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
                 "him",      remote_version_.sender_service_.endpoint_.to_string(),
                 "me",       remote_version_.recipient_service_.endpoint_.to_string()};
 
+            if (connection_ptr_->type_ == ConnectionType::kInbound and
+                remote_version_.recipient_service_.endpoint_.is_routable()) {
+                // TODO : SeenLocal() ?
+            }
+
             // Should send our version message if not done already
             if (not(static_cast<uint32_t>(protocol_handshake_status_.load()) bitand
                     static_cast<uint32_t>(ProtocolHandShakeStatus::kLocalVersionSent))) {
