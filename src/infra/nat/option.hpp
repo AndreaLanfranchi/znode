@@ -26,6 +26,7 @@ namespace znode::nat {
 enum class NatType {
     kNone,  // No network address translation: local IP as public IP
     kAuto,  // Detect public IP address using IPify.org
+    kStun,  // Detect public IP address using STUN protocol
     kIp     // Use provided IP address as public IP
 };
 

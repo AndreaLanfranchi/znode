@@ -29,6 +29,10 @@ bool lexical_cast(const std::string& input, Option& value) {
         value.type_ = NatType::kNone;
         return true;
     }
+    if (boost::algorithm::iequals(input, "stun")) {
+        value.type_ = NatType::kStun;
+        return true;
+    }
     if (boost::algorithm::iequals(input, "auto")) {
         value.type_ = NatType::kAuto;
         return true;

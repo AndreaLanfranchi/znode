@@ -31,10 +31,17 @@ NatOptionValidator::NatOptionValidator() {
             value = "auto";
             return {};
         }
+
+        if (boost::algorithm::iequals(value, "none")) {
+            value = "none";
+            return {};
+        }
+
         if (boost::algorithm::iequals(value, "auto")) {
             value = "auto";
             return {};
         }
+
         if (boost::algorithm::iequals(value, "stun")) {
             value = "stun";
             return {};

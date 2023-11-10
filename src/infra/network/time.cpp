@@ -45,7 +45,7 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
     const auto& time_server_adress = dns_entries.begin()->endpoint().address();
     udp::endpoint receiver_endpoint(time_server_adress, 123);
     udp::socket socket(executor);
-    std::ignore = socket.open(time_server_adress.is_v6() ? udp::v6() : udp::v4(), error_code);
+    std::ignore = socket.open(receiver_endpoint.protocol(), error_code);
     if (error_code) {
         return outcome::failure(error_code);
     }
