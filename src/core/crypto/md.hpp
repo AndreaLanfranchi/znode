@@ -37,7 +37,7 @@ struct MDContextDeleter {
 //! \brief A collection of recycle-able MD Contexts
 static ObjectPool<EVP_MD_CTX, MDContextDeleter> MDContexts(/*thread_safe=*/true);
 
-//! \brief Explicit deleter for EVP_MD_CTXes
+//! \brief Explicit recycler for EVP_MD_CTXes
 struct MDContextRecycler {
     constexpr MDContextRecycler() noexcept = default;
     void operator()(EVP_MD_CTX* ptr) const noexcept { MDContexts.add(ptr); }

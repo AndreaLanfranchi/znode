@@ -26,6 +26,6 @@ This projects contains the following directory components:
 * [`src/app`](../src/app) This directory contains the application implementation : storage access layer, networking layer, and all other features needed for complete functionality of a block-chain node. Sources built from this directory depend on the `core` directory contents.
   
 To simplify the building process cmake is configured to make use of GLOB lists of files. As a result a strict naming convention of files (see [Style Guide](../README.md#style-guide)). In addition to that we establish two file names suffix (before extension) reservations:
-* `_test` explicitly mark a file to be included in the unit tests target
+* `_test` explicitly mark a file to be included in the unit siphash_tests target
 * `_benchmark` explicitly mark a file to be included in the benchmarks target
 

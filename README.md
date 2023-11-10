@@ -70,7 +70,7 @@ Additional CMAKE options (specify with `-D<OPTION_NAME[:type]>=<value>`):
 | `BUILD_CORE_ONLY`      | Only build Znode Core components                   |  `OFF`  |
 | `BUILD_CLANG_COVERAGE` | **Clang** (only) instrumentation for code coverage |  `OFF`  |
 | `BUILD_SANITIZE`       | Build instrumentation for sanitizers               |  `OFF`  |
-| `BUILD_TESTS`          | Build unit / consensus tests                       |  `ON`   |
+| `BUILD_TESTS`          | Build unit / consensus siphash_tests                       |  `ON`   |
 
 Then run the build itself
 ```shell
@@ -82,12 +82,12 @@ small amount of RAM. To work around this, either specify `-jn` where `n` is the 
 remove `-j` completely. Typically, for Znode each compiler job requires up to 4GB of RAM. So if, for example, your total RAM is 16GB
 then `-j4` should be OK, while `-j8` is probably not. It also means that you need a machine with at least 4GB RAM to compile Znode._
 
-Now you can run the unit tests (if you have chosen to build them). There's one for `core` and one for `node`.
+Now you can run the unit siphash_tests (if you have chosen to build them). There's one for `core` and one for `node`.
 ```shell
 $ ./cmd/test/znode-core-test
 $ ./cmd/test/znode-main-test
 ```
-Along with tests also benchmarks are built. If you want to play with them run
+Along with siphash_tests also benchmarks are built. If you want to play with them run
 ```shell
 $ ./cmd/benckmark/znode-core-benchmarks
 $ ./cmd/benchmark/znode-infra-benchmarks
