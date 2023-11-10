@@ -55,18 +55,19 @@ implementation.
 - Implement pluggable consensus rules
 
 Please be aware that although this list might not be exhaustive, it is not a wishlist either.
-In any case this is a personal project, and I'm not bound to any deadline or roadmap.
+In any case this is a personal project, and I'm not bound to any deadline or roadmap.  
 Should things change in the future (e.g. benevolent funding), I'll update this list accordingly.
 
 ## Disclaimer
 This project is not affiliated with, nor endorsed or funded by either [zcashd] or [zend] authors / owners / maintainers.
 I am a former contractor for the company owning the [zend] project, but I'm not anymore: this project is not meant to be adversarial to them in any
-way. What I'm working on here is "_a_" way to improve efficiency, but it does not pretend to be "_the only_" way.
+way or form. What I'm working on here is "_a_" way to improve efficiency, but it does not pretend to be "_the only_" way.
 Should this get to a stable release sometime in the future, it'd mean I have added something to the "code diversity"
 which should be enforced in any cryptocurrency ecosystem.  
 Nevertheless this is a personal project, so far, which I'm developing in my spare time.
 Should you find it useful, if nothing else for hints about your development, feel free to use it, as a whole or in
-pieces, as you wish in compliance with [the license](./LICENSE).
+pieces, as you wish in compliance with [the license](./LICENSE).  
+
 I'm not responsible for any damage, loss of data, loss of money, loss of time, loss of sleep, loss of hair, loss of
 friends, loss of family, loss of pets, loss of anything else you may incur by using or engaging with this software.
 
