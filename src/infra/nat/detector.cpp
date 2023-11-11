@@ -48,6 +48,7 @@ namespace {
         co_return;
     }
 
+    // TODO needs work
     Task<void> resolve_stun(Option& option) {
         const std::string host{"stun.l.google.com"};
         const std::string port{"19302"};
@@ -89,9 +90,9 @@ namespace {
             LOGF_MESSAGE << "STUN request sent: " << receiver_endpoint;
             if (error_code) throw boost::system::system_error{error_code};
 
-            udp::endpoint local_endpoint{receiver_endpoint.protocol(), 0};
+            udp::endpoint local_endpoint(receiver_endpoint.protocol(), 0);
             boost::asio::streambuf response;
-            co_await socket.async_receive_from(response.prepare(64_KiB), local_endpoint, 0,
+            co_await socket.async_receive_from(response.prepare(64_KiB), local_endpoint,
                                                redirect_error(use_awaitable, error_code));
             LOGF_MESSAGE << "STUN response received";
             if (error_code) throw boost::system::system_error{error_code};
@@ -143,20 +144,17 @@ namespace {
             http::request<http::string_body> request(http::verb::get, target, version);
             request.set(http::field::host, host);
             request.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-            http::write(socket, request);
+            std::ignore = http::write(socket, request);
 
             beast::flat_buffer buffer;
             http::response<http::dynamic_body> response;
-            http::read(socket, buffer, response);
+            std::ignore = http::read(socket, buffer, response);
 
             const std::string public_ip{beast::buffers_to_string(response.body().data())};
             option.address_ = net::IPAddress::from_string(public_ip).value();
 
             beast::error_code error_code;
             std::ignore = socket.shutdown(tcp::socket::shutdown_both, error_code);
-            if (error_code && error_code not_eq beast::errc::not_connected) {
-                throw beast::system_error{error_code};
-            }
 
         } catch (const boost::system::system_error& error) {
             log::Error("Resolve public IP", {"error", error.code().message()})

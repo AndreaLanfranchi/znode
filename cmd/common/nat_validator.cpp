@@ -25,6 +25,7 @@ NatOptionValidator::NatOptionValidator() {
         "Network address translation detection logic (none|auto|ip)\n"
         "\t- none         no NAT, use the local IP address as public\n"
         "\t- auto         detect the public IP address using ipify.org (default)\n"
+        /*"\t- stun         detect the public IP address using STUN protocol (default)\n"*/
         "\t- 1.2.3.4      use manually provided IPv4/IPv6 address as public\n");
     func_ = [](std::string& value) -> std::string {
         if (value.empty()) {
@@ -42,10 +43,11 @@ NatOptionValidator::NatOptionValidator() {
             return {};
         }
 
-        if (boost::algorithm::iequals(value, "stun")) {
-            value = "stun";
-            return {};
-        }
+        // TODO re-enable when ready
+        //        if (boost::algorithm::iequals(value, "stun")) {
+        //            value = "stun";
+        //            return {};
+        //        }
 
         const auto parsed_address{net::IPAddress::from_string(value)};
         if (parsed_address.has_error()) {
