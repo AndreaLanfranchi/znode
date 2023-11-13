@@ -79,7 +79,7 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
     const auto transmitted_time_t = static_cast<std::time_t>(transmitted_time);
     const auto* transmitted_time_tm = std::gmtime(&transmitted_time_t);
 
-    std::time_t system_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    const auto system_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     const auto* system_time_tm = std::gmtime(&system_time_t);
 
     std::ignore = log::Info(
@@ -90,15 +90,14 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
 #pragma warning(pop)
 #endif
 
-    if (max_skew_seconds == 0) {
-        return outcome::success();
+    if (max_skew_seconds not_eq 0U) {
+        const auto delta_time = static_cast<uint32_t>(std::abs(std::difftime(system_time_t, transmitted_time_t)));
+        if (delta_time > max_skew_seconds) {
+            std::ignore = log::Error("Time Sync", {"skew seconds", std::to_string(delta_time), "max skew seconds",
+                                                   std::to_string(max_skew_seconds)});
+            return Error::kInvalidSystemTime;
+        }
     }
-
-    const auto delta_time = std::abs(system_time_t - transmitted_time_t);
-    if (delta_time > max_skew_seconds) {
-        return Error::kInvalidSystemTime;
-    }
-
     return outcome::success();
 }
 }  // namespace znode::net
