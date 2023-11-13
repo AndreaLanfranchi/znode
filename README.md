@@ -63,7 +63,7 @@ This project is not affiliated with, nor endorsed or funded by either [zcashd] o
 I am a former contractor for the company owning the [zend] project, but I'm not anymore: this project is not meant to be adversarial to them in any
 way or form. What I'm working on here is "_a_" way to improve efficiency, but it does not pretend to be "_the only_" way.
 Should this get to a stable release sometime in the future, it'd mean I have added something to the "code diversity"
-which should be enforced in any cryptocurrency ecosystem.  
+which should be enforced in any cryptocurrency ecosystem claiming to be permission-less.  
 Nevertheless this is a personal project, so far, which I'm developing in my spare time.
 Should you find it useful, if nothing else for hints about your development, feel free to use it, as a whole or in
 pieces, as you wish in compliance with [the license](./LICENSE).  
