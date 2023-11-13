@@ -253,11 +253,11 @@ void Node::start_write() {
     // against protocol handshake rules
     if (outbound_message_->data().tellg() == 0) {
         const auto msg_type{outbound_message_->header().get_type()};
+        const auto command{command_from_message_type(msg_type)};
         if (log::test_verbosity(log::Level::kTrace)) {
-            const std::list<std::string> log_params{
-                "action",  __func__,
-                "message", std::string(magic_enum::enum_name(outbound_message_->header().get_type())),
-                "size",    to_human_bytes(outbound_message_->data().size())};
+            const std::list<std::string> log_params{"action",  __func__,
+                                                    "command", command,
+                                                    "size",    to_human_bytes(outbound_message_->data().size())};
             print_log(log::Level::kTrace, log_params);
         }
 
@@ -268,7 +268,7 @@ void Node::start_write() {
                 // Actually outgoing messages' correct sequence is local responsibility
                 // maybe we should either assert or push back the message into the queue
                 const std::list<std::string> log_params{
-                    "action", __func__,  "message", std::string(magic_enum::enum_name(msg_type)),
+                    "action", __func__,  "command", command,
                     "status", "failure", "reason",  result.error().message()};
                 print_log(log::Level::kError, log_params, "Disconnecting peer but is local fault ...");
             }
