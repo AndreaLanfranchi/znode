@@ -52,9 +52,9 @@ enum class NodeIdleResult {
     kGlobalTimeout              // Too much time since the last completed activity
 };
 
-enum class DataDirectionMode {
-    kInbound,
-    kOutbound
+enum class DataDirectionMode : uint32_t {
+    kOutbound = 0,
+    kInbound = 1,
 };
 
 //! \brief Maximum number of messages to parse in a single read operation
@@ -83,12 +83,14 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Flags describing the status of the protocol handshake
     enum class ProtocolHandShakeStatus : uint32_t {
-        kNotInitiated = 0,                  // 0
-        kLocalVersionSent = 1 << 0,         // 1
-        kLocalVersionAckReceived = 1 << 1,  // 2
-        kRemoteVersionReceived = 1 << 2,    // 4
-        kRemoteVersionAckSent = 1 << 3,     // 8
-        kCompleted = kLocalVersionSent | kLocalVersionAckReceived | kRemoteVersionReceived | kRemoteVersionAckSent
+        kNotInitiated = 0,                                                           // 0
+        kVersionSent = 1 << static_cast<uint32_t>(DataDirectionMode::kOutbound),     // 1
+        kVersionReceived = 1 << static_cast<uint32_t>(DataDirectionMode::kInbound),  // 2
+        kVerAckSent = 4 << static_cast<uint32_t>(DataDirectionMode::kOutbound),      // 4
+        kVerAckReceived = 4 << static_cast<uint32_t>(DataDirectionMode::kInbound),   // 8
+        kVersionExchanged = kVersionSent | kVersionReceived,                         // 3
+        kVerAckExchanged = kVerAckSent | kVerAckReceived,                            // 12
+        kCompleted = kVersionExchanged | kVerAckExchanged,                           // 15
     };
 
     //! \return The unique identifier of the node
@@ -166,7 +168,7 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
 
     //! \brief Returns whether the message is acceptable in the current state of the protocol handshake
     //! \remarks Every message (inbound or outbound) MUST be validated by this before being further processed
-    [[nodiscard]] outcome::result<void> validate_message_for_protocol_handshake(DataDirectionMode direction,
+    [[nodiscard]] outcome::result<void> validate_message_for_protocol_handshake(DataDirectionMode message_direction,
                                                                                 MessageType message_type);
 
     //! \brief To be called as soon as the protocol handshake is completed

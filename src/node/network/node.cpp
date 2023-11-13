@@ -518,7 +518,7 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
 
             // Should send our version message if not done already
             if (not(static_cast<uint32_t>(protocol_handshake_status_.load()) bitand
-                    static_cast<uint32_t>(ProtocolHandShakeStatus::kLocalVersionSent))) {
+                    static_cast<uint32_t>(ProtocolHandShakeStatus::kVersionSent))) {
                 std::ignore = push_message(local_version_, MessagePriority::kHigh);
             }
             std::ignore = push_message(MessageType::kVerAck, MessagePriority::kHigh);
@@ -581,51 +581,83 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
     return result;
 }
 
-outcome::result<void> Node::validate_message_for_protocol_handshake(const DataDirectionMode direction,
+outcome::result<void> Node::validate_message_for_protocol_handshake(const DataDirectionMode message_direction,
                                                                     const MessageType message_type) {
     using enum net::Error;
 
-    // During protocol handshake we only allow version and verack messages
-    // After protocol handshake we only allow other messages
+    /*
+     * There's a mess in publicly available documentation about the protocol handshake correctness.
+     *
+     * According to https://en.bitcoin.it/wiki/Protocol_documentation#version the exchange of `version` message is
+     * enough to allow peers begin exchange other message types (any) and `verack` is labelled as a simple
+     * acknowledgement of the `version` message received. There's no constraint in `verack` message to be sent
+     * immediately after `version` message.
+     *
+     * On the other hand https://developer.bitcoin.org/reference/p2p_networking.html#verack says that `verack` is
+     * required to be sent by both peers (in response to a received `version`)  before any other message type
+     * can be exchanged.
+     * Quote "The “verack” message acknowledges a previously-received “version” message, informing the connecting
+     * node that it can begin to send other messages."
+     *
+     * Apparently Bitcoin Core implementation as well as zcash and zend have opted for the more relaxed
+     * former approach. For compatibility reasons we follow the same approach even if is in contrast with the logic
+     * application of a proper handshake procedure.
+     * In any case we must ensure that the exchange of `version` and `verack` messages is done only once per session,
+     * in the correct order and in a time frame that is not too long (see kMaxProtocolHandshakeDurationSeconds).
+     */
+
+    const auto current_status{protocol_handshake_status_.load()};
+
+    // We MUST begin with version exchange
+    if (current_status == ProtocolHandShakeStatus::kNotInitiated and message_type != MessageType::kVersion) {
+        return kInvalidProtocolHandShake;
+    }
+
+    // In case protocol handshake is completed any message type is allowed unless is a duplicate handshake message
+    if (current_status == ProtocolHandShakeStatus::kCompleted) {
+        if (message_type == MessageType::kVersion or message_type == MessageType::kVerAck) {
+            return kDuplicateProtocolHandShake;
+        }
+        return outcome::success();
+    }
+
+    // Look for duplicates in the handshake sequence
+    auto current_status_value = static_cast<uint32_t>(current_status);
+    uint32_t new_status_flag{0U};
     switch (message_type) {
         using enum MessageType;
         case kVersion:
+            new_status_flag = 1 << static_cast<uint32_t>(message_direction);
+            if ((current_status_value & new_status_flag) == new_status_flag) return kDuplicateProtocolHandShake;
+            break;
         case kVerAck:
-            if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) return kDuplicateProtocolHandShake;
-            break;  // Continue with validation
+            new_status_flag = 4 << static_cast<uint32_t>(message_direction);
+            if ((current_status_value & new_status_flag) == new_status_flag) return kDuplicateProtocolHandShake;
+            break;
         default:
-            if (protocol_handshake_status_ not_eq ProtocolHandShakeStatus::kCompleted) {
-                const std::list<std::string> log_params{"action",  __func__,
-                                                        "command", std::string{magic_enum::enum_name(message_type)},
-                                                        "size",    to_human_bytes(inbound_message_->size()),
-                                                        "status",  "unexpected message while handshake in progress"};
-                print_log(log::Level::kError, log_params);
-                return kInvalidProtocolHandShake;
-            }
-            return outcome::success();
-    }
-
-    uint32_t new_status_flag{0U};
-    switch (direction) {
-        using enum DataDirectionMode;
-        using enum ProtocolHandShakeStatus;
-        case kInbound:
-            new_status_flag = static_cast<uint32_t>(message_type == MessageType::kVersion ? kRemoteVersionReceived
-                                                                                          : kLocalVersionAckReceived);
-            break;
-        case kOutbound:
-            new_status_flag = static_cast<uint32_t>(message_type == MessageType::kVersion ? kLocalVersionSent
-                                                                                          : kRemoteVersionAckSent);
             break;
     }
 
-    const auto status{static_cast<uint32_t>(protocol_handshake_status_.load())};
-    if ((status & new_status_flag) == new_status_flag) return kDuplicateProtocolHandShake;
-    protocol_handshake_status_.store(static_cast<ProtocolHandShakeStatus>(status | new_status_flag));
-    if (protocol_handshake_status_ == ProtocolHandShakeStatus::kCompleted) {
-        // Happens only once per session
-        on_handshake_completed();
+    // Apply the new status flag if the message pertains to the handshake sequence
+    if (new_status_flag not_eq 0U) {
+        const auto new_status{static_cast<ProtocolHandShakeStatus>(current_status_value bitor new_status_flag)};
+        protocol_handshake_status_.exchange(new_status);
+        if (new_status == ProtocolHandShakeStatus::kCompleted) {
+            // Happens only once per session
+            asio::post(io_strand_, [self{shared_from_this()}]() { self->on_handshake_completed(); });
+        }
+        return outcome::success();
     }
+
+    // At least the `version` message must be exchanged before any other message type
+    if (current_status_value < static_cast<uint32_t>(ProtocolHandShakeStatus::kVersionExchanged)) {
+        return kInvalidProtocolHandShake;
+    }
+
+    // Replace the above with this if we want to be strict on handshake sequence
+    //    if (current_status_value < static_cast<uint32_t>(ProtocolHandShakeStatus::kCompleted)) {
+    //        return kInvalidProtocolHandShake;
+    //    }
 
     return outcome::success();
 }
