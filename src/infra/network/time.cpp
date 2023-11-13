@@ -59,6 +59,9 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
         return outcome::failure(error_code);
     }
 
+    // Get the system time
+    const std::time_t system_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+
     udp::endpoint sender_endpoint;
     size_t len = socket.receive_from(buffer(recv_buf), sender_endpoint, 0, error_code);
     if (error_code) {
@@ -68,27 +71,52 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
         return Error::kInvalidNtpResponse;
     }
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4996)  // Gmttime and asctime maybe insecure
-#endif
-
     // Interpret the ntp packet
     uint32_t transmitted_time = endian::load_big_u32(&recv_buf[40]);
     transmitted_time -= 2208988800U;  // NTP time starts in 1900, UNIX in 1970
     const auto transmitted_time_t = static_cast<std::time_t>(transmitted_time);
-    const auto* transmitted_time_tm = std::gmtime(&transmitted_time_t);
 
-    const auto system_time_t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    const auto* system_time_tm = std::gmtime(&system_time_t);
+    std::tm transmitted_time_tm_storage{};
+    std::tm system_time_tm_storage{};
+    std::tm* transmitted_time_tm = &transmitted_time_tm_storage;
+    std::tm* system_time_tm = &system_time_tm_storage;
+    std::string transmitted_time_str;
+    std::string system_time_str;
 
-    std::ignore = log::Info(
-        "Time Sync", {time_server, boost::replace_all_copy(std::string(std::asctime(transmitted_time_tm)), "\n", ""),
-                      "system time", boost::replace_all_copy(std::string(std::asctime(system_time_tm)), "\n", "")});
+    int err{0};
 
-#ifdef _MSC_VER
-#pragma warning(pop)
+#if defined(_MSC_VER) || defined(_WIN32) || defined(_WIN64)
+    err = gmtime_s(transmitted_time_tm, &transmitted_time_t);
+    if (err) {
+        return Error::kInvalidNtpResponse;
+    }
+    err = gmtime_s(system_time_tm, &system_time_t);
+    if (err) {
+        return Error::kInvalidSystemTime;
+    }
+#else
+    if (gmttime_r(&transmitted_time_t, transmitted_time_tm) == nullptr) {
+        return Error::kInvalidNtpResponse;
+    }
+    if (gmttime_r(&system_time_t, system_time_tm) == nullptr) {
+        return Error::kInvalidSystemTime;
+    }
 #endif
+
+    std::array<char, 26> time_str_buf{0};
+    err = asctime_s(time_str_buf.data(), time_str_buf.size(), transmitted_time_tm);
+    if (err) {
+        return Error::kInvalidNtpResponse;
+    }
+    transmitted_time_str = time_str_buf.data();
+    err = asctime_s(time_str_buf.data(), time_str_buf.size(), system_time_tm);
+    if (err) {
+        return Error::kInvalidSystemTime;
+    }
+    system_time_str = time_str_buf.data();
+
+    std::ignore = log::Info("Time Sync", {time_server, boost::replace_all_copy(transmitted_time_str, "\n", ""),
+                                          "system time", boost::replace_all_copy(system_time_str, "\n", "")});
 
     if (max_skew_seconds not_eq 0U) {
         const auto delta_time = static_cast<uint32_t>(std::abs(std::difftime(system_time_t, transmitted_time_t)));
