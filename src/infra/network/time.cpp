@@ -83,9 +83,8 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
     std::string transmitted_time_str;
     std::string system_time_str;
 
-    int err{0};
-
 #if defined(_MSC_VER) || defined(_WIN32) || defined(_WIN64)
+    errno_t err{0};
     err = gmtime_s(transmitted_time_tm, &transmitted_time_t);
     if (err) {
         return Error::kInvalidNtpResponse;
@@ -95,6 +94,7 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
         return Error::kInvalidSystemTime;
     }
 #else
+    int err{0};
     if (gmttime_r(&transmitted_time_t, transmitted_time_tm) == nullptr) {
         return Error::kInvalidNtpResponse;
     }
