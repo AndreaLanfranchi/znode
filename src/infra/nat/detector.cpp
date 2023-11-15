@@ -80,7 +80,8 @@ namespace {
             message[6] = 0xA4;
             message[7] = 0x42;  // < magic cookie
 
-            request_stream.write(reinterpret_cast<const char*>(message.data()), message.size());
+            request_stream.write(reinterpret_cast<const char*>(message.data()),
+                                 static_cast<std::streamsize>(message.size()));
 
             const udp::endpoint receiver_endpoint = results.begin()->endpoint();
             std::ignore = socket.open(receiver_endpoint.protocol(), error_code);

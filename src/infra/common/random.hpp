@@ -15,10 +15,10 @@
 */
 
 #pragma once
-#include "core/common/base.hpp"
-
 #include <limits>
 #include <random>
+
+#include <core/common/base.hpp>
 
 namespace znode {
 

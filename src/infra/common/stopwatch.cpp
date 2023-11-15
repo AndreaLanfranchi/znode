@@ -45,14 +45,14 @@ std::pair<StopWatch::TimePoint, StopWatch::Duration> StopWatch::lap() noexcept {
     return laps_.back();
 }
 
-StopWatch::Duration StopWatch::since_start(const TimePoint& origin) noexcept {
+StopWatch::Duration StopWatch::since_start(const TimePoint& origin) const noexcept {
     if (start_time_ == TimePoint()) {
         return {};
     }
     return Duration(origin - start_time_);
 }
 
-StopWatch::Duration StopWatch::since_start() noexcept { return since_start(TimeClock::now()); }
+StopWatch::Duration StopWatch::since_start() const noexcept { return since_start(TimeClock::now()); }
 
 std::pair<StopWatch::TimePoint, StopWatch::Duration> StopWatch::stop() noexcept {
     if (!started_) {

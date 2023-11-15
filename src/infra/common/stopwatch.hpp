@@ -50,11 +50,11 @@ class StopWatch {
     //! \brief Computes the duration amongst the start time and the provided timepoint
     //! \param origin [in] : An origin timepoint
     //! \return  Duration
-    Duration since_start(const TimePoint& origin) noexcept;
+    [[nodiscard]] Duration since_start(const TimePoint& origin) const noexcept;
 
     //! \brief Computes the duration amongst now and the start time
     //! \return  Duration
-    Duration since_start() noexcept;
+    [[nodiscard]] Duration since_start() const noexcept;
 
     //! \brief Stops the watch
     //! \return The timepoint of stop and the duration since start (if no laptimes) or the duration from previous

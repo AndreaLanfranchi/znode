@@ -22,8 +22,6 @@
 #include <absl/time/clock.h>
 #include <absl/time/time.h>
 #include <boost/algorithm/clamp.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/timer/timer.hpp>
 #include <magic_enum.hpp>
 
 #include <core/common/assert.hpp>
@@ -31,6 +29,7 @@
 
 #include <infra/common/log.hpp>
 #include <infra/common/random.hpp>
+#include <infra/common/stopwatch.hpp>
 
 namespace znode::net {
 
@@ -255,9 +254,8 @@ void Node::start_write() {
         const auto msg_type{outbound_message_->header().get_type()};
         const auto command{command_from_message_type(msg_type)};
         if (log::test_verbosity(log::Level::kTrace)) {
-            const std::list<std::string> log_params{"action",  __func__,
-                                                    "command", command,
-                                                    "size",    to_human_bytes(outbound_message_->data().size())};
+            const std::list<std::string> log_params{
+                "action", __func__, "command", command, "size", to_human_bytes(outbound_message_->data().size())};
             print_log(log::Level::kTrace, log_params);
         }
 
@@ -267,9 +265,8 @@ void Node::start_write() {
                 // TODO : Should we drop the connection here?
                 // Actually outgoing messages' correct sequence is local responsibility
                 // maybe we should either assert or push back the message into the queue
-                const std::list<std::string> log_params{
-                    "action", __func__,  "command", command,
-                    "status", "failure", "reason",  result.error().message()};
+                const std::list<std::string> log_params{"action", __func__,  "command", command,
+                                                        "status", "failure", "reason",  result.error().message()};
                 print_log(log::Level::kError, log_params, "Disconnecting peer but is local fault ...");
             }
             outbound_message_.reset();
@@ -413,7 +410,7 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
         if (not result.has_error()) {
             // Validate deserialization
 
-            boost::timer::cpu_timer deserialization_timer;
+            StopWatch deserialization_timer(/*auto_start=*/true);
             auto payload_ptr{MessagePayload::from_type(msg_type)};
             if (not payload_ptr) {
                 log::Error("Node", {"id", std::to_string(node_id_), "remote", to_string(), "command",
@@ -424,18 +421,17 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
             }
 
             result = payload_ptr->deserialize(inbound_message_->data());
-            deserialization_timer.stop();
+            const auto deserialization_duration{deserialization_timer.stop()};
 
             if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-                const std::list<std::string> log_params{
-                    "action",
-                    __func__,
-                    "command",
-                    command_from_message_type(msg_type),
-                    "size",
-                    to_human_bytes(inbound_message_->data().size()),
-                    "deserialization time",
-                    boost::replace_all_copy(std::string(deserialization_timer.format()), "\n", "")};
+                const std::list<std::string> log_params{"action",
+                                                        __func__,
+                                                        "command",
+                                                        command_from_message_type(msg_type),
+                                                        "size",
+                                                        to_human_bytes(inbound_message_->data().size()),
+                                                        "deserialization time",
+                                                        StopWatch::format(deserialization_duration.second)};
                 print_log(log::Level::kTrace, log_params);
             }
 
