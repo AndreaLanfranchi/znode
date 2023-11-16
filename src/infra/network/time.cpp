@@ -95,10 +95,10 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
     }
 #else
     int err{0};
-    if (gmttime_r(&transmitted_time_t, transmitted_time_tm) == nullptr) {
+    if (gmtime_r(&transmitted_time_t, transmitted_time_tm) == nullptr) {
         return Error::kInvalidNtpResponse;
     }
-    if (gmttime_r(&system_time_t, system_time_tm) == nullptr) {
+    if (gmtime_r(&system_time_t, system_time_tm) == nullptr) {
         return Error::kInvalidSystemTime;
     }
 #endif

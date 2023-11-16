@@ -104,9 +104,6 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES ".*Clang$")
         )
     endif ()
 
-    add_compile_options(-stdlib=libc++)
-    add_compile_options(-fsanitize-thread)
-
     if (BUILD_CLANG_COVERAGE)
         add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
         add_link_options(-fprofile-instr-generate -fcoverage-mapping)
