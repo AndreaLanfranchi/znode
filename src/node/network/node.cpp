@@ -623,11 +623,11 @@ outcome::result<void> Node::validate_message_for_protocol_handshake(const DataDi
     switch (message_type) {
         using enum MessageType;
         case kVersion:
-            new_status_flag = 1 << static_cast<uint32_t>(message_direction);
+            new_status_flag = 1U << static_cast<uint32_t>(message_direction);
             if ((current_status_value & new_status_flag) == new_status_flag) return kDuplicateProtocolHandShake;
             break;
         case kVerAck:
-            new_status_flag = 4 << static_cast<uint32_t>(message_direction);
+            new_status_flag = 4U << static_cast<uint32_t>(message_direction);
             if ((current_status_value & new_status_flag) == new_status_flag) return kDuplicateProtocolHandShake;
             break;
         default:
