@@ -120,6 +120,11 @@ std::string StopWatch::format(Duration duration) noexcept {
         } else if (duration >= 1us) {
             auto us = std::chrono::duration_cast<std::chrono::microseconds>(duration);
             ostream << us.count() << "us";
+        } else if (duration >= 1ns) {
+            auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration);
+            ostream << ns.count() << "ns";
+        } else {
+            ostream << "nil";
         }
     }
 
