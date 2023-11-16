@@ -18,11 +18,11 @@
 
 #include <array>
 
-#include <boost/algorithm/string/replace.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/udp.hpp>
 
 #include <core/common/endian.hpp>
+#include <core/common/time.hpp>
 
 #include <infra/common/log.hpp>
 #include <infra/network/errors.hpp>
@@ -72,54 +72,13 @@ outcome::result<void> check_system_time(boost::asio::any_io_executor executor, c
     }
 
     // Interpret the ntp packet
-    uint32_t transmitted_time = endian::load_big_u32(&recv_buf[40]);
+    auto transmitted_time = endian::load_big_u32(&recv_buf[40]);
     transmitted_time -= 2208988800U;  // NTP time starts in 1900, UNIX in 1970
-    const auto transmitted_time_t = static_cast<std::time_t>(transmitted_time);
-
-    std::tm transmitted_time_tm_storage{};
-    std::tm system_time_tm_storage{};
-    std::tm* transmitted_time_tm = &transmitted_time_tm_storage;
-    std::tm* system_time_tm = &system_time_tm_storage;
-    std::string transmitted_time_str;
-    std::string system_time_str;
-
-#if defined(_MSC_VER) || defined(_WIN32) || defined(_WIN64)
-    errno_t err{0};
-    err = gmtime_s(transmitted_time_tm, &transmitted_time_t);
-    if (err) {
-        return Error::kInvalidNtpResponse;
-    }
-    err = gmtime_s(system_time_tm, &system_time_t);
-    if (err) {
-        return Error::kInvalidSystemTime;
-    }
-#else
-    int err{0};
-    if (gmtime_r(&transmitted_time_t, transmitted_time_tm) == nullptr) {
-        return Error::kInvalidNtpResponse;
-    }
-    if (gmtime_r(&system_time_t, system_time_tm) == nullptr) {
-        return Error::kInvalidSystemTime;
-    }
-#endif
-
-    std::array<char, 26> time_str_buf{0};
-    err = asctime_s(time_str_buf.data(), time_str_buf.size(), transmitted_time_tm);
-    if (err) {
-        return Error::kInvalidNtpResponse;
-    }
-    transmitted_time_str = time_str_buf.data();
-    err = asctime_s(time_str_buf.data(), time_str_buf.size(), system_time_tm);
-    if (err) {
-        return Error::kInvalidSystemTime;
-    }
-    system_time_str = time_str_buf.data();
-
-    std::ignore = log::Info("Time Sync", {time_server, boost::replace_all_copy(transmitted_time_str, "\n", ""),
-                                          "system time", boost::replace_all_copy(system_time_str, "\n", "")});
+    std::ignore = log::Message(
+        "Time Sync", {time_server, format_ISO8601(transmitted_time), "system", format_ISO8601(system_time_t)});
 
     if (max_skew_seconds not_eq 0U) {
-        const auto delta_time = static_cast<uint32_t>(std::abs(std::difftime(system_time_t, transmitted_time_t)));
+        const auto delta_time = static_cast<uint32_t>(std::abs(std::difftime(system_time_t, transmitted_time)));
         if (delta_time > max_skew_seconds) {
             std::ignore = log::Error("Time Sync", {"skew seconds", std::to_string(delta_time), "max skew seconds",
                                                    std::to_string(max_skew_seconds)});
