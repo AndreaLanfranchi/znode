@@ -18,17 +18,6 @@
 
 #pragma once
 
-#if __has_include(<format>)
-#include <format>
-#elif __has_include(<experimental/format>)
-#include <experimental/format>
-namespace std {
-using format = std::experimental::format;
-}
-#else
-#error "Missing <format> or <experimental/format>"
-#endif
-
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -49,7 +38,7 @@ struct NodeClock : public SteadyClock {
 };
 
 //! \brief Returns a string formatted according to ISO 8601 of a time point
-std::string format_ISO8601(int64_t timestamp, bool include_time = true) noexcept;
+std::string format_ISO8601(int64_t unixseconds, bool include_time = true) noexcept;
 
 //! \brief Returns a string formatted according to ISO 8601 of a time point
 std::string format_ISO8601(const Seconds& time_point, bool include_time = true) noexcept;

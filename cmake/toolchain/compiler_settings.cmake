@@ -77,7 +77,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 
 elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
 
-    # Require at least GCC 12
+    # Require at least GCC 13
     # see https://en.cppreference.com/w/cpp/compiler_support
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13)
         message(FATAL_ERROR
@@ -92,21 +92,20 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
         add_link_options(-fno-omit-frame-pointer -fsanitize=${BUILD_SANITIZE} -DBUILD_SANITIZE)
     endif ()
 
-    if (CMAKE_BUILD_TYPE STREQUAL "Release")
-        add_compile_options(-g1)
-    endif ()
-
 elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES ".*Clang$")
 
-    # Require at least Clang 13
+    # Require at least Clang 15
     # see https://en.cppreference.com/w/cpp/compiler_support
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13)
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15)
         message(FATAL_ERROR
                 "\n===================================\n"
-                " Required Clang version >= 12"
+                " Required Clang version >= 15"
                 "\n===================================\n"
         )
     endif ()
+
+    add_compile_options(-stdlib=libc++)
+    add_compile_options(-fsanitize-thread)
 
     if (BUILD_CLANG_COVERAGE)
         add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
@@ -124,7 +123,6 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES ".*Clang$")
 
     if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         # coroutines support
-        add_compile_options(-stdlib=libc++)
         link_libraries(c++)
         link_libraries(c++abi)
     endif ()

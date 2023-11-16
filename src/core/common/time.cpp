@@ -27,13 +27,13 @@ std::chrono::time_point<NodeClock> NodeClock::now() noexcept {
     return std::chrono::time_point<NodeClock>{std::chrono::duration_cast<NodeClock::duration>(ret)};
 }
 
-std::string format_ISO8601(int64_t timestamp, bool include_time) noexcept {
+std::string format_ISO8601(int64_t unixseconds, bool include_time) noexcept {
     std::tm time_storage{};
-    const auto time_val{static_cast<std::time_t>(timestamp)};
+    const auto time_val{static_cast<std::time_t>(unixseconds)};
 #if defined(_MSC_VER) || defined(_WIN32) || defined(_WIN64)
-    if (gmtime_s(&time_storage, &time_val) not_eq errno_t(0)) return {};
+    if (gmtime_s(&time_storage, &time_val) != 0) return {};
 #else
-    if (gmtime_s(&time_val, &time_storage) == nullptr) return {};
+    if (gmtime_r(&time_val, &time_storage) == nullptr) return {};
 #endif
     time_storage.tm_year += 1900;
     time_storage.tm_mon += 1;

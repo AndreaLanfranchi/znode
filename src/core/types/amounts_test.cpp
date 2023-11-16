@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-#include <boost/format.hpp>
+#include <format>
 #include <catch2/catch.hpp>
 
 #include <core/types/amounts.hpp>
@@ -22,7 +22,7 @@
 namespace znode {
 
 std::string append_currency(const std::string_view& input) {
-    return boost::str(boost::format("%s %s") % input % kCurrency);
+    return std::format("{} {}", input, kCurrency);
 }
 
 TEST_CASE("Amounts", "[types]") {
