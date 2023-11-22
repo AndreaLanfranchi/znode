@@ -71,10 +71,6 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /RELEASE")          # Enable RELEASE so that the executable file has its checksum set
     endif ()
 
-    if (CMAKE_BUILD_TYPE MATCHES "Debug")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /VERBOSE /TIME")    # Debug linker
-    endif ()
-
 elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
 
     # Require at least GCC 13
