@@ -18,16 +18,27 @@
 
 #include "time.hpp"
 
+#include <atomic>
 #include <format>
 
 namespace znode {
 using namespace std::chrono_literals;
+
+namespace {
+    std::atomic<int64_t> mock_time{0};  // Used for testing
+}
+
 std::chrono::time_point<NodeClock> NodeClock::now() noexcept {
+    const auto mock_time_val{mock_time.load()};
+    if (mock_time_val not_eq 0) {
+        return std::chrono::time_point<NodeClock>{std::chrono::seconds{mock_time_val}};
+    }
     const auto ret{SteadyClock::now().time_since_epoch()};
     return std::chrono::time_point<NodeClock>{std::chrono::duration_cast<NodeClock::duration>(ret)};
 }
 
 std::string format_ISO8601(int64_t unixseconds, bool include_time) noexcept {
+    if (unixseconds < 0) return {};
     std::tm time_storage{};
     const auto time_val{static_cast<std::time_t>(unixseconds)};
 #if defined(_MSC_VER) || defined(_WIN32) || defined(_WIN64)
@@ -44,7 +55,8 @@ std::string format_ISO8601(int64_t unixseconds, bool include_time) noexcept {
     }
     return ret;
 }
-std::string format_ISO8601(const Seconds& time_point, bool include_time) noexcept {
-    return format_ISO8601(time_point.time_since_epoch().count(), include_time);
+std::string format_ISO8601(const SteadyClock::time_point& time_point, bool include_time) noexcept {
+    const auto seconds{std::chrono::duration_cast<std::chrono::seconds>(time_point.time_since_epoch())};
+    return format_ISO8601(seconds.count(), include_time);
 }
 }  // namespace znode

@@ -37,10 +37,12 @@ struct NodeClock : public SteadyClock {
     static time_point now() noexcept;
 };
 
+using NodeSeconds = std::chrono::time_point<NodeClock, std::chrono::seconds>;
+
 //! \brief Returns a string formatted according to ISO 8601 of a time point
 std::string format_ISO8601(int64_t unixseconds, bool include_time = true) noexcept;
 
 //! \brief Returns a string formatted according to ISO 8601 of a time point
-std::string format_ISO8601(const Seconds& time_point, bool include_time = true) noexcept;
+std::string format_ISO8601(const SteadyClock::time_point& time_point, bool include_time = true) noexcept;
 
 }  // namespace znode

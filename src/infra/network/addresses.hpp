@@ -25,6 +25,7 @@
 #include <gsl/gsl_util>
 #include <nlohmann/json.hpp>
 
+#include <core/common/time.hpp>
 #include <core/serialization/serializable.hpp>
 
 namespace znode::net {
@@ -191,6 +192,9 @@ class IPSubNet {
 };
 
 class NodeService : public ser::Serializable {
+  private:
+    static constexpr std::chrono::seconds kTimeInit{100'000'000};
+
   public:
     using ser::Serializable::Serializable;
     explicit NodeService(boost::asio::ip::tcp::endpoint& endpoint);
@@ -202,11 +206,31 @@ class NodeService : public ser::Serializable {
     // Copy constructor
     NodeService(const NodeService& other) = default;
 
-    uint32_t time_{0};       // unix timestamp 4 bytes
-    uint64_t services_{0};   // services mask (OR'ed from NetworkServicesType) 8 bytes
-    IPEndpoint endpoint_{};  // ipv4/ipv6 address and port 18 bytes
+    NodeSeconds time_{kTimeInit};  // unix timestamp 4 bytes
+    uint64_t services_{0};         // services mask (OR'ed from NetworkServicesType) 8 bytes
+    IPEndpoint endpoint_{};        // ipv4/ipv6 address and port 18 bytes
 
     [[nodiscard]] virtual nlohmann::json to_json() const noexcept;
+
+  private:
+    friend class ser::SDataStream;
+    outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
+};
+
+class NodeServiceInfo : public ser::Serializable {
+  public:
+    using ser::Serializable::Serializable;
+    explicit NodeServiceInfo(const NodeService& node_service);
+    explicit NodeServiceInfo(NodeService&& node_service);
+    ~NodeServiceInfo() override = default;
+
+    NodeService service_{};                                         // The actual service this class is bound to
+    IPAddress origin_{};                                            // The original address advertising this
+    NodeSeconds last_connection_attempt_{std::chrono::seconds(0)};  // Last time a connection has been attempted
+    NodeSeconds last_connection_success_{std::chrono::seconds(0)};  // Last time a connection has been successful
+    uint32_t connection_attempts_{0};                               // Attempts count since last successful connection
+
+    [[nodiscard]] nlohmann::json to_json() const noexcept;
 
   private:
     friend class ser::SDataStream;

@@ -457,7 +457,7 @@ NodeService::NodeService(const IPEndpoint& endpoint) : endpoint_(endpoint) {}
 
 nlohmann::json NodeService::to_json() const noexcept {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["time"] = time_;
+    ret["time"] = format_ISO8601(time_.time_since_epoch().count());
     ret["services"] = nlohmann::json::array();
     auto& services{ret["services"]};
     for (auto enumerator : magic_enum::enum_values<NodeServicesType>()) {
@@ -471,7 +471,10 @@ nlohmann::json NodeService::to_json() const noexcept {
 }
 
 outcome::result<void> NodeService::serialization(ser::SDataStream& stream, ser::Action action) {
-    auto result{stream.bind(time_, action)};
+    auto time_seconds{static_cast<uint32_t>(time_.time_since_epoch().count())};
+    auto result{stream.bind(time_seconds, action)};
+    time_ = NodeSeconds{typename NodeSeconds::duration{typename NodeSeconds::duration::rep{time_seconds}}};
+
     // TODO : validate time_ value
     if (not result.has_error()) result = stream.bind(services_, action);
     if (not result.has_error()) result = stream.bind(endpoint_, action);
@@ -480,6 +483,16 @@ outcome::result<void> NodeService::serialization(ser::SDataStream& stream, ser::
 
 NodeService::NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint)
     : endpoint_{endpoint.address(), endpoint.port()} {}
+
+nlohmann::json NodeServiceInfo::to_json() const noexcept {
+    nlohmann::json ret(nlohmann::json::value_t::object);
+    ret["service"] = service_.to_json();
+    ret["origin"] = origin_.to_string();
+    ret["last_connection_attempt"] = format_ISO8601(last_connection_attempt_.time_since_epoch().count());
+    ret["last_connection_success"] = format_ISO8601(last_connection_success_.time_since_epoch().count());
+    ret["connection_attempts"] = connection_attempts_;
+    return ret;
+}
 
 nlohmann::json VersionNodeService::to_json() const noexcept {
     nlohmann::json ret(nlohmann::json::value_t::object);
