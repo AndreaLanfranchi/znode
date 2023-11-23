@@ -493,6 +493,68 @@ nlohmann::json NodeServiceInfo::to_json() const noexcept {
     ret["connection_attempts"] = connection_attempts_;
     return ret;
 }
+outcome::result<void> NodeServiceInfo::serialization(ser::SDataStream& stream, ser::Action action) {
+    uint32_t time_value{0};
+    auto result{stream.bind(service_, action)};
+    if (not result.has_error()) result = stream.bind(origin_, action);
+    if (not result.has_error()) {
+        time_value = static_cast<uint32_t>(last_connection_attempt_.time_since_epoch().count());
+        result = stream.bind(time_value, action);
+        last_connection_attempt_ =
+            NodeSeconds{typename NodeSeconds::duration{typename NodeSeconds::duration::rep{time_value}}};
+    }
+    if (not result.has_error()) {
+        time_value = static_cast<uint32_t>(last_connection_success_.time_since_epoch().count());
+        result = stream.bind(time_value, action);
+        last_connection_success_ =
+            NodeSeconds{typename NodeSeconds::duration{typename NodeSeconds::duration::rep{time_value}}};
+    }
+    if (not result.has_error()) result = stream.bind(connection_attempts_, action);
+    return result;
+}
+
+bool NodeServiceInfo::is_bad(NodeSeconds now) const noexcept {
+    using namespace std::chrono_literals;
+
+    // Last try too recent
+    if (now - last_connection_attempt_ < 1min) return false;
+
+    // Seen in the future ?
+    // TODO : does this mean we allow up to 10 minutes of clock drift amongst nodes ?
+    if (service_.time_ > (now + 10min)) return true;
+
+    // Not seen since more than a month
+    if (service_.time_ < (now - std::chrono::days(30))) return true;
+
+    // Never successfully connected to and more than 3 tries
+    if (last_connection_success_ == NodeSeconds{0s} and connection_attempts_ > 3U) return true;
+
+    // Successfully connected more than a week ago but too many attempts since
+    if (std::chrono::duration_cast<std::chrono::days>(now - last_connection_success_) > std::chrono::days(7) and
+        connection_attempts_ > 3U)
+        return true;
+
+    return false;
+}
+
+double NodeServiceInfo::get_chance(znode::NodeSeconds now) const noexcept {
+
+    using namespace std::chrono_literals;
+    if (is_bad(now)) return {0.0};
+
+    double ret{1.0};
+
+    // De-prioritize very recent attempts
+    if (now - last_connection_attempt_ < 10min) ret *= 0.01;
+
+    // De-prioritize 66% after each failed attempt, but at most 1/28th to avoid the search taking forever or overly
+    // penalizing outages.
+    if (connection_attempts_ > 0U) {
+        ret *= std::pow(0.66, std::min(connection_attempts_, 8U));
+    }
+
+    return ret;
+}
 
 nlohmann::json VersionNodeService::to_json() const noexcept {
     nlohmann::json ret(nlohmann::json::value_t::object);

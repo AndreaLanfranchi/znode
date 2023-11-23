@@ -210,6 +210,8 @@ class NodeService : public ser::Serializable {
     uint64_t services_{0};         // services mask (OR'ed from NetworkServicesType) 8 bytes
     IPEndpoint endpoint_{};        // ipv4/ipv6 address and port 18 bytes
 
+
+
     [[nodiscard]] virtual nlohmann::json to_json() const noexcept;
 
   private:
@@ -229,6 +231,13 @@ class NodeServiceInfo : public ser::Serializable {
     NodeSeconds last_connection_attempt_{std::chrono::seconds(0)};  // Last time a connection has been attempted
     NodeSeconds last_connection_success_{std::chrono::seconds(0)};  // Last time a connection has been successful
     uint32_t connection_attempts_{0};                               // Attempts count since last successful connection
+
+    //! \brief Returns whether this service statistics are bad and as a result can be forgotten
+    [[nodiscard]] bool is_bad(NodeSeconds now = Now<NodeSeconds>()) const noexcept;
+
+    //! \brief Returns the relative chance of this service to be selected for a connection attempt when selecting
+    //! nodes for outbound connections
+    [[nodiscard]] double get_chance(NodeSeconds now = Now<NodeSeconds>()) const noexcept;
 
     [[nodiscard]] nlohmann::json to_json() const noexcept;
 
