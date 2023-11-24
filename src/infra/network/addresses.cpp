@@ -517,30 +517,28 @@ bool NodeServiceInfo::is_bad(NodeSeconds now) const noexcept {
     using namespace std::chrono_literals;
 
     // Last try too recent
-    if (now - last_connection_attempt_ < 1min) return false;
+    if (last_connection_attempt_ > now - 1min) return false;
 
     // Seen in the future ?
     // TODO : does this mean we allow up to 10 minutes of clock drift amongst nodes ?
     if (service_.time_ > (now + 10min)) return true;
 
-    // Not seen since more than a month
-    if (service_.time_ < (now - std::chrono::days(30))) return true;
+    // Not seen since more than allowed threshold
+    if (service_.time_ < (now - kMaxDaysSinceLastSeen)) return true;
 
-    // Never successfully connected to and more than 3 tries
-    if (last_connection_success_ == NodeSeconds{0s} and connection_attempts_ > 3U) return true;
+    // Never successfully connected to
+    if (last_connection_success_ == NodeSeconds{0s} and connection_attempts_ > kNewPeerMaxRetries) return true;
 
     // Successfully connected more than a week ago but too many attempts since
-    if (std::chrono::duration_cast<std::chrono::days>(now - last_connection_success_) > std::chrono::days(7) and
-        connection_attempts_ > 3U)
+    if (last_connection_success_ < (now - kRecentConnectionDays) and connection_attempts_ > kMaxReconnectionFailures)
         return true;
 
     return false;
 }
 
 double NodeServiceInfo::get_chance(znode::NodeSeconds now) const noexcept {
-
     using namespace std::chrono_literals;
-    if (is_bad(now)) return {0.0};
+    if (is_bad(now)) return 0.0;
 
     double ret{1.0};
 

@@ -210,8 +210,6 @@ class NodeService : public ser::Serializable {
     uint64_t services_{0};         // services mask (OR'ed from NetworkServicesType) 8 bytes
     IPEndpoint endpoint_{};        // ipv4/ipv6 address and port 18 bytes
 
-
-
     [[nodiscard]] virtual nlohmann::json to_json() const noexcept;
 
   private:
@@ -225,6 +223,14 @@ class NodeServiceInfo : public ser::Serializable {
     explicit NodeServiceInfo(const NodeService& node_service);
     explicit NodeServiceInfo(NodeService&& node_service);
     ~NodeServiceInfo() override = default;
+
+    static constexpr std::chrono::days kMaxDaysSinceLastSeen{30L};  // How old an address can be before being forgotten
+    static constexpr uint32_t kNewPeerMaxRetries{3L};  // After how many connection attempts a new peer is considered
+                                                       // bad
+    static constexpr std::chrono::days kRecentConnectionDays{7L};  // How recent a connection must be to be considered
+                                                                   // recent
+    static constexpr uint32_t kMaxReconnectionFailures{10L};  // How many times a non-new connection can fail before
+                                                              // being considered bad
 
     NodeService service_{};                                         // The actual service this class is bound to
     IPAddress origin_{};                                            // The original address advertising this
