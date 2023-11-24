@@ -220,17 +220,23 @@ class NodeService : public ser::Serializable {
 class NodeServiceInfo : public ser::Serializable {
   public:
     using ser::Serializable::Serializable;
-    explicit NodeServiceInfo(const NodeService& node_service);
-    explicit NodeServiceInfo(NodeService&& node_service);
+    explicit NodeServiceInfo(const NodeService& node_service, const IPAddress& source)
+        : service_{node_service}, origin_(source){};
+    explicit NodeServiceInfo(NodeService&& node_service, const IPAddress& source)
+        : service_{node_service}, origin_(source){};
     ~NodeServiceInfo() override = default;
 
-    static constexpr std::chrono::days kMaxDaysSinceLastSeen{30L};  // How old an address can be before being forgotten
-    static constexpr uint32_t kNewPeerMaxRetries{3L};  // After how many connection attempts a new peer is considered
-                                                       // bad
-    static constexpr std::chrono::days kRecentConnectionDays{7L};  // How recent a connection must be to be considered
-                                                                   // recent
-    static constexpr uint32_t kMaxReconnectionFailures{10L};  // How many times a non-new connection can fail before
-                                                              // being considered bad
+    //! \brief How old an address can be before being forgotten
+    static constexpr std::chrono::days kMaxDaysSinceLastSeen{30L};
+
+    //! \brief After how many connection attempts a new peer is considered bad
+    static constexpr uint32_t kNewPeerMaxRetries{3L};
+
+    //! \brief How long a connection can be deemed recent
+    static constexpr std::chrono::days kRecentConnectionDays{7L};
+
+    //! \brief Howm many connection failures are allowed in the "recent" history of this
+    static constexpr uint32_t kMaxReconnectionFailures{10L};
 
     NodeService service_{};                                         // The actual service this class is bound to
     IPAddress origin_{};                                            // The original address advertising this
