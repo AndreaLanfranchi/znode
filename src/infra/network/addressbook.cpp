@@ -18,9 +18,9 @@
 
 namespace znode::net {
 
-size_t AddressBook::size() const { return randomly_ordered_ids_.size(); }
+size_t AddressBook::size() const { return book_.size(); }
 
-bool AddressBook::empty() const { return size() not_eq 0U; }
+bool AddressBook::empty() const { return size() == 0U; }
 
 bool AddressBook::contains(const IPEndpoint& endpoint) const noexcept {
     std::shared_lock lock{mutex_};
