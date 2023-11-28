@@ -297,8 +297,7 @@ bool IPSubNet::contains(const boost::asio::ip::address& address) const noexcept 
 
     if (not address.is_v6()) return false;
     std::array<uint8_t, 16U> mask{0};
-    for (unsigned i{0}, end{static_cast<unsigned>(static_cast<unsigned>(prefix_length_) / unsigned(CHAR_BIT))}; i < end;
-         ++i) {
+    for (unsigned i{0}, end{static_cast<unsigned>(prefix_length_) / unsigned(CHAR_BIT)}; i < end; ++i) {
         mask[i] = 0xFFU;
     }
     if (prefix_length_ % unsigned(CHAR_BIT) not_eq 0) {
@@ -362,9 +361,8 @@ outcome::result<uint8_t> IPSubNet::parse_prefix_length(const std::string& input)
     unsigned ret{0};
     static const std::regex decimal_notation_pattern(R"(^([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3}).([0-9]{1,3})$)");
     static const std::regex cidr_notation_pattern(R"(^([0-9]{1,3})$)");
-    std::smatch matches;
 
-    if (std::regex_match(input, matches, decimal_notation_pattern)) {
+    if (std::smatch matches; std::regex_match(input, matches, decimal_notation_pattern)) {
         bool zero_found{false};
         for (unsigned i{1}; i < 5U; ++i) {
             uint16_t octet_value{0};
@@ -426,7 +424,7 @@ outcome::result<boost::asio::ip::address> IPSubNet::calculate_subnet_base_addres
 
     if (prefix_length > 128U) return boost::system::errc::value_too_large;
     std::array<uint8_t, 16U> mask{0U};
-    for (unsigned i{}, end{static_cast<unsigned>(prefix_length / unsigned(CHAR_BIT))}; i < end; ++i) {
+    for (unsigned i{}, end{prefix_length / unsigned(CHAR_BIT)}; i < end; ++i) {
         mask[i] = 0xFFU;
     }
     if (prefix_length % unsigned(CHAR_BIT) not_eq 0) {
@@ -434,7 +432,7 @@ outcome::result<boost::asio::ip::address> IPSubNet::calculate_subnet_base_addres
             0xFFU bitand (0xFFU << (unsigned(CHAR_BIT) - prefix_length % unsigned(CHAR_BIT)));
     }
     auto ipv6_bytes = address.to_v6().to_bytes();
-    for (unsigned i{0}; i < 16U; ++i) {
+    for (unsigned i{0}; i < ipv6_bytes.size(); ++i) {
         ipv6_bytes[i] and_eq mask[i];
     }
     return boost::asio::ip::address_v6(ipv6_bytes);
@@ -451,7 +449,7 @@ outcome::result<IPAddress> IPSubNet::calculate_subnet_base_address(const IPAddre
 NodeService::NodeService(boost::asio::ip::address address, uint16_t port_num)
     : endpoint_(std::move(address), port_num) {}
 
-NodeService::NodeService(boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(endpoint) {}
+NodeService::NodeService(const boost::asio::ip::tcp::endpoint& endpoint) : endpoint_(endpoint) {}
 
 NodeService::NodeService(const IPEndpoint& endpoint) : endpoint_(endpoint) {}
 
@@ -480,9 +478,6 @@ outcome::result<void> NodeService::serialization(ser::SDataStream& stream, ser::
     if (not result.has_error()) result = stream.bind(endpoint_, action);
     return result;
 }
-
-NodeService::NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint)
-    : endpoint_{endpoint.address(), endpoint.port()} {}
 
 nlohmann::json NodeServiceInfo::to_json() const noexcept {
     nlohmann::json ret(nlohmann::json::value_t::object);

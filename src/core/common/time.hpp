@@ -30,8 +30,7 @@ using Seconds = std::chrono::time_point<SteadyClock, std::chrono::seconds>;
 using Milliseconds = std::chrono::time_point<SteadyClock, std::chrono::milliseconds>;
 using Microseconds = std::chrono::time_point<SteadyClock, std::chrono::microseconds>;
 
-struct NodeClock : public SteadyClock {
-    static constexpr bool is_steady = true;
+struct NodeClock : public SystemClock {
     using time_point = std::chrono::time_point<NodeClock>;
     using duration = time_point::duration;
     static time_point now() noexcept;
@@ -41,8 +40,7 @@ using NodeSeconds = std::chrono::time_point<NodeClock, std::chrono::seconds>;
 
 //! \brief Returns a time point representing the current time
 template <typename T>
-T Now() noexcept
-{
+T Now() noexcept {
     return std::chrono::time_point_cast<T::duration>(T::clock::now());
 }
 

@@ -25,8 +25,8 @@ namespace znode {
 //! \brief Generates a random value of type T in a provided [min..max] range
 template <Integral T>
 T randomize(const T min, const T max) {
-    ZEN_THREAD_LOCAL std::random_device rnd;
-    ZEN_THREAD_LOCAL std::mt19937 gen(rnd());
+    static ZEN_THREAD_LOCAL std::random_device rnd;
+    static ZEN_THREAD_LOCAL std::mt19937 gen(rnd());
     std::uniform_int_distribution<T> dis(min, max);
     return dis(gen);
 }

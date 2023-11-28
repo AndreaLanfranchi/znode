@@ -197,9 +197,8 @@ class NodeService : public ser::Serializable {
 
   public:
     using ser::Serializable::Serializable;
-    explicit NodeService(boost::asio::ip::tcp::endpoint& endpoint);
+    explicit NodeService(const boost::asio::ip::tcp::endpoint& endpoint);
     explicit NodeService(const IPEndpoint& endpoint);
-    explicit NodeService(const boost::asio::ip::basic_endpoint<boost::asio::ip::tcp>& endpoint);
     NodeService(boost::asio::ip::address address, uint16_t port_num);
     ~NodeService() override = default;
 
@@ -235,7 +234,7 @@ class NodeServiceInfo : public ser::Serializable {
     //! \brief How long a connection can be deemed recent
     static constexpr std::chrono::days kRecentConnectionDays{7L};
 
-    //! \brief Howm many connection failures are allowed in the "recent" history of this
+    //! \brief How many connection failures are allowed in the "recent" history of this
     static constexpr uint32_t kMaxReconnectionFailures{10L};
 
     NodeService service_{};                                         // The actual service this class is bound to
@@ -272,20 +271,3 @@ class VersionNodeService : public NodeService {
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
 };
 }  // namespace znode::net
-
-namespace std {
-
-template <>
-struct hash<znode::net::IPAddress> {
-    size_t operator()(const znode::net::IPAddress& address) const noexcept {
-        return hash<boost::asio::ip::address>()(*address);
-    }
-};
-
-template <>
-struct hash<znode::net::IPEndpoint> {
-    size_t operator()(const znode::net::IPEndpoint& endpoint) const noexcept {
-        return hash<znode::net::IPAddress>()(endpoint.address_) ^ hash<uint16_t>()(endpoint.port_);
-    }
-};
-}  // namespace std

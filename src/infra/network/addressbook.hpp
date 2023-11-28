@@ -41,6 +41,15 @@ class AddressBook {
     //! \brief Returns whether the address book is empty
     [[nodiscard]] bool empty() const;
 
+    //! \brief Inserts or updates an item in the address book
+    //! \details If the item is already in the address book, it is updated with the new information
+    //! \returns true if the item was inserted, false if it was updated
+    //! \throws std::invalid_argument it the network address is not routable
+    [[nodiscard]] bool upsert(const NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty);
+
+    //! \brief Returns whether a NodeService is contained in the address book
+    [[nodiscard]] bool contains(const NodeService& service) const noexcept;
+
     //! \brief Returns whether an endpoint is contained in the address book
     [[nodiscard]] bool contains(const IPEndpoint& endpoint) const noexcept;
 
