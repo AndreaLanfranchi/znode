@@ -18,6 +18,7 @@
 #include <atomic>
 #include <shared_mutex>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <core/types/hash.hpp>
@@ -33,6 +34,7 @@ class AddressBook {
     static constexpr uint32_t kNewBucketsCount{1024};
     static constexpr uint32_t kTriedBucketsCount{256};
     static constexpr uint32_t kMaxNewBucketReferences{8};
+    static constexpr uint32_t kNewBucketsPerSourceGroup{64};
 
     AddressBook() : key_(get_random_bytes(32)) {}
     ~AddressBook() = default;
@@ -47,7 +49,13 @@ class AddressBook {
     //! \details If the item is already in the address book, it is updated with the new information
     //! \returns true if the item was inserted, false if it was updated
     //! \throws std::invalid_argument it the network address is not routable
-    [[nodiscard]] bool upsert(const NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty);
+    [[nodiscard]] bool add_new(const NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty);
+
+    //! \brief Inserts or updates a vector of item in the address book
+    //! \details If the item is already in the address book, it is updated with the new information
+    //! \returns true if any item was inserted, false otherwise
+    [[nodiscard]] bool add_new(const std::vector<NodeService>& services, const IPAddress& source,
+                               std::chrono::seconds time_penalty);
 
     //! \brief Returns whether a NodeService is contained in the address book
     [[nodiscard]] bool contains(const NodeService& service) const noexcept;
@@ -59,7 +67,6 @@ class AddressBook {
     [[nodiscard]] bool contains(uint32_t id) const noexcept;
 
   private:
-
     mutable std::shared_mutex mutex_;                                      // Thread safety
     h256 key_;                                                             // Secret key to randomize the address book
     std::atomic<uint32_t> last_used_id_{1};                                // Last used id (0 means "non-existent")
@@ -80,7 +87,8 @@ class AddressBook {
 
     //! \brief Create a "new" entry and add it to the internal data structures
     //! \returns A pair containing a pointer to the newly created entry and its newly generated id
-    std::pair<NodeServiceInfo*, /*id*/ uint32_t> insert_new_entry(const NodeService& service, const IPAddress& source) noexcept;
+    std::pair<NodeServiceInfo*, /*id*/ uint32_t> emplace_new_entry(const NodeService& service,
+                                                                   const IPAddress& source) noexcept;
 
     //! \brief Erases an entry from the address book entirely when is only in the "new" bucket
     void erase_new_entry(uint32_t id) noexcept;
@@ -95,5 +103,9 @@ class AddressBook {
     //! \brief Exchange two ids in the randomly ordered ids vector
     void swap_randomly_ordered_ids(uint32_t i, uint32_t j) noexcept;
 
+    //! \brief Computes the coordinates for placement in a "new" bucket
+    //! \returns A pair containing the bucket number and the bucket position
+    std::pair</* bucket_num */ uint32_t, /* bucket_pos */ uint32_t> compute_new_bucket_coordinates(
+        const NodeServiceInfo& service, const IPAddress& source) const noexcept;
 };
 }  // namespace znode::net

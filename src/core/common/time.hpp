@@ -41,7 +41,7 @@ using NodeSeconds = std::chrono::time_point<NodeClock, std::chrono::seconds>;
 //! \brief Returns a time point representing the current time
 template <typename T>
 T Now() noexcept {
-    return std::chrono::time_point_cast<T::duration>(T::clock::now());
+    return std::chrono::time_point_cast<typename T::duration>(T::clock::now());
 }
 
 //! \brief Returns a string formatted according to ISO 8601 of a time point

@@ -100,6 +100,11 @@ class MessageDigest {
     //! \brief Accumulates more data into the digest
     void update(std::string_view data) noexcept { update(string_view_to_byte_view(data)); };
 
+    template <Integral V>
+    void update(V data) noexcept {
+        update(ByteView(reinterpret_cast<const uint8_t*>(&data), sizeof(V)));
+    };
+
     //! \brief Finalizes the digest process and produces the actual digest
     //! \remarks After this instance has called finalize() once the instance itself cannot async_receive new updates
     //! unless it's recycled by init() or reset(). In case of any error the returned digest will be zero length

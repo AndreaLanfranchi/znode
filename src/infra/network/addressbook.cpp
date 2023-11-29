@@ -16,6 +16,12 @@
 
 #include "addressbook.hpp"
 
+#include <gsl/gsl_util>
+
+#include <core/crypto/md.hpp>
+
+#include <infra/common/log.hpp>
+
 namespace znode::net {
 
 size_t AddressBook::size() const { return randomly_ordered_ids_.size(); }
@@ -34,7 +40,7 @@ bool AddressBook::contains(uint32_t id) const noexcept {
     return map_id_to_serviceinfo_.contains(id);
 }
 
-bool AddressBook::upsert(const NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
+bool AddressBook::add_new(const NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
     using namespace std::chrono_literals;
 
     if (not service.endpoint_.address_.is_routable()) {
@@ -78,14 +84,13 @@ bool AddressBook::upsert(const NodeService& service, const IPAddress& source, st
 
     } else {
         // Insert new item
-        std::tie(entry, entry_id) = insert_new_entry(service, source);
+        std::tie(entry, entry_id) = emplace_new_entry(service, source);
         ASSERT(entry not_eq nullptr and entry_id not_eq 0);  // Must be inserted
         entry->service_.time_ = std::max(NodeSeconds{0s}, service.time_ - time_penalty);
     }
 
-    // TODO obtain coordinates of the bucket and position in the bucket
-    uint32_t bucket_num{0};
-    uint32_t bucket_pos{0};
+    // Obtain coordinates of the bucket and position in the bucket
+    auto [bucket_num, bucket_pos]{compute_new_bucket_coordinates(*entry, source)};
 
     // We can insert the entry in the new bucket if:
     // 1. The slot is empty
@@ -95,17 +100,46 @@ bool AddressBook::upsert(const NodeService& service, const IPAddress& source, st
     bool free_slot{existing_id == 0U /* empty bucket */};
     if (not free_slot and existing_id not_eq entry_id) {
         const auto it{map_id_to_serviceinfo_.find(existing_id)};
-        ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found
+        ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found or else the data structures are inconsistent
         if (it->second.is_bad() or (it->second.new_references_count_ > 1U and entry->new_references_count_ == 0)) {
-            // Free the slot
-
-            free_slot = true;
+            free_slot = true;  // Will overwrite the bad entry
         }
     }
+    if (free_slot) {
+        if (existing_id not_eq 0U) clear_new_bucket(bucket_num, bucket_pos);
+        new_buckets_[bucket_num][bucket_pos] = entry_id;
+        ++entry->new_references_count_;
+    } else {
+        // This should not actually be needed, but it is here for consistency
+        if (entry->new_references_count_ == 0U) {
+            erase_new_entry(entry_id);
+        }
+    }
+
+    return free_slot;
 }
 
-std::pair<NodeServiceInfo*, uint32_t> AddressBook::insert_new_entry(const NodeService& service,
-                                                                    const IPAddress& source) noexcept {
+bool AddressBook::add_new(const std::vector<NodeService>& services, const IPAddress& source,
+                          std::chrono::seconds time_penalty) {
+    uint32_t added_count{0U};
+    for (const auto& service : services) {
+        try {
+            if (add_new(service, source, time_penalty)) ++added_count;
+        } catch (const std::invalid_argument&) {
+            // Ignore invalid addresses
+            LOGF_TRACE1 << "Invalid address: " << service.endpoint_.address_.to_string();
+        }
+    }
+    if (added_count > 0U) {
+        std::ignore =
+            log::Info("Address Book", {"additions", std::to_string(added_count), "source", source.to_string()});
+        return true;
+    }
+    return false;
+}
+
+std::pair<NodeServiceInfo*, uint32_t> AddressBook::emplace_new_entry(const NodeService& service,
+                                                                     const IPAddress& source) noexcept {
     uint32_t new_id{last_used_id_.fetch_add(1U)};
     auto [it, inserted]{map_id_to_serviceinfo_.try_emplace(new_id, NodeServiceInfo(service, source))};
     ASSERT(inserted);  // Must be inserted (new_id is unique)
@@ -182,4 +216,35 @@ void AddressBook::swap_randomly_ordered_ids(uint32_t i, uint32_t j) noexcept {
     randomly_ordered_ids_[j] = id_at_i;
 }
 
+std::pair<uint32_t, uint32_t> AddressBook::compute_new_bucket_coordinates(const NodeServiceInfo& service,
+                                                                          const IPAddress& source) const noexcept {
+    const ByteView key_view{key_.data(), h256::size()};
+    const auto source_group{std::string(magic_enum::enum_name(source.get_type()))};
+    const auto service_group{std::string(magic_enum::enum_name(service.service_.endpoint_.address_.get_type()))};
+
+    crypto::Sha256 hasher{key_view};
+    hasher.update(service_group);
+    hasher.update(source_group);
+    auto digest{hasher.finalize()};
+    const auto hash1{endian::load_little_u64(digest.data())};
+
+    hasher.init(key_view);
+    hasher.update(source_group);
+    hasher.update(hash1 % kNewBucketsPerSourceGroup);
+    digest = hasher.finalize();
+    const auto hash2{endian::load_little_u64(digest.data())};
+
+    auto bucket_num{gsl::narrow_cast<uint32_t>(hash2 % kNewBucketsCount)};
+
+    hasher.init(key_view);
+    hasher.update('N');
+    hasher.update(bucket_num);
+    hasher.update(service.service_.endpoint_.address_->to_v6().to_bytes());
+    hasher.update(service.service_.endpoint_.port_);
+    digest = hasher.finalize();
+    const auto hash3{endian::load_little_u64(digest.data())};
+
+    auto bucket_pos{gsl::narrow_cast<uint32_t>(hash3 % kBucketSize)};
+    return {bucket_num, bucket_pos};
+}
 }  // namespace znode::net
