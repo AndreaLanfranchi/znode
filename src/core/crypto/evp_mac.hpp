@@ -17,6 +17,7 @@
 #pragma once
 #include <array>
 #include <memory>
+#include <span>
 
 #include <openssl/core_names.h>
 #include <openssl/evp.h>
@@ -102,6 +103,18 @@ class SipHash {
 
     //! \brief Accumulates more data
     void update(std::string_view data) noexcept { update(string_view_to_byte_view(data)); };
+
+    //! \brief Accumulates more data
+    void update(const std::span<const std::byte> data) noexcept {
+        if (data.empty()) return;
+        ingested_size_ += data.size();
+        ASSERT(EVP_MAC_update(ctx_.get(), reinterpret_cast<const unsigned char*>(data.data()), data.size()) == 1);
+    }
+
+    template <Integral T>
+    void update(T data) noexcept {
+        update(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&data), sizeof(T)));
+    };
 
     [[nodiscard]] Bytes finalize() noexcept {
         Bytes mac(mac_len_, 0);

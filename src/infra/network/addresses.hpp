@@ -17,6 +17,7 @@
 #pragma once
 
 #include <functional>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -26,7 +27,10 @@
 #include <nlohmann/json.hpp>
 
 #include <core/common/time.hpp>
+#include <core/crypto/evp_mac.hpp>
 #include <core/serialization/serializable.hpp>
+
+#include <infra/common/random.hpp>
 
 namespace znode::net {
 
@@ -131,6 +135,22 @@ class IPEndpoint : public ser::Serializable {
   private:
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
+};
+
+class IPEndpointHasher {
+  public:
+    IPEndpointHasher() = default;
+    size_t operator()(const IPEndpoint& endpoint) const noexcept {
+        crypto::SipHash24 hasher(seed_key_);
+        hasher.update(endpoint.address_->to_v6().to_bytes());
+        hasher.update(endpoint.port_);
+        const auto result{hasher.finalize()};
+        auto result_64{endian::load_big_u64(result.data())};
+        return static_cast<size_t>(result_64);
+    }
+
+  private:
+    const Bytes seed_key_{get_random_bytes(16 /* == 2 * sizeof(uint64_t) */)};
 };
 
 class IPSubNet {
@@ -242,6 +262,9 @@ class NodeServiceInfo : public ser::Serializable {
     NodeSeconds last_connection_attempt_{std::chrono::seconds(0)};  // Last time a connection has been attempted
     NodeSeconds last_connection_success_{std::chrono::seconds(0)};  // Last time a connection has been successful
     uint32_t connection_attempts_{0};                               // Attempts count since last successful connection
+    uint32_t random_pos_{0};            // Actual position in the randomly ordered ids vector (memory)
+    bool in_tried_bucket_{false};       // Whether this entry is in any of the "tried" buckets (memory)
+    uint32_t new_references_count_{0};  // Number of times this entry has been referenced in the "new" buckets (memory)
 
     //! \brief Returns whether this service statistics are bad and as a result can be forgotten
     [[nodiscard]] bool is_bad(NodeSeconds now = Now<NodeSeconds>()) const noexcept;

@@ -17,11 +17,8 @@
 #pragma once
 #include <atomic>
 #include <shared_mutex>
+#include <unordered_map>
 #include <vector>
-
-#include <boost/multi_index/member.hpp>
-#include <boost/multi_index/ordered_index.hpp>
-#include <boost/multi_index_container.hpp>
 
 #include <core/types/hash.hpp>
 
@@ -32,6 +29,11 @@ namespace znode::net {
 
 class AddressBook {
   public:
+    static constexpr uint32_t kBucketSize{64};
+    static constexpr uint32_t kNewBucketsCount{1024};
+    static constexpr uint32_t kTriedBucketsCount{256};
+    static constexpr uint32_t kMaxNewBucketReferences{8};
+
     AddressBook() : key_(get_random_bytes(32)) {}
     ~AddressBook() = default;
 
@@ -53,41 +55,45 @@ class AddressBook {
     //! \brief Returns whether an endpoint is contained in the address book
     [[nodiscard]] bool contains(const IPEndpoint& endpoint) const noexcept;
 
-    //! \brief Returns whether an IP address is contained in the address book
-    [[nodiscard]] bool contains(const IPAddress& address) const noexcept;
-
     //! \brief Returns whether an id is contained in the address book
     [[nodiscard]] bool contains(uint32_t id) const noexcept;
 
   private:
-    mutable std::shared_mutex mutex_;      // Thread safety
-    h256 key_;                             // Secret key to randomize the address book
-    std::atomic<uint32_t> last_id_{1};     // Last used id (0 is reserved for "non-existent")
-    std::atomic<uint32_t> new_size_{0};    // Number of items in "new" buckets
-    std::atomic<uint32_t> tried_size_{0};  // Number of items in "tried" buckets
 
-    //! \brief An entry in the address book
-    struct book_entry {
-        IPAddress address_;
-        uint32_t id_;
-        NodeServiceInfo item_;
-    };
-    struct by_address {};
-    struct by_id {};
+    mutable std::shared_mutex mutex_;                                      // Thread safety
+    h256 key_;                                                             // Secret key to randomize the address book
+    std::atomic<uint32_t> last_used_id_{1};                                // Last used id (0 means "non-existent")
+    std::atomic<uint32_t> new_entries_size_{0};                            // Number of items in "new" buckets
+    std::atomic<uint32_t> tried_entries_size_{0};                          // Number of items in "tried" buckets
+    mutable std::vector<uint32_t> randomly_ordered_ids_;                   // Randomly ordered ids
+    std::unordered_map<uint32_t, NodeServiceInfo> map_id_to_serviceinfo_;  // Index id -> ServiceInfo
+    std::unordered_map<IPEndpoint, uint32_t, IPEndpointHasher> map_endpoint_to_id_;  // Index endpoint -> id
 
-    //! \brief Holds all the ids in the address book and can be shuffled
-    std::vector<uint32_t> randomly_ordered_ids_;
+    /* Buckets */
+    using bucket_t = std::array<uint32_t, kBucketSize>;
+    std::array<bucket_t, kNewBucketsCount> new_buckets_{};      // New buckets (all zeroed)
+    std::array<bucket_t, kTriedBucketsCount> tried_buckets_{};  // Tried buckets (all zeroed)
 
-    //! \brief The multi-index container that holds the address book
-    //! \details The container is indexed by IP address and id which must be unique
-    boost::multi_index_container<
-        book_entry,
-        boost::multi_index::indexed_by<
-            boost::multi_index::ordered_unique<
-                boost::multi_index::tag<by_address>,
-                boost::multi_index::member<book_entry, IPAddress, &book_entry::address_>>,
-            boost::multi_index::ordered_unique<boost::multi_index::tag<by_id>,
-                                               boost::multi_index::member<book_entry, uint32_t, &book_entry::id_>>>>
-        book_;
+    /*
+     * Note ! Private methods, if called from public methods, assume that the caller has already acquired a lock
+     */
+
+    //! \brief Create a "new" entry and add it to the internal data structures
+    //! \returns A pair containing a pointer to the newly created entry and its newly generated id
+    std::pair<NodeServiceInfo*, /*id*/ uint32_t> insert_new_entry(const NodeService& service, const IPAddress& source) noexcept;
+
+    //! \brief Erases an entry from the address book entirely when is only in the "new" bucket
+    void erase_new_entry(uint32_t id) noexcept;
+
+    //! \brief Removes a reference from the "new" bucket
+    void clear_new_bucket(uint32_t bucket_num, uint32_t bucket_pos) noexcept;
+
+    //! \brief Queries internal data structures to find whether the provided service exists
+    //! \returns A pair containing a pointer to the entry and its id if it exists, nullptr and 0 otherwise
+    std::pair<NodeServiceInfo*, /*id*/ uint32_t> find_entry(const NodeService& service);
+
+    //! \brief Exchange two ids in the randomly ordered ids vector
+    void swap_randomly_ordered_ids(uint32_t i, uint32_t j) noexcept;
+
 };
 }  // namespace znode::net
