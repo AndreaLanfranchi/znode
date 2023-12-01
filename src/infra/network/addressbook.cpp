@@ -71,6 +71,8 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
             }
 
             // Adjust martian dates
+            // TODO: Do we care to handle advertisements of node which have a time far in the past ? (say more than 3
+            // months)
             if (it->time_ < NodeSeconds{NodeService::kTimeInit} or it->time_ > now + 10min) {
                 it->time_ = now - std::chrono::days(5);
             }
