@@ -16,6 +16,7 @@
 
 #include "addressbook.hpp"
 
+#include <absl/strings/str_cat.h>
 #include <gsl/gsl_util>
 
 #include <core/crypto/md.hpp>
@@ -41,7 +42,62 @@ bool AddressBook::contains(uint32_t id) const noexcept {
     return map_id_to_serviceinfo_.contains(id);
 }
 
-bool AddressBook::add_new(const NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
+bool AddressBook::add_new(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
+    std::unique_lock lock{mutex_};
+    try {
+        return add_new_impl(service, source, time_penalty);
+    } catch (const std::invalid_argument&) {
+        log::Warning("Address Book", {"invalid", service.endpoint_.to_string(), "from", source.to_string()})
+            << "Discarded ...";
+    }
+    return false;
+}
+
+bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& source,
+                          std::chrono::seconds time_penalty) {
+    using namespace std::chrono_literals;
+    NodeSeconds now{Now<NodeSeconds>()};
+    const auto services_size{services.size()};
+
+    uint32_t added_count{0U};
+    StopWatch sw(/*auto_start=*/true);
+    std::unique_lock lock{mutex_};
+    for (auto it{services.begin()}; it not_eq services.end();) {
+        try {
+            // Only add nodes that have the network service bit set - otherwise they are not useful
+            if (not(it->services_ bitand static_cast<uint64_t>(NodeServicesType::kNodeNetwork))) {
+                it = services.erase(it);
+                continue;
+            }
+
+            // Adjust martian dates
+            if (it->time_ < NodeSeconds{NodeService::kTimeInit} or it->time_ > now + 10min) {
+                it->time_ = now - std::chrono::days(5);
+            }
+
+            if (add_new_impl(*it, source, time_penalty)) {
+                ++added_count;
+                ++it;
+            } else {
+                // Don't bother to relay
+                it = services.erase(it);
+            }
+        } catch (const std::invalid_argument&) {
+            log::Warning("Address Book", {"invalid", it->endpoint_.to_string(), "from", source.to_string()})
+                << "Discarded ...";
+            it = services.erase(it);
+        }
+    }
+
+    std::ignore = log::Info("Address Book",
+                            {"processed", std::to_string(services_size), "in", StopWatch::format(sw.since_start()),
+                             "additions", std::to_string(added_count), "buckets new/tried",
+                             absl::StrCat(new_entries_size_.load(), "/", tried_entries_size_.load())});
+
+    return (added_count > 0U);
+}
+
+bool AddressBook::add_new_impl(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
     using namespace std::chrono_literals;
 
     if (not service.endpoint_.address_.is_routable()) {
@@ -54,7 +110,6 @@ bool AddressBook::add_new(const NodeService& service, const IPAddress& source, s
         time_penalty = 0s;
     }
 
-    std::unique_lock lock{mutex_};
     auto [book_entry, book_entry_id]{find_entry(service)};
     bool is_new_entry{book_entry == nullptr};
     if (not is_new_entry) {
@@ -116,27 +171,6 @@ bool AddressBook::add_new(const NodeService& service, const IPAddress& source, s
     }
 
     return free_slot;
-}
-
-bool AddressBook::add_new(const std::vector<NodeService>& services, const IPAddress& source,
-                          std::chrono::seconds time_penalty) {
-    uint32_t added_count{0U};
-    StopWatch sw(/*auto_start=*/true);
-
-    for (const auto& service : services) {
-        try {
-            if (add_new(service, source, time_penalty)) ++added_count;
-        } catch (const std::invalid_argument&) {
-            log::Warning("Address Book", {"invalid", service.endpoint_.to_string(), "from", source.to_string()})
-                << "Discarded";
-        }
-    }
-
-    std::ignore = log::Info("Address Book",
-                            {"processed", std::to_string(services.size()), "in", StopWatch::format(sw.since_start()),
-                             "additions", std::to_string(added_count), "new", std::to_string(new_entries_size_.load()),
-                             "tried", std::to_string(tried_entries_size_.load())});
-    return (added_count > 0U);
 }
 
 std::pair<NodeServiceInfo*, uint32_t> AddressBook::emplace_new_entry(const NodeService& service,

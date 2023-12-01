@@ -229,9 +229,6 @@ class IPSubNet {
 };
 
 class NodeService : public ser::Serializable {
-  private:
-    static constexpr std::chrono::seconds kTimeInit{100'000'000};
-
   public:
     using ser::Serializable::Serializable;
     explicit NodeService(const boost::asio::ip::tcp::endpoint& endpoint);
@@ -242,6 +239,7 @@ class NodeService : public ser::Serializable {
     // Copy constructor
     NodeService(const NodeService& other) = default;
 
+    static constexpr std::chrono::seconds kTimeInit{100'000'000};
     NodeSeconds time_{kTimeInit};  // unix timestamp 4 bytes
     uint64_t services_{0};         // services mask (OR'ed from NetworkServicesType) 8 bytes
     IPEndpoint endpoint_{};        // ipv4/ipv6 address and port 18 bytes

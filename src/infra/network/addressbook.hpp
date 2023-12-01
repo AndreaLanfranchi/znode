@@ -49,12 +49,12 @@ class AddressBook {
     //! \details If the item is already in the address book, it is updated with the new information
     //! \returns true if the item was inserted, false if it was updated
     //! \throws std::invalid_argument it the network address is not routable
-    [[nodiscard]] bool add_new(const NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty);
+    [[nodiscard]] bool add_new(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty);
 
     //! \brief Inserts or updates a vector of item in the address book
     //! \details If the item is already in the address book, it is updated with the new information
     //! \returns true if any item was inserted, false otherwise
-    [[nodiscard]] bool add_new(const std::vector<NodeService>& services, const IPAddress& source,
+    [[nodiscard]] bool add_new(std::vector<NodeService>& services, const IPAddress& source,
                                std::chrono::seconds time_penalty);
 
     //! \brief Returns whether a NodeService is contained in the address book
@@ -84,6 +84,13 @@ class AddressBook {
     /*
      * Note ! Private methods, if called from public methods, assume that the caller has already acquired a lock
      */
+
+    //! \brief Inserts or updates an item in the address book
+    //! \details If the item is already in the address book, it is updated with the new information
+    //! \returns true if the item was inserted, false if it was updated
+    //! \throws std::invalid_argument it the network address is not routable
+    [[nodiscard]] bool add_new_impl(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty);
+
 
     //! \brief Create a "new" entry and add it to the internal data structures
     //! \returns A pair containing a pointer to the newly created entry and its newly generated id
