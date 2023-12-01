@@ -214,6 +214,12 @@ std::string IPAddress::to_string() const noexcept {
     return value_.to_v4().to_string();
 }
 
+auto IPAddress::operator<=>(const IPAddress& other) const {
+    if (value_ < other.value_) return std::strong_ordering::less;
+    if (value_ > other.value_) return std::strong_ordering::greater;
+    return std::strong_ordering::equal;
+}
+
 IPEndpoint::IPEndpoint(const boost::asio::ip::tcp::endpoint& endpoint)
     : address_{endpoint.address()}, port_(endpoint.port()) {}
 
@@ -276,8 +282,9 @@ bool IPEndpoint::is_valid() const noexcept { return (address_.is_valid() and (po
 
 bool IPEndpoint::is_routable() const noexcept { return is_valid() and address_.is_routable(); }
 
-bool IPEndpoint::operator==(const IPEndpoint& other) const noexcept {
-    return address_ == other.address_ and port_ == other.port_;
+std::strong_ordering IPEndpoint::operator<=>(const IPEndpoint& other) const {
+    if (auto cmp{address_ <=> other.address_}; cmp != 0) return cmp;
+    return port_ <=> other.port_;
 }
 
 bool IPSubNet::is_valid() const noexcept {

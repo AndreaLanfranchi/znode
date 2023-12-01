@@ -24,10 +24,10 @@
 
 #include <core/common/misc.hpp>
 
-#include <infra/common/random.hpp>
 #include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/channel.hpp>
 #include <infra/concurrency/timer.hpp>
+#include <infra/network/addressbook.hpp>
 #include <infra/network/traffic_meter.hpp>
 
 #include <node/common/settings.hpp>
@@ -133,6 +133,7 @@ class NodeHub : public con::Stoppable {
     con::Channel<std::shared_ptr<Connection>> node_factory_feed_;  // Channel for new nodes to be instantiated
     con::Channel<std::shared_ptr<Connection>> connector_feed_;     // Channel for new outgoing connections
 
+    net::AddressBook address_book_{};                                   // The address book
     std::list<std::shared_ptr<Node>> nodes_;                            // All the connected nodes
     std::map<boost::asio::ip::address, uint32_t> connected_addresses_;  // Addresses that are connected
     mutable std::mutex nodes_mutex_;                                    // Guards access to nodes_

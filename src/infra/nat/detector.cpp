@@ -16,8 +16,6 @@
 
 #include "detector.hpp"
 
-#include "core/common/endian.hpp"
-
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/ip/udp.hpp>
 #include <boost/asio/redirect_error.hpp>
@@ -26,8 +24,10 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
 
+#include <core/common/endian.hpp>
+#include <core/common/random.hpp>
+
 #include <infra/common/log.hpp>
-#include <infra/common/random.hpp>
 
 namespace znode::nat {
 namespace {

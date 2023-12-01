@@ -26,11 +26,12 @@
 #include <gsl/gsl_util>
 #include <nlohmann/json.hpp>
 
+#include <core/common/random.hpp>
 #include <core/common/time.hpp>
 #include <core/crypto/evp_mac.hpp>
 #include <core/serialization/serializable.hpp>
 
-#include <infra/common/random.hpp>
+#include <infra/common/log.hpp>
 
 namespace znode::net {
 
@@ -98,6 +99,8 @@ class IPAddress : public ser::Serializable {
     //! \brief Overrides boost's to_string methods so we always have IPv6 addresses enclosed in square brackets
     [[nodiscard]] std::string to_string() const noexcept;
 
+    auto operator<=>(const IPAddress& other) const;
+
   private:
     boost::asio::ip::address value_{boost::asio::ip::address_v4()};
     friend class ser::SDataStream;
@@ -121,8 +124,6 @@ class IPEndpoint : public ser::Serializable {
     [[nodiscard]] bool is_valid() const noexcept;
     [[nodiscard]] bool is_routable() const noexcept;
 
-    bool operator==(const IPEndpoint& other) const noexcept;
-
     IPAddress address_{};
     uint16_t port_{0};
 
@@ -131,6 +132,14 @@ class IPEndpoint : public ser::Serializable {
 
     //! \brief Overrides boost's to_string methods so we always have IPv6 addresses enclosed in square brackets
     [[nodiscard]] std::string to_string() const noexcept;
+
+    std::strong_ordering operator<=>(const IPEndpoint& other) const;
+    bool operator==(const IPEndpoint& other) const { return (*this <=> other) == 0; };
+    bool operator!=(const IPEndpoint& other) const { return (*this <=> other) != 0; };
+    bool operator<(const IPEndpoint& other) const { return (*this <=> other) < 0; };
+    bool operator<=(const IPEndpoint& other) const { return (*this <=> other) <= 0; };
+    bool operator>(const IPEndpoint& other) const { return (*this <=> other) > 0; };
+    bool operator>=(const IPEndpoint& other) const { return (*this <=> other) >= 0; };
 
   private:
     friend class ser::SDataStream;
@@ -141,16 +150,26 @@ class IPEndpointHasher {
   public:
     IPEndpointHasher() = default;
     size_t operator()(const IPEndpoint& endpoint) const noexcept {
-        crypto::SipHash24 hasher(seed_key_);
-        hasher.update(endpoint.address_->to_v6().to_bytes());
-        hasher.update(endpoint.port_);
+        const auto endpoint_type{endpoint.address_.get_type()};
+        crypto::SipHash24 hasher{seed_key_};
+        hasher.update(std::string(magic_enum::enum_name(endpoint_type)));
+
+        if (endpoint_type == IPAddressType::kIPv4) {
+            auto bytes = endpoint.address_->to_v4().to_bytes();
+            hasher.update(bytes);
+        } else {
+            auto bytes = endpoint.address_->to_v6().to_bytes();
+            hasher.update(bytes);
+        }
+        hasher.update(std::to_string(endpoint.port_));
+
         const auto result{hasher.finalize()};
-        auto result_64{endian::load_big_u64(result.data())};
+        auto result_64{endian::load_little_u64(result.data())};
         return static_cast<size_t>(result_64);
     }
 
   private:
-    const Bytes seed_key_{get_random_bytes(16 /* == 2 * sizeof(uint64_t) */)};
+    const Bytes seed_key_{get_random_bytes(2U * sizeof(uint64_t))};
 };
 
 class IPSubNet {
@@ -207,8 +226,6 @@ class IPSubNet {
 
     IPAddress base_address_{};
     uint8_t prefix_length_{0};
-
-  private:
 };
 
 class NodeService : public ser::Serializable {

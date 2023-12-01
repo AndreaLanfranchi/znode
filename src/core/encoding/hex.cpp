@@ -20,7 +20,7 @@
 #include <array>
 #include <ranges>
 
-#include <infra/common/random.hpp>  // Can be included as it's header only
+#include <core/common/random.hpp>
 
 namespace znode::enc::hex {
 namespace {

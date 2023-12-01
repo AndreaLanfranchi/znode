@@ -521,6 +521,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
             auto& payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
             payload.shuffle();
             logger << "count=" << std::to_string(payload.identifiers_.size());
+            std::ignore = address_book_.add_new(payload.identifiers_, node_ptr->remote_endpoint().address_, {10s});
 
             // TODO Pass it to the address manager
             if (need_connections_.notified()) {

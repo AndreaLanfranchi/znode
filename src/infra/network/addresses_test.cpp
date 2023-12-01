@@ -305,4 +305,25 @@ TEST_CASE("Network Service Serialization", "[infra][net][addresses][serializatio
     CHECK(service2.services_ == service.services_);
     CHECK(service2.endpoint_ == service.endpoint_);
 }
+
+TEST_CASE("IPEndpoint SipHash Collision") {
+    auto result{IPEndpoint::from_string("[2a02:c207:2054:4847::7]:9033")};
+    REQUIRE(result.has_value());
+    const auto ep1{result.value()};
+    REQUIRE(ep1.port_ == 9033);
+    REQUIRE(ep1.address_.get_type() == IPAddressType::kIPv6);
+
+    result = IPEndpoint::from_string("209.126.0.125:9033");
+    REQUIRE(result.has_value());
+    const auto ep2{result.value()};
+    REQUIRE(ep2.port_ == 9033);
+    REQUIRE(ep2.address_.get_type() == IPAddressType::kIPv4);
+
+    IPEndpointHasher hasher{};
+    auto hash1{hasher(ep1)};
+    auto hash2{hasher(ep2)};
+    REQUIRE(hash1 == hash2);
+
+
+}
 }  // namespace znode::net

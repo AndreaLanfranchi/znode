@@ -111,7 +111,19 @@ class Hash : public ser::Serializable {
 
     const_iterator_type cend() { return bytes_.cend(); }
 
-    constexpr auto operator<=>(const Hash&) const = default;
+    std::strong_ordering operator<=>(const Hash<BITS>& other) const {
+        auto result(std::memcmp(bytes_.data(), other.bytes_.data(), kSize));
+        if (result < 0) return std::strong_ordering::less;
+        if (result > 0) return std::strong_ordering::greater;
+        return std::strong_ordering::equal;
+    };
+
+    bool operator==(const Hash<BITS>& other) const { return *this <=> other == 0; }
+    bool operator!=(const Hash<BITS>& other) const { return *this <=> other != 0; }
+    bool operator<(const Hash<BITS>& other) const { return *this <=> other < 0; }
+    bool operator<=(const Hash<BITS>& other) const { return *this <=> other <= 0; }
+    bool operator>(const Hash<BITS>& other) const { return *this <=> other > 0; }
+    bool operator>=(const Hash<BITS>& other) const { return *this <=> other >= 0; }
 
     inline explicit operator bool() const noexcept {
         return std::ranges::any_of(bytes_, [](const auto& byte) { return byte > 0; });

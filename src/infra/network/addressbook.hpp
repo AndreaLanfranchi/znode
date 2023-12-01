@@ -21,9 +21,9 @@
 #include <utility>
 #include <vector>
 
+#include <core/common/random.hpp>
 #include <core/types/hash.hpp>
 
-#include <infra/common/random.hpp>
 #include <infra/network/addresses.hpp>
 
 namespace znode::net {
@@ -36,7 +36,7 @@ class AddressBook {
     static constexpr uint32_t kMaxNewBucketReferences{8};
     static constexpr uint32_t kNewBucketsPerSourceGroup{64};
 
-    AddressBook() : key_(get_random_bytes(32)) {}
+    AddressBook() = default;
     ~AddressBook() = default;
 
     //! \brief Returns the overall size of the address book
@@ -68,7 +68,7 @@ class AddressBook {
 
   private:
     mutable std::shared_mutex mutex_;                                      // Thread safety
-    h256 key_;                                                             // Secret key to randomize the address book
+    const Bytes key_{get_random_bytes(2 * sizeof(uint64_t))};              // Secret key to randomize the address book
     std::atomic<uint32_t> last_used_id_{1};                                // Last used id (0 means "non-existent")
     std::atomic<uint32_t> new_entries_size_{0};                            // Number of items in "new" buckets
     std::atomic<uint32_t> tried_entries_size_{0};                          // Number of items in "tried" buckets
@@ -107,5 +107,10 @@ class AddressBook {
     //! \returns A pair containing the bucket number and the bucket position
     std::pair</* bucket_num */ uint32_t, /* bucket_pos */ uint32_t> compute_new_bucket_coordinates(
         const NodeServiceInfo& service, const IPAddress& source) const noexcept;
+
+    //! \brief Computes the group an address belongs to
+    //! \details The computation is based on finding the base address for an IP subnet
+    //! of 8 hosts at most (i.e. a /29 subnet for IPv4 and a /121 subnet for IPv6)
+    Bytes compute_group(const IPAddress& address) const noexcept;
 };
 }  // namespace znode::net

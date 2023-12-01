@@ -43,4 +43,17 @@ outcome::result<void> BlockHeader::serialization(ser::SDataStream& stream, ser::
     if (not result.has_error()) result = stream.bind(solution, action);
     return result;
 }
+
+constexpr auto BlockHeader::operator<=>(const BlockHeader& other) const {
+    if (auto cmp = version <=> other.version; cmp != 0) return cmp;
+    if (auto cmp = parent_hash <=> other.parent_hash; cmp != 0) return cmp;
+    if (auto cmp = merkle_root <=> other.merkle_root; cmp != 0) return cmp;
+    if (auto cmp = scct_root <=> other.scct_root; cmp != 0) return cmp;
+    if (auto cmp = time <=> other.time; cmp != 0) return cmp;
+    if (auto cmp = bits <=> other.bits; cmp != 0) return cmp;
+    if (nonce < other.nonce) return std::strong_ordering::less;
+    if (nonce > other.nonce) return std::strong_ordering::greater;
+    // Repeat for all other members.
+    return std::strong_ordering::equal;
+}
 }  // namespace znode

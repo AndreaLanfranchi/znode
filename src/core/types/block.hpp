@@ -41,6 +41,11 @@ class BlockHeader : public ser::Serializable {
     //! \brief Reset the object to its default state
     void reset();
 
+    //! \brief Need an explicit declaration of the spaceship operator as
+    //! the compiler cannot generate it for us due to the presence of
+    //! of boost::multiprecision::uint256_t which does not have a spaceship
+    constexpr auto operator<=>(const BlockHeader& other) const;
+
   private:
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;

@@ -26,7 +26,7 @@
 #include <boost/format.hpp>
 #include <gsl/gsl_util>
 
-#include <infra/common/random.hpp>  // Can be included as it's header only
+#include <core/common/random.hpp>
 
 namespace znode {
 

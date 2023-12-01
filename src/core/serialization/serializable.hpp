@@ -56,7 +56,7 @@ class Serializable {
     }
 
     // Needed for derived classes implementing spaceship operator
-    constexpr auto operator<=>(const Serializable&) const = default;
+    std::strong_ordering operator<=>(const Serializable&) const = default;
 
   private:
     virtual outcome::result<void> serialization(SDataStream& stream, Action action) = 0;

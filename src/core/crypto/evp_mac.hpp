@@ -28,8 +28,7 @@
 #include <core/common/cast.hpp>
 #include <core/common/endian.hpp>
 #include <core/common/object_pool.hpp>
-
-#include <infra/common/random.hpp>
+#include <core/common/random.hpp>
 
 namespace znode::crypto {
 
@@ -63,26 +62,13 @@ struct MacDeleter {
 template <unsigned int MAC_LEN, unsigned int C_ROUNDS, unsigned int D_ROUNDS>
 class SipHash {
   public:
-    SipHash()
-        : lib_ctx_{LibCtxs.empty() ? OSSL_LIB_CTX_new() : LibCtxs.acquire()},
-          mac_{EVP_MAC_fetch(lib_ctx_.get(), "SIPHASH", nullptr)},
-          ctx_{EVP_MAC_CTX_new(mac_.get())} {
-        ASSERT(lib_ctx_ != nullptr);
-        ASSERT(mac_ != nullptr);
-        ASSERT(ctx_ != nullptr);
-
-        params_[0] = OSSL_PARAM_construct_uint(OSSL_MAC_PARAM_SIZE, &mac_len_);
-        params_[1] = OSSL_PARAM_construct_uint(OSSL_MAC_PARAM_C_ROUNDS, &c_rounds_);
-        params_[2] = OSSL_PARAM_construct_uint(OSSL_MAC_PARAM_D_ROUNDS, &d_rounds_);
-        params_[3] = OSSL_PARAM_construct_end();
-    }
-
-    explicit SipHash(const ByteView key) : SipHash() { init(key); }
-    explicit SipHash(const std::string_view key) : SipHash() { init(key); }
-    SipHash(uint64_t k0, uint64_t k1) : SipHash() {
-        Bytes key(16, 0);
-        std::memcpy(key.data(), &k0, sizeof(k0));
-        std::memcpy(key.data() + sizeof(k0), &k1, sizeof(k1));
+    SipHash() { init(); }
+    explicit SipHash(const ByteView key) { init(key); }
+    explicit SipHash(const std::string_view key) { init(key); }
+    SipHash(uint64_t k0, uint64_t k1) {
+        Bytes key(2 * sizeof(k1), 0);
+        endian::store_little_u64(key.data(), k0);
+        endian::store_little_u64(key.data() + sizeof(k0), k1);
         init(key);
     }
 
@@ -93,6 +79,19 @@ class SipHash {
     SipHash(SipHash&&) = delete;
 
     ~SipHash() = default;
+
+    void init() noexcept {
+        auto key{get_random_bytes(2 * sizeof(uint64_t))};
+        init(key);
+    }
+
+    void init(ByteView key) noexcept {
+        ingested_size_ = 0;
+        ASSERT(key.size() == 16);
+        ASSERT(EVP_MAC_init(ctx_.get(), key.data(), key.size(), params_.data()) == 1);
+    }
+
+    void init(std::string_view key) noexcept { init(string_view_to_byte_view(key)); }
 
     //! \brief Accumulates more data
     void update(ByteView data) noexcept {
@@ -111,9 +110,10 @@ class SipHash {
         ASSERT(EVP_MAC_update(ctx_.get(), reinterpret_cast<const unsigned char*>(data.data()), data.size()) == 1);
     }
 
-    template <Integral T>
-    void update(T data) noexcept {
-        update(std::span<const std::byte>(reinterpret_cast<const std::byte*>(&data), sizeof(T)));
+    //! \brief Accumulates more data
+    template <Integral V>
+    void update(V data) noexcept {
+        update(ByteView(reinterpret_cast<const uint8_t*>(&data), sizeof(V)));
     };
 
     [[nodiscard]] Bytes finalize() noexcept {
@@ -136,25 +136,15 @@ class SipHash {
     unsigned int c_rounds_{C_ROUNDS};
     unsigned int d_rounds_{D_ROUNDS};
 
-    std::unique_ptr<OSSL_LIB_CTX, LibCtxRecycler> lib_ctx_{nullptr};
-    std::unique_ptr<EVP_MAC, MacDeleter> mac_{nullptr};
-    std::unique_ptr<EVP_MAC_CTX, MacCtxDeleter> ctx_{nullptr};
-    std::array<OSSL_PARAM, 4> params_;
+    std::unique_ptr<OSSL_LIB_CTX, LibCtxRecycler> lib_ctx_{LibCtxs.empty() ? OSSL_LIB_CTX_new() : LibCtxs.acquire()};
+    std::unique_ptr<EVP_MAC, MacDeleter> mac_{EVP_MAC_fetch(lib_ctx_.get(), "SIPHASH", nullptr)};
+    std::unique_ptr<EVP_MAC_CTX, MacCtxDeleter> ctx_{EVP_MAC_CTX_new(mac_.get())};
+    std::array<OSSL_PARAM, 4> params_{OSSL_PARAM_construct_uint(OSSL_MAC_PARAM_SIZE, &mac_len_),
+                                      OSSL_PARAM_construct_uint(OSSL_MAC_PARAM_C_ROUNDS, &c_rounds_),
+                                      OSSL_PARAM_construct_uint(OSSL_MAC_PARAM_D_ROUNDS, &d_rounds_),
+                                      OSSL_PARAM_construct_end()};
 
     size_t ingested_size_{0};  // Number of bytes ingested
-
-    void init() noexcept {
-        ingested_size_ = 0;
-        auto key{get_random_bytes(16U)};
-        ASSERT(EVP_MAC_init(ctx_.get(), key.data(), key.size(), params_.data()) == 1);
-    }
-
-    void init(ByteView key) noexcept {
-        ASSERT(key.size() == 16);
-        ASSERT(EVP_MAC_init(ctx_.get(), key.data(), key.size(), params_.data()) == 1);
-    }
-
-    void init(std::string_view key) noexcept { init(string_view_to_byte_view(key)); }
 };
 
 using SipHash24 = SipHash<8, 2, 4>;

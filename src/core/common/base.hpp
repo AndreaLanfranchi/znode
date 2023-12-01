@@ -47,8 +47,8 @@ BOOST_NORETURN void throw_exception(const std::exception&, const boost::source_l
 namespace znode {
 
 using BlockNum = uint32_t;
-using uint128_t = boost::multiprecision::uint128_t;
-using uint256_t = boost::multiprecision::uint256_t;
+using uint128_t = boost::multiprecision::uint128_t;  // Note ! Does not have spaceship operator
+using uint256_t = boost::multiprecision::uint256_t;  // Note ! Does not have spaceship operator
 
 template <class T>
 concept UnsignedIntegral = std::is_fundamental_v<T> and std::unsigned_integral<T>;
