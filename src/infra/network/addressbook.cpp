@@ -265,23 +265,50 @@ std::pair<uint32_t, uint32_t> AddressBook::compute_new_bucket_coordinates(const 
     crypto::SipHash24 hasher{key_view};
     hasher.update(service_group);
     hasher.update(source_group);
-    auto hash1{endian::load_little_u64(hasher.finalize().data())};
+    const auto hash1{endian::load_little_u64(hasher.finalize().data())};
 
     hasher.init(key_view);
     hasher.update(source_group);
     hasher.update(hash1 % kNewBucketsPerSourceGroup);
-    auto hash2{endian::load_little_u64(hasher.finalize().data())};
+    const auto hash2{endian::load_little_u64(hasher.finalize().data())};
 
     auto bucket_num{gsl::narrow_cast<uint32_t>(hash2 % kNewBucketsCount)};
 
     hasher.init(key_view);
     hasher.update('N');
     hasher.update(bucket_num);
-    hasher.update(service.service_.endpoint_.to_string());
-    auto hash3{endian::load_little_u64(hasher.finalize().data())};
+    hasher.update(service.service_.endpoint_.to_bytes());
+    const auto hash3{endian::load_little_u64(hasher.finalize().data())};
 
     auto bucket_pos{gsl::narrow_cast<uint32_t>(hash3 % kBucketSize)};
 
+    return {bucket_num, bucket_pos};
+}
+
+std::pair</* bucket_num */ uint32_t, /* bucket_pos */ uint32_t> AddressBook::compute_tried_bucket_coordinates(
+    const NodeServiceInfo& service) const noexcept {
+    const ByteView key_view{key_.data(), key_.size()};
+    const auto service_group{compute_group(service.service_.endpoint_.address_)};
+    const auto service_key{service.service_.endpoint_.to_bytes()};
+
+    crypto::SipHash24 hasher{key_view};
+    hasher.update(service_key);
+    const auto hash1{endian::load_little_u64(hasher.finalize().data())};
+
+    hasher.init(key_view);
+    hasher.update(service_group);
+    hasher.update(hash1 % kTriedBucketsPerGroup);
+    const auto hash2{endian::load_little_u64(hasher.finalize().data())};
+
+    auto bucket_num{gsl::narrow_cast<uint32_t>(hash2 % kNewBucketsCount)};
+
+    hasher.init(key_view);
+    hasher.update('T');
+    hasher.update(bucket_num);
+    hasher.update(service.service_.endpoint_.to_bytes());
+    const auto hash3{endian::load_little_u64(hasher.finalize().data())};
+
+    auto bucket_pos{gsl::narrow_cast<uint32_t>(hash3 % kBucketSize)};
     return {bucket_num, bucket_pos};
 }
 
@@ -292,12 +319,12 @@ Bytes AddressBook::compute_group(const znode::net::IPAddress& address) const noe
     switch (address_type) {
         using enum IPAddressType;
         case kIPv4: {
-            const auto subnet{IPSubNet::calculate_subnet_base_address(address, 29)};
+            const auto subnet{IPSubNet::calculate_subnet_base_address(address, kIPv4SubnetGroupsPrefix)};
             const auto subnet_bytes{subnet.value()->to_v4().to_bytes()};
             ret.append(subnet_bytes.begin(), subnet_bytes.end());
         } break;
         case kIPv6: {
-            const auto subnet{IPSubNet::calculate_subnet_base_address(address, 121)};
+            const auto subnet{IPSubNet::calculate_subnet_base_address(address, kIPv6SubnetGroupsPrefix)};
             const auto subnet_bytes{subnet.value()->to_v6().to_bytes()};
             ret.append(subnet_bytes.begin(), subnet_bytes.end());
         } break;

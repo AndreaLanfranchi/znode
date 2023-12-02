@@ -99,6 +99,9 @@ class IPAddress : public ser::Serializable {
     //! \brief Overrides boost's to_string methods so we always have IPv6 addresses enclosed in square brackets
     [[nodiscard]] std::string to_string() const noexcept;
 
+    //! \brief Returns the bytes representation of this address in network byte order
+    [[nodiscard]] Bytes to_bytes() const noexcept;
+
     auto operator<=>(const IPAddress& other) const;
 
   private:
@@ -132,6 +135,10 @@ class IPEndpoint : public ser::Serializable {
 
     //! \brief Overrides boost's to_string methods so we always have IPv6 addresses enclosed in square brackets
     [[nodiscard]] std::string to_string() const noexcept;
+
+    //! \brief Returns the bytes representation of this endpoint in network byte order
+    //! \remarks The returned bytes are the representation of the IP address followed by the port number
+    [[nodiscard]] Bytes to_bytes() const noexcept;
 
     std::strong_ordering operator<=>(const IPEndpoint& other) const;
     bool operator==(const IPEndpoint& other) const { return (*this <=> other) == 0; };

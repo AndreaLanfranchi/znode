@@ -214,6 +214,15 @@ std::string IPAddress::to_string() const noexcept {
     return value_.to_v4().to_string();
 }
 
+Bytes IPAddress::to_bytes() const noexcept {
+    if (value_.is_v4()) {
+        const auto addr_bytes{value_.to_v4().to_bytes()};
+        return Bytes(addr_bytes.begin(), addr_bytes.end());
+    }
+    const auto addr_bytes{value_.to_v6().to_bytes()};
+    return Bytes(addr_bytes.begin(), addr_bytes.end());
+}
+
 auto IPAddress::operator<=>(const IPAddress& other) const {
     if (value_ < other.value_) return std::strong_ordering::less;
     if (value_ > other.value_) return std::strong_ordering::greater;
@@ -265,6 +274,17 @@ outcome::result<IPEndpoint> IPEndpoint::from_string(const std::string& input) {
 }
 
 std::string IPEndpoint::to_string() const noexcept { return absl::StrCat(address_.to_string(), ":", port_); }
+
+Bytes IPEndpoint::to_bytes() const noexcept {
+    Bytes ret;
+    if (address_.is_valid()) {
+        const auto addr_bytes{address_.to_bytes()};
+        ret.insert(ret.end(), addr_bytes.begin(), addr_bytes.end());
+    }
+    ret.push_back(static_cast<uint8_t>(port_ >> 8));
+    ret.push_back(static_cast<uint8_t>(port_ & 0xFF));
+    return ret;
+}
 
 outcome::result<void> IPEndpoint::serialization(ser::SDataStream& stream, ser::Action action) {
     auto result{stream.bind(address_, action)};

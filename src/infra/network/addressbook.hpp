@@ -35,6 +35,9 @@ class AddressBook {
     static constexpr uint32_t kTriedBucketsCount{256};
     static constexpr uint32_t kMaxNewBucketReferences{8};
     static constexpr uint32_t kNewBucketsPerSourceGroup{64};
+    static constexpr uint32_t kTriedBucketsPerGroup{8};
+    static constexpr uint16_t kIPv4SubnetGroupsPrefix{16};
+    static constexpr uint16_t kIPv6SubnetGroupsPrefix{64};
 
     AddressBook() = default;
     ~AddressBook() = default;
@@ -91,7 +94,6 @@ class AddressBook {
     //! \throws std::invalid_argument it the network address is not routable
     [[nodiscard]] bool add_new_impl(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty);
 
-
     //! \brief Create a "new" entry and add it to the internal data structures
     //! \returns A pair containing a pointer to the newly created entry and its newly generated id
     std::pair<NodeServiceInfo*, /*id*/ uint32_t> emplace_new_entry(const NodeService& service,
@@ -114,6 +116,11 @@ class AddressBook {
     //! \returns A pair containing the bucket number and the bucket position
     std::pair</* bucket_num */ uint32_t, /* bucket_pos */ uint32_t> compute_new_bucket_coordinates(
         const NodeServiceInfo& service, const IPAddress& source) const noexcept;
+
+    //! \brief Computes the coordinates for placement in a "tried" bucket
+    //! \returns A pair containing the bucket number and the bucket position
+    std::pair</* bucket_num */ uint32_t, /* bucket_pos */ uint32_t> compute_tried_bucket_coordinates(
+        const NodeServiceInfo& service) const noexcept;
 
     //! \brief Computes the group an address belongs to
     //! \details The computation is based on finding the base address for an IP subnet
