@@ -17,6 +17,8 @@
 #pragma once
 
 #include <functional>
+#include <optional>
+#include <set>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -284,9 +286,9 @@ class NodeServiceInfo : public ser::Serializable {
     NodeSeconds last_connection_attempt_{std::chrono::seconds(0)};  // Last time a connection has been attempted
     NodeSeconds last_connection_success_{std::chrono::seconds(0)};  // Last time a connection has been successful
     uint32_t connection_attempts_{0};                               // Attempts count since last successful connection
-    uint32_t random_pos_{0};            // Actual position in the randomly ordered ids vector (memory)
-    bool in_tried_bucket_{false};       // Whether this entry is in any of the "tried" buckets (memory)
-    uint32_t new_references_count_{0};  // Number of times this entry has been referenced in the "new" buckets (memory)
+    uint32_t random_pos_{0};               // Actual position in the randomly ordered ids vector (memory)
+    std::optional<uint32_t> tried_ref_{};  // Coordinates of this entry in "tried" buckets (memory)
+    std::set<uint32_t> new_refs_{};        // Coordinates of this entry in "new" buckets (memory)
 
     //! \brief Returns whether this service statistics are bad and as a result can be forgotten
     [[nodiscard]] bool is_bad(NodeSeconds now = Now<NodeSeconds>()) const noexcept;

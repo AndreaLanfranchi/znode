@@ -30,17 +30,49 @@ namespace znode::net {
 
 class AddressBook {
   public:
-    static constexpr uint32_t kBucketSize{64};
-    static constexpr uint32_t kNewBucketsCount{1024};
-    static constexpr uint32_t kTriedBucketsCount{256};
-    static constexpr uint32_t kMaxNewBucketReferences{8};
-    static constexpr uint32_t kNewBucketsPerSourceGroup{64};
-    static constexpr uint32_t kTriedBucketsPerGroup{8};
+    static constexpr uint16_t kBucketSize{64};
+    static constexpr uint16_t kNewBucketsCount{1024};
+    static constexpr uint16_t kTriedBucketsCount{256};
+    static constexpr uint16_t kMaxNewBucketReferences{8};
+    static constexpr uint16_t kNewBucketsPerSourceGroup{64};
+    static constexpr uint16_t kTriedBucketsPerGroup{8};
     static constexpr uint16_t kIPv4SubnetGroupsPrefix{16};
     static constexpr uint16_t kIPv6SubnetGroupsPrefix{64};
 
     AddressBook() = default;
     ~AddressBook() = default;
+
+#if defined(_MSC_VER)
+    // Silence C4201 under MSVC
+    // https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-level-4-c4201
+#pragma warning(push)
+#pragma warning(disable : 4201)
+#endif
+
+    //! \brief A struct representing the coordinates of a slot in collection of buckets
+    struct SlotAddress {
+        SlotAddress() noexcept : x{0}, y{0} {}
+        explicit SlotAddress(uint16_t pos, uint16_t num) noexcept : x{pos}, y{num} {}
+        explicit SlotAddress(uint32_t pos_num) noexcept : xy{pos_num} {}
+        union alignas(uint32_t) {
+            struct alignas(uint16_t) {
+                uint16_t x;
+                uint16_t y;
+            };
+            uint32_t xy;
+        };
+        std::strong_ordering operator<=>(const SlotAddress& other) const { return xy <=> other.xy; }
+        bool operator==(const SlotAddress& other) const { return xy == other.xy; }
+    };
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+    // See struct for coordinates in NodeServiceInfo
+    static_assert(kBucketSize <= std::numeric_limits<uint16_t>::max());
+    static_assert(kNewBucketsCount <= std::numeric_limits<uint16_t>::max());
+    static_assert(kTriedBucketsCount <= std::numeric_limits<uint16_t>::max());
 
     //! \brief Returns the overall size of the address book
     [[nodiscard]] size_t size() const;
@@ -102,8 +134,14 @@ class AddressBook {
     //! \brief Erases an entry from the address book entirely when is only in the "new" bucket
     void erase_new_entry(uint32_t id) noexcept;
 
-    //! \brief Removes a reference from the "new" bucket
-    void clear_new_bucket(uint32_t bucket_num, uint32_t bucket_pos) noexcept;
+    //! \brief Removes an entry from any "new" bucket and adds it to a "tried" bucket
+    //! \remarks Shouldn't be room in the "tried" bucket, the previous entry is erased and
+    //! pushed back to the "new" bucket
+    void make_entry_tried(uint32_t entry_id) noexcept;
+
+    //! \brief Removes a reference of NodeServiceInfo from a "new" bucket's slot and optionally erases
+    //! the entry if it was the last reference
+    void clear_new_slot(const SlotAddress& slot_address, bool erase_entry = true) noexcept;
 
     //! \brief Queries internal data structures to find whether the provided service exists
     //! \returns A pair containing a pointer to the entry and its id if it exists, nullptr and 0 otherwise
@@ -112,19 +150,15 @@ class AddressBook {
     //! \brief Exchange two ids in the randomly ordered ids vector
     void swap_randomly_ordered_ids(uint32_t i, uint32_t j) noexcept;
 
-    //! \brief Computes the coordinates for placement in a "new" bucket
-    //! \returns A pair containing the bucket number and the bucket position
-    std::pair</* bucket_num */ uint32_t, /* bucket_pos */ uint32_t> compute_new_bucket_coordinates(
-        const NodeServiceInfo& service, const IPAddress& source) const noexcept;
+    //! \brief Computes the coordinates for placement in a "new" bucket's slot
+    SlotAddress get_new_slot(const NodeServiceInfo& service, const IPAddress& source) const noexcept;
 
-    //! \brief Computes the coordinates for placement in a "tried" bucket
-    //! \returns A pair containing the bucket number and the bucket position
-    std::pair</* bucket_num */ uint32_t, /* bucket_pos */ uint32_t> compute_tried_bucket_coordinates(
-        const NodeServiceInfo& service) const noexcept;
+    //! \brief Computes the coordinates for placement in a "tried" bucket's slot
+    SlotAddress get_tried_slot(const NodeServiceInfo& service) const noexcept;
 
     //! \brief Computes the group an address belongs to
     //! \details The computation is based on finding the base address for an IP subnet
-    //! of 8 hosts at most (i.e. a /29 subnet for IPv4 and a /121 subnet for IPv6)
-    Bytes compute_group(const IPAddress& address) const noexcept;
+    //! (i.e. kIPv4SubnetGroupsPrefix and kIPv6SubnetGroupsPrefix respectively)
+    static Bytes compute_group(const IPAddress& address) noexcept;
 };
 }  // namespace znode::net

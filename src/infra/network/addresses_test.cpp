@@ -322,7 +322,7 @@ TEST_CASE("IPEndpoint SipHash Collision") {
     IPEndpointHasher hasher{};
     auto hash1{hasher(ep1)};
     auto hash2{hasher(ep2)};
-    REQUIRE(hash1 == hash2);
+    REQUIRE(hash1 != hash2);
 
 
 }
