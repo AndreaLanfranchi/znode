@@ -53,6 +53,26 @@ bool AddressBook::add_new(NodeService& service, const IPAddress& source, std::ch
     return false;
 }
 
+bool AddressBook::set_good(const IPEndpoint& remote, NodeSeconds time) noexcept {
+    std::unique_lock lock{mutex_};
+    auto it{map_endpoint_to_id_.find(remote)};
+    if (it == map_endpoint_to_id_.end()) return false;  // No such an entry
+    auto entry_id{it->second};
+    auto it2{map_id_to_serviceinfo_.find(entry_id)};
+    ASSERT(it2 not_eq map_id_to_serviceinfo_.end());  // Must be found
+    auto& service_info{it2->second};
+
+    // Update info
+    service_info.service_.time_ = time;
+    service_info.last_connection_attempt_ = time;
+    service_info.last_connection_success_ = time;
+    service_info.connection_attempts_ = 0U;
+
+    // Ensure is in the tried bucket
+    if (!service_info.tried_ref_.has_value()) make_entry_tried(entry_id);
+    return true;
+}
+
 bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& source,
                           std::chrono::seconds time_penalty) {
     using namespace std::chrono_literals;
@@ -204,6 +224,7 @@ void AddressBook::erase_new_entry(uint32_t id) noexcept {
 }
 
 void AddressBook::make_entry_tried(uint32_t entry_id) noexcept {
+    using namespace std::chrono_literals;
     auto it{map_id_to_serviceinfo_.find(entry_id)};
     ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found
     auto& service_info{it->second};
@@ -211,12 +232,12 @@ void AddressBook::make_entry_tried(uint32_t entry_id) noexcept {
     if (service_info.tried_ref_.has_value()) return;  // Already in the tried bucket
 
     // Erase all references from the "new" buckets
-    for (const auto& slot_xy : service_info.new_refs_) {
-        SlotAddress slot_address{slot_xy};
-        clear_new_slot(slot_address, /*erase_entry=*/false);
-    }
     new_entries_size_ -= static_cast<uint32_t>(!service_info.new_refs_.empty());
-    service_info.new_refs_.clear();
+    for (auto slots_iterator{service_info.new_refs_.begin()}; slots_iterator not_eq service_info.new_refs_.end();) {
+        SlotAddress slot_address(*slots_iterator);
+        new_buckets_[slot_address.x][slot_address.y] = 0U;
+        slots_iterator = service_info.new_refs_.erase(slots_iterator);
+    }
 
     auto slot_address{get_tried_slot(service_info)};
     auto& slot{tried_buckets_[slot_address.x][slot_address.y]};
@@ -231,10 +252,8 @@ void AddressBook::make_entry_tried(uint32_t entry_id) noexcept {
         slot = 0U;
         --tried_entries_size_;
 
-        // Re-insert the evicted item in the new bucket
-        auto [new_entry, new_id]{emplace_new_entry(it2->second.service_, it2->second.origin_)};
-        ASSERT(new_id == id_to_evict);          // Must have the same id
-        ASSERT(!new_entry->new_refs_.empty());  // Must be now referenced in a "new" bucket
+        // Re-insert the evicted item in the new bucket (must happen)
+        ASSERT(add_new(it2->second.service_, it2->second.origin_, 0s));
     }
 
     slot = entry_id;
@@ -341,7 +360,7 @@ AddressBook::SlotAddress AddressBook::get_tried_slot(const znode::net::NodeServi
     hasher.update(hash1 % kTriedBucketsPerGroup);
     const auto hash2{endian::load_little_u64(hasher.finalize().data())};
 
-    ret.x = gsl::narrow_cast<uint16_t>(hash2 % kNewBucketsCount);
+    ret.x = gsl::narrow_cast<uint16_t>(hash2 % kTriedBucketsCount);
 
     hasher.init(key_view);
     hasher.update('T');

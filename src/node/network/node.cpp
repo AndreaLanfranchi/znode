@@ -518,6 +518,7 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
                 std::ignore = push_message(local_version_, MessagePriority::kHigh);
             }
             std::ignore = push_message(MessageType::kVerAck, MessagePriority::kHigh);
+            notify_node_hub = true;  // Will eventually set the outgoing address as good
             print_log(log::Level::kInfo, log_params);
         } break;
         case kVerAck:

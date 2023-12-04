@@ -86,6 +86,9 @@ class AddressBook {
     //! \throws std::invalid_argument it the network address is not routable
     [[nodiscard]] bool add_new(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty);
 
+    //! \brief Marks an item as good (reachable and successfully connected to)
+    [[nodiscard]] bool set_good(const IPEndpoint& remote, NodeSeconds time = Now<NodeSeconds>()) noexcept;
+
     //! \brief Inserts or updates a vector of item in the address book
     //! \details If the item is already in the address book, it is updated with the new information
     //! \returns true if any item was inserted, false otherwise

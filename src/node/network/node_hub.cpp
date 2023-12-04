@@ -517,10 +517,15 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
     const auto msg_type{payload_ptr->type()};
     switch (msg_type) {
         using enum MessageType;
+        case kVersion:
+            if (node_ptr->connection().type_ != ConnectionType::kInbound) {
+                std::ignore = address_book_.set_good(node_ptr->remote_endpoint());
+            };
+            break;
         case kAddr: {
             auto& payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
             payload.shuffle();
-            logger << "count=" << std::to_string(payload.identifiers_.size());
+            logger << "items=" << std::to_string(payload.identifiers_.size());
             std::ignore = address_book_.add_new(payload.identifiers_, node_ptr->remote_endpoint().address_, 2h);
 
             // TODO Pass it to the address manager
@@ -542,11 +547,11 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
         } break;
         case kGetHeaders: {
             auto& payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
-            logger << "count=" << std::to_string(payload.block_locator_hashes_.size());
+            logger << "items=" << std::to_string(payload.block_locator_hashes_.size());
         } break;
         case kInv: {
             auto& payload = dynamic_cast<MsgInventoryPayload&>(*payload_ptr);
-            logger << "count=" << std::to_string(payload.items_.size());
+            logger << "items=" << std::to_string(payload.items_.size());
         } break;
         default:
             break;
