@@ -344,7 +344,7 @@ AddressBook::SlotAddress AddressBook::get_new_slot(const NodeServiceInfo& servic
     return ret;
 }
 
-AddressBook::SlotAddress AddressBook::get_tried_slot(const znode::net::NodeServiceInfo& service) const noexcept {
+AddressBook::SlotAddress AddressBook::get_tried_slot(const NodeServiceInfo& service) const noexcept {
     const ByteView key_view{key_.data(), key_.size()};
     const auto service_group{compute_group(service.service_.endpoint_.address_)};
     const auto service_key{service.service_.endpoint_.to_bytes()};
@@ -373,7 +373,7 @@ AddressBook::SlotAddress AddressBook::get_tried_slot(const znode::net::NodeServi
     return ret;
 }
 
-Bytes AddressBook::compute_group(const znode::net::IPAddress& address) noexcept {
+Bytes AddressBook::compute_group(const IPAddress& address) noexcept {
     ASSERT(address.is_routable());
     const auto address_type{address.get_type()};
     Bytes ret{1, static_cast<uint8_t>(address_type)};
@@ -394,4 +394,14 @@ Bytes AddressBook::compute_group(const znode::net::IPAddress& address) noexcept 
     }
     return ret;
 }
+
+uint32_t AddressBook::get_entry_id(SlotAddress slot, bool tried) noexcept {
+    if (tried) {
+        if (slot.x >= kTriedBucketsCount or slot.y >= kBucketSize) return 0U;
+        return tried_buckets_[slot.x][slot.y];
+    }
+    if (slot.x >= kNewBucketsCount or slot.y >= kBucketSize) return 0U;
+    return new_buckets_[slot.x][slot.y];
+}
+
 }  // namespace znode::net

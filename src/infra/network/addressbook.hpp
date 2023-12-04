@@ -163,5 +163,11 @@ class AddressBook {
     //! \details The computation is based on finding the base address for an IP subnet
     //! (i.e. kIPv4SubnetGroupsPrefix and kIPv6SubnetGroupsPrefix respectively)
     static Bytes compute_group(const IPAddress& address) noexcept;
+
+    //! \brief Pulls the entry id registered at provided slot address
+    //! \param slot The slot address
+    //! \param tried Whether the slot is in a "tried" bucket. Otherwise is sought in a "new" bucket
+    uint32_t get_entry_id(SlotAddress slot, bool tried) noexcept;
+
 };
 }  // namespace znode::net
