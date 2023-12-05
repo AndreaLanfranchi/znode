@@ -25,8 +25,8 @@ namespace znode {
 //! \brief Generates a random value of type T in a provided [min..max] range
 template <Integral T>
 T randomize(const T min, const T max) {
-    static ZEN_THREAD_LOCAL std::random_device rnd;
-    static ZEN_THREAD_LOCAL std::mt19937 gen(rnd());
+    static THREAD_LOCAL std::random_device rnd;
+    static THREAD_LOCAL std::mt19937 gen(rnd());
     std::uniform_int_distribution<T> dis(min, max);
     return dis(gen);
 }
@@ -62,6 +62,9 @@ T randomize(T val, double percentage) {
     return randomize<T>(min, max);
 }
 
-Bytes get_random_bytes(size_t size);
+Bytes get_random_bytes(size_t size) noexcept;
+
+//! \brief Generates a random uint<bits>_t value
+uint64_t randbits(uint8_t nbits) noexcept;
 
 }  // namespace znode

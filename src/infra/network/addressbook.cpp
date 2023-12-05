@@ -26,7 +26,10 @@
 
 namespace znode::net {
 
-size_t AddressBook::size() const { return randomly_ordered_ids_.size(); }
+size_t AddressBook::size() const {
+    std::shared_lock lock{mutex_};
+    return randomly_ordered_ids_.size();
+}
 
 bool AddressBook::empty() const { return size() == 0U; }
 
@@ -266,7 +269,7 @@ void AddressBook::clear_new_slot(const SlotAddress& slot_address, bool erase_ent
     if (slot_address.x >= kNewBucketsCount or slot_address.y >= kBucketSize) return;  // TODO Or throw?
     const auto id{new_buckets_[slot_address.x][slot_address.y]};
     if (id == 0U) return;  // Empty slot already
-    auto it{map_id_to_serviceinfo_.find(id)};
+    const auto it{map_id_to_serviceinfo_.find(id)};
     ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found
 
     auto it2{it->second.new_refs_.find(slot_address.xy)};
@@ -285,8 +288,8 @@ std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::find_entry(const NodeS
         return {nullptr, 0U};
     }
 
-    auto id{it1->second};
-    auto it2{map_id_to_serviceinfo_.find(id)};
+    const auto id{it1->second};
+    const auto it2{map_id_to_serviceinfo_.find(id)};
     ASSERT(it2 != map_id_to_serviceinfo_.end());  // Must be found or else the data structures are inconsistent
     ASSERT((it2->second.service_.endpoint_ ==
             service.endpoint_));  // Must be the same (or else the data structures are inconsistent)
@@ -395,7 +398,7 @@ Bytes AddressBook::compute_group(const IPAddress& address) noexcept {
     return ret;
 }
 
-uint32_t AddressBook::get_entry_id(SlotAddress slot, bool tried) noexcept {
+uint32_t AddressBook::get_entry_id(SlotAddress slot, bool tried) const noexcept {
     if (tried) {
         if (slot.x >= kTriedBucketsCount or slot.y >= kBucketSize) return 0U;
         return tried_buckets_[slot.x][slot.y];
@@ -404,4 +407,61 @@ uint32_t AddressBook::get_entry_id(SlotAddress slot, bool tried) noexcept {
     return new_buckets_[slot.x][slot.y];
 }
 
+std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
+    bool new_only, std::optional<IPAddressType> type) const noexcept {
+    std::pair<std::optional<IPEndpoint>, NodeSeconds> ret{};
+
+    std::unique_lock lock{mutex_};
+    if (randomly_ordered_ids_.empty()) return ret;
+    if (new_only and new_entries_size_ == 0U) return ret;
+
+    // Determine whether to select from new or tried buckets
+    bool select_from_tried{false};
+    if (new_only or tried_entries_size_.load() == 0U) {
+        // Select from new buckets
+        select_from_tried = false;
+    } else {
+        if (new_entries_size_.load() == 0U) {
+            // Select from tried buckets
+            select_from_tried = true;
+        } else {
+            // Select from new or tried buckets
+            select_from_tried = static_cast<bool>(randomize<uint32_t>(0U, 1U));
+        }
+    }
+
+    const auto max_bucket_count{select_from_tried ? kTriedBucketsCount : kNewBucketsCount};
+    double chance_factor{1.0};
+    SlotAddress slot_address{0U};
+    for (;;) {
+        slot_address.x = randomize<uint16_t>(uint16_t(0), uint16_t(max_bucket_count - 1U));
+        const auto initial_y{randomize<uint16_t>(uint16_t(0), uint16_t(kBucketSize - 1U))};
+        uint16_t i{0U};
+        uint32_t entry_id{0U};
+        for (; i < kBucketSize; ++i) {
+            slot_address.y = (initial_y + i) % kBucketSize;
+            entry_id = get_entry_id(slot_address, select_from_tried);
+            if (entry_id == 0U) continue;
+            if (type.has_value()) {
+                // TODO : Avoid this double lookup
+                const auto it{map_id_to_serviceinfo_.find(entry_id)};
+                ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found or data structures are inconsistent
+                const auto& service_info{it->second};
+                if (service_info.service_.endpoint_.address_.get_type() not_eq type.value()) continue;
+            }
+            break;
+        }
+        if (i == kBucketSize) continue;  // No entry found in this bucket pick another one
+        const auto it{map_id_to_serviceinfo_.find(entry_id)};
+        ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found or data structures are inconsistent
+        const auto& service_info{it->second};
+        if (randbits(30) < static_cast<uint64_t>(chance_factor * service_info.get_chance() * (1ULL << 30))) {
+            ret.first = service_info.service_.endpoint_;
+            ret.second = service_info.service_.time_;
+            break;
+        }
+        chance_factor *= 1.2;  // Increase probability of selecting something at each iteration
+    }
+    return ret;
+}
 }  // namespace znode::net

@@ -20,8 +20,8 @@
 
 namespace znode {
 
-Bytes get_random_bytes(size_t size) {
-    if (size == 0U) throw std::invalid_argument("Size cannot be 0");
+Bytes get_random_bytes(size_t size) noexcept {
+    if (size == 0U) return {};
     Bytes bytes(size, 0);
     std::random_device rnd;
     std::mt19937 gen(rnd());
@@ -30,5 +30,23 @@ Bytes get_random_bytes(size_t size) {
         byte = static_cast<uint8_t>(dis(gen));
     }
     return bytes;
+}
+
+uint64_t randbits(uint8_t bits) noexcept {
+    if (bits == 0U) return 0ULL;
+    static THREAD_LOCAL uint64_t bit_buffer{0ULL};
+    static THREAD_LOCAL uint8_t bit_buffer_size{0U};
+    bits = std::min(bits, uint8_t(63U));
+    if (bits > 32U) {
+        return randomize<uint64_t>() >> (64U - bits);
+    }
+    if (bit_buffer_size < bits) {
+        bit_buffer = randomize<uint64_t>();
+        bit_buffer_size = static_cast<uint8_t>((bit_buffer)*size_t(CHAR_BIT));
+    }
+    uint64_t ret{bit_buffer & (UINT64_MAX >> (64U - bits))};
+    bit_buffer >>= bits;
+    bit_buffer_size -= bits;
+    return ret;
 }
 }  // namespace znode

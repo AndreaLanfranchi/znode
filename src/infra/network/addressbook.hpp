@@ -104,6 +104,13 @@ class AddressBook {
     //! \brief Returns whether an id is contained in the address book
     [[nodiscard]] bool contains(uint32_t id) const noexcept;
 
+    //! \brief Selects a random entry from the address book for a new dial-out connection
+    //! \param new_only Whether to only consider entries in the "new" buckets
+    //! \param type The type of address to select (IPv4 or IPv6). If not provided, any type is considered
+    //! \returns A pair containing the endpoint and the time it was last tried
+    [[nodiscard]] std::pair<std::optional<IPEndpoint>, NodeSeconds> select_random(
+        bool new_only, std::optional<IPAddressType> type = std::nullopt) const noexcept;
+
   private:
     mutable std::shared_mutex mutex_;                                      // Thread safety
     const Bytes key_{get_random_bytes(2 * sizeof(uint64_t))};              // Secret key to randomize the address book
@@ -167,7 +174,6 @@ class AddressBook {
     //! \brief Pulls the entry id registered at provided slot address
     //! \param slot The slot address
     //! \param tried Whether the slot is in a "tried" bucket. Otherwise is sought in a "new" bucket
-    uint32_t get_entry_id(SlotAddress slot, bool tried) noexcept;
-
+    uint32_t get_entry_id(SlotAddress slot, bool tried) const noexcept;
 };
 }  // namespace znode::net

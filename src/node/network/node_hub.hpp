@@ -72,13 +72,16 @@ class NodeHub : public con::Stoppable {
     //! and creates related nodes
     Task<void> node_factory_work();
 
-    //! \brief Executes the connector work loop asynchronously
+    //! \brief Executes the dial-out connector work loop asynchronously
     Task<void> connector_work();
+
+    //! \brief Executes the address book selector work loop asynchronously
+    Task<void> address_book_selector_work();
 
     //! \brief Asynchronously connects to a remoote endpoint
     Task<void> async_connect(Connection& connection);  // Connects to a remote endpoint
 
-    //! \brief Executes the acceptor work loop asynchronously
+    //! \brief Executes the dial-in acceptor work loop asynchronously
     Task<void> acceptor_work();
 
     //! \brief Accounts data about node's socket disconnections

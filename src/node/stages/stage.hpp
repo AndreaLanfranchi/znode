@@ -145,7 +145,7 @@ class StageError : public std::exception {
 
 //! \brief Throws StageError exception when code =! Result::kSuccess
 //! \param [in] code : The result of a stage operation
-inline ZEN_ALWAYS_INLINE void success_or_throw(Stage::Result code) {
+inline ALWAYS_INLINE void success_or_throw(Stage::Result code) {
     if (code != Stage::Result::kSuccess) {
         throw StageError(code);
     }

@@ -154,6 +154,12 @@ class NotifyChannel {
     }
     void notify() { std::ignore = channel_.try_send(std::monostate{}); }
 
+    //! \brief Determine whether the channel is open
+    [[nodiscard]] bool is_open() const noexcept { return channel_.is_open(); }
+
+    //! \brief Closes the channel
+    void close() { channel_.close(); }
+
   private:
     Channel<std::monostate> channel_;
 };

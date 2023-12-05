@@ -40,17 +40,17 @@
 #undef BITNESS_64
 
 #if defined(__wasm__)
-#define ZEN_THREAD_LOCAL
+#define THREAD_LOCAL
 #else
-#define ZEN_THREAD_LOCAL thread_local
+#define THREAD_LOCAL thread_local
 #endif
 
 // Inlining
 #if defined(__GNUC__) || defined(__clang__)
 #define ZEN_ALWAYS_INLINE __attribute__((always_inline))
 #elif defined(_MSC_VER) && !defined(__clang__)
-#define ZEN_ALWAYS_INLINE __forceinline
+#define ALWAYS_INLINE __forceinline
 #define __func__ __FUNCTION__
 #else
-#define ZEN_ALWAYS_INLINE
+#define ALWAYS_INLINE
 #endif

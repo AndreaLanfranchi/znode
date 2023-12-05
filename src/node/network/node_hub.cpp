@@ -65,6 +65,7 @@ bool NodeHub::start() noexcept {
     asio::co_spawn(asio_context_, node_factory_work(), asio::detached);
     asio::co_spawn(asio_context_, acceptor_work(), asio::detached);
     asio::co_spawn(asio_context_, connector_work(), asio::detached);
+    asio::co_spawn(asio_context_, address_book_selector_work(), asio::detached);
 
     resolve_task.wait();
     log::Info("Service", {"name", "Node Hub", "action", "start", "advertising address",
@@ -82,6 +83,7 @@ bool NodeHub::stop() noexcept {
         socket_acceptor_.close();
         node_factory_feed_.close();
         connector_feed_.close();
+        need_connections_.close();
 
         // We MUST wait for all nodes to stop before returning otherwise
         // this instance falls out of scope and the nodes call a callback
@@ -147,10 +149,6 @@ Task<void> NodeHub::node_factory_work() {
 
         new_node->start();
         on_node_connected(new_node);
-
-        if (current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
-            need_connections_.notify();
-        }
     }
 
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "node_factory", "status", "stopped"});
@@ -160,21 +158,14 @@ Task<void> NodeHub::node_factory_work() {
 Task<void> NodeHub::connector_work() {
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "connector", "status", "started"});
 
-    need_connections_.notify();
     while (is_running()) {
-        // Poll channel for any outstanding connection request
+        // Poll channel for any queued address to connect to
         boost::system::error_code error;
         std::shared_ptr<Connection> conn_ptr;
         if (not connector_feed_.try_receive(conn_ptr)) {
             const auto result = co_await connector_feed_.async_receive(error);
             if (error or not result.has_value()) continue;
             conn_ptr = result.value();
-        }
-
-        ASSERT_PRE(conn_ptr->socket_ptr_ == nullptr and "Socket must be null");
-        if (app_settings_.network.ipv4_only and conn_ptr->endpoint_.address_.get_type() not_eq IPAddressType::kIPv4) {
-            need_connections_.notify();
-            continue;
         }
 
         const std::string remote{conn_ptr->endpoint_.to_string()};
@@ -193,7 +184,7 @@ Task<void> NodeHub::connector_work() {
         }
         lock.unlock();
 
-        LOG_TRACE2 << "Connecting to " << remote;
+        log::Info("Service", {"name", "Node Hub", "remote", remote}) << "Connecting ...";
 
         try {
             co_await async_connect(*conn_ptr);
@@ -201,7 +192,6 @@ Task<void> NodeHub::connector_work() {
             log::Warning("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
                                      "error", ex.code().message()});
             std::ignore = conn_ptr->socket_ptr_->close(error);
-            need_connections_.notify();
             continue;
         }
 
@@ -213,6 +203,30 @@ Task<void> NodeHub::connector_work() {
         }
     }
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "connector", "status", "stopped"});
+    co_return;
+}
+
+Task<void> NodeHub::address_book_selector_work() {
+    std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "selector", "status", "started"});
+    while (is_running()) {
+        if (!need_connections_.notified()) {
+            co_await need_connections_.wait_one();
+        }
+        if (not is_running() || !need_connections_.is_open()) break;
+
+        // Select a random address from the address book
+        std::optional<IPAddressType> type;
+        if (app_settings_.network.ipv4_only) {
+            type = IPAddressType::kIPv4;
+        }
+        auto [endpoint, last_tried]{address_book_.select_random(/*new_only=*/false, type)};
+        if (not endpoint.has_value()) continue;
+        if (current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections) continue;
+
+        auto conn_ptr = std::make_shared<Connection>(endpoint.value(), ConnectionType::kSeedOutbound);
+        std::ignore = connector_feed_.try_send(std::move(conn_ptr));
+    }
+    std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "selector", "status", "stopped"});
     co_return;
 }
 
@@ -299,7 +313,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
             continue;
         } else if (not(*iterator)->is_running()) {
             on_node_disconnected(*iterator);
-            iterator->reset();
+            if (static_cast<unsigned>(iterator->use_count()) == 1U) iterator->reset();
             ++iterator;
             continue;
         }
@@ -318,7 +332,9 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
         }
         ++iterator;
     }
-    current_active_connections_.store(static_cast<uint32_t>(nodes_.size()));
+    if (is_running() && current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+        need_connections_.notify();
+    }
 }
 
 void NodeHub::on_info_timer_expired(con::Timer::duration& /*interval*/) {
@@ -329,11 +345,6 @@ void NodeHub::on_info_timer_expired(con::Timer::duration& /*interval*/) {
     const auto [inbound_traffic, outbound_traffic]{traffic_meter_.get_cumulative_bytes()};
     info_data.insert(info_data.end(), {"data i/o", absl::StrCat(to_human_bytes(inbound_traffic, true), " ",
                                                                 to_human_bytes(outbound_traffic, true))});
-
-    const auto [cumulative_speed_in, cumulative_speed_out]{traffic_meter_.get_cumulative_speed()};
-    info_data.insert(info_data.end(),
-                     {"overall speed i/o", absl::StrCat(to_human_bytes(cumulative_speed_in, true), "s ",
-                                                        to_human_bytes(cumulative_speed_out, true), "s")});
 
     const auto [instant_speed_in, instant_speed_out]{traffic_meter_.get_interval_speed(true)};
     info_data.insert(info_data.end(),
@@ -436,26 +447,21 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
     }
 
     ++total_disconnections_;
+    --current_active_connections_;
     switch (node->connection().type_) {
         using enum ConnectionType;
         case kInbound:
-            if (current_active_inbound_connections_ not_eq 0U) {
-                --current_active_inbound_connections_;
-            }
+            --current_active_inbound_connections_;
             break;
         case kOutbound:
         case kManualOutbound:
         case kSeedOutbound:
-            if (current_active_outbound_connections_ not_eq 0U) {
-                --current_active_outbound_connections_;
+            if (--current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+                need_connections_.notify();
             }
             break;
         default:
             ASSERT(false and "Should not happen");
-    }
-    current_active_connections_ = current_active_inbound_connections_ + current_active_outbound_connections_;
-    if (current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
-        need_connections_.notify();
     }
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service",
@@ -468,6 +474,7 @@ void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
     const std::lock_guard lock(nodes_mutex_);
     connected_addresses_[*node->remote_endpoint().address_]++;
     ++total_connections_;
+    ++current_active_connections_;
     switch (node->connection().type_) {
         using enum ConnectionType;
         case kInbound:
@@ -476,7 +483,9 @@ void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
         case kOutbound:
         case kManualOutbound:
         case kSeedOutbound:
-            ++current_active_outbound_connections_;
+            if (++current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+                need_connections_.notify();
+            }
             break;
         default:
             ASSERT(false and "Should not happen");
@@ -527,23 +536,6 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
             payload.shuffle();
             logger << "items=" << std::to_string(payload.identifiers_.size());
             std::ignore = address_book_.add_new(payload.identifiers_, node_ptr->remote_endpoint().address_, 2h);
-
-            // TODO Pass it to the address manager
-            if (need_connections_.notified()) {
-                for (const auto& service : payload.identifiers_) {
-                    if (app_settings_.network.ipv4_only and
-                        service.endpoint_.address_.get_type() == IPAddressType::kIPv6)
-                        continue;
-                    if (app_settings_.chain_config->default_port_ != service.endpoint_.port_) {
-                        log::Debug("Service", {"name", "Node Hub", "action", __func__, "message", "addr", "entry",
-                                               service.endpoint_.to_string()})
-                            << " << Non standard port";
-                    }
-                    std::ignore = connector_feed_.try_send(
-                        std::make_shared<Connection>(service.endpoint_, ConnectionType::kOutbound));
-                    break;
-                }
-            }
         } break;
         case kGetHeaders: {
             auto& payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
