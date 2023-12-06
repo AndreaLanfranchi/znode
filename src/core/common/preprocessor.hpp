@@ -47,7 +47,7 @@
 
 // Inlining
 #if defined(__GNUC__) || defined(__clang__)
-#define ZEN_ALWAYS_INLINE __attribute__((always_inline))
+#define ALWAYS_INLINE __attribute__((always_inline))
 #elif defined(_MSC_VER) && !defined(__clang__)
 #define ALWAYS_INLINE __forceinline
 #define __func__ __FUNCTION__

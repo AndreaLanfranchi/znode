@@ -55,7 +55,7 @@ bool NodeHub::start() noexcept {
         tls_client_context_ = std::make_unique<asio::ssl::context>(ctx);
     }
 
-    service_timer_.start(250ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
+    service_timer_.start(500ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
     info_timer_.start(5s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
 
     // We need to determine our network address which will be used to advertise us to other nodes
@@ -168,7 +168,7 @@ Task<void> NodeHub::connector_work() {
             conn_ptr = result.value();
         }
         if (!is_running()) break;
-        if(current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections) continue;
+        if (current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections) continue;
         const std::string remote{conn_ptr->endpoint_.to_string()};
 
         // Verify we're not exceeding connections per IP
@@ -307,7 +307,9 @@ Task<void> NodeHub::acceptor_work() {
 void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     const bool running{is_running()};
     size_t stopped_nodes{0};
-    std::unique_lock lock{nodes_mutex_};
+
+    std::unique_lock lock(nodes_mutex_, std::defer_lock);
+    if (!lock.try_lock()) return;  // We'll defer to next timer tick
 
     // Randomly shutdown one node
     // TODO remove this when done testing
@@ -322,7 +324,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
             iterator = nodes_.erase(iterator);
             continue;
         } else if (not(*iterator)->is_running()) {
-            on_node_disconnected(*iterator);
+            on_node_disconnected(*(*iterator));
             if (static_cast<unsigned>(iterator->use_count()) == 1U) iterator->reset();
             ++iterator;
             ++it_index;
@@ -354,7 +356,8 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
         ++iterator;
         ++it_index;
     }
-    if (is_running() && current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+    lock.unlock();
+    if (running && current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
         need_connections_.notify();
     }
 }
@@ -369,9 +372,8 @@ void NodeHub::on_info_timer_expired(con::Timer::duration& /*interval*/) {
                                                                 to_human_bytes(outbound_traffic, true))});
 
     const auto [instant_speed_in, instant_speed_out]{traffic_meter_.get_interval_speed(true)};
-    info_data.insert(info_data.end(),
-                     {"instant speed i/o", absl::StrCat(to_human_bytes(instant_speed_in, true), "s ",
-                                                        to_human_bytes(instant_speed_out, true), "s")});
+    info_data.insert(info_data.end(), {"speed i/o", absl::StrCat(to_human_bytes(instant_speed_in, true), "s ",
+                                                                 to_human_bytes(instant_speed_out, true), "s")});
 
     std::ignore = log::Info("Network usage", info_data);
 }
@@ -460,8 +462,8 @@ void NodeHub::initialize_acceptor() {
                     local_endpoint.value().to_string(), "secure", (app_settings_.network.use_tls ? "yes" : "no")});
 }
 
-void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
-    if (auto item{connected_addresses_.find(*node->remote_endpoint().address_)};
+void NodeHub::on_node_disconnected(const Node& node) {
+    if (auto item{connected_addresses_.find(*(node.remote_endpoint().address_))};
         item not_eq connected_addresses_.end()) {
         if (--item->second == 0) {
             connected_addresses_.erase(item);
@@ -470,7 +472,7 @@ void NodeHub::on_node_disconnected(const std::shared_ptr<Node>& node) {
 
     ++total_disconnections_;
     --current_active_connections_;
-    switch (node->connection().type_) {
+    switch (node.connection().type_) {
         using enum ConnectionType;
         case kInbound:
             --current_active_inbound_connections_;
@@ -555,8 +557,8 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
             break;
         case kAddr: {
             auto& payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
-            payload.shuffle();
             logger << "items=" << std::to_string(payload.identifiers_.size());
+            payload.shuffle();
             std::ignore = address_book_.add_new(payload.identifiers_, node_ptr->remote_endpoint().address_, 2h);
         } break;
         case kGetHeaders: {

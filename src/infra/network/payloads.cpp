@@ -199,6 +199,7 @@ nlohmann::json MsgAddrPayload::to_json() const {
 }
 
 void MsgAddrPayload::shuffle() noexcept {
+    if (identifiers_.size() < 2U) return;
     std::random_device rnd;
     std::mt19937 gen(rnd());
     std::shuffle(identifiers_.begin(), identifiers_.end(), gen);

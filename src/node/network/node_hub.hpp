@@ -86,7 +86,7 @@ class NodeHub : public con::Stoppable {
 
     //! \brief Accounts data about node's socket disconnections
     //! \remarks Requires a lock on nodes_mutex_ is holding
-    void on_node_disconnected(const std::shared_ptr<Node>& node);
+    void on_node_disconnected(const Node& node);
 
     //! \brief Accounts data about node's socket connections
     void on_node_connected(const std::shared_ptr<Node>& node);

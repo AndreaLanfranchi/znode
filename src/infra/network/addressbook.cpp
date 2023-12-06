@@ -114,10 +114,10 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
         }
     }
 
-    std::ignore = log::Info("Address Book",
-                            {"processed", std::to_string(services_size), "in", StopWatch::format(sw.since_start()),
-                             "additions", std::to_string(added_count), "buckets new/tried",
-                             absl::StrCat(new_entries_size_.load(), "/", tried_entries_size_.load())});
+    std::ignore = log::Trace("Address Book",
+                             {"processed", std::to_string(services_size), "in", StopWatch::format(sw.since_start()),
+                              "additions", std::to_string(added_count), "buckets new/tried",
+                              absl::StrCat(new_entries_size_.load(), "/", tried_entries_size_.load())});
 
     return (added_count > 0U);
 }
