@@ -250,7 +250,7 @@ void AddressBook::make_entry_tried(uint32_t entry_id) noexcept {
         auto it2{map_id_to_serviceinfo_.find(id_to_evict)};
         ASSERT(it2 not_eq map_id_to_serviceinfo_.end());  // Must be found
         ASSERT(it2->second.tried_ref_.has_value() &&
-               it2->second.tried_ref_.value() == id_to_evict);  // Must be in the tried bucket
+               it2->second.tried_ref_.value() == slot_address.xy);  // Must be in the tried bucket
         it2->second.tried_ref_.reset();
         slot = 0U;
         --tried_entries_size_;

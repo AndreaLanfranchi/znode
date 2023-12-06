@@ -167,7 +167,8 @@ Task<void> NodeHub::connector_work() {
             if (error or not result.has_value()) continue;
             conn_ptr = result.value();
         }
-
+        if (!is_running()) break;
+        if(current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections) continue;
         const std::string remote{conn_ptr->endpoint_.to_string()};
 
         // Verify we're not exceeding connections per IP
@@ -175,8 +176,8 @@ Task<void> NodeHub::connector_work() {
         if (const auto item = connected_addresses_.find(*conn_ptr->endpoint_.address_);
             item not_eq connected_addresses_.end() and
             item->second >= app_settings_.network.max_active_connections_per_ip) {
-            log::Warning("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
-                                     "error", "same IP connections overflow"})
+            log::Trace("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
+                                   "error", "same IP connections overflow"})
                 << "Discarding ...";
             lock.unlock();
             need_connections_.notify();
@@ -307,6 +308,15 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     const bool running{is_running()};
     size_t stopped_nodes{0};
     std::unique_lock lock{nodes_mutex_};
+
+    // Randomly shutdown one node
+    // TODO remove this when done testing
+    uint32_t it_index{0};
+    std::optional<uint32_t> random_index;
+    if (running && nodes_.size() > 1 && randomize<uint32_t>(0U, 120U) == 0) {
+        random_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
+    }
+
     for (auto iterator{nodes_.begin()}; iterator not_eq nodes_.end(); /* !!! no increment !!! */) {
         if (*iterator == nullptr) {
             iterator = nodes_.erase(iterator);
@@ -315,12 +325,23 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
             on_node_disconnected(*iterator);
             if (static_cast<unsigned>(iterator->use_count()) == 1U) iterator->reset();
             ++iterator;
+            ++it_index;
             continue;
         }
         if (not running) {
             std::ignore = (*iterator)->stop();
             if (++stopped_nodes == 16) break;  // Otherwise too many pending actions pile up.
             ++iterator;
+            ++it_index;
+            continue;
+        }
+        if (random_index and it_index == random_index.value()) {
+            log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer[shutdown]", "remote",
+                                  (*iterator)->to_string()})
+                << "Disconnecting ...";
+            std::ignore = (*iterator)->stop();
+            ++iterator;
+            ++it_index;
             continue;
         }
         if (const auto idling_result{(*iterator)->is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
@@ -331,6 +352,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
             std::ignore = (*iterator)->stop();
         }
         ++iterator;
+        ++it_index;
     }
     if (is_running() && current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
         need_connections_.notify();
