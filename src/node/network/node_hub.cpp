@@ -55,7 +55,7 @@ bool NodeHub::start() noexcept {
         tls_client_context_ = std::make_unique<asio::ssl::context>(ctx);
     }
 
-    service_timer_.start(250ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
+    service_timer_.start(125ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
     info_timer_.start(5s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
 
     // We need to determine our network address which will be used to advertise us to other nodes
@@ -178,14 +178,13 @@ Task<void> NodeHub::connector_work() {
         const std::string remote{conn_ptr->endpoint_.to_string()};
 
         // Verify we're not exceeding connections per IP
-        std::unique_lock lock{nodes_mutex_};
+        std::unique_lock lock{connected_addresses_mutex_};
         if (const auto item = connected_addresses_.find(*conn_ptr->endpoint_.address_);
             item not_eq connected_addresses_.end() and
             item->second >= app_settings_.network.max_active_connections_per_ip) {
             log::Trace("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
                                    "error", "same IP connections overflow"})
                 << "Discarding ...";
-            lock.unlock();
             need_connections_.notify();
             continue;
         }
@@ -349,8 +348,11 @@ Task<void> NodeHub::acceptor_work() {
     co_return;
 }
 
-void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
+void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
     const bool this_is_running{is_running()};
+
+    // This is a hack. Replace with count of connections in flight
+    static con::Timer::duration last_need_connections_check{app_settings_.network.connect_timeout_seconds * 1'000};
 
     std::unique_lock lock(nodes_mutex_, std::defer_lock);
     if (!lock.try_lock()) return;  // We'll defer to next timer tick
@@ -359,7 +361,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     // TODO remove this when done testing
     uint32_t it_index{0};
     std::optional<uint32_t> random_index;
-    if (this_is_running && nodes_.size() > 1 && randomize<uint32_t>(0U, 120U) == 0) {
+    if (this_is_running && nodes_.size() > 1 && randomize<uint32_t>(0U, 960U) == 0) {
         random_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
     }
 
@@ -367,40 +369,34 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
         if (*iterator == nullptr) {
             iterator = nodes_.erase(iterator);
             continue;
-        } else if ((*iterator)->status() == ComponentStatus::kNotStarted) {
+        }
+
+        if ((*iterator)->status() == ComponentStatus::kNotStarted) {
             if (static_cast<unsigned>(iterator->use_count()) == 1U) iterator->reset();
-            ++iterator;
-            ++it_index;
-            continue;
-        }
-        if (not this_is_running) {
+        } else if (not this_is_running) {
             if ((*iterator)->stop()) break;
-            ++iterator;
-            ++it_index;
-            continue;
-        }
-        if (random_index and it_index == random_index.value()) {
+        } else if (random_index and it_index == random_index.value()) {
             log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer[shutdown]", "remote",
                                   (*iterator)->to_string()})
                 << "Disconnecting ...";
             if ((*iterator)->stop()) break;
-            ++iterator;
-            ++it_index;
-            continue;
-        }
-        if (const auto idling_result{(*iterator)->is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
+        } else if (const auto idling_result{(*iterator)->is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(idling_result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
                                      (*iterator)->to_string(), "reason", reason})
                 << "Disconnecting ...";
-            std::ignore = (*iterator)->stop();
+            if ((*iterator)->stop()) break;
         }
         ++iterator;
         ++it_index;
     }
     lock.unlock();
-    if (this_is_running && current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
-        need_connections_.notify();
+    last_need_connections_check -= interval;
+    if (this_is_running && last_need_connections_check.count() <= 0) {
+        last_need_connections_check = con::Timer::duration(app_settings_.network.connect_timeout_seconds * 1'000);
+        if (current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+            need_connections_.notify();
+        }
     }
 }
 
@@ -409,9 +405,12 @@ void NodeHub::on_info_timer_expired(con::Timer::duration& /*interval*/) {
     info_data.insert(info_data.end(), {"peers i/o", absl::StrCat(current_active_inbound_connections_.load(), "/",
                                                                  current_active_outbound_connections_.load())});
 
+    const auto [new_buckets, tried_buckets]{address_book_.size_by_buckets()};
+    info_data.insert(info_data.end(), {"addresses new/tried", absl::StrCat(new_buckets, "/", tried_buckets)});
+
     const auto [inbound_traffic, outbound_traffic]{traffic_meter_.get_cumulative_bytes()};
-    info_data.insert(info_data.end(), {"data i/o", absl::StrCat(to_human_bytes(inbound_traffic, true), " ",
-                                                                to_human_bytes(outbound_traffic, true))});
+    info_data.insert(info_data.end(), {"traffic i/o", absl::StrCat(to_human_bytes(inbound_traffic, true), " ",
+                                                                   to_human_bytes(outbound_traffic, true))});
 
     const auto [instant_speed_in, instant_speed_out]{traffic_meter_.get_interval_speed(true)};
     info_data.insert(info_data.end(), {"speed i/o", absl::StrCat(to_human_bytes(instant_speed_in, true), "s ",
@@ -505,8 +504,11 @@ void NodeHub::initialize_acceptor() {
 }
 
 void NodeHub::on_node_connected(std::shared_ptr<Node> node_ptr) {
-    const std::unique_lock lock(nodes_mutex_);
-    connected_addresses_[*node_ptr->remote_endpoint().address_]++;
+    {
+        const std::unique_lock lock(connected_addresses_mutex_);
+        connected_addresses_[*node_ptr->remote_endpoint().address_]++;
+    }
+
     ++total_connections_;
     ++current_active_connections_;
     switch (node_ptr->connection().type_) {
@@ -522,7 +524,11 @@ void NodeHub::on_node_connected(std::shared_ptr<Node> node_ptr) {
         default:
             ASSERT(false and "Should not happen");
     }
-    nodes_.push_back(std::move(node_ptr));
+
+    {
+        const std::unique_lock lock(nodes_mutex_);
+        nodes_.push_back(std::move(node_ptr));
+    }
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service",
                    {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",
@@ -531,13 +537,14 @@ void NodeHub::on_node_connected(std::shared_ptr<Node> node_ptr) {
 }
 
 void NodeHub::on_node_disconnected(const Node& node) {
-    std::unique_lock lock(nodes_mutex_);
+    std::unique_lock lock(connected_addresses_mutex_);
     if (auto item{connected_addresses_.find(*node.remote_endpoint().address_)};
         item not_eq connected_addresses_.end()) {
         if (--item->second == 0) {
             connected_addresses_.erase(item);
         }
     }
+    lock.unlock();
 
     ++total_disconnections_;
     --current_active_connections_;
@@ -554,7 +561,7 @@ void NodeHub::on_node_disconnected(const Node& node) {
         default:
             ASSERT(false and "Should not happen");
     }
-    lock.unlock();
+
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service",
                    {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",

@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include <core/common/lru_set.hpp>
 #include <core/common/random.hpp>
 #include <core/types/hash.hpp>
 
@@ -77,6 +78,9 @@ class AddressBook {
     //! \brief Returns the overall size of the address book
     [[nodiscard]] size_t size() const;
 
+    //! \brief Returns the sizes of new and tried buckets respectively
+    [[nodiscard]] std::pair<uint32_t, uint32_t> size_by_buckets() const;
+
     //! \brief Returns whether the address book is empty
     [[nodiscard]] bool empty() const;
 
@@ -125,6 +129,9 @@ class AddressBook {
     using bucket_t = std::array<uint32_t, kBucketSize>;
     std::array<bucket_t, kNewBucketsCount> new_buckets_{};      // New buckets (all zeroed)
     std::array<bucket_t, kTriedBucketsCount> tried_buckets_{};  // Tried buckets (all zeroed)
+
+    mutable LruSet<IPEndpoint, IPEndpointHasher> recently_selected_{64, true};  // Recently randomly selected endpoints
+                                                                                // to avoid very near duplicates
 
     /*
      * Note ! Private methods, if called from public methods, assume that the caller has already acquired a lock

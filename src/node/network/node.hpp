@@ -61,7 +61,7 @@ enum class DataDirectionMode : uint32_t {
 static constexpr size_t kMaxMessagesPerRead = 32;
 
 //! \brief Maximum number of bytes to read/write in a single operation
-static constexpr size_t kMaxBytesPerIO = 64_KiB;
+static constexpr size_t kMaxBytesPerIO = 16_KiB;
 
 //! \brief A node holds a connection (and related session) to a remote peer
 class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {

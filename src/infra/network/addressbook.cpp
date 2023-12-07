@@ -31,6 +31,10 @@ size_t AddressBook::size() const {
     return randomly_ordered_ids_.size();
 }
 
+std::pair<uint32_t, uint32_t> AddressBook::size_by_buckets() const {
+    return {new_entries_size_.load(), tried_entries_size_.load()};
+}
+
 bool AddressBook::empty() const { return size() == 0U; }
 
 bool AddressBook::contains(const NodeService& service) const noexcept { return contains(service.endpoint_); }
@@ -102,10 +106,12 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
         }
     }
 
-    std::ignore = log::Info("Address Book",
-                            {"processed", std::to_string(services_size), "in", StopWatch::format(sw.since_start()),
-                             "additions", std::to_string(added_count), "buckets new/tried",
-                             absl::StrCat(new_entries_size_.load(), "/", tried_entries_size_.load())});
+    if (log::test_verbosity(log::Level::kTrace)) {
+        std::ignore = log::Trace("Address Book",
+                                 {"processed", std::to_string(services_size), "in", StopWatch::format(sw.since_start()),
+                                  "additions", std::to_string(added_count), "buckets new/tried",
+                                  absl::StrCat(new_entries_size_.load(), "/", tried_entries_size_.load())});
+    }
 
     return (added_count > 0U);
 }
@@ -439,9 +445,10 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
     }
 
     const auto max_bucket_count{select_from_tried ? kTriedBucketsCount : kNewBucketsCount};
+    const auto items_in_set{select_from_tried ? tried_entries_size_.load() : new_entries_size_.load()};
     double chance_factor{1.0};
     SlotAddress slot_address{0U};
-    for (;;) {
+    for (int attempt{0}; attempt < 50; ++attempt) {
         slot_address.x = randomize<uint16_t>(uint16_t(0), uint16_t(max_bucket_count - 1U));
         const auto initial_y{randomize<uint16_t>(uint16_t(0), uint16_t(kBucketSize - 1U))};
         uint16_t i{0U};
@@ -466,9 +473,19 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
         if (randbits(30) < static_cast<uint64_t>(chance_factor * service_info.get_chance() * (1ULL << 30))) {
             ret.first = service_info.service_.endpoint_;
             ret.second = service_info.service_.time_;
-            break;
+        } else {
+            chance_factor *= 1.2;  // Increase probability of selecting something at each iteration
         }
-        chance_factor *= 1.2;  // Increase probability of selecting something at each iteration
+
+        // Check we do not provide a recently extracted endpoint
+        if (ret.first.has_value()) {
+            if (!recently_selected_.insert(ret.first.value()) && items_in_set > recently_selected_.size()) {
+                ret.first.reset();
+                ret.second = NodeSeconds{std::chrono::seconds(0)};
+            } else {
+                break;  // Ok to return this
+            }
+        }
     }
     return ret;
 }

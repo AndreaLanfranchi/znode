@@ -145,9 +145,10 @@ class NodeHub : public con::Stoppable {
     con::Channel<NodeAndPayload> address_book_processor_feed_;  // Channel for messages targeting the address book
 
     net::AddressBook address_book_{};                                   // The address book
-    std::list<std::shared_ptr<Node>> nodes_;                            // All the connected nodes
-    std::map<boost::asio::ip::address, uint32_t> connected_addresses_;  // Addresses that are connected
     mutable std::mutex nodes_mutex_;                                    // Guards access to nodes_
+    std::list<std::shared_ptr<Node>> nodes_;                            // All the connected nodes
+    mutable std::mutex connected_addresses_mutex_;                      // Guards access to connected_addresses_
+    std::map<boost::asio::ip::address, uint32_t> connected_addresses_;  // Addresses that are connected
 
     size_t total_connections_{0};
     size_t total_disconnections_{0};

@@ -102,7 +102,7 @@ bool Node::stop() noexcept {
         ping_timer_.stop();
         boost::system::error_code error_code;
         if (ssl_stream_ not_eq nullptr) {
-            std::ignore = ssl_stream_->shutdown(error_code);
+            // std::ignore = ssl_stream_->shutdown(error_code);
             std::ignore = ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
             std::ignore = ssl_stream_->lowest_layer().close(error_code);
         } else {
