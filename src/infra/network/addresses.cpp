@@ -223,7 +223,7 @@ Bytes IPAddress::to_bytes() const noexcept {
     return Bytes(addr_bytes.begin(), addr_bytes.end());
 }
 
-auto IPAddress::operator<=>(const IPAddress& other) const {
+std::strong_ordering IPAddress::operator<=>(const IPAddress& other) const {
     if (value_ < other.value_) return std::strong_ordering::less;
     if (value_ > other.value_) return std::strong_ordering::greater;
     return std::strong_ordering::equal;

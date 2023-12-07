@@ -39,15 +39,18 @@ using asio::ip::tcp;
 std::atomic_int Node::next_node_id_{1};  // Start from 1 for user-friendliness
 
 Node::Node(AppSettings& app_settings, std::shared_ptr<Connection> connection_ptr, boost::asio::io_context& io_context,
-           boost::asio::ssl::context* ssl_context, std::function<void(DataDirectionMode, size_t)> on_data,
-           std::function<void(std::shared_ptr<Node>, std::shared_ptr<MessagePayload>)> on_message)
+           boost::asio::ssl::context* ssl_context,                                                  //
+           std::function<void(DataDirectionMode, size_t)> on_data,                                  //
+           std::function<void(std::shared_ptr<Node>, std::shared_ptr<MessagePayload>)> on_message,  //
+           std::function<void(const Node&)> on_disconnected)
     : app_settings_(app_settings),
       connection_ptr_(std::move(connection_ptr)),
       io_strand_(io_context),
       ping_timer_(io_context, "Node_ping_timer", true),
       ssl_context_(ssl_context),
       on_data_(std::move(on_data)),
-      on_message_(std::move(on_message)) {
+      on_message_(std::move(on_message)),
+      on_disconnected_(std::move(on_disconnected)) {
     // TODO Set version's services according to settings
     local_version_.protocol_version_ = kDefaultProtocolVersion;
     local_version_.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork) bitor
@@ -120,6 +123,7 @@ void Node::on_stop_completed() noexcept {
     std::ignore = log::Info(
         "Node", {"id", std::to_string(node_id_), "remote", to_string(), "status", "disconnected", "data i/o",
                  absl::StrCat(to_human_bytes(inbound_bytes, true), " ", to_human_bytes(outbound_bytes, true))});
+    on_disconnected_(*this);
     set_stopped();
 }
 

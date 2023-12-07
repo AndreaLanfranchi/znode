@@ -67,8 +67,10 @@ static constexpr size_t kMaxBytesPerIO = 64_KiB;
 class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
   public:
     Node(AppSettings& app_settings, std::shared_ptr<Connection> connection_ptr, boost::asio::io_context& io_context,
-         boost::asio::ssl::context* ssl_context, std::function<void(DataDirectionMode, size_t)> on_data,
-         std::function<void(std::shared_ptr<Node>, std::shared_ptr<MessagePayload>)> on_message);
+         boost::asio::ssl::context* ssl_context,                  //
+         std::function<void(DataDirectionMode, size_t)> on_data,  //
+         std::function<void(std::shared_ptr<Node>, std::shared_ptr<MessagePayload>)> on_message,
+         std::function<void(const Node&)> on_disconnected);
 
     Node(Node& other) = delete;
     Node(Node&& other) = delete;
@@ -209,6 +211,8 @@ class Node : public con::Stoppable, public std::enable_shared_from_this<Node> {
     std::function<void(DataDirectionMode, size_t)> on_data_;  // To account data sizes stats at node hub
     std::function<void(std::shared_ptr<Node>, std::shared_ptr<MessagePayload>)>
         on_message_;  // Called on inbound message
+    std::function<void(const Node&)>
+        on_disconnected_;  // Called when node gets disconnected (either by us or by the remote peer)
 
     boost::asio::streambuf receive_buffer_;  // Socket async_receive buffer
     boost::asio::streambuf send_buffer_;     // Socket async_send buffer

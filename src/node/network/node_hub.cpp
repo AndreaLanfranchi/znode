@@ -55,7 +55,7 @@ bool NodeHub::start() noexcept {
         tls_client_context_ = std::make_unique<asio::ssl::context>(ctx);
     }
 
-    service_timer_.start(500ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
+    service_timer_.start(250ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
     info_timer_.start(5s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
 
     // We need to determine our network address which will be used to advertise us to other nodes
@@ -66,6 +66,7 @@ bool NodeHub::start() noexcept {
     asio::co_spawn(asio_context_, acceptor_work(), asio::detached);
     asio::co_spawn(asio_context_, connector_work(), asio::detached);
     asio::co_spawn(asio_context_, address_book_selector_work(), asio::detached);
+    asio::co_spawn(asio_context_, address_book_processor_work(), asio::detached);
 
     resolve_task.wait();
     log::Info("Service", {"name", "Node Hub", "action", "start", "advertising address",
@@ -84,6 +85,7 @@ bool NodeHub::stop() noexcept {
         node_factory_feed_.close();
         connector_feed_.close();
         need_connections_.close();
+        address_book_processor_feed_.close();
 
         // We MUST wait for all nodes to stop before returning otherwise
         // this instance falls out of scope and the nodes call a callback
@@ -137,15 +139,19 @@ Task<void> NodeHub::node_factory_work() {
         const auto new_node = std::make_shared<Node>(
             app_settings_, conn_ptr, asio_context_,
             conn_ptr->type_ == ConnectionType::kInbound ? tls_server_context_.get() : tls_client_context_.get(),
+            /* on_data */
             [this](DataDirectionMode direction, size_t bytes_transferred) {
                 on_node_data(direction, bytes_transferred);
             },
+            /* on_message */
             [this](std::shared_ptr<Node> node_ptr, std::shared_ptr<MessagePayload> payload_ptr) {
                 on_node_received_message(std::move(node_ptr), std::move(payload_ptr));
-            });
+            },
+            /* on_disconnected */
+            [this](const Node& node) { on_node_disconnected(node); });
 
-        log::Info("Service", {"name", "Node Hub", "action", "accept", "remote", conn_ptr->endpoint_.to_string(), "id",
-                              std::to_string(new_node->id())});
+        log::Trace("Service", {"name", "Node Hub", "component", "nodefactory", "remote",
+                               conn_ptr->endpoint_.to_string(), "id", std::to_string(new_node->id())});
 
         new_node->start();
         on_node_connected(new_node);
@@ -231,6 +237,45 @@ Task<void> NodeHub::address_book_selector_work() {
     co_return;
 }
 
+Task<void> NodeHub::address_book_processor_work() {
+    using namespace std::chrono_literals;
+    std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "address book", "status", "started"});
+    while (is_running()) {
+        // Poll channel for any queued address to connect to
+        boost::system::error_code error;
+        NodeAndPayload item{nullptr, nullptr};
+        if (not address_book_processor_feed_.try_receive(item)) {
+            const auto result = co_await address_book_processor_feed_.async_receive(error);
+            if (error or not result.has_value()) continue;
+            item = result.value();
+        }
+        if (!is_running()) break;
+        auto [node_ptr, payload_ptr] = std::move(item);
+        if (node_ptr == nullptr or payload_ptr == nullptr) continue;
+
+        try {
+            switch (payload_ptr->type()) {
+                case MessageType::kAddr: {
+                    auto& payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
+                    payload.shuffle();
+                    std::ignore = address_book_.add_new(payload.identifiers_, node_ptr->remote_endpoint().address_, 2h);
+                } break;
+                case MessageType::kGetAddr: {
+                    // TODO : Implement
+                } break;
+                default:
+                    ASSERT(false and "Should not happen");
+            }
+        } catch (const std::invalid_argument& ex) {
+            log::Warning("Service", {"name", "Node Hub", "action", "address book", "error", ex.what()});
+            node_ptr->stop();
+            continue;
+        }
+    }
+    std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "address book", "status", "stopped"});
+    co_return;
+}
+
 Task<void> NodeHub::async_connect(Connection& connection) {
     const auto protocol = connection.endpoint_.address_.get_type() == IPAddressType::kIPv4 ? tcp::v4() : tcp::v6();
     connection.socket_ptr_ = std::make_shared<tcp::socket>(asio_context_);
@@ -305,8 +350,7 @@ Task<void> NodeHub::acceptor_work() {
 }
 
 void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
-    const bool running{is_running()};
-    size_t stopped_nodes{0};
+    const bool this_is_running{is_running()};
 
     std::unique_lock lock(nodes_mutex_, std::defer_lock);
     if (!lock.try_lock()) return;  // We'll defer to next timer tick
@@ -315,7 +359,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     // TODO remove this when done testing
     uint32_t it_index{0};
     std::optional<uint32_t> random_index;
-    if (running && nodes_.size() > 1 && randomize<uint32_t>(0U, 120U) == 0) {
+    if (this_is_running && nodes_.size() > 1 && randomize<uint32_t>(0U, 120U) == 0) {
         random_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
     }
 
@@ -323,16 +367,14 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
         if (*iterator == nullptr) {
             iterator = nodes_.erase(iterator);
             continue;
-        } else if (not(*iterator)->is_running()) {
-            on_node_disconnected(*(*iterator));
+        } else if ((*iterator)->status() == ComponentStatus::kNotStarted) {
             if (static_cast<unsigned>(iterator->use_count()) == 1U) iterator->reset();
             ++iterator;
             ++it_index;
             continue;
         }
-        if (not running) {
-            std::ignore = (*iterator)->stop();
-            if (++stopped_nodes == 16) break;  // Otherwise too many pending actions pile up.
+        if (not this_is_running) {
+            if ((*iterator)->stop()) break;
             ++iterator;
             ++it_index;
             continue;
@@ -341,7 +383,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
             log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer[shutdown]", "remote",
                                   (*iterator)->to_string()})
                 << "Disconnecting ...";
-            std::ignore = (*iterator)->stop();
+            if ((*iterator)->stop()) break;
             ++iterator;
             ++it_index;
             continue;
@@ -357,7 +399,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
         ++it_index;
     }
     lock.unlock();
-    if (running && current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+    if (this_is_running && current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
         need_connections_.notify();
     }
 }
@@ -462,8 +504,35 @@ void NodeHub::initialize_acceptor() {
                     local_endpoint.value().to_string(), "secure", (app_settings_.network.use_tls ? "yes" : "no")});
 }
 
+void NodeHub::on_node_connected(std::shared_ptr<Node> node_ptr) {
+    const std::unique_lock lock(nodes_mutex_);
+    connected_addresses_[*node_ptr->remote_endpoint().address_]++;
+    ++total_connections_;
+    ++current_active_connections_;
+    switch (node_ptr->connection().type_) {
+        using enum ConnectionType;
+        case kInbound:
+            ++current_active_inbound_connections_;
+            break;
+        case kOutbound:
+        case kManualOutbound:
+        case kSeedOutbound:
+            ++current_active_outbound_connections_;
+            break;
+        default:
+            ASSERT(false and "Should not happen");
+    }
+    nodes_.push_back(std::move(node_ptr));
+    if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
+        log::Trace("Service",
+                   {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",
+                    std::to_string(total_disconnections_), "rejections", std::to_string(total_rejected_connections_)});
+    }
+}
+
 void NodeHub::on_node_disconnected(const Node& node) {
-    if (auto item{connected_addresses_.find(*(node.remote_endpoint().address_))};
+    std::unique_lock lock(nodes_mutex_);
+    if (auto item{connected_addresses_.find(*node.remote_endpoint().address_)};
         item not_eq connected_addresses_.end()) {
         if (--item->second == 0) {
             connected_addresses_.erase(item);
@@ -480,41 +549,12 @@ void NodeHub::on_node_disconnected(const Node& node) {
         case kOutbound:
         case kManualOutbound:
         case kSeedOutbound:
-            if (--current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
-                need_connections_.notify();
-            }
+            --current_active_outbound_connections_;
             break;
         default:
             ASSERT(false and "Should not happen");
     }
-    if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
-        log::Trace("Service",
-                   {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",
-                    std::to_string(total_disconnections_), "rejections", std::to_string(total_rejected_connections_)});
-    }
-}
-
-void NodeHub::on_node_connected(const std::shared_ptr<Node>& node) {
-    const std::lock_guard lock(nodes_mutex_);
-    connected_addresses_[*node->remote_endpoint().address_]++;
-    ++total_connections_;
-    ++current_active_connections_;
-    switch (node->connection().type_) {
-        using enum ConnectionType;
-        case kInbound:
-            ++current_active_inbound_connections_;
-            break;
-        case kOutbound:
-        case kManualOutbound:
-        case kSeedOutbound:
-            if (++current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
-                need_connections_.notify();
-            }
-            break;
-        default:
-            ASSERT(false and "Should not happen");
-    }
-    nodes_.push_back(node);
+    lock.unlock();
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
         log::Trace("Service",
                    {"name", "Node Hub", "connections", std::to_string(total_connections_), "disconnections",
@@ -553,14 +593,13 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
         case kVersion:
             if (node_ptr->connection().type_ != ConnectionType::kInbound) {
                 std::ignore = address_book_.set_good(node_ptr->remote_endpoint());
-            };
+            }
             break;
-        case kAddr: {
-            auto& payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
-            logger << "items=" << std::to_string(payload.identifiers_.size());
-            payload.shuffle();
-            std::ignore = address_book_.add_new(payload.identifiers_, node_ptr->remote_endpoint().address_, 2h);
-        } break;
+        case kAddr:
+        case kGetAddr:
+            std::ignore =
+                address_book_processor_feed_.try_send(std::make_pair(std::move(node_ptr), std::move(payload_ptr)));
+            break;
         case kGetHeaders: {
             auto& payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
             logger << "items=" << std::to_string(payload.block_locator_hashes_.size());

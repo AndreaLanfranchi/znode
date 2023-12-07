@@ -56,26 +56,6 @@ bool AddressBook::add_new(NodeService& service, const IPAddress& source, std::ch
     return false;
 }
 
-bool AddressBook::set_good(const IPEndpoint& remote, NodeSeconds time) noexcept {
-    std::unique_lock lock{mutex_};
-    auto it{map_endpoint_to_id_.find(remote)};
-    if (it == map_endpoint_to_id_.end()) return false;  // No such an entry
-    auto entry_id{it->second};
-    auto it2{map_id_to_serviceinfo_.find(entry_id)};
-    ASSERT(it2 not_eq map_id_to_serviceinfo_.end());  // Must be found
-    auto& service_info{it2->second};
-
-    // Update info
-    service_info.service_.time_ = time;
-    service_info.last_connection_attempt_ = time;
-    service_info.last_connection_success_ = time;
-    service_info.connection_attempts_ = 0U;
-
-    // Ensure is in the tried bucket
-    if (!service_info.tried_ref_.has_value()) make_entry_tried(entry_id);
-    return true;
-}
-
 bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& source,
                           std::chrono::seconds time_penalty) {
     using namespace std::chrono_literals;
@@ -83,6 +63,8 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
     const auto services_size{services.size()};
 
     uint32_t added_count{0U};
+    std::set<IPAddress> unique_addresses{};
+
     StopWatch sw(/*auto_start=*/true);
     std::unique_lock lock{mutex_};
     for (auto it{services.begin()}; it not_eq services.end();) {
@@ -91,6 +73,12 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
             if (not(it->services_ bitand static_cast<uint64_t>(NodeServicesType::kNodeNetwork))) {
                 it = services.erase(it);
                 continue;
+            }
+
+            // Verify remotes are not pushing duplicate addresses
+            // it's a violation of the protocol
+            if (!unique_addresses.insert(it->endpoint_.address_).second) {
+                throw std::invalid_argument("Duplicate address");
             }
 
             // Adjust martian dates
@@ -114,12 +102,32 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
         }
     }
 
-    std::ignore = log::Trace("Address Book",
-                             {"processed", std::to_string(services_size), "in", StopWatch::format(sw.since_start()),
-                              "additions", std::to_string(added_count), "buckets new/tried",
-                              absl::StrCat(new_entries_size_.load(), "/", tried_entries_size_.load())});
+    std::ignore = log::Info("Address Book",
+                            {"processed", std::to_string(services_size), "in", StopWatch::format(sw.since_start()),
+                             "additions", std::to_string(added_count), "buckets new/tried",
+                             absl::StrCat(new_entries_size_.load(), "/", tried_entries_size_.load())});
 
     return (added_count > 0U);
+}
+
+bool AddressBook::set_good(const IPEndpoint& remote, NodeSeconds time) noexcept {
+    std::unique_lock lock{mutex_};
+    auto it{map_endpoint_to_id_.find(remote)};
+    if (it == map_endpoint_to_id_.end()) return false;  // No such an entry
+    auto entry_id{it->second};
+    auto it2{map_id_to_serviceinfo_.find(entry_id)};
+    ASSERT(it2 not_eq map_id_to_serviceinfo_.end());  // Must be found
+    auto& service_info{it2->second};
+
+    // Update info
+    service_info.service_.time_ = time;
+    service_info.last_connection_attempt_ = time;
+    service_info.last_connection_success_ = time;
+    service_info.connection_attempts_ = 0U;
+
+    // Ensure is in the tried bucket
+    if (!service_info.tried_ref_.has_value()) make_entry_tried(entry_id);
+    return true;
 }
 
 bool AddressBook::add_new_impl(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {

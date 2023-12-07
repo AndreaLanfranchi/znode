@@ -104,7 +104,7 @@ class IPAddress : public ser::Serializable {
     //! \brief Returns the bytes representation of this address in network byte order
     [[nodiscard]] Bytes to_bytes() const noexcept;
 
-    auto operator<=>(const IPAddress& other) const;
+    std::strong_ordering operator<=>(const IPAddress& other) const;
 
   private:
     boost::asio::ip::address value_{boost::asio::ip::address_v4()};

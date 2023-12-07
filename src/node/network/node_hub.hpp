@@ -48,7 +48,8 @@ class NodeHub : public con::Stoppable {
           info_timer_{io_context, "nh_info", true},
           need_connections_(io_context.get_executor()),
           node_factory_feed_(io_context.get_executor(), settings.network.max_active_connections),
-          connector_feed_(io_context.get_executor(), settings.network.max_active_connections) {
+          connector_feed_(io_context.get_executor(), settings.network.max_active_connections),
+          address_book_processor_feed_(io_context.get_executor(), 5'000) {
         if (app_settings_.network.nonce == 0U) {
             app_settings_.network.nonce = randomize<uint64_t>(/*min=*/1U);
         }
@@ -78,18 +79,22 @@ class NodeHub : public con::Stoppable {
     //! \brief Executes the address book selector work loop asynchronously
     Task<void> address_book_selector_work();
 
+    //! \brief Executes the address book processor work loop asynchronously
+    //! \details This function will process messages targeting the address book
+    Task<void> address_book_processor_work();
+
     //! \brief Asynchronously connects to a remoote endpoint
     Task<void> async_connect(Connection& connection);  // Connects to a remote endpoint
 
     //! \brief Executes the dial-in acceptor work loop asynchronously
     Task<void> acceptor_work();
 
+    //! \brief Accounts data about node's socket connections
+    void on_node_connected(std::shared_ptr<Node> node_ptr);
+
     //! \brief Accounts data about node's socket disconnections
     //! \remarks Requires a lock on nodes_mutex_ is holding
     void on_node_disconnected(const Node& node);
-
-    //! \brief Accounts data about node's socket connections
-    void on_node_connected(const std::shared_ptr<Node>& node);
 
     //! \brief Handles data traffic on the wire accounting from nodes
     void on_node_data(DataDirectionMode direction,
@@ -135,6 +140,9 @@ class NodeHub : public con::Stoppable {
     con::NotifyChannel need_connections_;  // Notify channel for new connections to be established
     con::Channel<std::shared_ptr<Connection>> node_factory_feed_;  // Channel for new nodes to be instantiated
     con::Channel<std::shared_ptr<Connection>> connector_feed_;     // Channel for new outgoing connections
+
+    using NodeAndPayload = std::pair<std::shared_ptr<Node>, std::shared_ptr<MessagePayload>>;
+    con::Channel<NodeAndPayload> address_book_processor_feed_;  // Channel for messages targeting the address book
 
     net::AddressBook address_book_{};                                   // The address book
     std::list<std::shared_ptr<Node>> nodes_;                            // All the connected nodes
