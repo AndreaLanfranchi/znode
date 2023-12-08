@@ -422,7 +422,7 @@ void NodeHub::on_info_timer_expired(con::Timer::duration& /*interval*/) {
 void NodeHub::feed_connections_from_cli() {
     for (auto const& str : app_settings_.network.connect_nodes) {
         const auto endpoint{IPEndpoint::from_string(str)};
-        if (not endpoint) continue;  // Invalid endpoint - Should not happen as already validated by CLI
+        if (not endpoint or not endpoint.value().is_routable()) continue;  // Invalid endpoint
         auto conn_ptr = std::make_shared<Connection>(endpoint.value(), ConnectionType::kManualOutbound);
         std::ignore = connector_feed_.try_send(std::move(conn_ptr));
     }

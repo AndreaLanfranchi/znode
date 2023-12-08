@@ -23,19 +23,14 @@
 namespace znode {
 
 //! \brief A thread-safe LRU set with capped size
-//! \details Every time an item is added to the set, or it is queried for existence, it is moved to the front of the
-//! list. If the set is full, the last item is removed from the list. The set is thread-safe if the template parameter
+//! \details Every time an item is added to the set it is moved to the front of the list.
+//! If the set is full, the last item is removed from the list. The set is thread-safe if the template parameter
 //! is set to true.
 template <class Key, class Hasher = std::hash<Key>>
 class LruSet {
   public:
     LruSet() = delete;
     explicit LruSet(size_t max_size, bool thread_safe = false) : max_size_{max_size}, thread_safe_{thread_safe} {}
-
-    // Not copyable or movable
-    LruSet(LruSet& other) = delete;
-    LruSet(LruSet&& other) = delete;
-    LruSet& operator=(LruSet& other) = delete;
 
     //! \brief Adds an item to the set
     //! \return true if the item was added, false if it was already present
@@ -56,6 +51,18 @@ class LruSet {
             list_.pop_back();
         }
         return ret;
+    }
+
+    [[nodiscard]] Key front() const {
+        std::unique_lock lock(mutex_, std::defer_lock);
+        if (thread_safe_) lock.lock();
+        return list_.front();
+    }
+
+    [[nodiscard]] Key back() const {
+        std::unique_lock lock(mutex_, std::defer_lock);
+        if (thread_safe_) lock.lock();
+        return list_.back();
     }
 
     [[nodiscard]] bool contains(const Key& item) const {
@@ -82,6 +89,13 @@ class LruSet {
         std::unique_lock lock(mutex_, std::defer_lock);
         if (thread_safe_) lock.lock();
         return list_;
+    }
+
+    void clear() {
+        std::unique_lock lock(mutex_, std::defer_lock);
+        if (thread_safe_) lock.lock();
+        list_.clear();
+        map_.clear();
     }
 
   private:
