@@ -35,22 +35,19 @@ class LruSet {
     //! \brief Adds an item to the set
     //! \return true if the item was added, false if it was already present
     bool insert(const Key& item) {
-        bool ret{true};  // Assume the item is not present
         std::unique_lock lock(mutex_, std::defer_lock);
         if (thread_safe_) lock.lock();
         const auto it = map_.find(item);
         if (it != map_.end()) {
-            ret = false;  // Item is present
-            std::ignore = list_.erase(it->second);
-            std::ignore = map_.erase(it);
+            list_.splice(list_.begin(), list_, it->second);
+            return false;
         }
-        list_.push_front(item);
-        map_[item] = list_.begin();
+        map_[item] = list_.insert(list_.begin(), item);
         if (list_.size() > max_size_) {
             map_.erase(list_.back());
             list_.pop_back();
         }
-        return ret;
+        return true;
     }
 
     [[nodiscard]] Key front() const {
@@ -68,7 +65,7 @@ class LruSet {
     [[nodiscard]] bool contains(const Key& item) const {
         std::unique_lock lock(mutex_, std::defer_lock);
         if (thread_safe_) lock.lock();
-        return map_.find(item) != map_.end();
+        return map_.contains(item);
     }
 
     [[nodiscard]] size_t size() const {

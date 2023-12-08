@@ -137,7 +137,8 @@ class NodeHub : public con::Stoppable {
     std::atomic_uint32_t current_active_inbound_connections_{0};
     std::atomic_uint32_t current_active_outbound_connections_{0};
 
-    con::NotifyChannel need_connections_;  // Notify channel for new connections to be established
+    con::NotifyChannel need_connections_;               // Notify channel for new connections to be established
+    std::atomic_uint32_t needed_connections_count_{0};  // Number of connections to be established
     con::Channel<std::shared_ptr<Connection>> node_factory_feed_;  // Channel for new nodes to be instantiated
     con::Channel<std::shared_ptr<Connection>> connector_feed_;     // Channel for new outgoing connections
 

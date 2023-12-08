@@ -174,6 +174,10 @@ Task<void> NodeHub::connector_work() {
             conn_ptr = result.value();
         }
         if (!is_running()) break;
+
+        auto prev_count = needed_connections_count_.load(std::memory_order_relaxed);
+        if (prev_count > 0) needed_connections_count_.exchange(prev_count - 1);
+
         if (current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections) continue;
         const std::string remote{conn_ptr->endpoint_.to_string()};
 
@@ -185,7 +189,6 @@ Task<void> NodeHub::connector_work() {
             log::Trace("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
                                    "error", "same IP connections overflow"})
                 << "Discarding ...";
-            need_connections_.notify();
             continue;
         }
         lock.unlock();
@@ -214,24 +217,32 @@ Task<void> NodeHub::connector_work() {
 
 Task<void> NodeHub::address_book_selector_work() {
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "selector", "status", "started"});
+
+    std::optional<IPAddressType> address_type;
+    if (app_settings_.network.ipv4_only) {
+        address_type = IPAddressType::kIPv4;
+    }
+
     while (is_running()) {
         if (!need_connections_.notified()) {
             co_await need_connections_.wait_one();
         }
         if (not is_running() || !need_connections_.is_open()) break;
 
-        // Select a random address from the address book
-        std::optional<IPAddressType> type;
-        if (app_settings_.network.ipv4_only) {
-            type = IPAddressType::kIPv4;
+        // Pull as many addresses from the address book as required
+        const auto needed_count = needed_connections_count_.load(std::memory_order_relaxed);
+        for (uint32_t i{0}; i < needed_count; ++i) {
+            if (not is_running() || !need_connections_.is_open()) break;
+            auto [endpoint, last_tried]{address_book_.select_random(/*new_only=*/false, address_type)};
+            if (not endpoint.has_value()) {
+                std::ignore = needed_connections_count_.fetch_sub(1);
+                continue;
+            }
+            auto conn_ptr = std::make_shared<Connection>(endpoint.value(), ConnectionType::kSeedOutbound);
+            std::ignore = connector_feed_.try_send(std::move(conn_ptr));
         }
-        auto [endpoint, last_tried]{address_book_.select_random(/*new_only=*/false, type)};
-        if (not endpoint.has_value()) continue;
-        if (current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections) continue;
-
-        auto conn_ptr = std::make_shared<Connection>(endpoint.value(), ConnectionType::kSeedOutbound);
-        std::ignore = connector_feed_.try_send(std::move(conn_ptr));
     }
+
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "selector", "status", "stopped"});
     co_return;
 }
@@ -348,11 +359,8 @@ Task<void> NodeHub::acceptor_work() {
     co_return;
 }
 
-void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
+void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     const bool this_is_running{is_running()};
-
-    // This is a hack. Replace with count of connections in flight
-    static con::Timer::duration last_need_connections_check{app_settings_.network.connect_timeout_seconds * 1'000};
 
     std::unique_lock lock(nodes_mutex_, std::defer_lock);
     if (!lock.try_lock()) return;  // We'll defer to next timer tick
@@ -391,12 +399,14 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
         ++it_index;
     }
     lock.unlock();
-    last_need_connections_check -= interval;
-    if (this_is_running && last_need_connections_check.count() <= 0) {
-        last_need_connections_check = con::Timer::duration(app_settings_.network.connect_timeout_seconds * 1'000);
-        if (current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
-            need_connections_.notify();
-        }
+    if (not this_is_running) return;
+
+    // Check whether we need to establish new connections
+    if (needed_connections_count_ == 0 &&
+        current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+        needed_connections_count_ = app_settings_.network.min_outgoing_connections -
+                                    current_active_outbound_connections_.load(std::memory_order_relaxed);
+        need_connections_.notify();
     }
 }
 
