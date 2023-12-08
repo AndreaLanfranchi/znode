@@ -118,12 +118,9 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
 
 bool AddressBook::set_good(const IPEndpoint& remote, NodeSeconds time) noexcept {
     std::unique_lock lock{mutex_};
-    auto it{map_endpoint_to_id_.find(remote)};
-    if (it == map_endpoint_to_id_.end()) return false;  // No such an entry
-    auto entry_id{it->second};
-    auto it2{map_id_to_serviceinfo_.find(entry_id)};
-    ASSERT(it2 not_eq map_id_to_serviceinfo_.end());  // Must be found
-    auto& service_info{it2->second};
+    auto [entry, entry_id]{find_entry(remote)};
+    if (entry == nullptr) return false;  // No such an entry
+    auto& service_info{*entry};
 
     // Update info
     service_info.service_.time_ = time;
@@ -132,6 +129,33 @@ bool AddressBook::set_good(const IPEndpoint& remote, NodeSeconds time) noexcept 
     service_info.connection_attempts_ = 0U;
 
     // Ensure is in the tried bucket
+    if (!service_info.tried_ref_.has_value()) make_entry_tried(entry_id);
+    return true;
+}
+
+bool AddressBook::set_failed(const znode::net::IPEndpoint& remote, znode::NodeSeconds time) noexcept {
+    std::unique_lock lock{mutex_};
+    auto [entry, entry_id]{find_entry(remote)};
+    if (entry == nullptr) return false;  // No such an entry
+    auto& service_info{*entry};
+
+    // Update info
+    service_info.last_connection_attempt_ = time;
+    ++service_info.connection_attempts_;
+
+    if (!service_info.tried_ref_.has_value()) make_entry_tried(entry_id);
+    return true;
+}
+
+bool AddressBook::set_tried(const znode::net::IPEndpoint& remote, znode::NodeSeconds time) noexcept {
+    std::unique_lock lock{mutex_};
+    auto [entry, entry_id]{find_entry(remote)};
+    if (entry == nullptr) return false;  // No such an entry
+    auto& service_info{*entry};
+
+    // Update info
+    service_info.last_connection_attempt_ = time;
+
     if (!service_info.tried_ref_.has_value()) make_entry_tried(entry_id);
     return true;
 }
@@ -149,7 +173,7 @@ bool AddressBook::add_new_impl(NodeService& service, const IPAddress& source, st
         time_penalty = 0s;
     }
 
-    auto [book_entry, book_entry_id]{find_entry(service)};
+    auto [book_entry, book_entry_id]{find_entry(service.endpoint_)};
     bool is_new_entry{book_entry == nullptr};
     if (not is_new_entry) {
         // Periodically update time seen
@@ -296,8 +320,8 @@ void AddressBook::clear_new_slot(const SlotAddress& slot_address, bool erase_ent
     if (erase_entry) erase_new_entry(id);
 }
 
-std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::find_entry(const NodeService& service) {
-    const auto it1{map_endpoint_to_id_.find(service.endpoint_)};
+std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::find_entry(const IPEndpoint& endpoint) {
+    const auto it1{map_endpoint_to_id_.find(endpoint)};
     if (it1 == map_endpoint_to_id_.end()) {
         return {nullptr, 0U};
     }
@@ -306,7 +330,7 @@ std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::find_entry(const NodeS
     const auto it2{map_id_to_serviceinfo_.find(id)};
     ASSERT(it2 != map_id_to_serviceinfo_.end());  // Must be found or else the data structures are inconsistent
     ASSERT((it2->second.service_.endpoint_ ==
-            service.endpoint_));  // Must be the same (or else the data structures are inconsistent)
+            endpoint));  // Must be the same (or else the data structures are inconsistent)
     return {&(it2->second), id};
 }
 

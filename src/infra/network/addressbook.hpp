@@ -99,6 +99,12 @@ class AddressBook {
     //! \brief Marks an item as good (reachable and successfully connected to)
     [[nodiscard]] bool set_good(const IPEndpoint& remote, NodeSeconds time = Now<NodeSeconds>()) noexcept;
 
+    //! \brief Records a failed attempt on an item
+    [[nodiscard]] bool set_failed(const IPEndpoint& remote, NodeSeconds time = Now<NodeSeconds>()) noexcept;
+
+    //! \brief Records an attempt on an item
+    [[nodiscard]] bool set_tried(const IPEndpoint& remote, NodeSeconds time = Now<NodeSeconds>()) noexcept;
+
     //! \brief Returns whether a NodeService is contained in the address book
     [[nodiscard]] bool contains(const NodeService& service) const noexcept;
 
@@ -160,9 +166,9 @@ class AddressBook {
     //! the entry if it was the last reference
     void clear_new_slot(const SlotAddress& slot_address, bool erase_entry = true) noexcept;
 
-    //! \brief Queries internal data structures to find whether the provided service exists
+    //! \brief Queries internal data structures to find whether the provided endpoint is bound to a known service
     //! \returns A pair containing a pointer to the entry and its id if it exists, nullptr and 0 otherwise
-    std::pair<NodeServiceInfo*, /*id*/ uint32_t> find_entry(const NodeService& service);
+    std::pair<NodeServiceInfo*, /*id*/ uint32_t> find_entry(const IPEndpoint& service);
 
     //! \brief Exchange two ids in the randomly ordered ids vector
     void swap_randomly_ordered_ids(uint32_t i, uint32_t j) noexcept;
