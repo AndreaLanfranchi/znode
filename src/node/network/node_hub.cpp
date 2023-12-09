@@ -193,9 +193,8 @@ Task<void> NodeHub::connector_work() {
         }
         lock.unlock();
 
-        log::Info("Service", {"name", "Node Hub", "remote", remote}) << "Connecting ...";
-
         try {
+            log::Info("Service", {"name", "Node Hub", "remote", remote}) << "Connecting ...";
             co_await async_connect(*conn_ptr);
             std::ignore = address_book_.set_tried(conn_ptr->endpoint_);
         } catch (const boost::system::system_error& ex) {
@@ -388,7 +387,8 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
             if (static_cast<unsigned>(iterator->use_count()) == 1U) iterator->reset();
         } else if (not this_is_running) {
             if ((*iterator)->stop()) break;
-        } else if (random_index and it_index == random_index.value()) {
+        } else if (random_index and it_index == random_index.value() and
+                   (*iterator)->connection().type_ not_eq ConnectionType::kInbound) {
             log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer[shutdown]", "remote",
                                   (*iterator)->to_string()})
                 << "Disconnecting ...";
@@ -407,10 +407,10 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     if (not this_is_running) return;
 
     // Check whether we need to establish new connections
-    if (needed_connections_count_ == 0 &&
+    if (needed_connections_count_ == 0 && not address_book_.empty() &&
         current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
-        needed_connections_count_ = app_settings_.network.min_outgoing_connections -
-                                    current_active_outbound_connections_.load(std::memory_order_relaxed);
+        needed_connections_count_.exchange(app_settings_.network.min_outgoing_connections -
+                                           current_active_outbound_connections_.load(std::memory_order_seq_cst));
         need_connections_.notify();
     }
 }
@@ -615,6 +615,15 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
         case kVersion:
             if (node_ptr->connection().type_ != ConnectionType::kInbound) {
                 std::ignore = address_book_.set_good(node_ptr->remote_endpoint());
+
+                // Also send our address as advertisement
+                MsgAddrPayload payload{};
+                NodeService node_service{
+                    IPEndpoint(app_settings_.network.nat.address_, app_settings_.chain_config->default_port_)};
+                node_service.time_ = Now<NodeSeconds>();
+                node_service.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
+                payload.identifiers_.push_back(node_service);
+                std::ignore = node_ptr->push_message(payload);
             }
             break;
         case kAddr:
