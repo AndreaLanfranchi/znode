@@ -283,7 +283,6 @@ Task<void> NodeHub::address_book_processor_work() {
         } catch (const std::invalid_argument& ex) {
             log::Warning("Service", {"name", "Node Hub", "action", "address book", "error", ex.what()});
             node_ptr->stop();
-            continue;
         }
     }
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "address book", "status", "stopped"});

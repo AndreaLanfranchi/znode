@@ -521,9 +521,9 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
                     static_cast<uint32_t>(ProtocolHandShakeStatus::kVersionSent))) {
                 std::ignore = push_message(local_version_, MessagePriority::kHigh);
             }
+            print_log(log::Level::kInfo, log_params);
             std::ignore = push_message(MessageType::kVerAck, MessagePriority::kHigh);
             notify_node_hub = true;  // Will eventually set the outgoing address as good
-            print_log(log::Level::kInfo, log_params);
         } break;
         case kVerAck:
             // This actually requires no action. Handshake flags already set
@@ -567,7 +567,7 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
             break;
     }
 
-    if (result.has_error() or log::test_verbosity(log::Level::kTrace)) {
+    if (result.has_error() or not err_extended_reason.empty() or log::test_verbosity(log::Level::kTrace)) {
         const std::list<std::string> log_params{
             "action", __func__, "command",
             command,  "status", std::string(result.has_error() ? result.error().message() : "success")};
