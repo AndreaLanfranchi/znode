@@ -101,7 +101,7 @@ class SipHash {
     }
 
     //! \brief Accumulates more data
-    void update(std::string_view data) noexcept { update(string_view_to_byte_view(data)); };
+    void update(std::string_view data) noexcept { update(string_view_to_byte_view(data)); }
 
     //! \brief Accumulates more data
     void update(const std::span<const std::byte> data) noexcept {
@@ -114,7 +114,7 @@ class SipHash {
     template <Integral V>
     void update(V data) noexcept {
         update(ByteView(reinterpret_cast<const uint8_t*>(&data), sizeof(V)));
-    };
+    }
 
     [[nodiscard]] Bytes finalize() noexcept {
         Bytes mac(mac_len_, 0);
