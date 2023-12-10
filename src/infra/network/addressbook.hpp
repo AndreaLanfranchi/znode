@@ -48,6 +48,9 @@ class AddressBook {
     // https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/compiler-warning-level-4-c4201
 #pragma warning(push)
 #pragma warning(disable : 4201)
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 #endif
 
     //! \brief A struct representing the coordinates of a slot in collection of buckets
@@ -68,6 +71,8 @@ class AddressBook {
 
 #if defined(_MSC_VER)
 #pragma warning(pop)
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
 #endif
 
     // See struct for coordinates in NodeServiceInfo
