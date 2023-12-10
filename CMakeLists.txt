@@ -224,13 +224,11 @@ if (NOT MSVC)
     add_compile_options(-Werror -Wall -Wextra -pedantic)
     add_compile_options(-Wshadow -Wimplicit-fallthrough -Wsign-conversion)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wold-style-cast>)
-
-    add_compile_options(-Wno-nested-anon-types -Wno-gnu-anonymous-struct) # Used for good reasons
+    add_compile_options(-Wno-missing-field-initializers -Wnon-virtual-dtor)
     add_compile_options(-Wno-unknown-pragmas) # Ignore unknown pragmas (especially for clang-tidy)
 
     if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        add_compile_options(-Wno-attributes -fms-extensions)
-
+        add_compile_options(-Wno-attributes)
         # coroutines support
         if ((CMAKE_CXX_STANDARD GREATER_EQUAL 20))
             add_compile_options(-fcoroutines)
@@ -238,7 +236,7 @@ if (NOT MSVC)
     endif ()
 
     if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        add_compile_options(-Wno-missing-field-initializers -Wnon-virtual-dtor)
+        add_compile_options(-Wno-nested-anon-types -Wno-gnu-anonymous-struct) # Used for good reasons
         if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
             add_compile_definitions(_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS)
             add_compile_options(-Wthread-safety)
