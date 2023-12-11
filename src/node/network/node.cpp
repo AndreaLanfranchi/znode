@@ -102,12 +102,10 @@ bool Node::stop() noexcept {
         ping_timer_.stop();
         boost::system::error_code error_code;
         if (ssl_stream_ not_eq nullptr) {
-            // std::ignore = ssl_stream_->shutdown(error_code);
-            std::ignore = ssl_stream_->lowest_layer().shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
-            std::ignore = ssl_stream_->lowest_layer().close(error_code);
+            std::ignore = ssl_stream_->lowest_layer().cancel(error_code);
+            std::ignore = ssl_stream_->shutdown(error_code);
         } else {
-            std::ignore = connection_ptr_->socket_ptr_->shutdown(asio::ip::tcp::socket::shutdown_both, error_code);
-            std::ignore = connection_ptr_->socket_ptr_->close(error_code);
+            std::ignore = connection_ptr_->socket_ptr_->cancel(error_code);
         }
         asio::post(io_strand_, [self{shared_from_this()}]() { self->on_stop_completed(); });
     }
@@ -115,6 +113,14 @@ bool Node::stop() noexcept {
 }
 
 void Node::on_stop_completed() noexcept {
+    boost::system::error_code error_code;
+    if (ssl_stream_ not_eq nullptr) {
+        std::ignore = ssl_stream_->lowest_layer().close(error_code);
+        ssl_stream_.release();
+    } else {
+        std::ignore = connection_ptr_->socket_ptr_->close(error_code);
+    }
+
     if (log::test_verbosity(log::Level::kTrace)) {
         const std::list<std::string> log_params{"action", __func__, "status", "success"};
         print_log(log::Level::kTrace, log_params);
@@ -212,6 +218,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
         on_data_(DataDirectionMode::kInbound, bytes_transferred);
 
         const auto parse_result{parse_messages(bytes_transferred)};
+        receive_buffer_.consume(bytes_transferred);
         if (parse_result.has_error()) {
             const std::list<std::string> log_params{"action", __func__, "status", parse_result.error().message()};
             print_log(log::Level::kError, log_params, " Disconnecting ...");
@@ -450,7 +457,7 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
 
             // Deliver payload for local processing and eventually forward it to higher level code
             ASSERT(payload_ptr);
-            if (not result.has_error()) result = process_inbound_message(payload_ptr);
+            if (not result.has_error()) result = process_inbound_message(std::move(payload_ptr));
             if (not result.has_error()) {
                 inbound_message_metrics_[msg_type].count_++;
                 inbound_message_metrics_[msg_type].bytes_ += inbound_message_->data().size();
@@ -470,7 +477,6 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
         inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
     }
 
-    receive_buffer_.consume(bytes_transferred);
     return result;
 }
 

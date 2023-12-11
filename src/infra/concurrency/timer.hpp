@@ -142,7 +142,6 @@ class Timer : public Stoppable {
     std::atomic_bool autoreset_{false};          // If true, timer is resubmitted after callback execution
     std::atomic<duration> interval_;             // Interval between triggered events
     std::function<void(duration&)> call_back_;   // Function to call on triggered
-    std::atomic_bool working_{false};            // Whether the timer is working
     std::exception_ptr exception_ptr_{nullptr};  // Captured exception (if any)
 };
 }  // namespace znode::con

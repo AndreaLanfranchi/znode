@@ -120,6 +120,9 @@ Task<void> NodeHub::node_factory_work() {
 
         ASSERT_PRE(conn_ptr not_eq nullptr and conn_ptr->socket_ptr_ not_eq nullptr);
         ASSERT_PRE(conn_ptr->type_ not_eq ConnectionType::kNone);
+        if (conn_ptr->type_ == ConnectionType::kOutbound) {
+            --needed_connections_count_;
+        }
         if (not conn_ptr->socket_ptr_->is_open()) continue;  // Remotely closed meanwhile ?
 
         boost::system::error_code local_error_code;
@@ -175,20 +178,16 @@ Task<void> NodeHub::connector_work() {
         }
         if (!is_running()) break;
 
-        auto prev_count = needed_connections_count_.load(std::memory_order_relaxed);
-        if (prev_count > 0) needed_connections_count_.exchange(prev_count - 1);
-
-        if (current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections) continue;
         const std::string remote{conn_ptr->endpoint_.to_string()};
-
         // Verify we're not exceeding connections per IP
         std::unique_lock lock{connected_addresses_mutex_};
         if (const auto item = connected_addresses_.find(*conn_ptr->endpoint_.address_);
             item not_eq connected_addresses_.end() and
             item->second >= app_settings_.network.max_active_connections_per_ip) {
-            log::Trace("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
-                                   "error", "same IP connections overflow"})
+            log::Warning("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
+                                     "error", "same IP connections overflow"})
                 << "Discarding ...";
+            --needed_connections_count_;
             continue;
         }
         lock.unlock();
@@ -205,6 +204,7 @@ Task<void> NodeHub::connector_work() {
             if (ex.code() not_eq boost::asio::error::operation_aborted) {
                 std::ignore = address_book_.set_failed(conn_ptr->endpoint_);
             }
+            --needed_connections_count_;
             continue;
         }
 
@@ -235,15 +235,16 @@ Task<void> NodeHub::address_book_selector_work() {
 
         // Pull as many addresses from the address book as required
         const auto needed_count = needed_connections_count_.load(std::memory_order_relaxed);
-        for (uint32_t i{0}; i < needed_count; ++i) {
-            if (not is_running() || !need_connections_.is_open()) break;
+        for (uint32_t i{0}; is_running() && need_connections_.is_open() && i < needed_count; ++i) {
             auto [endpoint, last_tried]{address_book_.select_random(/*new_only=*/false, address_type)};
             if (not endpoint.has_value()) {
-                std::ignore = needed_connections_count_.fetch_sub(1);
-                continue;
+                log::Warning("Service",
+                             {"name", "Node Hub", "action", "address book selector", "error", "no address found"});
+                --needed_connections_count_;
+            } else {
+                auto conn_ptr = std::make_shared<Connection>(endpoint.value(), ConnectionType::kOutbound);
+                std::ignore = connector_feed_.try_send(std::move(conn_ptr));
             }
-            auto conn_ptr = std::make_shared<Connection>(endpoint.value(), ConnectionType::kSeedOutbound);
-            std::ignore = connector_feed_.try_send(std::move(conn_ptr));
         }
     }
 
@@ -377,27 +378,23 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     }
 
     for (auto iterator{nodes_.begin()}; iterator not_eq nodes_.end(); /* !!! no increment !!! */) {
-        if (*iterator == nullptr) {
+        if ((*iterator)->status() == ComponentStatus::kNotStarted) {
             iterator = nodes_.erase(iterator);
             continue;
-        }
-
-        if ((*iterator)->status() == ComponentStatus::kNotStarted) {
-            if (static_cast<unsigned>(iterator->use_count()) == 1U) iterator->reset();
         } else if (not this_is_running) {
-            if ((*iterator)->stop()) break;
+            std::ignore = (*iterator)->stop();
         } else if (random_index and it_index == random_index.value() and
                    (*iterator)->connection().type_ not_eq ConnectionType::kInbound) {
             log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer[shutdown]", "remote",
                                   (*iterator)->to_string()})
                 << "Disconnecting ...";
-            if ((*iterator)->stop()) break;
+            std::ignore = (*iterator)->stop();
         } else if (const auto idling_result{(*iterator)->is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(idling_result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
                                      (*iterator)->to_string(), "reason", reason})
                 << "Disconnecting ...";
-            if ((*iterator)->stop()) break;
+            std::ignore = (*iterator)->stop();
         }
         ++iterator;
         ++it_index;
@@ -406,12 +403,25 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     if (not this_is_running) return;
 
     // Check whether we need to establish new connections
-    if (needed_connections_count_ == 0 && not address_book_.empty() &&
-        current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
-        needed_connections_count_.exchange(app_settings_.network.min_outgoing_connections -
-                                           current_active_outbound_connections_.load(std::memory_order_seq_cst));
-        need_connections_.notify();
+    if (const auto outbounds{current_active_outbound_connections_.load()};
+        outbounds < app_settings_.network.min_outgoing_connections and not address_book_.empty()) {
+        const auto needed{app_settings_.network.min_outgoing_connections - outbounds};
+        uint32_t expected{0};
+        if (needed_connections_count_.compare_exchange_strong(expected, needed)) {
+            log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer", "status", "need_connections",
+                                  "count", std::to_string(needed)});
+            need_connections_.notify();
+        }
     }
+    //    if (needed_connections_count_.load() == 0 && not address_book_.empty() &&
+    //        current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
+    //        needed_connections_count_.exchange(app_settings_.network.min_outgoing_connections -
+    //                                           current_active_outbound_connections_.load(std::memory_order_seq_cst));
+    //        need_connections_.notify();
+    //        log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer", "status", "need_connections",
+    //                              "count",
+    //                              std::to_string(needed_connections_count_.load(std::memory_order_seq_cst))});
+    //    }
 }
 
 void NodeHub::on_info_timer_expired(con::Timer::duration& /*interval*/) {
@@ -519,7 +529,7 @@ void NodeHub::initialize_acceptor() {
 
 void NodeHub::on_node_connected(std::shared_ptr<Node> node_ptr) {
     {
-        const std::unique_lock lock(connected_addresses_mutex_);
+        const std::scoped_lock lock(connected_addresses_mutex_);
         connected_addresses_[*node_ptr->remote_endpoint().address_]++;
     }
 
@@ -540,7 +550,7 @@ void NodeHub::on_node_connected(std::shared_ptr<Node> node_ptr) {
     }
 
     {
-        const std::unique_lock lock(nodes_mutex_);
+        const std::scoped_lock lock(nodes_mutex_);
         nodes_.push_back(std::move(node_ptr));
     }
     if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
@@ -614,7 +624,6 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
         case kVersion:
             if (node_ptr->connection().type_ != ConnectionType::kInbound) {
                 std::ignore = address_book_.set_good(node_ptr->remote_endpoint());
-
                 // Also send our address as advertisement
                 MsgAddrPayload payload{};
                 NodeService node_service{

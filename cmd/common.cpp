@@ -89,7 +89,7 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
 
     cli.add_option("--asio.concurrency", user_asio_concurrency, "Concurrency level for asio")
         ->capture_default_str()
-        ->check(CLI::Range(size_t(2), available_hw_concurrency));
+        ->check(CLI::Range(size_t(1), available_hw_concurrency));
 
     // Network settings
     auto& network_opts = *cli.add_option_group("Network", "Networking options");
@@ -202,7 +202,6 @@ void parse_node_command_line(CLI::App& cli, int argc, char** argv, AppSettings& 
         throw std::invalid_argument("--chaindata.growthsize max value > " +
                                     to_human_bytes(mdbx_max_size_hard_limit / 2, /*binary=*/true));
     }
-
 
     // Check number of allowed connections is consistent
     if (settings.network.min_outgoing_connections > settings.network.max_active_connections) {
