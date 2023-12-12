@@ -40,17 +40,18 @@ struct secure_allocator : public std::allocator<T>, private boost::noncopyable {
         using other = secure_allocator<Other>;
     };
     [[nodiscard]] constexpr T* allocate(size_t n) {
-        if (T * ptr{base::allocate(n)}; ptr != nullptr) [[likely]] {
+        T* ptr{base::allocate(n)};
+        if (ptr != nullptr) [[likely]] {
             std::ignore = LockedPagesManager::instance().lock_range(ptr, sizeof(T) * n);
-            return ptr;
         }
-        return nullptr;
+        return ptr;
     }
 
     constexpr void deallocate(T* ptr, size_t n) {
         if (ptr != nullptr) [[likely]] {
-            memory_cleanse(ptr, sizeof(T) * n);
-            std::ignore = LockedPagesManager::instance().unlock_range(ptr, sizeof(T) * n);
+            const size_t size{sizeof(T) * n};
+            memory_cleanse(ptr, size);
+            std::ignore = LockedPagesManager::instance().unlock_range(ptr, size);
         }
         base::deallocate(ptr, n);
     }

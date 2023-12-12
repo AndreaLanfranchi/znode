@@ -138,8 +138,8 @@ class AddressBook {
 
     /* Buckets */
     using bucket_t = std::array<uint32_t, kBucketSize>;
-    std::array<bucket_t, kNewBucketsCount> new_buckets_{};      // New buckets (all zeroed)
-    std::array<bucket_t, kTriedBucketsCount> tried_buckets_{};  // Tried buckets (all zeroed)
+    std::array<bucket_t, kNewBucketsCount> new_buckets_{{0}};      // New buckets (all zeroed)
+    std::array<bucket_t, kTriedBucketsCount> tried_buckets_{{0}};  // Tried buckets (all zeroed)
 
     mutable LruSet<IPEndpoint, IPEndpointHasher> recently_selected_{64, true};  // Recently randomly selected endpoints
                                                                                 // to avoid very near duplicates

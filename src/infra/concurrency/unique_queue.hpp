@@ -40,22 +40,22 @@ class UniqueQueue {
     }
 
     [[nodiscard]] bool empty() const noexcept {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         return queue_.empty();
     }
 
     [[nodiscard]] size_t size() const noexcept {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         return queue_.size();
     }
 
     [[nodiscard]] bool contains(const T& item) const noexcept {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         return set_.contains(item);
     }
 
     [[nodiscard]] bool push(const T& item) {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         const bool inserted{set_.insert(item).second};
         if (inserted) {
             queue_.push(item);
@@ -69,7 +69,7 @@ class UniqueQueue {
     }
 
     [[nodiscard]] std::optional<T> pop() {
-        std::unique_lock lock(mutex_);
+        std::scoped_lock lock(mutex_);
         if (queue_.empty()) {
             return std::nullopt;
         }
@@ -81,7 +81,7 @@ class UniqueQueue {
     }
 
     void clear() noexcept {
-        std::lock_guard lock(mutex_);
+        std::scoped_lock lock(mutex_);
         std::queue<T> empty_queue;
         std::unordered_set<T> empty_set;
         std::swap(queue_, empty_queue);

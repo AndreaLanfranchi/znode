@@ -169,7 +169,7 @@ void BufferBase::flush() const {
         line = std::regex_replace(line, color_pattern, "");
         colorized = false;
     }
-    const std::unique_lock out_lck{out_mtx};
+    const std::scoped_lock out_lck{out_mtx};
     auto& out = settings_.log_std_out ? std::cout : std::cerr;
     out << line << std::endl;
     if (file_ and file_->is_open()) {

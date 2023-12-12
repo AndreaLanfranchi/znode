@@ -134,7 +134,7 @@ bool AddressBook::set_good(const IPEndpoint& remote, NodeSeconds time) noexcept 
 }
 
 bool AddressBook::set_failed(const znode::net::IPEndpoint& remote, znode::NodeSeconds time) noexcept {
-    std::unique_lock lock{mutex_};
+    std::scoped_lock lock{mutex_};
     auto [entry, entry_id]{find_entry(remote)};
     if (entry == nullptr) return false;  // No such an entry
     auto& service_info{*entry};
@@ -449,7 +449,7 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
     bool new_only, std::optional<IPAddressType> type) const noexcept {
     std::pair<std::optional<IPEndpoint>, NodeSeconds> ret{};
 
-    std::unique_lock lock{mutex_};
+    std::scoped_lock lock{mutex_};
     if (randomly_ordered_ids_.empty()) return ret;
     if (new_only and new_entries_size_ == 0U) return ret;
 

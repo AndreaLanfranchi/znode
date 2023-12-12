@@ -19,24 +19,24 @@
 namespace znode::net {
 
 void TrafficMeter::update_inbound(size_t bytes) noexcept {
-    const std::lock_guard lock{mutex_};
+    const std::scoped_lock lock{mutex_};
     cumulative_inbound_bytes_ += bytes;
     interval_inbound_bytes_ += bytes;
 }
 
 void TrafficMeter::update_outbound(size_t bytes) noexcept {
-    const std::lock_guard lock{mutex_};
+    const std::scoped_lock lock{mutex_};
     cumulative_outbound_bytes_ += bytes;
     interval_outbound_bytes_ += bytes;
 }
 
 std::pair<size_t, size_t> TrafficMeter::get_cumulative_bytes() const noexcept {
-    const std::lock_guard lock{mutex_};
+    const std::scoped_lock lock{mutex_};
     return {cumulative_inbound_bytes_, cumulative_outbound_bytes_};
 }
 
 std::pair<size_t, size_t> TrafficMeter::get_cumulative_speed() const noexcept {
-    const std::lock_guard lock{mutex_};
+    const std::scoped_lock lock{mutex_};
     const auto elapsed_time{std::chrono::steady_clock::now() - start_time_};
     const auto elapsed_seconds{
         static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(elapsed_time).count())};
@@ -45,7 +45,7 @@ std::pair<size_t, size_t> TrafficMeter::get_cumulative_speed() const noexcept {
 }
 
 std::pair<size_t, size_t> TrafficMeter::get_interval_bytes(bool reset_interval) noexcept {
-    const std::lock_guard lock{mutex_};
+    const std::scoped_lock lock{mutex_};
     std::pair<size_t, size_t> ret{interval_inbound_bytes_, interval_outbound_bytes_};
     if (reset_interval) {
         interval_inbound_bytes_ = 0;
@@ -56,7 +56,7 @@ std::pair<size_t, size_t> TrafficMeter::get_interval_bytes(bool reset_interval) 
 }
 
 std::pair<size_t, size_t> TrafficMeter::get_interval_speed(bool reset_interval) noexcept {
-    const std::lock_guard lock{mutex_};
+    const std::scoped_lock lock{mutex_};
     const auto elapsed_time{std::chrono::steady_clock::now() - interval_time_};
     const auto elapsed_seconds{
         static_cast<unsigned long>(std::chrono::duration_cast<std::chrono::seconds>(elapsed_time).count())};
@@ -72,7 +72,7 @@ std::pair<size_t, size_t> TrafficMeter::get_interval_speed(bool reset_interval) 
 }
 
 void TrafficMeter::reset() noexcept {
-    const std::lock_guard lock{mutex_};
+    const std::scoped_lock lock{mutex_};
     cumulative_inbound_bytes_ = 0;
     cumulative_outbound_bytes_ = 0;
     interval_inbound_bytes_ = 0;
