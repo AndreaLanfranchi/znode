@@ -276,7 +276,17 @@ Task<void> NodeHub::address_book_processor_work() {
                     std::ignore = address_book_.add_new(payload.identifiers_, node_ptr->remote_endpoint().address_, 2h);
                 } break;
                 case MessageType::kGetAddr: {
-                    // TODO : Implement
+                    auto services{address_book_.get_random_services(kMaxAddrItems, 25)};
+                    if (services.empty()) {
+                        std::ignore = node_ptr->push_message(MessageType::kNotFound);
+                    } else {
+                        log::Info("Service", {"name", "Node Hub", "action", "address book", "remote",
+                                              node_ptr->to_string(), "count", std::to_string(services.size())})
+                            << "Sending ...";
+                        MsgAddrPayload payload{};
+                        payload.identifiers_.swap(services);
+                        std::ignore = node_ptr->push_message(payload);
+                    }
                 } break;
                 default:
                     ASSERT(false and "Should not happen");
@@ -384,7 +394,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
         } else if (not this_is_running) {
             std::ignore = (*iterator)->stop();
         } else if (random_index and it_index == random_index.value() and
-                   (*iterator)->connection().type_ not_eq ConnectionType::kInbound) {
+                   (*iterator)->connection().type_ not_eq ConnectionType::kInbound and (*iterator)->fully_connected()) {
             log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer[shutdown]", "remote",
                                   (*iterator)->to_string()})
                 << "Disconnecting ...";

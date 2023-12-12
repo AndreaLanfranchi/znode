@@ -513,4 +513,35 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
     }
     return ret;
 }
+
+std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count, uint32_t max_percentage,
+                                                          std::optional<IPAddressType> type) noexcept {
+    std::scoped_lock lock{mutex_};
+    if (randomly_ordered_ids_.empty()) return {};
+
+    size_t count{randomly_ordered_ids_.size()};
+    if (max_percentage > 0U) {
+        count = count * max_percentage / 100U;
+    }
+    if (max_count > 0U) {
+        count = std::min(count, static_cast<size_t>(max_count));
+    }
+
+    const auto now{Now<NodeSeconds>()};
+    std::vector<NodeService> ret{};
+    ret.reserve(count);
+    for (size_t i{0}; i < randomly_ordered_ids_.size(); ++i) {
+        if (ret.size() == count) break;
+        size_t random_index{randomize<size_t>(0U, randomly_ordered_ids_.size() - i - 1U) + i};
+        swap_randomly_ordered_ids(static_cast<uint32_t>(i), static_cast<uint32_t>(random_index));
+        auto it{map_id_to_serviceinfo_.find(randomly_ordered_ids_[i])};
+        ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found or else the data structures are inconsistent
+        const auto& service_info{it->second};
+        if (type.has_value() and service_info.service_.endpoint_.address_.get_type() not_eq type.value()) continue;
+        if (service_info.is_bad(now)) continue;
+        ret.push_back(service_info.service_);
+    }
+    return ret;
+}
+
 }  // namespace znode::net

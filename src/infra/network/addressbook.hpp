@@ -126,6 +126,10 @@ class AddressBook {
     [[nodiscard]] std::pair<std::optional<IPEndpoint>, NodeSeconds> select_random(
         bool new_only, std::optional<IPAddressType> type = std::nullopt) const noexcept;
 
+    //! \brief Selects a randomly picked set of NodeServices from the ones collected into the address book
+    std::vector<NodeService> get_random_services(uint32_t max_count, uint32_t max_percentage,
+                                                 std::optional<IPAddressType> type = std::nullopt) noexcept;
+
   private:
     mutable std::shared_mutex mutex_;                                      // Thread safety
     const Bytes key_{get_random_bytes(2 * sizeof(uint64_t))};              // Secret key to randomize the address book
