@@ -324,6 +324,7 @@ Task<void> NodeHub::async_connect(Connection& connection) {
 
     co_await connection.socket_ptr_->async_connect(connection.endpoint_.to_endpoint(), boost::asio::use_awaitable);
     set_common_socket_options(*connection.socket_ptr_);
+    co_return;
 }
 
 Task<void> NodeHub::acceptor_work() {
@@ -366,8 +367,7 @@ Task<void> NodeHub::acceptor_work() {
 void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     const bool this_is_running{is_running()};
 
-    std::unique_lock lock(nodes_mutex_, std::defer_lock);
-    if (!lock.try_lock()) return;  // We'll defer to next timer tick
+    std::unique_lock lock(nodes_mutex_);
 
     // Randomly shutdown one node
     // TODO remove this when done testing
@@ -413,15 +413,6 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
             need_connections_.notify();
         }
     }
-    //    if (needed_connections_count_.load() == 0 && not address_book_.empty() &&
-    //        current_active_outbound_connections_ < app_settings_.network.min_outgoing_connections) {
-    //        needed_connections_count_.exchange(app_settings_.network.min_outgoing_connections -
-    //                                           current_active_outbound_connections_.load(std::memory_order_seq_cst));
-    //        need_connections_.notify();
-    //        log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer", "status", "need_connections",
-    //                              "count",
-    //                              std::to_string(needed_connections_count_.load(std::memory_order_seq_cst))});
-    //    }
 }
 
 void NodeHub::on_info_timer_expired(con::Timer::duration& /*interval*/) {

@@ -50,7 +50,7 @@ bool AddressBook::contains(uint32_t id) const noexcept {
 }
 
 bool AddressBook::add_new(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
-    std::unique_lock lock{mutex_};
+    std::scoped_lock lock{mutex_};
     try {
         return add_new_impl(service, source, time_penalty);
     } catch (const std::invalid_argument&) {
@@ -70,7 +70,7 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
     std::set<IPAddress> unique_addresses{};
 
     StopWatch sw(/*auto_start=*/true);
-    std::unique_lock lock{mutex_};
+    std::scoped_lock lock{mutex_};
     for (auto it{services.begin()}; it not_eq services.end();) {
         try {
             // Only add nodes that have the network service bit set - otherwise they are not useful
@@ -117,7 +117,7 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
 }
 
 bool AddressBook::set_good(const IPEndpoint& remote, NodeSeconds time) noexcept {
-    std::unique_lock lock{mutex_};
+    std::scoped_lock lock{mutex_};
     auto [entry, entry_id]{find_entry(remote)};
     if (entry == nullptr) return false;  // No such an entry
     auto& service_info{*entry};
@@ -148,7 +148,7 @@ bool AddressBook::set_failed(const znode::net::IPEndpoint& remote, znode::NodeSe
 }
 
 bool AddressBook::set_tried(const znode::net::IPEndpoint& remote, znode::NodeSeconds time) noexcept {
-    std::unique_lock lock{mutex_};
+    std::scoped_lock lock{mutex_};
     auto [entry, entry_id]{find_entry(remote)};
     if (entry == nullptr) return false;  // No such an entry
     auto& service_info{*entry};

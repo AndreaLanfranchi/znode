@@ -103,7 +103,6 @@ bool Node::stop() noexcept {
         boost::system::error_code error_code;
         if (ssl_stream_ not_eq nullptr) {
             std::ignore = ssl_stream_->lowest_layer().cancel(error_code);
-            std::ignore = ssl_stream_->shutdown(error_code);
         } else {
             std::ignore = connection_ptr_->socket_ptr_->cancel(error_code);
         }
@@ -116,7 +115,6 @@ void Node::on_stop_completed() noexcept {
     boost::system::error_code error_code;
     if (ssl_stream_ not_eq nullptr) {
         std::ignore = ssl_stream_->lowest_layer().close(error_code);
-        ssl_stream_.release();
     } else {
         std::ignore = connection_ptr_->socket_ptr_->close(error_code);
     }
@@ -187,7 +185,7 @@ void Node::handle_ssl_handshake(const boost::system::error_code& error_code) {
 }
 
 void Node::start_read() {
-    if (not is_running()) return;
+    if (not connection_ptr_->socket_ptr_->is_open()) return;
     auto read_handler{
         [self{shared_from_this()}](const boost::system::error_code& error_code, const size_t bytes_transferred) {
             self->handle_read(error_code, bytes_transferred);
@@ -232,7 +230,7 @@ void Node::handle_read(const boost::system::error_code& error_code, const size_t
 }
 
 void Node::start_write() {
-    if (not is_running()) return;
+    if (not connection_ptr_->socket_ptr_->is_open()) return;
     if (bool expected{false}; not is_writing_.compare_exchange_strong(expected, true)) {
         return;  // Already writing - the queue will cause this to re-enter automatically
     }
@@ -251,7 +249,7 @@ void Node::start_write() {
         // Try to get a new message from the queue
         const std::scoped_lock lock{outbound_messages_mutex_};
         if (outbound_messages_queue_.empty()) {
-            is_writing_.store(false);
+            is_writing_.exchange(false);
             return;  // Eventually next message submission to the queue will trigger a new write cycle
         }
         outbound_message_ = outbound_messages_queue_.top().first;
@@ -323,7 +321,7 @@ void Node::start_write() {
 
 void Node::handle_write(const boost::system::error_code& error_code, size_t bytes_transferred) {
     if (not is_running()) {
-        is_writing_.store(false);
+        is_writing_.exchange(false);
         return;
     }
 
@@ -356,7 +354,7 @@ void Node::handle_write(const boost::system::error_code& error_code, size_t byte
             connection_ptr_->socket_ptr_->async_write_some(send_buffer_.data(), write_handler);
         }
     } else {
-        is_writing_.store(false);
+        is_writing_.exchange(false);
         asio::post(io_strand_, [self{shared_from_this()}]() { self->start_write(); });
     }
 }
@@ -395,7 +393,7 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
 
     while (not result.has_error() and not data.empty()) {
         if (inbound_message_ == nullptr) {
-            inbound_message_start_time_.store(std::chrono::steady_clock::now());
+            inbound_message_start_time_.exchange(std::chrono::steady_clock::now());
             inbound_message_ = std::make_unique<Message>(version_, app_settings_.chain_config.value().magic_);
         }
 
@@ -464,7 +462,7 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
 
                 // Reset the message barrel for the next message
                 inbound_message_.reset();
-                inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
+                inbound_message_start_time_.exchange(std::chrono::steady_clock::time_point::min());
             }
         }
     }
@@ -474,7 +472,7 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
     // 2. An error has occurred in the loop hence we discard all
     if (result.has_error()) {
         inbound_message_.reset();
-        inbound_message_start_time_.store(std::chrono::steady_clock::time_point::min());
+        inbound_message_start_time_.exchange(std::chrono::steady_clock::time_point::min());
     }
 
     return result;
@@ -581,10 +579,11 @@ outcome::result<void> Node::process_inbound_message(std::shared_ptr<MessagePaylo
     }
     if (not result.has_error()) {
         if (msg_type not_eq MessageType::kPing and msg_type not_eq MessageType::kPong) {
-            last_message_received_time_.store(std::chrono::steady_clock::now());
+            last_message_received_time_.exchange(std::chrono::steady_clock::now());
         }
-        if (notify_node_hub) on_message_(shared_from_this(), payload_ptr);
+        if (notify_node_hub) on_message_(shared_from_this(), std::move(payload_ptr));
     }
+    payload_ptr.reset();
     return result;
 }
 
