@@ -133,14 +133,14 @@ void Node::on_stop_completed() noexcept {
 
 void Node::on_ping_timer_expired(con::Timer::duration& interval) noexcept {
     using namespace std::chrono_literals;
-    if (ping_meter_.pending_sample()) return;  // Wait for response to return
+    if (not is_running() or ping_meter_.pending_sample()) return;  // Wait for response to return
     const auto nonce{randomize<uint64_t>(/*min=*/1U)};
     MsgPingPongPayload ping_payload{MessageType::kPing, nonce};
     if (const auto result{push_message(ping_payload, MessagePriority::kHigh)}; result.has_error()) {
         const std::list<std::string> log_params{"action",  __func__, "status",
                                                 "failure", "reason", result.error().message()};
         print_log(log::Level::kError, log_params, "Disconnecting ...");
-        asio::post(io_strand_, [self{shared_from_this()}]() { self->stop(); });
+        std::ignore = stop();
         interval = 0ms;
         return;
     }
