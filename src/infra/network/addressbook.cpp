@@ -16,6 +16,8 @@
 
 #include "addressbook.hpp"
 
+#include <set>
+
 #include <absl/strings/str_cat.h>
 #include <gsl/gsl_util>
 
@@ -53,8 +55,9 @@ bool AddressBook::add_new(NodeService& service, const IPAddress& source, std::ch
     std::scoped_lock lock{mutex_};
     try {
         return add_new_impl(service, source, time_penalty);
-    } catch (const std::invalid_argument&) {
-        log::Warning("Address Book", {"invalid", service.endpoint_.to_string(), "from", source.to_string()})
+    } catch (const std::invalid_argument& ex) {
+        log::Warning("Address Book",
+                     {"invalid", service.endpoint_.to_string(), "from", source.to_string(), "reason", ex.what()})
             << "Discarded ...";
     }
     return false;
@@ -99,8 +102,9 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
                 // Don't bother to relay
                 it = services.erase(it);
             }
-        } catch (const std::invalid_argument&) {
-            log::Warning("Address Book", {"invalid", it->endpoint_.to_string(), "from", source.to_string()})
+        } catch (const std::invalid_argument& ex) {
+            log::Warning("Address Book", {"invalid address", it->endpoint_.to_string(), "from", source.to_string(),
+                                          "reason", ex.what()})
                 << "Discarded ...";
             it = services.erase(it);
         }
@@ -527,6 +531,7 @@ std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count, ui
         count = std::min(count, static_cast<size_t>(max_count));
     }
 
+    std::set<IPEndpoint> selected_endpoints{};
     const auto now{Now<NodeSeconds>()};
     std::vector<NodeService> ret{};
     ret.reserve(count);
@@ -539,6 +544,7 @@ std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count, ui
         const auto& service_info{it->second};
         if (type.has_value() and service_info.service_.endpoint_.address_.get_type() not_eq type.value()) continue;
         if (service_info.is_bad(now)) continue;
+        if (!selected_endpoints.insert(service_info.service_.endpoint_).second) continue;  // Duplicate
         ret.push_back(service_info.service_);
     }
     return ret;

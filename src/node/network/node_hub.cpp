@@ -200,10 +200,6 @@ Task<void> NodeHub::connector_work() {
             log::Warning("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
                                      "error", ex.code().message()});
             std::ignore = conn_ptr->socket_ptr_->close(error);
-            // Unless operation have been aborted mark the address as failed
-            if (ex.code() not_eq boost::asio::error::operation_aborted) {
-                std::ignore = address_book_.set_failed(conn_ptr->endpoint_);
-            }
             --needed_connections_count_;
             continue;
         }
@@ -332,8 +328,22 @@ Task<void> NodeHub::async_connect(Connection& connection) {
     connection.socket_ptr_->set_option(syncnt_option_t(3));  // TODO adjust to CLI value
 #endif
 
-    co_await connection.socket_ptr_->async_connect(connection.endpoint_.to_endpoint(), boost::asio::use_awaitable);
-    set_common_socket_options(*connection.socket_ptr_);
+    boost::asio::deadline_timer timeout{asio_context_};
+    timeout.expires_from_now(boost::posix_time::seconds(app_settings_.network.connect_timeout_seconds));
+    timeout.async_wait([&connection](const boost::system::error_code& error) {
+        if (error) return;
+        boost::system::error_code local_error_code;
+        std::ignore = connection.socket_ptr_->close(local_error_code);
+    });
+
+    try {
+        connection.socket_ptr_->connect(connection.endpoint_.to_endpoint());
+        timeout.cancel();
+        set_common_socket_options(*connection.socket_ptr_);
+    } catch (const boost::system::system_error& error) {
+        timeout.cancel();
+        throw error;
+    }
     co_return;
 }
 
