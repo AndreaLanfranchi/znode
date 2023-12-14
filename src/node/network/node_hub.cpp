@@ -184,8 +184,8 @@ Task<void> NodeHub::connector_work() {
         if (const auto item = connected_addresses_.find(*conn_ptr->endpoint_.address_);
             item not_eq connected_addresses_.end() and
             item->second >= app_settings_.network.max_active_connections_per_ip) {
-            log::Warning("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
-                                     "error", "same IP connections overflow"})
+            log::Debug("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
+                                   "error", "same IP connections overflow"})
                 << "Discarding ...";
             --needed_connections_count_;
             continue;
@@ -210,6 +210,10 @@ Task<void> NodeHub::connector_work() {
             co_await node_factory_feed_.async_send(error, std::move(conn_ptr));
             if (error) break;
         }
+
+        boost::asio::deadline_timer timeout{asio_context_};
+        timeout.expires_from_now(boost::posix_time::milliseconds(250U));
+        co_await timeout.async_wait(asio::use_awaitable);
     }
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "connector", "status", "stopped"});
     co_return;
@@ -234,8 +238,8 @@ Task<void> NodeHub::address_book_selector_work() {
         for (uint32_t i{0}; is_running() && need_connections_.is_open() && i < needed_count; ++i) {
             auto [endpoint, last_tried]{address_book_.select_random(/*new_only=*/false, address_type)};
             if (not endpoint.has_value()) {
-                log::Warning("Service",
-                             {"name", "Node Hub", "action", "address book selector", "error", "no address found"});
+                log::Debug("Service",
+                           {"name", "Node Hub", "action", "address book selector", "error", "no address found"});
                 --needed_connections_count_;
             } else {
                 auto conn_ptr = std::make_shared<Connection>(endpoint.value(), ConnectionType::kOutbound);
@@ -328,20 +332,20 @@ Task<void> NodeHub::async_connect(Connection& connection) {
     connection.socket_ptr_->set_option(syncnt_option_t(3));  // TODO adjust to CLI value
 #endif
 
-    boost::asio::deadline_timer timeout{asio_context_};
-    timeout.expires_from_now(boost::posix_time::seconds(app_settings_.network.connect_timeout_seconds));
-    timeout.async_wait([&connection](const boost::system::error_code& error) {
-        if (error) return;
-        boost::system::error_code local_error_code;
-        std::ignore = connection.socket_ptr_->close(local_error_code);
-    });
+    //    boost::asio::deadline_timer timeout{asio_context_};
+    //    timeout.expires_from_now(boost::posix_time::seconds(app_settings_.network.connect_timeout_seconds));
+    //    timeout.async_wait([&connection](const boost::system::error_code& error) {
+    //        if (error) return;
+    //        boost::system::error_code local_error_code;
+    //        std::ignore = connection.socket_ptr_->close(local_error_code);
+    //    });
 
     try {
         connection.socket_ptr_->connect(connection.endpoint_.to_endpoint());
-        timeout.cancel();
+        //        timeout.cancel();
         set_common_socket_options(*connection.socket_ptr_);
     } catch (const boost::system::system_error& error) {
-        timeout.cancel();
+        //        timeout.cancel();
         throw error;
     }
     co_return;
@@ -388,12 +392,11 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     const bool this_is_running{is_running()};
 
     std::unique_lock lock(nodes_mutex_);
-
     // Randomly shutdown one node
     // TODO remove this when done testing
     uint32_t it_index{0};
     std::optional<uint32_t> random_index;
-    if (this_is_running && nodes_.size() > 1 && randomize<uint32_t>(0U, 960U) == 0) {
+    if (this_is_running && nodes_.size() > 1 && randomize<uint32_t>(0U, 250U) == 0) {
         random_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
     }
 
@@ -402,19 +405,19 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
             iterator = nodes_.erase(iterator);
             continue;
         } else if (not this_is_running) {
-            std::ignore = (*iterator)->stop();
+            asio::post(asio_context_, [node_ptr = *iterator]() { std::ignore = node_ptr->stop(); });
         } else if (random_index and it_index == random_index.value() and
                    (*iterator)->connection().type_ not_eq ConnectionType::kInbound and (*iterator)->fully_connected()) {
-            log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer[shutdown]", "remote",
-                                  (*iterator)->to_string()})
+            log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[random shutdown]", "remote",
+                                     (*iterator)->to_string()})
                 << "Disconnecting ...";
-            std::ignore = (*iterator)->stop();
+            asio::post(asio_context_, [node_ptr = *iterator]() { std::ignore = node_ptr->stop(); });
         } else if (const auto idling_result{(*iterator)->is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(idling_result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
                                      (*iterator)->to_string(), "reason", reason})
                 << "Disconnecting ...";
-            std::ignore = (*iterator)->stop();
+            asio::post(asio_context_, [node_ptr = *iterator]() { std::ignore = node_ptr->stop(); });
         }
         ++iterator;
         ++it_index;
@@ -428,8 +431,8 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
         const auto needed{app_settings_.network.min_outgoing_connections - outbounds};
         uint32_t expected{0};
         if (needed_connections_count_.compare_exchange_strong(expected, needed)) {
-            log::Info("Service", {"name", "Node Hub", "action", "handle_service_timer", "status", "need_connections",
-                                  "count", std::to_string(needed)});
+            log::Debug("Service", {"name", "Node Hub", "action", "handle_service_timer", "status", "need_connections",
+                                   "count", std::to_string(needed)});
             need_connections_.notify();
         }
     }

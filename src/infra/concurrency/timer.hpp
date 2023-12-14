@@ -135,7 +135,7 @@ class Timer : public Stoppable {
 
   private:
     //! \brief Launches async timer
-    Task<void> work() noexcept;
+    Task<void> work();
 
     boost::asio::steady_timer timer_;            // The timer itself
     const std::string name_{};                   // Name of the timer (for logging purposes)

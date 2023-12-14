@@ -60,7 +60,7 @@ bool Timer::stop() noexcept {
     return true;
 }
 
-Task<void> Timer::work() noexcept {
+Task<void> Timer::work() {
     try {
         auto wait_interval{interval_.load()};
         const auto resubmit{autoreset_.load()};
@@ -70,12 +70,14 @@ Task<void> Timer::work() noexcept {
             call_back_(wait_interval);
         } while (is_running() and resubmit and wait_interval.count() not_eq 0U);
 
-    } catch (const system::system_error& error) {
-        if (error.code() not_eq asio::error::operation_aborted) {
+    } catch (const boost::system::system_error& error) {
+        if (error.code() not_eq asio::error::operation_aborted)
             std::ignore = log::Error(absl::StrCat("Timer[", name_, "]"),
                                      {"action", "async_wait", "error", error.code().message()});
-            exception_ptr_ = std::current_exception();
-        }
+    } catch (const std::system_error& exception) {
+        std::ignore = log::Critical(absl::StrCat("Timer[", name_, "]"),
+                                    {"action", "async_wait", "error", exception.code().message()});
+        exception_ptr_ = std::current_exception();
     } catch (const std::exception& exception) {
         std::ignore =
             log::Critical(absl::StrCat("Timer[", name_, "]"), {"action", "callback", "error", exception.what()});
