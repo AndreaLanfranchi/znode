@@ -195,6 +195,7 @@ Task<void> NodeHub::connector_work() {
         try {
             log::Info("Service", {"name", "Node Hub", "remote", remote}) << "Connecting ...";
             co_await async_connect(*conn_ptr);
+            std::ignore = address_book_.set_tried(conn_ptr->endpoint_);
         } catch (const boost::system::system_error& ex) {
             log::Warning("Service", {"name", "Node Hub", "action", "outgoing connection request", "remote", remote,
                                      "error", ex.code().message()});
