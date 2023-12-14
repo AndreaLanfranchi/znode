@@ -48,11 +48,13 @@ bool Context::start() noexcept {
     }
     return true;
 }
+
 bool Context::stop() noexcept {
     if (not Stoppable::stop()) return false;  // Already stopped
     LOG_TRACE2 << "Stopping [" << name_ << "] context";
     work_guard_.reset();
     io_context_->stop();
+    thread_pool_.stop();
     thread_pool_.join();
     set_stopped();
     return true;

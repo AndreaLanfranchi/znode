@@ -103,6 +103,7 @@ bool Node::stop() noexcept {
         boost::system::error_code error_code;
         if (ssl_stream_ not_eq nullptr) {
             std::ignore = ssl_stream_->lowest_layer().cancel(error_code);
+            std::ignore = ssl_stream_->shutdown(error_code);
         } else {
             std::ignore = connection_ptr_->socket_ptr_->cancel(error_code);
         }
@@ -119,15 +120,17 @@ void Node::on_stop_completed() noexcept {
         std::ignore = connection_ptr_->socket_ptr_->close(error_code);
     }
 
+    on_disconnected_(*this);
+
     if (log::test_verbosity(log::Level::kTrace)) {
         const std::list<std::string> log_params{"action", __func__, "status", "success"};
         print_log(log::Level::kTrace, log_params);
     }
+
     const auto [inbound_bytes, outbound_bytes]{traffic_meter_.get_cumulative_bytes()};
     std::ignore = log::Info(
         "Node", {"id", std::to_string(node_id_), "remote", to_string(), "status", "disconnected", "data i/o",
                  absl::StrCat(to_human_bytes(inbound_bytes, true), " ", to_human_bytes(outbound_bytes, true))});
-    on_disconnected_(*this);
     set_stopped();
 }
 

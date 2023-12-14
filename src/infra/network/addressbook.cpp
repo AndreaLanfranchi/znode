@@ -284,26 +284,30 @@ void AddressBook::make_entry_tried(uint32_t entry_id) noexcept {
         slots_iterator = service_info.new_refs_.erase(slots_iterator);
     }
 
-    auto slot_address{get_tried_slot(service_info)};
-    auto& slot{tried_buckets_[slot_address.x][slot_address.y]};
-    if (slot not_eq 0U) {
+    auto tried_slot_address{get_tried_slot(service_info)};
+    auto& tried_slot_value{tried_buckets_[tried_slot_address.x][tried_slot_address.y]};
+    if (tried_slot_value not_eq 0U) {
         // Evict existing item from the tried bucket
-        auto id_to_evict{slot};
-        auto it2{map_id_to_serviceinfo_.find(id_to_evict)};
+        auto it2{map_id_to_serviceinfo_.find(tried_slot_value)};
         ASSERT(it2 not_eq map_id_to_serviceinfo_.end());  // Must be found
         ASSERT(it2->second.tried_ref_.has_value() &&
-               it2->second.tried_ref_.value() == slot_address.xy);  // Must be in the tried bucket
+               it2->second.tried_ref_.value() == tried_slot_address.xy);  // Must be in the tried bucket
         it2->second.tried_ref_.reset();
-        slot = 0U;
+        tried_slot_value = 0U;
         --tried_entries_size_;
 
-        // Re-insert the evicted item in the new bucket (must happen)
-        ASSERT(add_new(it2->second.service_, it2->second.origin_, 0s));
+        // Find a new slot for the evicted item
+        auto new_slot_address{get_new_slot(it2->second, it2->second.origin_)};
+        auto& new_slot_value{new_buckets_[new_slot_address.x][new_slot_address.y]};
+        ASSERT(new_slot_value not_eq it2->first);  // Must be 0 or not the same as the evicted item
+        if (new_slot_value not_eq 0U) clear_new_slot(new_slot_address, true);
+        ASSERT(it2->second.new_refs_.emplace(new_slot_address.xy).second);  // Must be inserted
+        ++new_entries_size_;
     }
 
-    slot = entry_id;
+    tried_slot_value = entry_id;
     ++tried_entries_size_;
-    service_info.tried_ref_.emplace(slot_address.xy);
+    service_info.tried_ref_.emplace(tried_slot_address.xy);
 }
 
 void AddressBook::clear_new_slot(const SlotAddress& slot_address, bool erase_entry) noexcept {

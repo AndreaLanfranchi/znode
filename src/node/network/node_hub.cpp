@@ -332,6 +332,7 @@ Task<void> NodeHub::async_connect(Connection& connection) {
     connection.socket_ptr_->set_option(syncnt_option_t(3));  // TODO adjust to CLI value
 #endif
 
+    // TODO : Actually kept for reference ... eventually remove
     //    boost::asio::deadline_timer timeout{asio_context_};
     //    timeout.expires_from_now(boost::posix_time::seconds(app_settings_.network.connect_timeout_seconds));
     //    timeout.async_wait([&connection](const boost::system::error_code& error) {
@@ -401,23 +402,23 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     }
 
     for (auto iterator{nodes_.begin()}; iterator not_eq nodes_.end(); /* !!! no increment !!! */) {
-        if ((*iterator)->status() == ComponentStatus::kNotStarted) {
+        if ((*iterator)->status() == ComponentStatus::kNotStarted and (*iterator).use_count() == 1) {
             iterator = nodes_.erase(iterator);
             continue;
         } else if (not this_is_running) {
-            asio::post(asio_context_, [node_ptr = *iterator]() { std::ignore = node_ptr->stop(); });
+            (*iterator)->stop();
         } else if (random_index and it_index == random_index.value() and
                    (*iterator)->connection().type_ not_eq ConnectionType::kInbound and (*iterator)->fully_connected()) {
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[random shutdown]", "remote",
                                      (*iterator)->to_string()})
                 << "Disconnecting ...";
-            asio::post(asio_context_, [node_ptr = *iterator]() { std::ignore = node_ptr->stop(); });
+            (*iterator)->stop();
         } else if (const auto idling_result{(*iterator)->is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(idling_result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
                                      (*iterator)->to_string(), "reason", reason})
                 << "Disconnecting ...";
-            asio::post(asio_context_, [node_ptr = *iterator]() { std::ignore = node_ptr->stop(); });
+            (*iterator)->stop();
         }
         ++iterator;
         ++it_index;
