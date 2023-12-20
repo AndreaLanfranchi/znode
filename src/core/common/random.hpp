@@ -27,6 +27,7 @@ template <Integral T>
 T randomize(const T min, const T max) {
     static THREAD_LOCAL std::random_device rnd;
     static THREAD_LOCAL std::mt19937 gen(rnd());
+    if (min == max) return min;
     std::uniform_int_distribution<T> dis(min, max);
     return dis(gen);
 }

@@ -16,12 +16,8 @@
 
 #include "addressbook.hpp"
 
-#include <set>
-
 #include <absl/strings/str_cat.h>
 #include <gsl/gsl_util>
-
-#include <core/crypto/md.hpp>
 
 #include <infra/common/log.hpp>
 #include <infra/common/stopwatch.hpp>
@@ -30,31 +26,36 @@ namespace znode::net {
 
 size_t AddressBook::size() const {
     std::shared_lock lock{mutex_};
-    return randomly_ordered_ids_.size();
+    return entries_.size();
 }
 
 std::pair<uint32_t, uint32_t> AddressBook::size_by_buckets() const {
     return {new_entries_size_.load(), tried_entries_size_.load()};
 }
 
-bool AddressBook::empty() const { return size() == 0U; }
+bool AddressBook::empty() const {
+    std::shared_lock lock{mutex_};
+    return entries_.empty();
+}
 
 bool AddressBook::contains(const NodeService& service) const noexcept { return contains(service.endpoint_); }
 
 bool AddressBook::contains(const IPEndpoint& endpoint) const noexcept {
     std::shared_lock lock{mutex_};
-    return map_endpoint_to_id_.contains(endpoint);
+    auto& idx{entries_.get<by_endpoint>()};
+    return idx.contains(endpoint);
 }
 
 bool AddressBook::contains(uint32_t id) const noexcept {
     std::shared_lock lock{mutex_};
-    return map_id_to_serviceinfo_.contains(id);
+    auto& idx{entries_.get<by_id>()};
+    return idx.contains(id);
 }
 
-bool AddressBook::add_new(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
+bool AddressBook::insert_or_update(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
     std::scoped_lock lock{mutex_};
     try {
-        return add_new_impl(service, source, time_penalty);
+        return insert_or_update_impl(service, source, time_penalty).second;
     } catch (const std::invalid_argument& ex) {
         log::Warning("Address Book",
                      {"invalid", service.endpoint_.to_string(), "from", source.to_string(), "reason", ex.what()})
@@ -63,8 +64,8 @@ bool AddressBook::add_new(NodeService& service, const IPAddress& source, std::ch
     return false;
 }
 
-bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& source,
-                          std::chrono::seconds time_penalty) {
+bool AddressBook::insert_or_update(std::vector<NodeService>& services, const IPAddress& source,
+                                   std::chrono::seconds time_penalty) {
     using namespace std::chrono_literals;
     NodeSeconds now{Now<NodeSeconds>()};
     const auto services_size{services.size()};
@@ -95,7 +96,7 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
                 it->time_ = now - std::chrono::days(5);
             }
 
-            if (add_new_impl(*it, source, time_penalty)) {
+            if (insert_or_update_impl(*it, source, time_penalty).second) {
                 ++added_count;
                 ++it;
             } else {
@@ -116,230 +117,150 @@ bool AddressBook::add_new(std::vector<NodeService>& services, const IPAddress& s
                                   "additions", std::to_string(added_count), "buckets new/tried",
                                   absl::StrCat(new_entries_size_.load(), "/", tried_entries_size_.load())});
     }
-
     return (added_count > 0U);
 }
 
 bool AddressBook::set_good(const IPEndpoint& remote, NodeSeconds time) noexcept {
     std::scoped_lock lock{mutex_};
-    auto [entry, entry_id]{find_entry(remote)};
-    if (entry == nullptr) return false;  // No such an entry
-    auto& service_info{*entry};
+    auto [service_info, entry_id]{lookup_entry(remote)};
+    if (service_info == nullptr) return false;  // No such an entry
 
     // Update info
-    service_info.service_.time_ = time;
-    service_info.last_connection_attempt_ = time;
-    service_info.last_connection_success_ = time;
-    service_info.connection_attempts_ = 0U;
+    service_info->service_.time_ = time;
+    service_info->last_connection_attempt_ = time;
+    service_info->last_connection_success_ = time;
+    service_info->connection_attempts_ = 0U;
 
     // Ensure is in the tried bucket
-    if (!service_info.tried_ref_.has_value()) make_entry_tried(entry_id);
+    if (!service_info->tried_ref_.has_value()) make_entry_tried(entry_id);
     return true;
 }
 
-bool AddressBook::set_failed(const znode::net::IPEndpoint& remote, znode::NodeSeconds time) noexcept {
+bool AddressBook::set_failed(const IPEndpoint& remote, NodeSeconds time) noexcept {
     std::scoped_lock lock{mutex_};
-    auto [entry, entry_id]{find_entry(remote)};
+    auto [service_info, entry_id]{lookup_entry(remote)};
+    if (service_info == nullptr) return false;  // No such an entry
+
+    // Update info
+    service_info->last_connection_attempt_ = time;
+    ++service_info->connection_attempts_;
+
+    if (!service_info->tried_ref_.has_value()) make_entry_tried(entry_id);
+    return true;
+}
+
+bool AddressBook::set_tried(const IPEndpoint& remote, NodeSeconds time) noexcept {
+    std::scoped_lock lock{mutex_};
+    auto [entry, entry_id]{lookup_entry(remote)};
     if (entry == nullptr) return false;  // No such an entry
     auto& service_info{*entry};
 
     // Update info
     service_info.last_connection_attempt_ = time;
-    ++service_info.connection_attempts_;
 
     if (!service_info.tried_ref_.has_value()) make_entry_tried(entry_id);
     return true;
 }
 
-bool AddressBook::set_tried(const znode::net::IPEndpoint& remote, znode::NodeSeconds time) noexcept {
-    std::scoped_lock lock{mutex_};
-    auto [entry, entry_id]{find_entry(remote)};
-    if (entry == nullptr) return false;  // No such an entry
-    auto& service_info{*entry};
+void AddressBook::erase_new_entry(uint32_t entry_id) noexcept {
+    if (entry_id == 0U) return;  // Cannot erase non-existent entry
+    auto& idx{entries_.get<by_id>()};
+    auto it{idx.find(entry_id)};
+    ASSERT(it not_eq idx.end());  // Must be found or else the data structures are inconsistent
+    auto& entry{*it->list_it};
+    ASSERT(entry.new_refs_.empty());        // Must not be referenced by any "new" bucket
+    ASSERT(!entry.tried_ref_.has_value());  // Must not be in the tried bucket
 
-    // Update info
-    service_info.last_connection_attempt_ = time;
-
-    if (!service_info.tried_ref_.has_value()) make_entry_tried(entry_id);
-    return true;
-}
-
-bool AddressBook::add_new_impl(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
-    using namespace std::chrono_literals;
-
-    if (not service.endpoint_.address_.is_routable()) {
-        throw std::invalid_argument("Address is not routable");
-    }
-
-    // Do not apply penalty if the source is the same as the service
-    // i.e. remote self advertisement
-    if (source == service.endpoint_.address_) {
-        time_penalty = 0s;
-    }
-
-    auto [book_entry, book_entry_id]{find_entry(service.endpoint_)};
-    bool is_new_entry{book_entry == nullptr};
-    if (not is_new_entry) {
-        // Periodically update time seen
-        const bool currently_online{NodeClock::now() - service.time_ < 24h};
-        const auto update_interval{currently_online ? 1h : 24h};
-        if (book_entry->service_.time_ < (service.time_ - update_interval - time_penalty)) {
-            book_entry->service_.time_ = std::max(NodeSeconds{0s}, service.time_ - time_penalty);
-        }
-        book_entry->service_.services_ |= service.services_;
-
-        // Do not update when:
-        // 1. The provided service has a seen date older than the one in the address book
-        // 2. The entry is already in the tried bucket
-        // 3. The entry has already been referenced kMaxNewBucketReferences times
-        if (service.time_ <= book_entry->service_.time_ or book_entry->tried_ref_.has_value() or
-            book_entry->new_refs_.size() == kMaxNewBucketReferences) {
-            return false;
-        }
-
-        // Stochastic test : previous new_references_count_ == N: 2^N times harder to increase it
-        uint32_t factor{1U << book_entry->new_refs_.size()};
-        if (randomize<uint32_t>(0U, factor) not_eq 0) {
-            return false;
-        }
-
-    } else {
-        // Insert new item
-        std::tie(book_entry, book_entry_id) = emplace_new_entry(service, source);
-        ASSERT(book_entry not_eq nullptr and book_entry_id not_eq 0);  // Must be inserted
-        book_entry->service_.time_ = std::max(NodeSeconds{0s}, service.time_ - time_penalty);
-    }
-
-    // Obtain coordinates of the bucket and position in the bucket
-    const auto slot_address{get_new_slot(*book_entry, source)};
-    auto& slot{new_buckets_[slot_address.x][slot_address.y]};
-
-    // We can insert the entry in the new bucket if:
-    // 1. The slot is empty
-    // 2. The slot is occupied by an entry that is either bad or is present in
-    //    that very slot only (i.e. it has not been referenced by any other bucket's slot)
-    bool is_free_slot{slot == 0U /* empty bucket */};
-    if (not is_free_slot and slot not_eq book_entry_id) {
-        const auto it{map_id_to_serviceinfo_.find(slot)};
-        ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found or else the data structures are inconsistent
-        if (it->second.is_bad() or (it->second.new_refs_.size() > 1U and book_entry->new_refs_.empty())) {
-            is_free_slot = true;  // Will overwrite the bad entry
-        }
-    }
-    if (is_free_slot) {
-        if (slot not_eq 0U) clear_new_slot(slot_address);
-        slot = book_entry_id;
-    } else {
-        // Erase the item which could not find a slot
-        if (book_entry->new_refs_.empty()) {
-            erase_new_entry(book_entry_id);
-        }
-    }
-
-    return is_free_slot;
-}
-
-std::pair<NodeServiceInfo*, uint32_t> AddressBook::emplace_new_entry(const NodeService& service,
-                                                                     const IPAddress& source) noexcept {
-    uint32_t new_id{last_used_id_.fetch_add(1U)};
-    auto [it, inserted]{map_id_to_serviceinfo_.try_emplace(new_id, NodeServiceInfo(service, source))};
-    ASSERT(inserted);  // Must be inserted (new_id is unique)
-    auto new_entry{&(it->second)};
-    randomly_ordered_ids_.push_back(new_id);
-    new_entry->random_pos_ = static_cast<uint32_t>(randomly_ordered_ids_.size() - 1U);
-    ASSERT(map_endpoint_to_id_.insert({service.endpoint_, new_id}).second);  // Must be inserted
-
-    ++new_entries_size_;
-    return {new_entry, new_id};
-}
-
-void AddressBook::erase_new_entry(uint32_t id) noexcept {
-    if (id == 0U) return;  // Cannot erase non-existent entry
-    auto it{map_id_to_serviceinfo_.find(id)};
-    ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found
-    ASSERT(it->second.new_refs_.empty());            // Must not be referenced by any "new" bucket
-    ASSERT(!it->second.tried_ref_.has_value());      // Must not be in the tried bucket
-    ASSERT(not randomly_ordered_ids_.empty());       // Must not be empty or else the data structures are inconsistent
-    swap_randomly_ordered_ids(it->second.random_pos_, static_cast<uint32_t>(randomly_ordered_ids_.size() - 1U));
-    ASSERT(randomly_ordered_ids_.back() == id);  // Must have become the last element
+    swap_randomly_ordered_ids(entry.random_pos_, static_cast<uint32_t>(randomly_ordered_ids_.size() - 1U));
+    ASSERT(randomly_ordered_ids_.back() == entry_id);  // Must have become the last element
     randomly_ordered_ids_.pop_back();
-    std::ignore = map_endpoint_to_id_.erase(it->second.service_.endpoint_);
-    std::ignore = map_id_to_serviceinfo_.erase(it);
     --new_entries_size_;
+    std::ignore = list_.erase(it->list_it);
+    std::ignore = idx.erase(it);
 }
 
 void AddressBook::make_entry_tried(uint32_t entry_id) noexcept {
     using namespace std::chrono_literals;
-    auto it{map_id_to_serviceinfo_.find(entry_id)};
-    ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found
-    auto& service_info{it->second};
 
-    if (service_info.tried_ref_.has_value()) return;  // Already in the tried bucket
+    NodeServiceInfo* service_info{nullptr};
+    std::tie(service_info, std::ignore) = lookup_entry(entry_id);
+    ASSERT(service_info != nullptr);
+    if (service_info->tried_ref_.has_value()) return;  // Already in the tried bucket
 
     // Erase all references from the "new" buckets
-    new_entries_size_ -= static_cast<uint32_t>(!service_info.new_refs_.empty());
-    for (auto slots_iterator{service_info.new_refs_.begin()}; slots_iterator not_eq service_info.new_refs_.end();) {
-        SlotAddress slot_address(*slots_iterator);
-        new_buckets_[slot_address.x][slot_address.y] = 0U;
-        slots_iterator = service_info.new_refs_.erase(slots_iterator);
+    new_entries_size_ -= static_cast<uint32_t>(!service_info->new_refs_.empty());
+    for (auto refs_iterator{service_info->new_refs_.begin()}; refs_iterator not_eq service_info->new_refs_.end();) {
+        new_buckets_.erase(*refs_iterator);
+        refs_iterator = service_info->new_refs_.erase(refs_iterator);
     }
 
-    auto tried_slot_address{get_tried_slot(service_info)};
-    auto& tried_slot_value{tried_buckets_[tried_slot_address.x][tried_slot_address.y]};
-    if (tried_slot_value not_eq 0U) {
+    const auto tried_slot_address{get_tried_slot(*service_info)};
+    const auto tried_slot_it{tried_buckets_.find(tried_slot_address.xy)};
+
+    if (tried_slot_it not_eq tried_buckets_.end()) {
         // Evict existing item from the tried bucket
-        auto it2{map_id_to_serviceinfo_.find(tried_slot_value)};
-        ASSERT(it2 not_eq map_id_to_serviceinfo_.end());  // Must be found
-        ASSERT(it2->second.tried_ref_.has_value() &&
-               it2->second.tried_ref_.value() == tried_slot_address.xy);  // Must be in the tried bucket
-        it2->second.tried_ref_.reset();
-        tried_slot_value = 0U;
+        auto [evict_service_info, evict_entry_id]{lookup_entry(tried_slot_it->second)};
+        ASSERT(evict_service_info != nullptr);
+
+        ASSERT(evict_service_info->tried_ref_.has_value() &&
+               evict_service_info->tried_ref_.value() == tried_slot_address.xy);  // Must be in the tried bucket
+        ASSERT(evict_service_info->new_refs_.empty());                            // Must not be referenced by any "new"
+                                                                                  // bucket
+        evict_service_info->tried_ref_.reset();
+        tried_buckets_.erase(tried_slot_it);
         --tried_entries_size_;
 
-        // Find a new slot for the evicted item
-        auto new_slot_address{get_new_slot(it2->second, it2->second.origin_)};
-        auto& new_slot_value{new_buckets_[new_slot_address.x][new_slot_address.y]};
-        ASSERT(new_slot_value not_eq it2->first);  // Must be 0 or not the same as the evicted item
-        if (new_slot_value not_eq 0U) clear_new_slot(new_slot_address, true);
-        ASSERT(it2->second.new_refs_.emplace(new_slot_address.xy).second);  // Must be inserted
+        // Get coordinates for a bucket positioning in the "new" collection
+        // and eventually put a reference to the evicted item
+        const auto slot_address{get_new_slot(*evict_service_info, evict_service_info->origin_)};
+        clear_new_slot(slot_address, true);  // Make room for the new entry if necessary
+        ASSERT(evict_service_info->new_refs_.emplace(slot_address.xy).second);  // Must be inserted
+        ASSERT(new_buckets_.emplace(slot_address.xy, evict_entry_id).second);   // Must be inserted
         ++new_entries_size_;
     }
 
-    tried_slot_value = entry_id;
+    ASSERT(tried_buckets_.emplace(tried_slot_address.xy, entry_id).second);  // Must be inserted
+    service_info->tried_ref_.emplace(tried_slot_address.xy);
     ++tried_entries_size_;
-    service_info.tried_ref_.emplace(tried_slot_address.xy);
 }
 
-void AddressBook::clear_new_slot(const SlotAddress& slot_address, bool erase_entry) noexcept {
-    if (empty()) return;
-    if (slot_address.x >= kNewBucketsCount or slot_address.y >= kBucketSize) return;  // TODO Or throw?
-    const auto id{new_buckets_[slot_address.x][slot_address.y]};
-    if (id == 0U) return;  // Empty slot already
-    const auto it{map_id_to_serviceinfo_.find(id)};
-    ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found
+void AddressBook::clear_new_slot(const SlotAddress& slot_address, bool erase_unreferenced_entry) noexcept {
+    ASSERT(slot_address.x < kNewBucketsCount and slot_address.y < kBucketSize);
+    auto slot_it{new_buckets_.find(slot_address.xy)};
+    if (slot_it == new_buckets_.end()) return;  // Empty slot already
 
-    auto it2{it->second.new_refs_.find(slot_address.xy)};
-    ASSERT(it2 not_eq it->second.new_refs_.end());  // Must be found
-    std::ignore = it->second.new_refs_.erase(it2);
-    new_buckets_[slot_address.x][slot_address.y] = 0U;
-    if (!it->second.new_refs_.empty() or it->second.tried_ref_.has_value()) return;
-
-    // Remove the service from the address book entirely
-    if (erase_entry) erase_new_entry(id);
-}
-
-std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::find_entry(const IPEndpoint& endpoint) {
-    const auto it1{map_endpoint_to_id_.find(endpoint)};
-    if (it1 == map_endpoint_to_id_.end()) {
-        return {nullptr, 0U};
+    {
+        auto [service_info, entry_id]{lookup_entry(slot_it->second)};
+        ASSERT(entry_id != 0U);                                        // Must be found
+        ASSERT(service_info->new_refs_.erase(slot_address.xy) == 1U);  // Must be erased
+        if (!service_info->new_refs_.empty() or service_info->tried_ref_.has_value()) {
+            erase_unreferenced_entry = false;  // Do not erase the entry
+        }
     }
 
-    const auto id{it1->second};
-    const auto it2{map_id_to_serviceinfo_.find(id)};
-    ASSERT(it2 != map_id_to_serviceinfo_.end());  // Must be found or else the data structures are inconsistent
-    ASSERT((it2->second.service_.endpoint_ ==
-            endpoint));  // Must be the same (or else the data structures are inconsistent)
-    return {&(it2->second), id};
+    // Remove the service from the address book entirely
+    if (erase_unreferenced_entry) erase_new_entry(slot_it->second);
+    new_buckets_.erase(slot_it);  // Effectively clear the slot
+}
+
+std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::lookup_entry(const IPEndpoint& endpoint) const noexcept {
+    auto& idx{entries_.get<by_endpoint>()};
+    const auto it{idx.find(endpoint)};
+    if (it == idx.end()) {
+        return {nullptr, 0U};
+    }
+    NodeServiceInfo* entry{&(*(it->list_it))};
+    return {entry, it->id};
+}
+
+std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::lookup_entry(const uint32_t entry_id) const noexcept {
+    auto& idx{entries_.get<by_id>()};
+    const auto it{idx.find(entry_id)};
+    if (it == idx.end()) {
+        return {nullptr, 0U};
+    }
+    NodeServiceInfo* entry{&(*(it->list_it))};
+    return {entry, it->id};
 }
 
 void AddressBook::swap_randomly_ordered_ids(uint32_t i, uint32_t j) noexcept {
@@ -348,14 +269,16 @@ void AddressBook::swap_randomly_ordered_ids(uint32_t i, uint32_t j) noexcept {
 
     auto id_at_i{randomly_ordered_ids_[i]};
     auto id_at_j{randomly_ordered_ids_[j]};
-    const auto it1{map_id_to_serviceinfo_.find(id_at_i)};
-    const auto it2{map_id_to_serviceinfo_.find(id_at_j)};
-    ASSERT(it1 not_eq map_id_to_serviceinfo_.end());  // Must be found
-    ASSERT(it2 not_eq map_id_to_serviceinfo_.end());  // Must be found
+
+    auto& idx{entries_.get<by_id>()};
+    auto it1{idx.find(id_at_i)};
+    auto it2{idx.find(id_at_j)};
+    ASSERT(it1 not_eq idx.end());  // Must be found
+    ASSERT(it2 not_eq idx.end());  // Must be found
 
     // Swap the references
-    it1->second.random_pos_ = j;
-    it2->second.random_pos_ = i;
+    it1->list_it->random_pos_ = j;
+    it2->list_it->random_pos_ = i;
 
     // Swap the ids
     randomly_ordered_ids_[i] = id_at_j;
@@ -443,14 +366,24 @@ Bytes AddressBook::compute_group(const IPAddress& address) noexcept {
     }
     return ret;
 }
+std::pair<uint32_t, uint32_t> AddressBook::get_bucket_boundaries(bool use_tried) const noexcept {
+    uint32_t min{0};
+    uint32_t max{0};
+    const auto& buckets{use_tried ? tried_buckets_ : new_buckets_};
+    if (buckets.empty()) return {min, max};
+    min = buckets.begin()->first;
+    max = buckets.rbegin()->first;
+    return {min, max};
+}
 
-uint32_t AddressBook::get_entry_id(SlotAddress slot, bool tried) const noexcept {
-    if (tried) {
-        if (slot.x >= kTriedBucketsCount or slot.y >= kBucketSize) return 0U;
-        return tried_buckets_[slot.x][slot.y];
-    }
-    if (slot.x >= kNewBucketsCount or slot.y >= kBucketSize) return 0U;
-    return new_buckets_[slot.x][slot.y];
+uint32_t AddressBook::get_entry_id_from_slot(SlotAddress slot, bool use_tried) const noexcept {
+    const auto& buckets{use_tried ? tried_buckets_ : new_buckets_};
+    if (buckets.empty()) return 0U;
+
+    auto it{buckets.upper_bound(slot.xy)};
+    if (it == buckets.begin()) return 0U;
+    --it;
+    return it->second;
 }
 
 std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
@@ -459,7 +392,7 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
 
     std::scoped_lock lock{mutex_};
     if (randomly_ordered_ids_.empty()) return ret;
-    if (new_only and new_entries_size_ == 0U) return ret;
+    if (new_only and new_entries_size_.load() == 0U) return ret;
 
     // Determine whether to select from new or tried buckets
     bool select_from_tried{false};
@@ -476,35 +409,25 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
         }
     }
 
-    const auto max_bucket_count{select_from_tried ? kTriedBucketsCount : kNewBucketsCount};
+    const auto [rnd_min, rnd_max]{get_bucket_boundaries(select_from_tried)};
+
     const auto items_in_set{select_from_tried ? tried_entries_size_.load() : new_entries_size_.load()};
     double chance_factor{1.0};
-    SlotAddress slot_address{0U};
-    for (int attempt{0}; attempt < 50; ++attempt) {
-        slot_address.x = randomize<uint16_t>(uint16_t(0), uint16_t(max_bucket_count - 1U));
-        const auto initial_y{randomize<uint16_t>(uint16_t(0), uint16_t(kBucketSize - 1U))};
-        uint16_t i{0U};
-        uint32_t entry_id{0U};
-        for (; i < kBucketSize; ++i) {
-            slot_address.y = (initial_y + i) % kBucketSize;
-            entry_id = get_entry_id(slot_address, select_from_tried);
-            if (entry_id == 0U) continue;
-            if (type.has_value()) {
-                // TODO : Avoid this double lookup
-                const auto it{map_id_to_serviceinfo_.find(entry_id)};
-                ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found or data structures are inconsistent
-                const auto& service_info{it->second};
-                if (service_info.service_.endpoint_.address_.get_type() not_eq type.value()) continue;
-            }
-            break;
+    for (int attempt{0}; attempt < 50'000; ++attempt) {
+        const SlotAddress slot_address{randomize<uint32_t>(rnd_min, rnd_max)};
+        const uint32_t entry_id{get_entry_id_from_slot(slot_address, select_from_tried)};
+        if (entry_id == 0U) continue;
+        NodeServiceInfo* service_info{nullptr};
+        std::tie(service_info, std::ignore) = lookup_entry(entry_id);
+        ASSERT(service_info not_eq nullptr);  // Must be found or else the data structures are inconsistent
+
+        // Check type
+        if (type.has_value()) {
+            if (service_info->service_.endpoint_.address_.get_type() not_eq type.value()) continue;
         }
-        if (i == kBucketSize) continue;  // No entry found in this bucket pick another one
-        const auto it{map_id_to_serviceinfo_.find(entry_id)};
-        ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found or data structures are inconsistent
-        const auto& service_info{it->second};
-        if (randbits(30) < static_cast<uint64_t>(chance_factor * service_info.get_chance() * (1ULL << 30))) {
-            ret.first = service_info.service_.endpoint_;
-            ret.second = service_info.service_.time_;
+        if (randbits(30) < static_cast<uint64_t>(chance_factor * service_info->get_chance() * (1ULL << 30))) {
+            ret.first = service_info->service_.endpoint_;
+            ret.second = service_info->service_.time_;
         } else {
             chance_factor *= 1.2;  // Increase probability of selecting something at each iteration
         }
@@ -539,13 +462,15 @@ std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count, ui
     const auto now{Now<NodeSeconds>()};
     std::vector<NodeService> ret{};
     ret.reserve(count);
+    auto& idx{entries_.get<by_id>()};
+
     for (size_t i{0}; i < randomly_ordered_ids_.size(); ++i) {
         if (ret.size() == count) break;
         size_t random_index{randomize<size_t>(0U, randomly_ordered_ids_.size() - i - 1U) + i};
         swap_randomly_ordered_ids(static_cast<uint32_t>(i), static_cast<uint32_t>(random_index));
-        auto it{map_id_to_serviceinfo_.find(randomly_ordered_ids_[i])};
-        ASSERT(it not_eq map_id_to_serviceinfo_.end());  // Must be found or else the data structures are inconsistent
-        const auto& service_info{it->second};
+        auto it{idx.find(randomly_ordered_ids_[i])};
+        ASSERT(it not_eq idx.end());  // Must be found or else the data structures are inconsistent
+        const auto& service_info{*it->list_it};
         if (type.has_value() and service_info.service_.endpoint_.address_.get_type() not_eq type.value()) continue;
         if (service_info.is_bad(now)) continue;
         if (!selected_endpoints.insert(service_info.service_.endpoint_).second) continue;  // Duplicate
@@ -554,4 +479,93 @@ std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count, ui
     return ret;
 }
 
+std::pair<NodeServiceInfo*, bool> AddressBook::insert_or_update_impl(NodeService& service, const IPAddress& source,
+                                                                     std::chrono::seconds time_penalty) {
+    using namespace std::chrono_literals;
+    if (source == service.endpoint_.address_) time_penalty = 0s;  // Self advertisement
+    std::pair<NodeServiceInfo*, bool> ret{nullptr, false};
+    auto [entry, entry_id]{lookup_entry(service.endpoint_)};
+    if (entry != nullptr) {
+        update_entry(*entry, entry_id, service, source, time_penalty);
+        ret.first = entry;
+        ret.second = false;
+    } else {
+        // Insert new item
+        std::tie(entry, entry_id) = insert_entry(service, source, time_penalty);
+        entry->service_.time_ = std::max(NodeSeconds{NodeService::kTimeInit}, service.time_ - time_penalty);
+        ret.first = entry;
+        ret.second = true;
+    }
+    return ret;
+}
+
+std::pair<NodeServiceInfo*, uint32_t> AddressBook::insert_entry(const NodeService& service, const IPAddress& source,
+                                                                std::chrono::seconds time_penalty) noexcept {
+    uint32_t new_id{last_used_id_.fetch_add(1U)};
+    NodeServiceInfo service_info{service, source};
+    service_info.service_.time_ -= time_penalty;
+
+    // Get coordinates of the bucket and position in the new bucket
+    // and eventually put a reference to the entry in the new bucket
+    const auto slot_address{get_new_slot(service_info, source)};
+    clear_new_slot(slot_address, true);                              // Make room for the new entry if necessary
+    ASSERT(service_info.new_refs_.emplace(slot_address.xy).second);  // Must be inserted
+    ASSERT(new_buckets_.emplace(slot_address.xy, new_id).second);    // Must be inserted
+
+    service_info.random_pos_ = static_cast<uint32_t>(randomly_ordered_ids_.size());
+    randomly_ordered_ids_.push_back(new_id);
+
+    auto new_it{list_.emplace(list_.end(), std::move(service_info))};
+    entries_.insert({new_id, service.endpoint_, new_it});
+    ++new_entries_size_;
+    return {new_it.operator->(), new_id};
+}
+
+void AddressBook::update_entry(NodeServiceInfo& entry, const uint32_t entry_id, const NodeService& service,
+                               const IPAddress& source, std::chrono::seconds time_penalty) noexcept {
+    // Update time seen
+    using namespace std::chrono_literals;
+    const bool currently_online{NodeClock::now() - service.time_ < 24h};
+    const auto update_interval{currently_online ? 1h : 24h};
+    if (entry.service_.time_ < (service.time_ - update_interval - time_penalty)) {
+        entry.service_.time_ = std::max(NodeSeconds{NodeService::kTimeInit}, service.time_ - time_penalty);
+    }
+    entry.service_.services_ |= service.services_;
+
+    // Sanity check : entry must be either in the new bucket or in the tried bucket but not both
+    ASSERT(!entry.new_refs_.empty() xor entry.tried_ref_.has_value());
+
+    // Do not update when:
+    // 1. The provided service has a seen date older than the one in the address book
+    // 2. The entry is already in the tried bucket
+    // 3. The entry has already been referenced kMaxNewBucketReferences times
+    if (entry.service_.time_ < service.time_ or entry.tried_ref_.has_value() or
+        entry.new_refs_.size() == kMaxNewBucketReferences) {
+        return;
+    }
+
+    // Stochastic test : previous new_references_count_ == N: 2^N times harder to increase it
+    uint32_t factor{1U << entry.new_refs_.size()};
+    if (randomize<uint32_t>(0U, factor - 1) not_eq 0) {
+        return;
+    }
+
+    // Get coordinates of the bucket and position in the new bucket
+    // and eventually put a reference to the entry in the new bucket
+    const auto slot_address{get_new_slot(entry, source)};
+    if (entry.new_refs_.contains(slot_address.xy)) {
+        ASSERT(new_buckets_.contains(slot_address.xy));  // Must be found or else the data structures are inconsistent)
+        return;
+    }
+
+    auto slot_it{new_buckets_.find(slot_address.xy)};
+    if (slot_it != new_buckets_.end()) {
+        ASSERT(slot_it->second != entry_id);  // Must not contain a reference to this entry otherwise the data
+                                              // structures are inconsistent
+        clear_new_slot(slot_address, true);   // Make room for the new entry
+    }
+    ASSERT(entry.new_refs_.emplace(slot_address.xy).second);         // Must be inserted
+    ASSERT(new_buckets_.emplace(slot_address.xy, entry_id).second);  // Must be inserted
+    if (entry.new_refs_.size() == 1U) ++new_entries_size_;
+}
 }  // namespace znode::net

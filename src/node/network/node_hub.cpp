@@ -274,7 +274,8 @@ Task<void> NodeHub::address_book_processor_work() {
                 case MessageType::kAddr: {
                     auto& payload = dynamic_cast<MsgAddrPayload&>(*payload_ptr);
                     payload.shuffle();
-                    std::ignore = address_book_.add_new(payload.identifiers_, node_ptr->remote_endpoint().address_, 2h);
+                    std::ignore =
+                        address_book_.insert_or_update(payload.identifiers_, node_ptr->remote_endpoint().address_, 2h);
                 } break;
                 case MessageType::kGetAddr: {
                     auto services{address_book_.get_random_services(kMaxAddrItems, 25)};
