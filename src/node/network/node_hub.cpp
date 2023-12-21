@@ -395,11 +395,15 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     const bool this_is_running{is_running()};
 
     std::unique_lock lock(nodes_mutex_);
+    uint32_t shutdown_count{16};  // Limit the number of nodes we shutdown per timer tick
+
     // Randomly shutdown one node
     // TODO remove this when done testing
     uint32_t it_index{0};
     std::optional<uint32_t> random_index;
-    if (this_is_running && nodes_.size() > 1 && randomize<uint32_t>(0U, 250U) == 0) {
+    if (this_is_running && current_active_outbound_connections_ == app_settings_.network.min_outgoing_connections &&
+        address_book_.size() > app_settings_.network.min_outgoing_connections &&
+        randomize<uint32_t>(0U, 250U) == 0) {
         random_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
     }
 
@@ -409,18 +413,21 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
             continue;
         } else if (not this_is_running) {
             (*iterator)->stop();
+            if (--shutdown_count == 0) break;
         } else if (random_index and it_index == random_index.value() and
                    (*iterator)->connection().type_ not_eq ConnectionType::kInbound and (*iterator)->fully_connected()) {
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[random shutdown]", "remote",
                                      (*iterator)->to_string()})
                 << "Disconnecting ...";
             (*iterator)->stop();
+            if (--shutdown_count == 0) break;
         } else if (const auto idling_result{(*iterator)->is_idle()}; idling_result not_eq NodeIdleResult::kNotIdle) {
             const std::string reason{magic_enum::enum_name(idling_result)};
             log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[idle_check]", "remote",
                                      (*iterator)->to_string(), "reason", reason})
                 << "Disconnecting ...";
             (*iterator)->stop();
+            if (--shutdown_count == 0) break;
         }
         ++iterator;
         ++it_index;
