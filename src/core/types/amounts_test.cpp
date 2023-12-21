@@ -15,15 +15,14 @@
 */
 
 #include <format>
+
 #include <catch2/catch.hpp>
 
 #include <core/types/amounts.hpp>
 
 namespace znode {
 
-std::string append_currency(const std::string_view& input) {
-    return std::format("{} {}", input, kCurrency);
-}
+std::string append_currency(const std::string_view& input) { return std::format("{} {}", input, kCurrency); }
 
 TEST_CASE("Amounts", "[types]") {
     Amount a1;

@@ -27,7 +27,7 @@ void write_config_value(mdbx::txn& txn, std::string_view key, const ByteView& va
     config.upsert(to_slice(key), to_slice(value));
 }
 
-std::optional<Bytes> read_config_value(mdbx::txn& txn, std::string_view key) { 
+std::optional<Bytes> read_config_value(mdbx::txn& txn, std::string_view key) {
     Cursor config(txn, db::tables::kConfig);
     if (not config.seek(to_slice(key))) {
         return std::nullopt;
@@ -38,7 +38,6 @@ std::optional<Bytes> read_config_value(mdbx::txn& txn, std::string_view key) {
 }
 
 std::optional<Version> read_schema_version(mdbx::txn& txn) {
-
     auto data{read_config_value(txn, tables::kDbSchemaVersionKey)};
     if (not data) return std::nullopt;
     ASSERT_POST(data->length() == sizeof(Version) and "Invalid serialized schema version");

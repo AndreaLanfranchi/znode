@@ -402,8 +402,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     uint32_t it_index{0};
     std::optional<uint32_t> random_index;
     if (this_is_running && current_active_outbound_connections_ == app_settings_.network.min_outgoing_connections &&
-        address_book_.size() > app_settings_.network.min_outgoing_connections &&
-        randomize<uint32_t>(0U, 250U) == 0) {
+        address_book_.size() > app_settings_.network.min_outgoing_connections && randomize<uint32_t>(0U, 250U) == 0) {
         random_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
     }
 

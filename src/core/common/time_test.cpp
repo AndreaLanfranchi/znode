@@ -22,7 +22,7 @@
 
 namespace znode {
 
-TEST_CASE("format_ISO8601","[util]") {
+TEST_CASE("format_ISO8601", "[util]") {
     CHECK(format_ISO8601(0) == "1970-01-01T00:00:00Z");
     CHECK(format_ISO8601(0, false) == "1970-01-01");
     CHECK(format_ISO8601(1234567890) == "2009-02-13T23:31:30Z");
@@ -30,4 +30,4 @@ TEST_CASE("format_ISO8601","[util]") {
     CHECK(format_ISO8601(1234567890, true) == "2009-02-13T23:31:30Z");
     CHECK(format_ISO8601(1317425777, true) == "2011-09-30T23:36:17Z");
 }
-} // namespace znode
+}  // namespace znode
