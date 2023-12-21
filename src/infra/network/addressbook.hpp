@@ -61,7 +61,7 @@ class AddressBook {
     //! \brief A struct representing the coordinates of a slot in collection of buckets
     struct SlotAddress {
         SlotAddress() : x{0}, y{0} {};
-        explicit SlotAddress(uint16_t pos, uint16_t num) noexcept : x{pos}, y{num} {}
+        explicit SlotAddress(uint16_t pos, uint16_t num) noexcept : y{num}, x{pos} {}
         explicit SlotAddress(uint32_t pos_num) noexcept : xy{pos_num} {}
         union alignas(uint32_t) {
             struct alignas(uint16_t) {
