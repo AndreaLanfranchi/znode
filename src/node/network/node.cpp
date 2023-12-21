@@ -409,9 +409,8 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
                 continue;
             }
 
-            log::Error("Node",
-                       {"id", std::to_string(node_id_), "remote", to_string(), "command",
-                        command_from_message_type(msg_type), "status", "failure", "reason", result.error().message()});
+            log::Warning("Node", {"id", std::to_string(node_id_), "remote", to_string(), "status", "failure", "reason",
+                                  result.error().message()});
         }
 
         if (not result.has_error())
