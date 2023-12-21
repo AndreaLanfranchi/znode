@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <node/database/mdbx_tables.hpp>
+#include <infra/database/mdbx_tables.hpp>
 
 namespace znode::db::stages {
 

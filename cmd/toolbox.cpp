@@ -29,9 +29,8 @@
 #include <core/common/misc.hpp>
 
 #include <infra/common/log.hpp>
+#include <infra/database/mdbx.hpp>
 #include <infra/os/signals.hpp>
-
-#include <node/database/mdbx.hpp>
 
 namespace fs = std::filesystem;
 using namespace znode;

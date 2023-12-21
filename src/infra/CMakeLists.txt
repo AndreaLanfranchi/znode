@@ -32,6 +32,8 @@ set_target_properties(${BUILD_INFRA_COMPONENT} PROPERTIES LINKER_LANGUAGE CXX)
 set(PUBLIC_LIBS
         third-party-includes
         ${BUILD_CORE_COMPONENT}
+        mdbx-static
+        nlohmann_json::nlohmann_json
         absl::time
         Boost::headers
         Boost::thread

@@ -24,7 +24,7 @@
 #include <core/common/cast.hpp>
 #include <core/common/endian.hpp>
 
-#include <node/database/mdbx_tables.hpp>
+#include <infra/database/mdbx_tables.hpp>
 
 namespace znode::db {
 

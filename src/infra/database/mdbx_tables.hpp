@@ -19,8 +19,9 @@
 #include <array>
 #include <ranges>
 
+#include <infra/database/mdbx.hpp>
+
 #include <node/common/version.hpp>
-#include <node/database/mdbx.hpp>
 
 namespace znode::db::tables {
 

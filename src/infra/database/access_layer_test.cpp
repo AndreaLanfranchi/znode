@@ -17,9 +17,8 @@
 
 #include <catch2/catch.hpp>
 
+#include <infra/database/access_layer.hpp>
 #include <infra/filesystem/directories.hpp>
-
-#include <node/database/access_layer.hpp>
 
 namespace znode::db {
 

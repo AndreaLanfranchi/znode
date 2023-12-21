@@ -30,11 +30,11 @@
 #include <infra/common/common.hpp>
 #include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/context.hpp>
+#include <infra/database/access_layer.hpp>
+#include <infra/database/mdbx_tables.hpp>
 #include <infra/network/time.hpp>
 #include <infra/os/signals.hpp>
 
-#include <node/database/access_layer.hpp>
-#include <node/database/mdbx_tables.hpp>
 #include <node/network/node_hub.hpp>
 #include <node/zk/params.hpp>
 

@@ -33,13 +33,7 @@ set(PUBLIC_LIBS
         third-party-includes
         ${BUILD_CORE_COMPONENT}
         ${BUILD_INFRA_COMPONENT}
-        absl::time
-        mdbx-static
-        nlohmann_json::nlohmann_json
-        Boost::coroutine # Mind the order
-        Boost::context   # of this two
-        OpenSSL::SSL
-        )
+)
 
 set(PRIVATE_LIBS $<$<BOOL:${MSVC}>:ntdll.lib>)
 target_link_libraries(${BUILD_NODE_COMPONENT} PUBLIC ${PUBLIC_LIBS} PRIVATE ${PRIVATE_LIBS})

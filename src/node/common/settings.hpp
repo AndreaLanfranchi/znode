@@ -27,10 +27,9 @@
 #include <core/common/base.hpp>
 
 #include <infra/common/log.hpp>
+#include <infra/database/mdbx.hpp>  // TODO define dbsettings here and remove this include (mdbx.hpp must include this)
 #include <infra/filesystem/directories.hpp>
 #include <infra/nat/option.hpp>
-
-#include <node/database/mdbx.hpp>  // TODO define dbsettings here and remove this include (mdbx.hpp must include this)
 
 namespace znode {
 
@@ -56,16 +55,16 @@ struct NetworkSettings {
 };
 
 struct AppSettings {
-    size_t asio_concurrency{2};                       // Async context concurrency level
-    std::unique_ptr<DataDirectory> data_directory;    // Main data folder
-    db::EnvConfig chaindata_env_config{};             // Chaindata db config
+    size_t asio_concurrency{2};                     // Async context concurrency level
+    std::unique_ptr<DataDirectory> data_directory;  // Main data folder
+    db::EnvConfig chaindata_env_config{};           // Chaindata db config
     db::EnvConfig nodedata_env_config{
         // Nodedata db config
         .max_size{512_MiB},
         .growth_size{2_MiB},
         .max_tables{32},
         .max_readers{32},
-    };              
+    };
     uint32_t network_id{kMainNetConfig.identifier_};  // Network/Chain id
     std::optional<ChainConfig> chain_config;          // Chain config
     size_t batch_size{512_MiB};                       // Batch size to use in stages

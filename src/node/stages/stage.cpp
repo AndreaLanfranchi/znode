@@ -17,7 +17,7 @@
 
 #include "stage.hpp"
 
-#include <node/database/stages.hpp>
+#include <infra/database/stages.hpp>
 
 namespace znode::stages {
 

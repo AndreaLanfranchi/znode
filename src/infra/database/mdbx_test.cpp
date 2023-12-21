@@ -24,9 +24,8 @@
 
 #include <core/common/cast.hpp>
 
+#include <infra/database/mdbx.hpp>
 #include <infra/filesystem/directories.hpp>
-
-#include <node/database/mdbx.hpp>
 
 namespace znode::db {
 
