@@ -120,12 +120,14 @@ bool AddressBook::insert_or_update(std::vector<NodeService>& services, const IPA
     return (added_count > 0U);
 }
 
-bool AddressBook::set_good(const IPEndpoint& remote, NodeSeconds time) noexcept {
+bool AddressBook::set_good(const IPEndpoint& remote, const MsgVersionPayload& version_info, NodeSeconds time) noexcept {
     std::scoped_lock lock{mutex_};
     auto [service_info, entry_id]{lookup_entry(remote)};
     if (service_info == nullptr) return false;  // No such an entry
 
     // Update info
+    service_info->user_agent_ = version_info.user_agent_;
+    service_info->service_.services_ = version_info.services_;
     service_info->service_.time_ = time;
     service_info->last_connection_attempt_ = time;
     service_info->last_connection_success_ = time;

@@ -282,6 +282,7 @@ class NodeServiceInfo : public ser::Serializable {
     static constexpr uint32_t kMaxReconnectionFailures{10L};
 
     NodeService service_{};                                         // The actual service this class is bound to
+    std::string user_agent_{};                                      // The user agent of the peer
     IPAddress origin_{};                                            // The original address advertising this
     NodeSeconds last_connection_attempt_{std::chrono::seconds(0)};  // Last time a connection has been attempted
     NodeSeconds last_connection_success_{std::chrono::seconds(0)};  // Last time a connection has been successful

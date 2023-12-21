@@ -31,6 +31,7 @@
 #include <core/types/hash.hpp>
 
 #include <infra/network/addresses.hpp>
+#include <infra/network/payloads.hpp>
 
 namespace znode::net {
 
@@ -106,7 +107,8 @@ class AddressBook {
                                         std::chrono::seconds time_penalty);
 
     //! \brief Marks an item as good (reachable and successfully connected to)
-    [[nodiscard]] bool set_good(const IPEndpoint& remote, NodeSeconds time = Now<NodeSeconds>()) noexcept;
+    [[nodiscard]] bool set_good(const IPEndpoint& remote, const MsgVersionPayload& version_info,
+                                NodeSeconds time = Now<NodeSeconds>()) noexcept;
 
     //! \brief Records a failed attempt on an item
     [[nodiscard]] bool set_failed(const IPEndpoint& remote, NodeSeconds time = Now<NodeSeconds>()) noexcept;

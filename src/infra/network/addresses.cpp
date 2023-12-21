@@ -518,6 +518,7 @@ nlohmann::json NodeServiceInfo::to_json() const noexcept {
 outcome::result<void> NodeServiceInfo::serialization(ser::SDataStream& stream, ser::Action action) {
     uint32_t time_value{0};
     auto result{stream.bind(service_, action)};
+    if (not result.has_error()) result = stream.bind(user_agent_, action);
     if (not result.has_error()) result = stream.bind(origin_, action);
     if (not result.has_error()) {
         time_value = static_cast<uint32_t>(last_connection_attempt_.time_since_epoch().count());

@@ -646,7 +646,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
         using enum MessageType;
         case kVersion:
             if (node_ptr->connection().type_ != ConnectionType::kInbound) {
-                std::ignore = address_book_.set_good(node_ptr->remote_endpoint());
+                std::ignore = address_book_.set_good(node_ptr->remote_endpoint(), node_ptr->version_info());
                 // Also send our address as advertisement
                 MsgAddrPayload payload{};
                 NodeService node_service{
