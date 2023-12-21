@@ -38,6 +38,12 @@ class Exception : public std::exception {
     std::string what_;
 };
 
+//! \brief Upserts a key/value pair into Config table
+void write_config_value(mdbx::txn& txn, std::string_view key, const ByteView& value);
+
+//! \brief Pulls a value from Config table
+std::optional<Bytes> read_config_value(mdbx::txn& txn, std::string_view key);
+
 //! \brief Pulls database schema version from Config table
 std::optional<Version> read_schema_version(mdbx::txn& txn);
 

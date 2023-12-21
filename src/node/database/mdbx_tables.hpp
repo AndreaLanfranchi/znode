@@ -60,6 +60,9 @@ inline constexpr db::MapConfig kSyncStageProgress{"Stages"};
 //! \brief List of all Chaindata database tables
 inline constexpr std::array<db::MapConfig, 3> kChainDataTables{kConfig, kHeaders, kSyncStageProgress};
 
+//! \brief List of all Nodes database tables
+inline constexpr std::array<db::MapConfig, 1> kNodeDataTables{kConfig};
+
 //! \brief Ensures all tables are properly deployed in database
 //! \remarks Should a table already exist it's flags are not checked.
 //! A change in table's flags MUST reflect in db schema version check hence handled by proper migrations
