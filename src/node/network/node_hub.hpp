@@ -24,13 +24,13 @@
 
 #include <core/common/misc.hpp>
 
+#include <infra/common/settings.hpp>
 #include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/channel.hpp>
 #include <infra/concurrency/timer.hpp>
 #include <infra/network/addressbook.hpp>
 #include <infra/network/traffic_meter.hpp>
 
-#include <node/common/settings.hpp>
 #include <node/network/connection.hpp>
 #include <node/network/node.hpp>
 #include <node/network/secure.hpp>

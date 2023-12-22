@@ -29,5 +29,4 @@ struct Version {
     [[nodiscard]] std::string to_string() const { return absl::StrCat(Major, ".", Minor, ".", Patch); }
     friend auto operator<=>(const Version&, const Version&) = default;
 };
-
 }  // namespace znode

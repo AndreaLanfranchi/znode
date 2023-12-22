@@ -466,8 +466,7 @@ std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count, ui
     ret.reserve(count);
     auto& idx{entries_.get<by_id>()};
 
-    for (size_t i{0}; i < randomly_ordered_ids_.size(); ++i) {
-        if (ret.size() == count) break;
+    for (size_t i{0}; ret.size() < count && i < randomly_ordered_ids_.size(); ++i) {
         size_t random_index{randomize<size_t>(0U, randomly_ordered_ids_.size() - i - 1U) + i};
         swap_randomly_ordered_ids(static_cast<uint32_t>(i), static_cast<uint32_t>(random_index));
         auto it{idx.find(randomly_ordered_ids_[i])};

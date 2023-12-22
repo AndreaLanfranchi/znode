@@ -17,15 +17,12 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
 #include <magic_enum.hpp>
 
 #include <core/common/base.hpp>
 
-#include <infra/common/log.hpp>
+#include <infra/common/settings.hpp>
 #include <infra/concurrency/stoppable.hpp>
-
-#include <node/common/settings.hpp>
 
 namespace znode::stages {
 

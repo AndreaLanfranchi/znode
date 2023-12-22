@@ -24,8 +24,7 @@
 #include <core/common/misc.hpp>
 
 #include <infra/common/log.hpp>
-
-#include <node/common/settings.hpp>
+#include <infra/common/settings.hpp>
 
 namespace znode::cmd {
 

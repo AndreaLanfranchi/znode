@@ -17,7 +17,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <node/common/version.hpp>
+#include <infra/common/version.hpp>
 
 namespace znode {
 TEST_CASE("Versions", "[misc]") {

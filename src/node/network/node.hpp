@@ -32,13 +32,13 @@
 
 #include <core/common/base.hpp>
 
+#include <infra/common/settings.hpp>
 #include <infra/concurrency/timer.hpp>
 #include <infra/network/message.hpp>
 #include <infra/network/ping_meter.hpp>
 #include <infra/network/protocol.hpp>
 #include <infra/network/traffic_meter.hpp>
 
-#include <node/common/settings.hpp>
 #include <node/network/connection.hpp>
 
 namespace znode::net {
