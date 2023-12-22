@@ -60,8 +60,16 @@ inline constexpr db::MapConfig kSyncStageProgress{"Stages"};
 //! \brief List of all Chaindata database tables
 inline constexpr std::array<db::MapConfig, 3> kChainDataTables{kConfig, kHeaders, kSyncStageProgress};
 
+//! \details Stores list of known peer addresses and related info
+//! \struct
+//! \verbatim
+//!   key   : IPEndpoint (serialized)
+//!   value : NodeServiceInfo (serialized)
+//! \endverbatim
+inline constexpr db::MapConfig kAddressBook{"AddressBook"};
+
 //! \brief List of all Nodes database tables
-inline constexpr std::array<db::MapConfig, 1> kNodeDataTables{kConfig};
+inline constexpr std::array<db::MapConfig, 2> kNodeDataTables{kConfig, kAddressBook};
 
 //! \brief Ensures all tables are properly deployed in database
 //! \remarks Should a table already exist it's flags are not checked.

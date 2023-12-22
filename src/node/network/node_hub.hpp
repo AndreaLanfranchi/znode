@@ -15,9 +15,9 @@
 */
 
 #pragma once
-#include <iostream>
 #include <list>
 #include <memory>
+#include <condition_variable>
 
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
@@ -25,7 +25,6 @@
 #include <core/common/misc.hpp>
 
 #include <infra/common/settings.hpp>
-#include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/channel.hpp>
 #include <infra/concurrency/timer.hpp>
 #include <infra/network/addressbook.hpp>
@@ -150,6 +149,8 @@ class NodeHub : public con::Stoppable {
     std::list<std::shared_ptr<Node>> nodes_;                            // All the connected nodes
     mutable std::mutex connected_addresses_mutex_;                      // Guards access to connected_addresses_
     std::map<boost::asio::ip::address, uint32_t> connected_addresses_;  // Addresses that are connected
+    std::condition_variable all_peers_shutdown_{};                      // Used to signal shutdown of all peers
+    std::mutex all_peers_shutdown_mutex_{};                             // Guards access to all_peers_shutdown_
 
     size_t total_connections_{0};
     size_t total_disconnections_{0};

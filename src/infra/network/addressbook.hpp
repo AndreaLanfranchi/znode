@@ -30,6 +30,7 @@
 #include <core/common/random.hpp>
 #include <core/types/hash.hpp>
 
+#include <infra/database/mdbx.hpp>
 #include <infra/network/addresses.hpp>
 #include <infra/network/payloads.hpp>
 
@@ -136,6 +137,12 @@ class AddressBook {
     std::vector<NodeService> get_random_services(uint32_t max_count, uint32_t max_percentage,
                                                  std::optional<IPAddressType> type = std::nullopt) noexcept;
 
+    //! \brief Loads the address book from disk
+    void load(db::EnvConfig& env_config);  
+
+    //! \brief Saves the address book to disk
+    void save(db::EnvConfig& env_config) const;  
+
   private:
     mutable std::shared_mutex mutex_;                     // Thread safety
     Bytes key_{get_random_bytes(2 * sizeof(uint64_t))};   // Secret key to randomize the address book
@@ -150,7 +157,7 @@ class AddressBook {
     mutable LruSet<IPEndpoint, IPEndpointHasher> recently_selected_{64, true};  // Recently randomly selected endpoints
                                                                                 // to avoid very near duplicates
 
-    std::list<NodeServiceInfo> list_;  // List of NodeServiceInfo (for iterator invariance)
+    mutable std::list<NodeServiceInfo> list_;  // List of NodeServiceInfo (for iterator invariance)
     using list_it_type = std::list<NodeServiceInfo>::iterator;
     struct AddressBookEntry {
         uint32_t id{0};         // Id of the entry
