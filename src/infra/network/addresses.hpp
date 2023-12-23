@@ -287,7 +287,7 @@ class NodeServiceInfo : public ser::Serializable {
     NodeSeconds last_connection_attempt_{std::chrono::seconds(0)};  // Last time a connection has been attempted
     NodeSeconds last_connection_success_{std::chrono::seconds(0)};  // Last time a connection has been successful
     uint32_t connection_attempts_{0};                               // Attempts count since last successful connection
-    uint32_t random_pos_{0};               // Actual position in the randomly ordered ids vector (memory)
+    uint32_t random_pos_{0};               // Actual position in the randomly ordered ids vector
     std::optional<uint32_t> tried_ref_{};  // Coordinates of this entry in "tried" buckets (memory)
     std::set<uint32_t> new_refs_{};        // Coordinates of this entry in "new" buckets (memory)
 

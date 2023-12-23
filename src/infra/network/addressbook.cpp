@@ -28,7 +28,7 @@ namespace znode::net {
 
 size_t AddressBook::size() const {
     std::shared_lock lock{mutex_};
-    return entries_.size();
+    return list_index_.size();
 }
 
 std::pair<uint32_t, uint32_t> AddressBook::size_by_buckets() const {
@@ -37,7 +37,7 @@ std::pair<uint32_t, uint32_t> AddressBook::size_by_buckets() const {
 
 bool AddressBook::empty() const {
     std::shared_lock lock{mutex_};
-    return entries_.empty();
+    return list_index_.empty();
 }
 
 bool AddressBook::insert_or_update(NodeService& service, const IPAddress& source, std::chrono::seconds time_penalty) {
@@ -156,13 +156,13 @@ bool AddressBook::contains(const NodeService& service) const noexcept { return c
 
 bool AddressBook::contains(const IPEndpoint& endpoint) const noexcept {
     std::shared_lock lock{mutex_};
-    auto& idx{entries_.get<by_endpoint>()};
+    auto& idx{list_index_.get<by_endpoint>()};
     return idx.contains(endpoint);
 }
 
 bool AddressBook::contains(uint32_t id) const noexcept {
     std::shared_lock lock{mutex_};
-    auto& idx{entries_.get<by_id>()};
+    auto& idx{list_index_.get<by_id>()};
     return idx.contains(id);
 }
 
@@ -188,7 +188,6 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
             select_from_tried = static_cast<bool>(randomize<uint32_t>(0U, 1U));
         }
     }
-
 
     // TODO: instead of randomly picking slot addresses prefer to randomly pick
     // elements from new or tried buckets
@@ -246,7 +245,7 @@ std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count, ui
     const auto now{Now<NodeSeconds>()};
     std::vector<NodeService> ret{};
     ret.reserve(count);
-    auto& idx{entries_.get<by_id>()};
+    auto& idx{list_index_.get<by_id>()};
 
     for (size_t i{0}; ret.size() < count && i < randomly_ordered_ids_.size(); ++i) {
         size_t random_index{randomize<size_t>(0U, randomly_ordered_ids_.size() - i - 1U) + i};
@@ -274,35 +273,69 @@ void AddressBook::load(db::EnvConfig& env_config) {
         txn.commit(/*renew=*/true);
 
         auto key_data(db::read_config_value(*txn, "seed"));
-        if (key_data) {
-            key_ = key_data.value();
-        }
-
-        db::Cursor cursor(txn, db::tables::kAddressBook);
+        if (key_data) key_ = key_data.value();
+        
+        db::Cursor cursor(txn, db::tables::kServices);
         log::Info("Address Book", {"action", "loading", "entries", std::to_string(cursor.size())});
 
         ser::SDataStream data_stream(ser::Scope::kStorage, 0);
         auto data{cursor.to_first(/*throw_notfound=*/false)};
+        uint32_t entry_id{1U};
+
+        // Load services
         while (data) {
             data_stream.clear();
             std::ignore = data_stream.write(db::from_slice(data.value));
+            entry_id = endian::load_big_u32(db::from_slice(data.key).data());
 
             NodeServiceInfo service_info;
             const auto result{service_info.deserialize(data_stream)};
             if (!result.has_error()) {
-                uint32_t new_id{last_used_id_.fetch_add(1U)};
-                const auto slot_address{get_new_slot(service_info, service_info.origin_)};
+                auto new_it{list_.emplace(list_.end(), std::move(service_info))};
+                list_index_.insert({entry_id, service_info.service_.endpoint_, new_it});
+            }
+            data = cursor.to_next(/*throw_notfound=*/false);
+        }
+        last_used_id_.exchange(entry_id+1);  // Is the last used
 
-                // We might loose some due to collisions in hashing
-                // TODO: not a big deal so far but something to look into
-                if (new_buckets_.emplace(slot_address.xy, new_id).second) {
-                    ASSERT(service_info.new_refs_.emplace(slot_address.xy).second);  // Must be inserted
-                    ++new_entries_size_;
-                    service_info.random_pos_ = static_cast<uint32_t>(randomly_ordered_ids_.size());
-                    randomly_ordered_ids_.push_back(new_id);
-                    auto new_it{list_.emplace(list_.end(), std::move(service_info))};
-                    entries_.insert({new_id, service_info.service_.endpoint_, new_it});
-                }
+        // Load randomly ordered ids
+        cursor.bind(txn, db::tables::kRandomOrder);
+        randomly_ordered_ids_.reserve(cursor.size());
+        data = cursor.to_first(/*throw_notfound=*/false);
+        while (data) {
+            entry_id = endian::load_big_u32(db::from_slice(data.value).data());
+            randomly_ordered_ids_.push_back(entry_id);
+            data = cursor.to_next(/*throw_notfound=*/false);
+        }
+
+        // Load buckets
+        cursor.bind(txn, db::tables::kBuckets);
+        data = cursor.to_first(/*throw_notfound=*/false);
+        while (data) {
+            const auto key_view{db::from_slice(data.key)};
+            const auto value_view{db::from_slice(data.value)};
+            const auto bucket_type{key_view[0]};
+            const auto slot_address{endian::load_big_u32(key_view.data() + 1)};
+            entry_id = endian::load_big_u32(value_view.data());
+
+            NodeServiceInfo* service_info{nullptr};
+            std::tie(service_info, std::ignore) = lookup_entry(entry_id);
+            ASSERT(service_info != nullptr);  // Must be found or else the data structures are inconsistent
+
+            switch (bucket_type) {
+                case 'N': {
+                    ASSERT(service_info->new_refs_.emplace(slot_address).second);  // Must be inserted
+                    ASSERT(new_buckets_.emplace(slot_address, entry_id).second);   // Must be inserted
+                    if (service_info->new_refs_.size() == 1U) ++new_entries_size_;
+                } break;
+                case 'T': {
+                    ASSERT(service_info->tried_ref_.has_value() == false);  // Must not be in the tried bucket yet
+                    service_info->tried_ref_.emplace(slot_address);
+                    ASSERT(tried_buckets_.emplace(slot_address, entry_id).second);  // Must be inserted
+                    ++tried_entries_size_;
+                } break;
+                default:
+                    ASSERT(false);  // Should never happen
             }
             data = cursor.to_next(/*throw_notfound=*/false);
         }
@@ -331,26 +364,64 @@ void AddressBook::save(db::EnvConfig& env_config) const {
         auto node_data_env{db::open_env(env_config)};
         db::RWTxn txn(node_data_env);
         db::tables::deploy_tables(*txn, db::tables::kNodeDataTables);
-        db::write_config_value(*txn, "seed", key_);
-        txn->clear_map(db::tables::kAddressBook.name);
         txn.commit(/*renew=*/true);
-        db::Cursor cursor(txn, db::tables::kAddressBook);
+        db::write_config_value(*txn, "seed", key_);
+        txn->clear_map(db::tables::kServices.name);
+        txn->clear_map(db::tables::kRandomOrder.name);
+        txn->clear_map(db::tables::kBuckets.name);
+        txn.commit(/*renew=*/true);
+        db::Cursor cursor(txn, db::tables::kServices);
 
         ser::SDataStream data_stream(ser::Scope::kStorage, 0);
-        for (NodeServiceInfo& item : list_) {
+        Bytes key(sizeof(uint32_t), 0);
+        auto& idx{list_index_.get<by_id>()};
+
+        // Save all entries
+        for (auto it{idx.begin()}; it not_eq idx.end(); ++it) {
             data_stream.clear();
-            const auto result{item.serialize(data_stream)};
+            const auto result{it->list_it->serialize(data_stream)};
             if (result.has_error()) {
                 log::Error("Address Book", {"action", "serialization", "error", result.error().message()});
                 break;
             }
 
-            // We use the endpoint as the key
-            const auto key{item.service_.endpoint_.to_bytes()};
+            endian::store_big_u32(key.data(), it->id);
             const auto k{db::to_slice(key)};
             const auto v{db::to_slice(data_stream.read().value())};
             cursor.upsert(k, v);
         }
+
+        // Save the contents of randomly ordered ids
+        uint32_t ordinal{0U};
+        Bytes value(sizeof(uint32_t), 0);
+        cursor.bind(txn, db::tables::kRandomOrder);
+        for (const auto entry_id : randomly_ordered_ids_) {
+            endian::store_big_u32(key.data(), ordinal++);
+            endian::store_big_u32(value.data(), entry_id);
+            const auto k{db::to_slice(key)};
+            const auto v{db::to_slice(value)};
+            cursor.upsert(k, v);
+        }
+
+        // Save the contents of New and Tried buckets
+        cursor.bind(txn, db::tables::kBuckets);
+        key.insert(key.begin(), 'N');
+        for (const auto& [slot_address, entry_id] : new_buckets_) {
+            endian::store_big_u32(key.data() + 1, slot_address);
+            endian::store_big_u32(value.data(), entry_id);
+            const auto k{db::to_slice(key)};
+            const auto v{db::to_slice(value)};
+            cursor.upsert(k, v);
+        }
+        key[0] = 'T';
+        for (const auto& [slot_address, entry_id] : tried_buckets_) {
+            endian::store_big_u32(key.data() + 1, slot_address);
+            endian::store_big_u32(value.data(), entry_id);
+            const auto k{db::to_slice(key)};
+            const auto v{db::to_slice(value)};
+            cursor.upsert(k, v);
+        }
+
         cursor.close();
         txn.commit(/*renew=*/false);
         log::Info("Closing database", {"path", env_config.path});
@@ -366,7 +437,7 @@ void AddressBook::save(db::EnvConfig& env_config) const {
 
 void AddressBook::erase_new_entry(uint32_t entry_id) noexcept {
     if (entry_id == 0U) return;  // Cannot erase non-existent entry
-    auto& idx{entries_.get<by_id>()};
+    auto& idx{list_index_.get<by_id>()};
     auto it{idx.find(entry_id)};
     ASSERT(it not_eq idx.end());  // Must be found or else the data structures are inconsistent
     auto& entry{*it->list_it};
@@ -446,7 +517,7 @@ void AddressBook::clear_new_slot(const SlotAddress& slot_address, bool erase_unr
 }
 
 std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::lookup_entry(const IPEndpoint& endpoint) const noexcept {
-    auto& idx{entries_.get<by_endpoint>()};
+    auto& idx{list_index_.get<by_endpoint>()};
     const auto it{idx.find(endpoint)};
     if (it == idx.end()) {
         return {nullptr, 0U};
@@ -456,7 +527,7 @@ std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::lookup_entry(const IPE
 }
 
 std::pair<NodeServiceInfo*, /*id*/ uint32_t> AddressBook::lookup_entry(const uint32_t entry_id) const noexcept {
-    auto& idx{entries_.get<by_id>()};
+    auto& idx{list_index_.get<by_id>()};
     const auto it{idx.find(entry_id)};
     if (it == idx.end()) {
         return {nullptr, 0U};
@@ -472,7 +543,7 @@ void AddressBook::swap_randomly_ordered_ids(uint32_t i, uint32_t j) noexcept {
     auto id_at_i{randomly_ordered_ids_[i]};
     auto id_at_j{randomly_ordered_ids_[j]};
 
-    auto& idx{entries_.get<by_id>()};
+    auto& idx{list_index_.get<by_id>()};
     auto it1{idx.find(id_at_i)};
     auto it2{idx.find(id_at_j)};
     ASSERT(it1 not_eq idx.end());  // Must be found
@@ -626,7 +697,7 @@ std::pair<NodeServiceInfo*, uint32_t> AddressBook::insert_entry(const NodeServic
     randomly_ordered_ids_.push_back(new_id);
 
     auto new_it{list_.emplace(list_.end(), std::move(service_info))};
-    entries_.insert({new_id, service.endpoint_, new_it});
+    list_index_.insert({new_id, service.endpoint_, new_it});
     ++new_entries_size_;
     return {new_it.operator->(), new_id};
 }

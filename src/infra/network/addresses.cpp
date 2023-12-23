@@ -533,6 +533,7 @@ outcome::result<void> NodeServiceInfo::serialization(ser::SDataStream& stream, s
             NodeSeconds{typename NodeSeconds::duration{typename NodeSeconds::duration::rep{time_value}}};
     }
     if (not result.has_error()) result = stream.bind(connection_attempts_, action);
+    if (not result.has_error()) result = stream.bind(random_pos_, action);
     return result;
 }
 

@@ -63,13 +63,30 @@ inline constexpr std::array<db::MapConfig, 3> kChainDataTables{kConfig, kHeaders
 //! \details Stores list of known peer addresses and related info
 //! \struct
 //! \verbatim
-//!   key   : IPEndpoint (serialized)
+//!   key   : uint32_t id (BE)
 //!   value : NodeServiceInfo (serialized)
 //! \endverbatim
-inline constexpr db::MapConfig kAddressBook{"AddressBook"};
+inline constexpr db::MapConfig kServices{"Services"};
+
+//! \details Stores the contents of AddressBook::randomly_ordered_ids_
+//! \struct
+//! \verbatim
+//!   key   : uint32_t ordinal position (BE)
+//!   value : uint32_t entry_id (BE)
+//! \endverbatim
+inline constexpr db::MapConfig kRandomOrder{"RandomOrder"};
+
+//! \details Stores the contents of AddressBook's buckets
+//! \struct
+//! \verbatim
+//!   key   : 'N' (New) / 'T' (Tried) + uint32_t bucket address (BE)
+//!   value : uint32_t entry_id (BE)
+//! \endverbatim
+inline constexpr db::MapConfig kBuckets{"Buckets"};
+
 
 //! \brief List of all Nodes database tables
-inline constexpr std::array<db::MapConfig, 2> kNodeDataTables{kConfig, kAddressBook};
+inline constexpr std::array<db::MapConfig, 4> kNodeDataTables{kConfig, kServices, kRandomOrder, kBuckets};
 
 //! \brief Ensures all tables are properly deployed in database
 //! \remarks Should a table already exist it's flags are not checked.

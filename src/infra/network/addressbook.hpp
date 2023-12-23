@@ -177,7 +177,7 @@ class AddressBook {
                 boost::multi_index::tag<by_endpoint>,
                 boost::multi_index::member<AddressBookEntry, IPEndpoint, &AddressBookEntry::endpoint>>>>;
 
-    address_book_index_t entries_;
+    address_book_index_t list_index_;
 
     /*
      * Note ! Private methods, if called from public methods, assume that the caller has already acquired a lock

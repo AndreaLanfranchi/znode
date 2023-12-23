@@ -63,7 +63,7 @@ bool NodeHub::start() noexcept {
     address_book_.load(env_config);
 
     service_timer_.start(125ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
-    info_timer_.start(5s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
+    info_timer_.start(10s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
 
     // We need to determine our network address which will be used to advertise us to other nodes
     // If we have a NAT traversal option enabled we need to use the public address
