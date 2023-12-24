@@ -445,13 +445,12 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
         ++iterator;
         ++it_index;
     }
-    lock.unlock();
-
-    if (not this_is_running) {
-        if (nodes_.empty()) all_peers_shutdown_.notify_all();
+    if (not this_is_running and nodes_.empty()) {
+        all_peers_shutdown_.notify_all();
         interval = 0s; // Stop ticking
         return;
     }
+    lock.unlock();
 
     // Check whether we need to establish new connections
     if (const auto outbounds{current_active_outbound_connections_.load()};
