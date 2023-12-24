@@ -59,7 +59,7 @@ bool AddressBook::insert_or_update(std::vector<NodeService>& services, const IPA
     const auto services_size{services.size()};
 
     uint32_t added_count{0U};
-    std::set<IPAddress> unique_addresses{};
+    std::set<IPEndpoint> unique_endpoints{};
 
     StopWatch sw(/*auto_start=*/true);
     std::scoped_lock lock{mutex_};
@@ -73,8 +73,8 @@ bool AddressBook::insert_or_update(std::vector<NodeService>& services, const IPA
 
             // Verify remotes are not pushing duplicate addresses
             // it's a violation of the protocol
-            if (!unique_addresses.insert(it->endpoint_.address_).second) {
-                throw std::invalid_argument("Duplicate address");
+            if (!unique_endpoints.insert(it->endpoint_).second) {
+                throw std::invalid_argument("Duplicate endpoint");
             }
 
             // Adjust martian dates
@@ -191,15 +191,17 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
 
     // TODO: instead of randomly picking slot addresses prefer to randomly pick
     // elements from new or tried buckets
-
-    const auto [rnd_min, rnd_max]{get_bucket_boundaries(select_from_tried)};
-
     const auto items_in_set{select_from_tried ? tried_entries_size_.load() : new_entries_size_.load()};
+    const auto& bucket{select_from_tried ? tried_buckets_ : new_buckets_};
+    const auto bucket_size{bucket.size()};
+
     double chance_factor{1.0};
     for (int attempt{0}; attempt < 50'000; ++attempt) {
-        const SlotAddress slot_address{randomize<uint32_t>(rnd_min, rnd_max)};
-        const uint32_t entry_id{get_entry_id_from_slot(slot_address, select_from_tried)};
-        if (entry_id == 0U) continue;
+        // Pick a random item in the bucket
+        const uint32_t random_item_index{static_cast<uint32_t>(randomize<size_t>(0U, bucket_size - 1))};
+        const auto random_item_it{std::next(bucket.begin(), random_item_index)};
+        const auto entry_id{random_item_it->second};
+
         NodeServiceInfo* service_info{nullptr};
         std::tie(service_info, std::ignore) = lookup_entry(entry_id);
         ASSERT(service_info not_eq nullptr);  // Must be found or else the data structures are inconsistent
@@ -274,7 +276,7 @@ void AddressBook::load(db::EnvConfig& env_config) {
 
         auto key_data(db::read_config_value(*txn, "seed"));
         if (key_data) key_ = key_data.value();
-        
+
         db::Cursor cursor(txn, db::tables::kServices);
         log::Info("Address Book", {"action", "loading", "entries", std::to_string(cursor.size())});
 
@@ -296,7 +298,7 @@ void AddressBook::load(db::EnvConfig& env_config) {
             }
             data = cursor.to_next(/*throw_notfound=*/false);
         }
-        last_used_id_.exchange(entry_id+1);  // Is the last used
+        last_used_id_.exchange(entry_id + 1);  // Is the last used
 
         // Load randomly ordered ids
         cursor.bind(txn, db::tables::kRandomOrder);
@@ -638,26 +640,6 @@ Bytes AddressBook::compute_group(const IPAddress& address) noexcept {
             ASSERT(false);  // Should never happen
     }
     return ret;
-}
-
-std::pair<uint32_t, uint32_t> AddressBook::get_bucket_boundaries(bool use_tried) const noexcept {
-    uint32_t min{0};
-    uint32_t max{0};
-    const auto& buckets{use_tried ? tried_buckets_ : new_buckets_};
-    if (buckets.empty()) return {min, max};
-    min = buckets.begin()->first;
-    max = buckets.rbegin()->first;
-    return {min, max};
-}
-
-uint32_t AddressBook::get_entry_id_from_slot(SlotAddress slot, bool use_tried) const noexcept {
-    const auto& buckets{use_tried ? tried_buckets_ : new_buckets_};
-    if (buckets.empty()) return 0U;
-
-    auto it{buckets.upper_bound(slot.xy)};
-    if (it == buckets.begin()) return 0U;
-    --it;
-    return it->second;
 }
 
 std::pair<NodeServiceInfo*, bool> AddressBook::insert_or_update_impl(NodeService& service, const IPAddress& source,

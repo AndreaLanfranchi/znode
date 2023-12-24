@@ -138,10 +138,10 @@ class AddressBook {
                                                  std::optional<IPAddressType> type = std::nullopt) noexcept;
 
     //! \brief Loads the address book from disk
-    void load(db::EnvConfig& env_config);  
+    void load(db::EnvConfig& env_config);
 
     //! \brief Saves the address book to disk
-    void save(db::EnvConfig& env_config) const;  
+    void save(db::EnvConfig& env_config) const;
 
   private:
     mutable std::shared_mutex mutex_;                     // Thread safety
@@ -217,15 +217,6 @@ class AddressBook {
     //! \details The computation is based on finding the base address for an IP subnet
     //! (i.e. kIPv4SubnetGroupsPrefix and kIPv6SubnetGroupsPrefix respectively)
     static Bytes compute_group(const IPAddress& address) noexcept;
-
-    //! \brief Computes the coordinates boundaries of the bucket
-    //! \remarks By default the "new" bucket is considered. If use_tried is true, the "tried" bucket is considered
-    [[nodiscard]] std::pair<uint32_t, uint32_t> get_bucket_boundaries(bool use_tried = false) const noexcept;
-
-    //! \brief Pulls the entry id registered at provided slot address
-    //! \param slot The slot address
-    //! \param tried Whether the slot is in a "tried" bucket. Otherwise is sought in a "new" bucket
-    uint32_t get_entry_id_from_slot(SlotAddress slot, bool use_tried) const noexcept;
 
     //! \brief Inserts or updates an address book item in the collection
     //! \returns Whether any item was inserted

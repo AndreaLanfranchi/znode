@@ -28,6 +28,7 @@
 #include <core/common/misc.hpp>
 #include <core/common/random.hpp>
 
+#include <infra/common/common.hpp>
 #include <infra/common/log.hpp>
 #include <infra/common/stopwatch.hpp>
 
@@ -392,46 +393,26 @@ outcome::result<void> Node::push_message(const MessageType message_type, Message
 outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
     size_t messages_parsed{0};
     outcome::result<void> result{outcome::success()};
+    MessageType msg_type{MessageType::kMissingOrUnknown};
     ByteView data{boost::asio::buffer_cast<const uint8_t*>(receive_buffer_.data()), bytes_transferred};
 
-    while (not result.has_error() and not data.empty()) {
+    while (!data.empty()) {
         if (inbound_message_ == nullptr) {
             inbound_message_start_time_.exchange(std::chrono::steady_clock::now());
             inbound_message_ = std::make_unique<Message>(version_, app_settings_.chain_config.value().magic_);
         }
 
-        result = inbound_message_->write(data);  // Note! data is consumed here
-        const auto msg_type{inbound_message_->get_type()};
-        if (result.has_error()) {
-            if (result.error() == Error::kMessageHeaderIncomplete or result.error() == Error::kMessageBodyIncomplete) {
-                // These two guys depict a normal condition: we must continue reading data from socket
-                result = outcome::success();
-                continue;
-            }
+        try {
+            success_or_throw(inbound_message_->write(data));  // Note! data is consumed here
 
-            log::Warning("Node", {"id", std::to_string(node_id_), "remote", to_string(), "status", "failure", "reason",
-                                  result.error().message()});
-        }
-
-        if (not result.has_error())
-            result = validate_message_for_protocol_handshake(DataDirectionMode::kInbound, msg_type);
-
-        // Message is complete and we can deserialize it
-        ASSERT(msg_type not_eq MessageType::kMissingOrUnknown and "Must have a valid message type");
-        if (not result.has_error()) {
-            // Validate deserialization
+            msg_type = inbound_message_->get_type();
+            success_or_throw(validate_message_for_protocol_handshake(DataDirectionMode::kInbound, msg_type));
+            ASSERT(msg_type not_eq MessageType::kMissingOrUnknown and "Must have a valid message type");
 
             StopWatch deserialization_timer(/*auto_start=*/true);
             auto payload_ptr{MessagePayload::from_type(msg_type)};
-            if (not payload_ptr) {
-                log::Error("Node", {"id", std::to_string(node_id_), "remote", to_string(), "command",
-                                    command_from_message_type(msg_type), "status", "failure", "reason",
-                                    "Message payload type not supported."});
-                result = Error::kMessagePayLoadUnhandleable;
-                break;
-            }
-
-            result = payload_ptr->deserialize(inbound_message_->data());
+            if (not payload_ptr) success_or_throw(Error::kMessagePayLoadUnhandleable);
+            success_or_throw(payload_ptr->deserialize(inbound_message_->data()));
             const auto deserialization_duration{deserialization_timer.stop()};
 
             if (log::test_verbosity(log::Level::kTrace)) [[unlikely]] {
@@ -446,35 +427,33 @@ outcome::result<void> Node::parse_messages(const size_t bytes_transferred) {
                 print_log(log::Level::kTrace, log_params);
             }
 
-            if (not result.has_error() and not inbound_message_->data().eof()) {
-                result = Error::kMessagePayloadExtraData;  // Mismatch between payload size and actual data
-            }
-
-            // Check we're not under flooding condition
-            if (not result.has_error() and ++messages_parsed > kMaxMessagesPerRead) {
-                result = net::Error::kMessageFloodingDetected;
-            }
+            if (not inbound_message_->data().eof()) success_or_throw(Error::kMessagePayloadExtraData);
+            if (++messages_parsed > kMaxMessagesPerRead) success_or_throw(Error::kMessageFloodingDetected);
 
             // Deliver payload for local processing and eventually forward it to higher level code
+            // And Reset the message barrel for the next message
             ASSERT(payload_ptr);
-            if (not result.has_error()) result = process_inbound_message(std::move(payload_ptr));
-            if (not result.has_error()) {
-                inbound_message_metrics_[msg_type].count_++;
-                inbound_message_metrics_[msg_type].bytes_ += inbound_message_->data().size();
+            success_or_throw(process_inbound_message(std::move(payload_ptr)));
+            inbound_message_metrics_[msg_type].count_++;
+            inbound_message_metrics_[msg_type].bytes_ += inbound_message_->data().size();
+            inbound_message_.reset();
+            inbound_message_start_time_.exchange(std::chrono::steady_clock::time_point::min());
 
-                // Reset the message barrel for the next message
-                inbound_message_.reset();
-                inbound_message_start_time_.exchange(std::chrono::steady_clock::time_point::min());
+        } catch (const boost::system::system_error& error) {
+            if (error.code() == Error::kMessageHeaderIncomplete or error.code() == Error::kMessageBodyIncomplete) {
+                // These two guys depict a normal condition: we must continue reading data from socket
+                result = outcome::success();
+                continue;
             }
-        }
-    }
 
-    // We can get here for two reasons:
-    // 1. We have read all the data from the socket but the message is still incomplete (no errors)
-    // 2. An error has occurred in the loop hence we discard all
-    if (result.has_error()) {
-        inbound_message_.reset();
-        inbound_message_start_time_.exchange(std::chrono::steady_clock::time_point::min());
+            log::Warning("Node",
+                         {"id", std::to_string(node_id_), "remote", to_string(), "action", __func__, "command",
+                          command_from_message_type(msg_type, false), "status", "failure", "reason", error.what()});
+            result = error.code();
+            inbound_message_.reset();
+            inbound_message_start_time_.exchange(std::chrono::steady_clock::time_point::min());
+            break;
+        }
     }
 
     return result;

@@ -17,7 +17,6 @@
 #include "protocol.hpp"
 
 #include <algorithm>
-#include <cctype>
 #include <utility>
 #include <vector>
 
@@ -25,14 +24,17 @@
 
 #include <core/common/assert.hpp>
 #include <core/common/base.hpp>
+#include <core/common/cast.hpp>
 
 namespace znode::net {
 namespace {
 
-    Bytes get_command_from_message_type(MessageType message_type) noexcept {
+    Bytes get_command_from_message_type(MessageType message_type, bool check_length = true) noexcept {
         std::string label(magic_enum::enum_name(message_type));
         label.erase(0, 1);  // get rid of the 'k' prefix
-        ASSERT(not label.empty() and label.size() <= kMessageHeaderCommandLength and "Message command label too long");
+        if (check_length) {
+            ASSERT(label.size() <= kMessageHeaderCommandLength and "Message command label too long");
+        }
         std::transform(label.begin(), label.end(), label.begin(), [](unsigned char c) { return std::tolower(c); });
         Bytes ret{label.begin(), label.end()};
         ret.resize(kMessageHeaderCommandLength, 0);
@@ -66,8 +68,8 @@ bool is_known_command(const std::string& command) noexcept {
     return message_type_from_command(command_bytes) not_eq MessageType::kMissingOrUnknown;
 }
 
-std::string command_from_message_type(MessageType message_type) noexcept {
-    auto command{get_command_from_message_type(message_type)};
-    return std::string{command.begin(), command.end()};
+std::string command_from_message_type(MessageType message_type, bool check_length) noexcept {
+    auto command{get_command_from_message_type(message_type, check_length)};
+    return std::string{byte_view_to_string_view(command)};
 }
 }  // namespace znode::net

@@ -203,7 +203,7 @@ int main(int argc, char* argv[]) {
 
     auto* db_opts = app_main.add_option_group("Db", "Database options");
     db_opts->get_formatter()->column_width(35);
-    auto* db_path = db_opts->add_option("--datadir", data_dir, "Path to database")->capture_default_str();
+    std::ignore = db_opts->add_option("--datadir", data_dir, "Path to database")->capture_default_str();
     auto* nodes_opt = db_opts->add_flag("--nodes", "Open nodes database");
     auto* shared_opt = db_opts->add_flag("--shared", "Open database in shared mode");
     auto* exclusive_opt = db_opts->add_flag("--exclusive", "Open database in exclusive mode")->excludes(shared_opt);

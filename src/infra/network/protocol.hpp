@@ -94,6 +94,6 @@ MessageType message_type_from_command(const std::array<uint8_t, kMessageHeaderCo
 bool is_known_command(const std::string& command) noexcept;
 
 //! \brief Returns the command string from the corresponding message type
-std::string command_from_message_type(MessageType message_type) noexcept;
+std::string command_from_message_type(MessageType message_type, bool check_length = true) noexcept;
 
 }  // namespace znode::net
