@@ -62,7 +62,7 @@ bool NodeHub::start() noexcept {
     env_config.exclusive = true;
     address_book_.load(env_config);
 
-    service_timer_.start(125ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
+    service_timer_.start(500ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
     info_timer_.start(10s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
 
     // We need to determine our network address which will be used to advertise us to other nodes
@@ -409,13 +409,13 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
     const bool this_is_running{is_running()};
 
     std::unique_lock lock(nodes_mutex_);
-    uint32_t shutdown_count{16};  // Limit the number of nodes we shutdown per timer tick
+    uint32_t shutdown_count{32};  // Limit the number of nodes we shutdown per timer tick
 
     // Randomly shutdown one node
     // TODO remove this when done testing
     uint32_t it_index{0};
     std::optional<uint32_t> random_index;
-    if (this_is_running && current_active_outbound_connections_ == app_settings_.network.min_outgoing_connections &&
+    if (this_is_running && current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections &&
         address_book_.size() > app_settings_.network.min_outgoing_connections && randomize<uint32_t>(0U, 250U) == 0) {
         random_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
     }
