@@ -56,11 +56,8 @@ bool NodeHub::start() noexcept {
     }
 
     // Load address book
-    auto& env_config{app_settings_.nodedata_env_config};
-    env_config.path = (*app_settings_.data_directory)[DataDirectory::kNodesName].path().string();
-    env_config.create = !std::filesystem::exists(db::get_datafile_path(env_config.path));
-    env_config.exclusive = true;
-    address_book_.load(env_config);
+    address_book_.start();
+    address_book_.load();
 
     service_timer_.start(500ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
     info_timer_.start(10s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
@@ -107,12 +104,8 @@ bool NodeHub::stop() noexcept {
 
         service_timer_.stop();
         info_timer_.stop();
-        
-        auto& env_config{app_settings_.nodedata_env_config};
-        env_config.path = (*app_settings_.data_directory)[DataDirectory::kNodesName].path().string();
-        env_config.create = !std::filesystem::exists(db::get_datafile_path(env_config.path));
-        env_config.exclusive = true;
-        address_book_.save(env_config);
+        address_book_.stop();
+        address_book_.save();
 
         set_stopped();
     }

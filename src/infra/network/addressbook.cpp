@@ -184,13 +184,12 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
             // Select from tried buckets
             select_from_tried = true;
         } else {
-            // Select from new or tried buckets
+            // Select from new or tried buckets with a 50% chance
+            // to pick from either
             select_from_tried = static_cast<bool>(randomize<uint32_t>(0U, 1U));
         }
     }
 
-    // TODO: instead of randomly picking slot addresses prefer to randomly pick
-    // elements from new or tried buckets
     const auto items_in_set{select_from_tried ? tried_entries_size_.load() : new_entries_size_.load()};
     const auto& bucket{select_from_tried ? tried_buckets_ : new_buckets_};
     const auto bucket_size{bucket.size()};
@@ -263,11 +262,34 @@ std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count, ui
     return ret;
 }
 
-void AddressBook::load(db::EnvConfig& env_config) {
+bool AddressBook::start() noexcept {
+    bool ret{Stoppable::start()};
+    if (ret) {
+        service_timer_.start(std::chrono::minutes(5),
+                             [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
+    }
+    return ret;
+}
+
+bool AddressBook::stop() noexcept {
+    bool ret{Stoppable::stop()};
+    if (ret) {
+        service_timer_.stop();
+    }
+    return ret;
+}
+
+void AddressBook::load() {
     using namespace std::chrono_literals;
     std::scoped_lock lock{mutex_};
     StopWatch sw(/*auto_start=*/true);
     try {
+
+        auto& env_config{app_settings_.nodedata_env_config};
+        env_config.path = (*app_settings_.data_directory)[DataDirectory::kNodesName].path().string();
+        env_config.create = !std::filesystem::exists(db::get_datafile_path(env_config.path));
+        env_config.exclusive = true;
+
         log::Info("Opening database", {"path", env_config.path});
         auto node_data_env{db::open_env(env_config)};
         db::RWTxn txn(node_data_env);
@@ -275,7 +297,9 @@ void AddressBook::load(db::EnvConfig& env_config) {
         txn.commit(/*renew=*/true);
 
         auto key_data(db::read_config_value(*txn, "seed"));
-        if (key_data) key_ = key_data.value();
+        if (key_data && key_data.value().size() == (2 * sizeof(uint64_t))) {
+            key_ = key_data.value();
+        }
 
         db::Cursor cursor(txn, db::tables::kServices);
         log::Info("Address Book", {"action", "loading", "entries", std::to_string(cursor.size())});
@@ -355,13 +379,22 @@ void AddressBook::load(db::EnvConfig& env_config) {
                                StopWatch::format(sw.since_start())});
 }
 
-void AddressBook::save(db::EnvConfig& env_config) const {
+void AddressBook::save() const {
     if (empty()) return;
+    
+    bool expected{false};
+    if (not is_saving_.compare_exchange_strong(expected, false)) return;
+
     std::scoped_lock lock{mutex_};
     StopWatch sw(/*auto_start=*/true);
     log::Info("Address Book", {"action", "saving", "entries", std::to_string(list_.size())}) << "...";
 
     try {
+        auto& env_config{app_settings_.nodedata_env_config};
+        env_config.path = (*app_settings_.data_directory)[DataDirectory::kNodesName].path().string();
+        env_config.create = !std::filesystem::exists(db::get_datafile_path(env_config.path));
+        env_config.exclusive = true;
+
         log::Info("Opening database", {"path", env_config.path});
         auto node_data_env{db::open_env(env_config)};
         db::RWTxn txn(node_data_env);
@@ -430,12 +463,20 @@ void AddressBook::save(db::EnvConfig& env_config) const {
         node_data_env.close();
     } catch (const std::exception& ex) {
         log::Error("Address Book", {"action", "saving", "error", ex.what()});
+        is_saving_.exchange(false);
         return;
     }
 
     log::Info("Address Book", {"action", "saved", "entries", std::to_string(list_.size()), "elapsed",
                                StopWatch::format(sw.since_start())});
+    is_saving_.exchange(false);
 };
+
+void AddressBook::on_service_timer_expired(con::Timer::duration& interval) {
+    if (!is_running()) return;
+    // TODO clean up outdated entries
+    save();
+}
 
 void AddressBook::erase_new_entry(uint32_t entry_id) noexcept {
     if (entry_id == 0U) return;  // Cannot erase non-existent entry

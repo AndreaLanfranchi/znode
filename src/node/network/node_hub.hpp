@@ -15,9 +15,9 @@
 */
 
 #pragma once
+#include <condition_variable>
 #include <list>
 #include <memory>
-#include <condition_variable>
 
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
@@ -48,7 +48,8 @@ class NodeHub : public con::Stoppable {
           need_connections_(io_context.get_executor()),
           node_factory_feed_(io_context.get_executor(), settings.network.max_active_connections),
           connector_feed_(io_context.get_executor(), settings.network.max_active_connections),
-          address_book_processor_feed_(io_context.get_executor(), 5'000) {
+          address_book_processor_feed_(io_context.get_executor(), 500),
+          address_book_{settings, io_context} {
         if (app_settings_.network.nonce == 0U) {
             app_settings_.network.nonce = randomize<uint64_t>(/*min=*/1U);
         }
@@ -144,7 +145,7 @@ class NodeHub : public con::Stoppable {
     using NodeAndPayload = std::pair<std::shared_ptr<Node>, std::shared_ptr<MessagePayload>>;
     con::Channel<NodeAndPayload> address_book_processor_feed_;  // Channel for messages targeting the address book
 
-    net::AddressBook address_book_{};                                   // The address book
+    net::AddressBook address_book_;                                     // The address book
     mutable std::mutex nodes_mutex_;                                    // Guards access to nodes_
     std::list<std::shared_ptr<Node>> nodes_;                            // All the connected nodes
     mutable std::mutex connected_addresses_mutex_;                      // Guards access to connected_addresses_
