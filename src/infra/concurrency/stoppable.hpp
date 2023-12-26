@@ -17,6 +17,8 @@
 
 #pragma once
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 
 namespace znode::con {
 
@@ -41,6 +43,9 @@ class Stoppable {
     //! \return True if the request to stop has been stored otherwise false (i.e. already requested to stop)
     virtual bool stop() noexcept;
 
+    //! \brief Puts the caller in wait mode for complete shutdown of this component
+    void wait_stopped() noexcept;
+
     //! \brief Returns the current state of the component
     [[nodiscard]] ComponentStatus status() const noexcept;
 
@@ -55,6 +60,10 @@ class Stoppable {
     void set_stopped() noexcept;
 
     std::atomic<ComponentStatus> state_{ComponentStatus::kNotStarted};  // The state of the component
+
+  private:
+    std::condition_variable component_stopped_cv_{};  // Used to signal complete shutdown of component
+    std::mutex component_stopped_mutex_{};            // Guards access to component_stopped_cv
 };
 
 }  // namespace znode::con

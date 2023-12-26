@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include <boost/asio/io_context.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index_container.hpp>
@@ -30,12 +31,16 @@
 #include <core/common/random.hpp>
 #include <core/types/hash.hpp>
 
+#include <infra/common/settings.hpp>
+#include <infra/concurrency/stoppable.hpp>
+#include <infra/concurrency/timer.hpp>
+#include <infra/database/mdbx.hpp>
 #include <infra/network/addresses.hpp>
 #include <infra/network/payloads.hpp>
 
 namespace znode::net {
 
-class AddressBook {
+class AddressBook : public con::Stoppable {
   public:
     static constexpr uint16_t kBucketSize{64};
     static constexpr uint16_t kNewBucketsCount{1024};
@@ -46,8 +51,17 @@ class AddressBook {
     static constexpr uint16_t kIPv4SubnetGroupsPrefix{16};
     static constexpr uint16_t kIPv6SubnetGroupsPrefix{64};
 
-    AddressBook() = default;
+    AddressBook(AppSettings& settings, boost::asio::io_context& io_context)
+        : Stoppable(),
+          app_settings_{settings},
+          asio_context_{io_context},
+          service_timer_{io_context, "ab_service", true} {}
     ~AddressBook() = default;
+
+    // Not copyable nor moveable
+    AddressBook(AddressBook& other) = delete;
+    AddressBook(AddressBook&& other) = delete;
+    AddressBook& operator=(const AddressBook& other) = delete;
 
 #if defined(_MSC_VER)
     // Silence C4201 under MSVC
@@ -136,13 +150,28 @@ class AddressBook {
     std::vector<NodeService> get_random_services(uint32_t max_count, uint32_t max_percentage,
                                                  std::optional<IPAddressType> type = std::nullopt) noexcept;
 
+    //! \brief Loads the address book from disk
+    void load();
+
+    //! \brief Saves the address book to disk
+    void save() const;
+
+    bool start() noexcept override;
+
+    bool stop() noexcept override;
+
   private:
+    AppSettings& app_settings_;              // Reference to global application settings
+    boost::asio::io_context& asio_context_;  // Reference to global asio context
+    con::Timer service_timer_;               // Triggers a maintenance cycle
+
     mutable std::shared_mutex mutex_;                     // Thread safety
     Bytes key_{get_random_bytes(2 * sizeof(uint64_t))};   // Secret key to randomize the address book
     std::atomic<uint32_t> last_used_id_{1};               // Last used id (0 means "non-existent")
     std::atomic<uint32_t> new_entries_size_{0};           // Number of items in "new" buckets
     std::atomic<uint32_t> tried_entries_size_{0};         // Number of items in "tried" buckets
     mutable std::vector<uint32_t> randomly_ordered_ids_;  // Randomly ordered ids
+    mutable std::atomic_bool is_saving_{false};           // Whether a save operation is in progress
 
     /* Buckets */
     std::map</*bucket_address*/ uint32_t, /*entry_id*/ uint32_t> new_buckets_;    // New buckets references
@@ -150,7 +179,7 @@ class AddressBook {
     mutable LruSet<IPEndpoint, IPEndpointHasher> recently_selected_{64, true};  // Recently randomly selected endpoints
                                                                                 // to avoid very near duplicates
 
-    std::list<NodeServiceInfo> list_;  // List of NodeServiceInfo (for iterator invariance)
+    mutable std::list<NodeServiceInfo> list_;  // List of NodeServiceInfo (for iterator invariance)
     using list_it_type = std::list<NodeServiceInfo>::iterator;
     struct AddressBookEntry {
         uint32_t id{0};         // Id of the entry
@@ -170,11 +199,14 @@ class AddressBook {
                 boost::multi_index::tag<by_endpoint>,
                 boost::multi_index::member<AddressBookEntry, IPEndpoint, &AddressBookEntry::endpoint>>>>;
 
-    address_book_index_t entries_;
+    address_book_index_t list_index_;
 
     /*
      * Note ! Private methods, if called from public methods, assume that the caller has already acquired a lock
      */
+
+    //! \brief Executes one maintenance cycle over address book entries
+    void on_service_timer_expired(con::Timer::duration& interval);
 
     //! \brief Erases an entry from the address book entirely
     //! \remarks Entry must not be referenced in any bucket otherwise the behavior is void
@@ -210,15 +242,6 @@ class AddressBook {
     //! \details The computation is based on finding the base address for an IP subnet
     //! (i.e. kIPv4SubnetGroupsPrefix and kIPv6SubnetGroupsPrefix respectively)
     static Bytes compute_group(const IPAddress& address) noexcept;
-
-    //! \brief Computes the coordinates boundaries of the bucket
-    //! \remarks By default the "new" bucket is considered. If use_tried is true, the "tried" bucket is considered
-    [[nodiscard]] std::pair<uint32_t, uint32_t> get_bucket_boundaries(bool use_tried = false) const noexcept;
-
-    //! \brief Pulls the entry id registered at provided slot address
-    //! \param slot The slot address
-    //! \param tried Whether the slot is in a "tried" bucket. Otherwise is sought in a "new" bucket
-    uint32_t get_entry_id_from_slot(SlotAddress slot, bool use_tried) const noexcept;
 
     //! \brief Inserts or updates an address book item in the collection
     //! \returns Whether any item was inserted

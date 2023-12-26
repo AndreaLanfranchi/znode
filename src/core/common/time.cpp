@@ -33,7 +33,7 @@ std::chrono::time_point<NodeClock> NodeClock::now() noexcept {
     if (mock_time_val not_eq 0) {
         return std::chrono::time_point<NodeClock>{std::chrono::seconds{mock_time_val}};
     }
-    const auto ret{SteadyClock::now().time_since_epoch()};
+    const auto ret{SystemClock::now().time_since_epoch()};
     return std::chrono::time_point<NodeClock>{std::chrono::duration_cast<NodeClock::duration>(ret)};
 }
 

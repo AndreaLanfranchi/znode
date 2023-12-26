@@ -30,10 +30,17 @@ bool Stoppable::stop() noexcept {
     return state_.compare_exchange_strong(expected, ComponentStatus::kStopping);
 }
 
+void Stoppable::wait_stopped() noexcept {
+    std::unique_lock lock{component_stopped_mutex_};
+    component_stopped_cv_.wait(lock, [this]() { return status() == ComponentStatus::kNotStarted; });
+}
+
 Stoppable::ComponentStatus Stoppable::status() const noexcept { return state_.load(); }
 
 bool Stoppable::is_running() const noexcept { return status() == ComponentStatus::kStarted; }
 
-void Stoppable::set_stopped() noexcept { state_.exchange(ComponentStatus::kNotStarted); }
-
+void Stoppable::set_stopped() noexcept {
+    state_.exchange(ComponentStatus::kNotStarted);
+    component_stopped_cv_.notify_all();
+}
 }  // namespace znode::con

@@ -15,7 +15,7 @@
 */
 
 #pragma once
-#include <iostream>
+#include <condition_variable>
 #include <list>
 #include <memory>
 
@@ -25,7 +25,6 @@
 #include <core/common/misc.hpp>
 
 #include <infra/common/settings.hpp>
-#include <infra/common/stopwatch.hpp>
 #include <infra/concurrency/channel.hpp>
 #include <infra/concurrency/timer.hpp>
 #include <infra/network/addressbook.hpp>
@@ -49,7 +48,8 @@ class NodeHub : public con::Stoppable {
           need_connections_(io_context.get_executor()),
           node_factory_feed_(io_context.get_executor(), settings.network.max_active_connections),
           connector_feed_(io_context.get_executor(), settings.network.max_active_connections),
-          address_book_processor_feed_(io_context.get_executor(), 5'000) {
+          address_book_processor_feed_(io_context.get_executor(), 500),
+          address_book_{settings, io_context} {
         if (app_settings_.network.nonce == 0U) {
             app_settings_.network.nonce = randomize<uint64_t>(/*min=*/1U);
         }
@@ -145,11 +145,13 @@ class NodeHub : public con::Stoppable {
     using NodeAndPayload = std::pair<std::shared_ptr<Node>, std::shared_ptr<MessagePayload>>;
     con::Channel<NodeAndPayload> address_book_processor_feed_;  // Channel for messages targeting the address book
 
-    net::AddressBook address_book_{};                                   // The address book
+    net::AddressBook address_book_;                                     // The address book
     mutable std::mutex nodes_mutex_;                                    // Guards access to nodes_
     std::list<std::shared_ptr<Node>> nodes_;                            // All the connected nodes
     mutable std::mutex connected_addresses_mutex_;                      // Guards access to connected_addresses_
     std::map<boost::asio::ip::address, uint32_t> connected_addresses_;  // Addresses that are connected
+    std::condition_variable all_peers_shutdown_{};                      // Used to signal shutdown of all peers
+    std::mutex all_peers_shutdown_mutex_{};                             // Guards access to all_peers_shutdown_
 
     size_t total_connections_{0};
     size_t total_disconnections_{0};

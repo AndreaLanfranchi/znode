@@ -55,8 +55,12 @@ bool NodeHub::start() noexcept {
         tls_client_context_ = std::make_unique<asio::ssl::context>(ctx);
     }
 
-    service_timer_.start(125ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
-    info_timer_.start(5s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
+    // Load address book
+    address_book_.start();
+    address_book_.load();
+
+    service_timer_.start(500ms, [this](std::chrono::milliseconds& interval) { on_service_timer_expired(interval); });
+    info_timer_.start(10s, [this](std::chrono::milliseconds& interval) { on_info_timer_expired(interval); });
 
     // We need to determine our network address which will be used to advertise us to other nodes
     // If we have a NAT traversal option enabled we need to use the public address
@@ -91,15 +95,18 @@ bool NodeHub::stop() noexcept {
         // this instance falls out of scope and the nodes call a callback
         // which points to nowhere. The burden to stop nodes is on the
         // shoulders of the service timer.
-        auto pending_nodes{size()};
-        while (pending_nodes not_eq 0U) {
-            log::Info("Service", {"name", "Node Hub", "action", "stop", "pending", std::to_string(pending_nodes)});
-            std::this_thread::sleep_for(std::chrono::seconds(2));
-            pending_nodes = size();
+        while (true) {
+            std::unique_lock lock(all_peers_shutdown_mutex_);
+            const auto wait_result{all_peers_shutdown_.wait_for(lock, std::chrono::seconds(2))};
+            if (wait_result != std::cv_status::timeout) break;
+            log::Info("Service", {"name", "Node Hub", "action", "stop"}) << "Waiting for peers to clean shutdown ...";
         }
 
         service_timer_.stop();
         info_timer_.stop();
+        address_book_.stop();
+        address_book_.save();
+
         set_stopped();
     }
     return ret;
@@ -391,17 +398,17 @@ Task<void> NodeHub::acceptor_work() {
     co_return;
 }
 
-void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
+void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
     const bool this_is_running{is_running()};
 
     std::unique_lock lock(nodes_mutex_);
-    uint32_t shutdown_count{16};  // Limit the number of nodes we shutdown per timer tick
+    uint32_t shutdown_count{32};  // Limit the number of nodes we shutdown per timer tick
 
     // Randomly shutdown one node
     // TODO remove this when done testing
     uint32_t it_index{0};
     std::optional<uint32_t> random_index;
-    if (this_is_running && current_active_outbound_connections_ == app_settings_.network.min_outgoing_connections &&
+    if (this_is_running && current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections &&
         address_book_.size() > app_settings_.network.min_outgoing_connections && randomize<uint32_t>(0U, 250U) == 0) {
         random_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
     }
@@ -431,8 +438,12 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& /*interval*/) {
         ++iterator;
         ++it_index;
     }
+    if (not this_is_running and nodes_.empty()) {
+        all_peers_shutdown_.notify_all();
+        interval = 0s; // Stop ticking
+        return;
+    }
     lock.unlock();
-    if (not this_is_running) return;
 
     // Check whether we need to establish new connections
     if (const auto outbounds{current_active_outbound_connections_.load()};
@@ -476,7 +487,7 @@ void NodeHub::feed_connections_from_cli() {
 }
 
 void NodeHub::feed_connections_from_dns() {
-    if (not app_settings_.network.force_dns_seeding) return;
+    if (not app_settings_.network.force_dns_seeding && !address_book_.empty()) return;
     const auto& hosts{get_chain_seeds(*app_settings_.chain_config)};
     std::map<std::string, std::vector<IPEndpoint>, std::less<>> host_to_endpoints{};
 

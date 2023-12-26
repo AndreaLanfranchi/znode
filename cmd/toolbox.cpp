@@ -191,7 +191,7 @@ void do_tables(const db::EnvConfig& config) {
 
 int main(int argc, char* argv[]) {
     os::Signals::init();
-    CLI::App app_main("Zenpp db tool");
+    CLI::App app_main("Znode db tool");
     app_main.get_formatter()->column_width(50);
     app_main.require_subcommand(1);      // At least 1 subcommand is required
     const log::Settings log_settings{};  // Holds logging settings
@@ -199,12 +199,12 @@ int main(int argc, char* argv[]) {
     /*
      * Database options (path required)
      */
+    std::string data_dir{};
+
     auto* db_opts = app_main.add_option_group("Db", "Database options");
     db_opts->get_formatter()->column_width(35);
-    auto* db_path = db_opts->add_option("--db", "Path to database")
-                        ->capture_default_str()
-                        ->default_str((DataDirectory::default_path() / DataDirectory::kChainDataName).string())
-                        ->check(CLI::ExistingDirectory);
+    std::ignore = db_opts->add_option("--datadir", data_dir, "Path to database")->capture_default_str();
+    auto* nodes_opt = db_opts->add_flag("--nodes", "Open nodes database");
     auto* shared_opt = db_opts->add_flag("--shared", "Open database in shared mode");
     auto* exclusive_opt = db_opts->add_flag("--exclusive", "Open database in exclusive mode")->excludes(shared_opt);
 
@@ -229,8 +229,31 @@ int main(int argc, char* argv[]) {
     CLI11_PARSE(app_main, argc, argv)
 
     try {
-        const Directory db_dir(fs::path(db_path->as<std::string>()));
-        db::EnvConfig src_config{db_dir.path().string()};
+
+        // Locate the db directory we're interested into
+        if (data_dir.empty()) {
+            if (!*nodes_opt) {
+                data_dir = (DataDirectory::default_path() / DataDirectory::kChainDataName).string();
+			} else {
+                data_dir = (DataDirectory::default_path() / DataDirectory::kNodesName).string();
+			}
+        } else {
+            // Verify that the provided path is a directory
+            if (!fs::is_directory(data_dir)) {
+				throw std::runtime_error("Invalid path: " + data_dir);
+			}
+            // Verify datadir has either chaindata or nodes subdir
+            if (!*nodes_opt) {
+				data_dir = (fs::path(data_dir) / DataDirectory::kChainDataName).string();
+            } else {
+                data_dir = (fs::path(data_dir) / DataDirectory::kNodesName).string();
+            }
+            if (!fs::is_directory(data_dir)) {
+                throw std::runtime_error("Invalid database path: " + data_dir);
+            }
+        }
+
+        db::EnvConfig src_config{data_dir};
         src_config.create = false;  // Database must exist
         src_config.shared = static_cast<bool>(*shared_opt);
         src_config.exclusive = static_cast<bool>(*exclusive_opt);

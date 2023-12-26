@@ -17,7 +17,6 @@
 
 #include "common.hpp"
 
-#include <iostream>
 #include <stdexcept>
 
 #include <boost/algorithm/string/replace.hpp>
