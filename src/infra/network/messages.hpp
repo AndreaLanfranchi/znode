@@ -80,7 +80,7 @@ inline constexpr MessageDefinition kMessageAddr{
     .is_vectorized = true,
     .max_vector_items = size_t{kMaxAddrItems},
     .vector_item_size = size_t{kAddrItemSize},
-    .min_payload_length = size_t{1 + kAddrItemSize},
+    .min_payload_length = size_t{1},
     .max_payload_length = size_t{ser::ser_compact_sizeof(kMaxAddrItems) + (kMaxAddrItems * kAddrItemSize)},
 };
 
@@ -114,7 +114,7 @@ inline constexpr MessageDefinition kMessageHeaders{
     .message_type = MessageType::kHeaders,
     .is_vectorized = true,
     .max_vector_items = size_t{kMaxHeadersItems},
-    .min_payload_length = size_t{1 + 140},
+    .min_payload_length = size_t{1} /* can be an empty list if none found */,
 };
 
 inline constexpr MessageDefinition kMessageGetAddr{

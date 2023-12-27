@@ -109,13 +109,13 @@ class MsgPingPongPayload : public MessagePayload {
 class MsgGetHeadersPayload : public MessagePayload {
   public:
     MsgGetHeadersPayload() : MessagePayload(MessageType::kGetHeaders) {
-        block_locator_hashes_.reserve(kMaxGetHeadersItems);
+        hashes_.reserve(kMaxGetHeadersItems);
     }
     ~MsgGetHeadersPayload() override = default;
 
     uint32_t protocol_version_{0};
-    std::vector<h256> block_locator_hashes_{};
-    h256 hash_stop_{};
+    std::vector<h256> hashes_{};
+    h256 stop_{};
 
     [[nodiscard]] nlohmann::json to_json() const override;
 

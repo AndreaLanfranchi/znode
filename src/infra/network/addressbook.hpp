@@ -50,6 +50,7 @@ class AddressBook : public con::Stoppable {
     static constexpr uint16_t kTriedBucketsPerGroup{8};
     static constexpr uint16_t kIPv4SubnetGroupsPrefix{16};
     static constexpr uint16_t kIPv6SubnetGroupsPrefix{64};
+    static constexpr size_t kMaxGetAddrPercent{23};
 
     AddressBook(AppSettings& settings, boost::asio::io_context& io_context)
         : Stoppable(),
@@ -147,7 +148,7 @@ class AddressBook : public con::Stoppable {
         bool new_only, std::optional<IPAddressType> type = std::nullopt) const noexcept;
 
     //! \brief Selects a randomly picked set of NodeServices from the ones collected into the address book
-    std::vector<NodeService> get_random_services(uint32_t max_count, uint32_t max_percentage,
+    std::vector<NodeService> get_random_services(uint32_t max_count,
                                                  std::optional<IPAddressType> type = std::nullopt) noexcept;
 
     //! \brief Loads the address book from disk

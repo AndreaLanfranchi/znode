@@ -266,15 +266,18 @@ Task<void> NodeHub::address_book_processor_work() {
     while (is_running()) {
         // Poll channel for any queued address to connect to
         boost::system::error_code error;
-        NodeAndPayload item{nullptr, nullptr};
+        WeakNodeAndPayload item{};
         if (not address_book_processor_feed_.try_receive(item)) {
             const auto result = co_await address_book_processor_feed_.async_receive(error);
             if (error or not result.has_value()) continue;
             item = result.value();
         }
         if (!is_running()) break;
-        auto [node_ptr, payload_ptr] = std::move(item);
-        if (node_ptr == nullptr or payload_ptr == nullptr) continue;
+        auto [weak_node_ptr, payload_ptr] = std::move(item);
+
+        // Might have been disconnected during the wait in the queue
+        auto node_ptr{weak_node_ptr.lock()};
+        if (not node_ptr) continue;
 
         try {
             switch (payload_ptr->type()) {
@@ -285,17 +288,13 @@ Task<void> NodeHub::address_book_processor_work() {
                         address_book_.insert_or_update(payload.identifiers_, node_ptr->remote_endpoint().address_, 2h);
                 } break;
                 case MessageType::kGetAddr: {
-                    auto services{address_book_.get_random_services(kMaxAddrItems, 25)};
-                    if (services.empty()) {
-                        std::ignore = node_ptr->push_message(MessageType::kNotFound);
-                    } else {
-                        log::Info("Service", {"name", "Node Hub", "action", "address book", "remote",
-                                              node_ptr->to_string(), "count", std::to_string(services.size())})
-                            << "Sending ...";
-                        MsgAddrPayload payload{};
-                        payload.identifiers_.swap(services);
-                        std::ignore = node_ptr->push_message(payload);
-                    }
+                    auto services{address_book_.get_random_services(kMaxAddrItems)};
+                    log::Trace("Service", {"name", "Node Hub", "action", "address book", "remote", node_ptr->to_string(),
+                                          "count", std::to_string(services.size())})
+                        << "Sending ...";
+                    MsgAddrPayload payload{};
+                    payload.identifiers_.swap(services);
+                    std::ignore = node_ptr->push_message(payload);
                 } break;
                 default:
                     ASSERT(false and "Should not happen");
@@ -440,7 +439,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
     }
     if (not this_is_running and nodes_.empty()) {
         all_peers_shutdown_.notify_all();
-        interval = 0s; // Stop ticking
+        interval = 0s;  // Stop ticking
         return;
     }
     lock.unlock();
@@ -670,12 +669,11 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
             break;
         case kAddr:
         case kGetAddr:
-            std::ignore =
-                address_book_processor_feed_.try_send(std::make_pair(std::move(node_ptr), std::move(payload_ptr)));
+            std::ignore = address_book_processor_feed_.try_send(std::make_pair(node_ptr, std::move(payload_ptr)));
             break;
         case kGetHeaders: {
             auto& payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
-            logger << "items=" << std::to_string(payload.block_locator_hashes_.size());
+            logger << "items=" << std::to_string(payload.hashes_.size());
         } break;
         case kInv: {
             auto& payload = dynamic_cast<MsgInventoryPayload&>(*payload_ptr);

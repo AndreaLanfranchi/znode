@@ -61,6 +61,7 @@ MessageType message_type_from_command(const std::array<uint8_t, kMessageHeaderCo
     }
     return MessageType::kMissingOrUnknown;
 }
+
 bool is_known_command(const std::string& command) noexcept {
     if (command.empty() or command.size() > kMessageHeaderCommandLength) return false;
     std::array<uint8_t, kMessageHeaderCommandLength> command_bytes{0};
@@ -70,6 +71,8 @@ bool is_known_command(const std::string& command) noexcept {
 
 std::string command_from_message_type(MessageType message_type, bool check_length) noexcept {
     auto command{get_command_from_message_type(message_type, check_length)};
-    return std::string{byte_view_to_string_view(command)};
+    auto ret{std::string{byte_view_to_string_view(command)}};
+    ret.erase(std::find_if(ret.rbegin(), ret.rend(), [](unsigned char c) { return c != 0; }).base(), ret.end());
+    return ret;
 }
 }  // namespace znode::net

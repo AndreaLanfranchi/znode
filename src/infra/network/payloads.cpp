@@ -80,7 +80,7 @@ outcome::result<void> MsgVersionPayload::serialization(SDataStream& stream, Acti
 
 nlohmann::json MsgVersionPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["command"] = command_from_message_type(type());
 
     ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
     auto& data = ret["data"];
@@ -109,7 +109,7 @@ nlohmann::json MsgVersionPayload::to_json() const {
 
 nlohmann::json MsgPingPongPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["command"] = command_from_message_type(type());
     ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
     auto& data = ret["data"];
     data["nonce"] = nonce_;
@@ -126,41 +126,41 @@ outcome::result<void> MsgGetHeadersPayload::serialization(SDataStream& stream, s
     auto result = stream.bind(protocol_version_, action);
     if (not result.has_error()) {
         if (action == Action::kSerialize) {
-            const auto vector_size = block_locator_hashes_.size();
+            const auto vector_size = hashes_.size();
             if (vector_size == 0U) return Error::kMessagePayloadEmptyVector;
             if (vector_size > kMaxGetHeadersItems) return Error::kMessagePayloadOversizedVector;
             if (result = write_compact(stream, vector_size); result.has_error()) return result.error();
-            for (auto& item : block_locator_hashes_) {
+            for (auto& item : hashes_) {
                 if (result = item.serialize(stream); result.has_error()) break;
             }
-            if (not result.has_error()) result = hash_stop_.serialize(stream);
+            if (not result.has_error()) result = stop_.serialize(stream);
         } else {
             const auto expected_vector_size{read_compact(stream)};
             if (expected_vector_size.has_error()) return expected_vector_size.error();
             if (expected_vector_size.value() == 0U) return Error::kMessagePayloadEmptyVector;
             if (expected_vector_size.value() > kMaxHeadersItems) return Error::kMessagePayloadOversizedVector;
-            block_locator_hashes_.resize(expected_vector_size.value());
-            for (auto& item : block_locator_hashes_) {
+            hashes_.resize(expected_vector_size.value());
+            for (auto& item : hashes_) {
                 if (result = item.deserialize(stream); result.has_error()) break;
             }
-            if (not result.has_error()) result = hash_stop_.deserialize(stream);
+            if (not result.has_error()) result = stop_.deserialize(stream);
         }
     }
     return result;
 }
 nlohmann::json MsgGetHeadersPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["command"] = command_from_message_type(type());
     ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
     auto& data = ret["data"];
 
     data["protocol_version"] = protocol_version_;
     data["hashes"] = nlohmann::json(nlohmann::json::value_t::array);
     auto& hashes = data["hashes"];
-    for (auto& item : block_locator_hashes_) {
+    for (auto& item : hashes_) {
         hashes.push_back(item.to_hex(/*reverse=*/true, /*with_prefix=*/true));
     }
-    data["hash_stop"] = hash_stop_.to_hex(/*reverse=*/true, /*with_prefix=*/true);
+    data["stop"] = stop_.to_hex(/*reverse=*/true, /*with_prefix=*/true);
     return ret;
 }
 
@@ -187,7 +187,7 @@ outcome::result<void> MsgAddrPayload::serialization(SDataStream& stream, ser::Ac
 }
 nlohmann::json MsgAddrPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["command"] = command_from_message_type(type());
     ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
     auto& data = ret["data"];
     data["identifiers"] = nlohmann::json(nlohmann::json::value_t::array);
@@ -229,7 +229,7 @@ outcome::result<void> MsgInventoryPayload::serialization(SDataStream& stream, se
 
 nlohmann::json MsgInventoryPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["command"] = command_from_message_type(type());
     ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
     auto& data = ret["data"];
     data["items"] = nlohmann::json(nlohmann::json::value_t::array);
@@ -288,7 +288,7 @@ outcome::result<void> MsgRejectPayload::serialization(SDataStream& stream, ser::
 
 nlohmann::json MsgRejectPayload::to_json() const {
     nlohmann::json ret(nlohmann::json::value_t::object);
-    ret["command"] = std::string(magic_enum::enum_name(type())).substr(1);
+    ret["command"] = command_from_message_type(type());
     ret["data"] = nlohmann::json(nlohmann::json::value_t::object);
     auto& data = ret["data"];
     data["rejected_command"] = rejected_command_;

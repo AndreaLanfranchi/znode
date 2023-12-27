@@ -55,6 +55,7 @@ bool AddressBook::insert_or_update(NodeService& service, const IPAddress& source
 bool AddressBook::insert_or_update(std::vector<NodeService>& services, const IPAddress& source,
                                    std::chrono::seconds time_penalty) {
     using namespace std::chrono_literals;
+    if (services.empty()) return false;
     NodeSeconds now{Now<NodeSeconds>()};
     const auto services_size{services.size()};
 
@@ -229,15 +230,12 @@ std::pair<std::optional<IPEndpoint>, NodeSeconds> AddressBook::select_random(
     return ret;
 }
 
-std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count, uint32_t max_percentage,
+std::vector<NodeService> AddressBook::get_random_services(uint32_t max_count,
                                                           std::optional<IPAddressType> type) noexcept {
     std::scoped_lock lock{mutex_};
     if (randomly_ordered_ids_.empty()) return {};
 
-    size_t count{randomly_ordered_ids_.size()};
-    if (max_percentage > 0U) {
-        count = count * max_percentage / 100U;
-    }
+    size_t count{randomly_ordered_ids_.size() * kMaxGetAddrPercent / 100};
     if (max_count > 0U) {
         count = std::min(count, static_cast<size_t>(max_count));
     }
@@ -284,7 +282,6 @@ void AddressBook::load() {
     std::scoped_lock lock{mutex_};
     StopWatch sw(/*auto_start=*/true);
     try {
-
         auto& env_config{app_settings_.nodedata_env_config};
         env_config.path = (*app_settings_.data_directory)[DataDirectory::kNodesName].path().string();
         env_config.create = !std::filesystem::exists(db::get_datafile_path(env_config.path));
@@ -381,7 +378,7 @@ void AddressBook::load() {
 
 void AddressBook::save() const {
     if (empty()) return;
-    
+
     bool expected{false};
     if (not is_saving_.compare_exchange_strong(expected, false)) return;
 

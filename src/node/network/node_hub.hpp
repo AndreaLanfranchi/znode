@@ -142,8 +142,8 @@ class NodeHub : public con::Stoppable {
     con::Channel<std::shared_ptr<Connection>> node_factory_feed_;  // Channel for new nodes to be instantiated
     con::Channel<std::shared_ptr<Connection>> connector_feed_;     // Channel for new outgoing connections
 
-    using NodeAndPayload = std::pair<std::shared_ptr<Node>, std::shared_ptr<MessagePayload>>;
-    con::Channel<NodeAndPayload> address_book_processor_feed_;  // Channel for messages targeting the address book
+    using WeakNodeAndPayload = std::pair<std::weak_ptr<Node>, std::shared_ptr<MessagePayload>>;
+    con::Channel<WeakNodeAndPayload> address_book_processor_feed_;  // Channel for messages targeting the address book
 
     net::AddressBook address_book_;                                     // The address book
     mutable std::mutex nodes_mutex_;                                    // Guards access to nodes_
