@@ -21,6 +21,7 @@
 #include <bit>
 
 #include <core/common/endian.hpp>
+#include <core/common/cast.hpp>
 
 namespace znode::crypto {
 namespace {
@@ -35,6 +36,7 @@ namespace {
     }
 
 }  // namespace
+
 uint32_t Murmur3::Hash(const uint32_t seed, ByteView data) {
     uint32_t h1{seed};
     const uint32_t c1{0xcc9e2d51};
@@ -59,7 +61,7 @@ uint32_t Murmur3::Hash(const uint32_t seed, ByteView data) {
 
     // Tail
     uint32_t k1{0};
-    switch (data.size()) {
+    switch (data.length()) {
         case 3:
             k1 ^= static_cast<uint32_t>(data[2]) << 16;
             [[fallthrough]];
@@ -81,5 +83,9 @@ uint32_t Murmur3::Hash(const uint32_t seed, ByteView data) {
     // Final mix
     return fmix(h1);
 
+}
+
+uint32_t Murmur3::Hash(const uint32_t seed, std::string_view data) {
+    return Hash(seed, string_view_to_byte_view(data));
 }
 }  // namespace znode::crypto

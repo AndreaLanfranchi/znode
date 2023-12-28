@@ -26,6 +26,7 @@ class Murmur3 {
     //! \see https://en.wikipedia.org/wiki/MurmurHash
     //! \see https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
     static uint32_t Hash(const uint32_t seed, ByteView data);
+    static uint32_t Hash(const uint32_t seed, std::string_view data);
 };
 
 }  // namespace znode::crypto
