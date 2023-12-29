@@ -32,6 +32,7 @@ enum class Error {
     kCompactSizeTooBig,        // The compact size is too big
     kUnexpectedError,          // An unexpected error occurred
     kStringTooBig,             // The string is too big
+    kInvalidEnumValue,         // The enum value is not valid
     kInvalidRejectionCode,     // The rejection code is not valid
     kInvalidInventoryType,     // The inventory type is not valid
 };
@@ -69,6 +70,7 @@ class ErrorCategory : public boost::system::error_category {
                 return make_error_condition(boost::system::errc::value_too_large);
             case kNonCanonicalCompactSize:
             case kCompactSizeTooBig:
+            case kInvalidEnumValue:
                 return make_error_condition(boost::system::errc::argument_out_of_domain);
             case kUnexpectedError:
                 return make_error_condition(boost::system::errc::io_error);

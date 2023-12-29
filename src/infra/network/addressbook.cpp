@@ -469,7 +469,7 @@ void AddressBook::save() const {
     is_saving_.exchange(false);
 };
 
-void AddressBook::on_service_timer_expired(con::Timer::duration& interval) {
+void AddressBook::on_service_timer_expired(con::Timer::duration& /*interval*/) {
     if (!is_running()) return;
     // TODO clean up outdated entries
     save();

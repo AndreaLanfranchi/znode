@@ -163,7 +163,7 @@ class SDataStream : public DataStream {
 
     // Serialization for arithmetic types
     template <typename T>
-    requires Integral<T>
+        requires Integral<T>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         switch (action) {
             using enum Action;
@@ -180,7 +180,7 @@ class SDataStream : public DataStream {
     }
 
     template <typename T>
-    requires BigUnsignedIntegral<T>
+        requires BigUnsignedIntegral<T>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         std::array<uint8_t, ssizeof<T>> bytes{0x0};
         switch (action) {
@@ -203,28 +203,34 @@ class SDataStream : public DataStream {
 
     // Serialization for Serializable classes
     template <typename T>
-    requires std::derived_from<T, Serializable>
-    [[nodiscard]] outcome::result<void> bind(T& object, Action action) { return object.serialization(*this, action); }
+        requires std::derived_from<T, Serializable>
+    [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
+        return object.serialization(*this, action);
+    }
 
     // Serialization for basic_string<bytes>
-    // Note ! In Bitcoin's objects variable sizes strings of bytes are
-    // a special case as they're always the last element of a structure.
-    // Due to this the size of the member is not recorded
     template <typename T>
-    requires std::is_same_v<T, Bytes>
+        requires std::is_same_v<T, Bytes>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         switch (action) {
             using enum Action;
             case kComputeSize:
-                computed_size_ += object.size();
+                computed_size_ += ser_compact_sizeof(object.size()) + object.size();
                 break;
             case kSerialize:
+                if (const auto result{write_compact(*this, static_cast<uint64_t>(object.size()))}; result.has_error())
+                    [[unlikely]] {
+                    return result.error();
+                }
                 return write(object);
             case kDeserialize:
-                if (auto read_result{read()}; read_result.has_error()) [[unlikely]] {
-                    return read_result.error();
+
+                if (const auto data_length{read_compact(*this)}; data_length.has_error()) [[unlikely]] {
+                    return data_length.error();
                 } else {
-                    object.assign(read_result.value());
+                    auto data{read(data_length.value())};
+                    if (data.has_error()) return data.error();
+                    object.assign(data.value().begin(), data.value().end());
                 }
                 break;
         }
@@ -233,7 +239,7 @@ class SDataStream : public DataStream {
 
     // Serialization for bool
     template <typename T>
-    requires std::is_same_v<T, bool>
+        requires std::is_same_v<T, bool>
     [[nodiscard]] outcome::result<void> bind(bool& object, Action action) {
         switch (action) {
             using enum Action;
@@ -250,7 +256,7 @@ class SDataStream : public DataStream {
 
     // Serialization for bytes array (fixed size)
     template <class T, std::size_t N>
-    requires std::is_fundamental_v<T>
+        requires std::is_fundamental_v<T>
     [[nodiscard]] outcome::result<void> bind(std::array<T, N>& object, Action action) {
         const auto element_size{ssizeof<T>};
         const auto array_bytes_size{N * element_size};
@@ -274,7 +280,7 @@ class SDataStream : public DataStream {
 
     // Serialization for std::string
     template <class T>
-    requires std::is_same_v<T, std::string>
+        requires std::is_same_v<T, std::string>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         switch (action) {
             using enum Action;
@@ -303,7 +309,7 @@ class SDataStream : public DataStream {
     // Serialization for ip::address
     // see https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
     template <class T>
-    requires std::is_same_v<T, boost::asio::ip::address>
+        requires std::is_same_v<T, boost::asio::ip::address>
     [[nodiscard]] outcome::result<void> bind(T& object, Action action) {
         std::array<uint8_t, 16> bytes{0x0};
         switch (action) {
