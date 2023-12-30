@@ -51,8 +51,12 @@ class BloomFilter : public ser::Serializable {
     //! \note Not thread safe.
     void insert(ByteView data);
 
-    //! \brief Checks if an element is in the filter.
+    //! \brief Checks if an element matches in the filter.
     [[nodiscard]] bool contains(ByteView data) const;
+
+    //! \brief Wether the filter size is within limits.
+    //! \remarks Catches newly deserialized filters which are too large.
+    [[nodiscard]] bool is_within_size_constraints() const;
 
   private:
     Bytes data_{};
@@ -64,5 +68,30 @@ class BloomFilter : public ser::Serializable {
 
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
+};
+
+//! \brief RollingBloomFilter is a probabilistic "keep track of most recently inserted" set.
+//! \details Construct it with the number of items to keep track of, and a false-positive
+//! rate. Unlike CBloomFilter, by default nTweak is set to a cryptographically secure random value for you. 
+//! Similarly rather than clear() the method reset() is provided, which also changes 
+//! nTweak to decrease the impact of false-positives.
+//! contains(item) will always return true if item was one of the last N to 1.5*N insert()'ed 
+//! but may also return true for items that were not inserted. 
+//! * It needs around 1.8 bytes per element per factor 0.1 of false positive rate.
+//! \verbatim
+//! For example, if we want 1000 elements, we'd need: 
+//! - ~1800 bytes for a false positive rate of 0.1
+//! - ~3600 bytes for a false positive rate of 0.01
+//! - ~5400 bytes for a false positive rate of 0.001
+//! \endverbatim
+//! If we make these simplifying assumptions:
+//! - logFpRate / log(0.5) doesn't get rounded or clamped in the nHashFuncs calculation
+//! - nElements is even, so that nEntriesPerGeneration == nElements / 2
+//! Then we get a more accurate estimate for filter bytes:
+//! 
+//! 3/(log(256)*log(2)) * log(1/fpRate) * nElements
+//! 
+class RollingBloomFilter {
+
 };
 }  // namespace znode

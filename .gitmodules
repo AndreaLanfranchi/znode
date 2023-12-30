@@ -10,3 +10,6 @@
 [submodule "third-party/indicators"]
 	path = third-party/indicators
 	url = https://github.com/p-ranav/indicators.git
+[submodule "third-party/fastrange"]
+	path = third-party/fastrange
+	url = https://github.com/lemire/fastrange.git

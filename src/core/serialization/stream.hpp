@@ -224,7 +224,6 @@ class SDataStream : public DataStream {
                 }
                 return write(object);
             case kDeserialize:
-
                 if (const auto data_length{read_compact(*this)}; data_length.has_error()) [[unlikely]] {
                     return data_length.error();
                 } else {

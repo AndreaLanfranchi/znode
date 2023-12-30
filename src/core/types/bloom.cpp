@@ -55,6 +55,27 @@ inline uint32_t BloomFilter::hash(uint32_t hash_num, ByteView data) const {
            static_cast<uint32_t>(data_.size() * 8);
 }
 
+void BloomFilter::insert(ByteView data) {
+    if (data_.empty()) return;  // Avoid division by zero in hash()
+    for (uint32_t i{0}; i < hash_funcs_count_; ++i) {
+        uint32_t bit_pos = hash(i, data);
+        data_[bit_pos >> 3] |= static_cast<uint8_t>(1U << (7U & bit_pos));
+    }
+}
+
+bool BloomFilter::contains(ByteView data) const {
+    if (data_.empty()) return false;  // Avoid division by zero in hash()
+    for (uint32_t i{0}; i < hash_funcs_count_; ++i) {
+        uint32_t bit_pos = hash(i, data);
+        if (!(data_[bit_pos >> 3] & static_cast<uint8_t>(1U << (7U & bit_pos)))) return false;
+    }
+    return true;
+}
+
+bool BloomFilter::is_within_size_constraints() const {
+    return (data_.size() <= kMaxFilterSize && hash_funcs_count_ <= kMaxHashFuncsCount);
+}
+
 outcome::result<void> BloomFilter::serialization(ser::SDataStream& stream, ser::Action action) {
     auto result{stream.bind(data_, action)};
     if (not result.has_error()) result = stream.bind(hash_funcs_count_, action);
@@ -69,22 +90,5 @@ outcome::result<void> BloomFilter::serialization(ser::SDataStream& stream, ser::
         }
     }
     return result;
-}
-
-void BloomFilter::insert(ByteView data) {
-    if (data_.empty()) return;  // Avoid division by zero in hash()
-    for (uint32_t i{0}; i < hash_funcs_count_; ++i) {
-        uint32_t bit_pos = hash(i, data);
-        data_[bit_pos >> 3] |= (1 << (7 & bit_pos));
-    }
-}
-
-bool BloomFilter::contains(ByteView data) const {
-    if (data_.empty()) return false;  // Avoid division by zero in hash()
-    for (uint32_t i{0}; i < hash_funcs_count_; ++i) {
-        uint32_t bit_pos = hash(i, data);
-        if (!(data_[bit_pos >> 3] & (1 << (7 & bit_pos)))) return false;
-    }
-    return true;
 }
 }  // namespace znode
