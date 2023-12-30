@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include <core/common/base.hpp>
 #include <core/serialization/serializable.hpp>
 
@@ -49,14 +51,14 @@ class BloomFilter : public ser::Serializable {
     //! \brief Inserts an element into the filter.
     //! \param[in] data The data to insert.
     //! \note Not thread safe.
-    void insert(ByteView data);
+    void insert(ByteView data) noexcept;
 
     //! \brief Checks if an element matches in the filter.
-    [[nodiscard]] bool contains(ByteView data) const;
+    [[nodiscard]] bool contains(ByteView data) const noexcept;
 
     //! \brief Wether the filter size is within limits.
     //! \remarks Catches newly deserialized filters which are too large.
-    [[nodiscard]] bool is_within_size_constraints() const;
+    [[nodiscard]] bool is_within_size_constraints() const noexcept;
 
   private:
     Bytes data_{};
@@ -64,7 +66,7 @@ class BloomFilter : public ser::Serializable {
     uint32_t tweaks_{0};
     Flags flags_{Flags::kNone};
 
-    uint32_t hash(uint32_t hash_num, ByteView data) const;
+    uint32_t hash(uint32_t hash_num, ByteView data) const noexcept;
 
     friend class ser::SDataStream;
     outcome::result<void> serialization(ser::SDataStream& stream, ser::Action action) override;
@@ -92,6 +94,28 @@ class BloomFilter : public ser::Serializable {
 //! 3/(log(256)*log(2)) * log(1/fpRate) * nElements
 //! 
 class RollingBloomFilter {
+  public:
+    RollingBloomFilter(uint32_t num_elements, double false_positive_rate);
 
+    //! \brief Inserts an element into the filter.
+    //! \param[in] data The data to insert.
+    //! \note Not thread safe.
+    void insert(ByteView key) noexcept;
+
+    //! \brief Checks if an element matches in the filter.
+    [[nodiscard]] bool contains(ByteView key) const noexcept;
+
+    void reset() noexcept;
+
+    private:
+
+    std::vector<uint64_t> data_{};
+    uint32_t hash_funcs_count_{0};
+    uint32_t tweaks_{0};
+    uint32_t num_entries_per_generation_{0};
+    uint32_t num_entries_this_generation_{0};
+    uint32_t generation_id_{0};
+
+    uint32_t hash(uint32_t hash_num, ByteView data) const noexcept;
 };
 }  // namespace znode

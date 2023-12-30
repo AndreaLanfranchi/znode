@@ -212,7 +212,7 @@ message(CHECK_PASS "All required packages found")
 # Interface library for third parties
 add_library(third-party-includes INTERFACE)
 target_include_directories(third-party-includes INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/third-party/expected/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/third-party/fastrange
         ${CMAKE_CURRENT_SOURCE_DIR}/third-party/libmdbx
         ${CMAKE_CURRENT_SOURCE_DIR}/third-party/indicators/include
         ${CMAKE_CURRENT_SOURCE_DIR}/third-party/magic_enum/include

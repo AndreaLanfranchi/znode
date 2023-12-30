@@ -19,10 +19,11 @@
 
 #include <catch2/catch.hpp>
 
+#include <core/common/random.hpp>
 #include <core/encoding/hex.hpp>
 
 namespace znode {
-TEST_CASE("Bloom Filter population and serialization", "[bloom]") {
+TEST_CASE("Bloom Filter", "[bloom]") {
     SECTION("Without tweaks") {
         BloomFilter filter(3, 0.01, 0, BloomFilter::Flags::kAll);
 
@@ -54,7 +55,6 @@ TEST_CASE("Bloom Filter population and serialization", "[bloom]") {
         input = "99108ad8ed9bb6274d3980bab5a85c048f0950c8";
         input_data = enc::hex::decode(input).value();
         CHECK(filter.contains(input_data));
-
     }
 
     SECTION("With tweaks") {
@@ -82,6 +82,66 @@ TEST_CASE("Bloom Filter population and serialization", "[bloom]") {
         ser::SDataStream stream(ser::Scope::kNetwork, 0);
         CHECK_FALSE(filter.serialize(stream).has_error());
         CHECK(enc::hex::encode(stream.read().value(), true) == "0x03ce4299050000000100008001");
+    }
+}
+
+TEST_CASE("Rolling Bloom Filter", "[bloom]") {
+    // Last 100 entries, 1% false positive
+    RollingBloomFilter rfilter(100, 0.01);
+
+    // Overfill
+    std::vector<Bytes> unique_inputs;
+    while (unique_inputs.size() < 400) {
+        auto input_data{get_random_bytes(64)};
+        if (std::any_of(unique_inputs.begin(), unique_inputs.end(),
+                        [&input_data](const Bytes& value) { return value == input_data; }))
+            continue;
+        rfilter.insert(input_data);
+        unique_inputs.push_back(input_data);
+    }
+
+    // Ensure last 100 inserted items are remembered
+    for (int i = 0; i < 100; ++i) {
+        CHECK(rfilter.contains(unique_inputs[unique_inputs.size() - 100 + i]));
+    }
+
+    rfilter.reset();
+    CHECK_FALSE(rfilter.contains(unique_inputs.back()));
+
+    // Now roll through data and make sure last 100 entries are always
+    // remembered.
+    for (decltype(unique_inputs.size()) i{0}; i < unique_inputs.size(); ++i) {
+        if (i >= 100) {
+            CHECK(rfilter.contains(unique_inputs[i - 100]));
+        }
+        rfilter.insert(unique_inputs[i]);
+        CHECK(rfilter.contains(unique_inputs[i]));
+    }
+
+    // Insert 999 more random entries
+    for (int i{0}; i < 999; ++i) {
+        auto input_data{get_random_bytes(64)};
+        rfilter.insert(input_data);
+        CHECK(rfilter.contains(input_data));
+    }
+
+    uint32_t hit_count{0};
+    for (const auto& input : unique_inputs) {
+        if (rfilter.contains(input)) {
+            ++hit_count;
+        }
+    }
+    CHECK_NOFAIL(hit_count <= 5);  // It's an approximation
+
+    // Now create a filter which has room for all our data
+    RollingBloomFilter rfilter2(1'000, 0.01);
+    // Insert all our data
+    for (const auto& input : unique_inputs) {
+        rfilter2.insert(input);
+    }
+    // Ensure all items are remembered
+    for (const auto& input : unique_inputs) {
+        CHECK(rfilter2.contains(input));
     }
 }
 }  // namespace znode

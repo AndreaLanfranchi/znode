@@ -40,7 +40,7 @@ outcome::result<void> BlockHeader::serialization(ser::SDataStream& stream, ser::
     if (not result.has_error()) result = stream.bind(time, action);
     if (not result.has_error()) result = stream.bind(bits, action);
     if (not result.has_error()) result = stream.bind(nonce, action);
-    if (not result.has_error()) result = stream.bind(solution, action);
+    if (not result.has_error() && action != ser::Action::kComputeSize) result = stream.bind(solution, action);
     return result;
 }
 
