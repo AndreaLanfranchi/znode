@@ -110,6 +110,9 @@ class AddressBook : public con::Stoppable {
     //! \brief Returns whether the address book is empty
     [[nodiscard]] bool empty() const;
 
+    //! \brief Returns whether the address book is dirty (i.e. has been modified since last save)
+    [[nodiscard]] bool dirty() const noexcept { return is_dirty_.load(); }
+
     //! \brief Inserts or updates an address book item in the collection
     //! \returns A pair containing a pointer to the entry and a boolean indicating whether it was inserted
     [[nodiscard]] bool insert_or_update(NodeService& service, const IPAddress& source,
@@ -172,6 +175,7 @@ class AddressBook : public con::Stoppable {
     std::atomic<uint32_t> new_entries_size_{0};           // Number of items in "new" buckets
     std::atomic<uint32_t> tried_entries_size_{0};         // Number of items in "tried" buckets
     mutable std::vector<uint32_t> randomly_ordered_ids_;  // Randomly ordered ids
+    mutable std::atomic_bool is_dirty_{false};            // Whether the address book has been modified
     mutable std::atomic_bool is_saving_{false};           // Whether a save operation is in progress
 
     /* Buckets */

@@ -377,7 +377,7 @@ void AddressBook::load() {
 }
 
 void AddressBook::save() const {
-    if (empty()) return;
+    if (empty() or not is_dirty_) return;
 
     bool expected{false};
     if (not is_saving_.compare_exchange_strong(expected, false)) return;
@@ -458,6 +458,8 @@ void AddressBook::save() const {
         txn.commit(/*renew=*/false);
         log::Info("Closing database", {"path", env_config.path});
         node_data_env.close();
+        is_dirty_.exchange(false);
+
     } catch (const std::exception& ex) {
         log::Error("Address Book", {"action", "saving", "error", ex.what()});
         is_saving_.exchange(false);
@@ -490,6 +492,7 @@ void AddressBook::erase_new_entry(uint32_t entry_id) noexcept {
     --new_entries_size_;
     std::ignore = list_.erase(it->list_it);
     std::ignore = idx.erase(it);
+    is_dirty_.exchange(true);
 }
 
 void AddressBook::make_entry_tried(uint32_t entry_id) noexcept {
@@ -535,6 +538,7 @@ void AddressBook::make_entry_tried(uint32_t entry_id) noexcept {
     ASSERT(tried_buckets_.emplace(tried_slot_address.xy, entry_id).second);  // Must be inserted
     service_info->tried_ref_.emplace(tried_slot_address.xy);
     ++tried_entries_size_;
+    is_dirty_.exchange(true);
 }
 
 void AddressBook::clear_new_slot(const SlotAddress& slot_address, bool erase_unreferenced_entry) noexcept {
@@ -596,6 +600,7 @@ void AddressBook::swap_randomly_ordered_ids(uint32_t i, uint32_t j) noexcept {
     // Swap the ids
     randomly_ordered_ids_[i] = id_at_j;
     randomly_ordered_ids_[j] = id_at_i;
+    is_dirty_.exchange(true);
 }
 
 AddressBook::SlotAddress AddressBook::get_new_slot(const NodeServiceInfo& service,
@@ -719,6 +724,7 @@ std::pair<NodeServiceInfo*, uint32_t> AddressBook::insert_entry(const NodeServic
     auto new_it{list_.emplace(list_.end(), std::move(service_info))};
     list_index_.insert({new_id, service.endpoint_, new_it});
     ++new_entries_size_;
+    is_dirty_.exchange(true);
     return {new_it.operator->(), new_id};
 }
 
@@ -768,5 +774,6 @@ void AddressBook::update_entry(NodeServiceInfo& entry, const uint32_t entry_id, 
     ASSERT(entry.new_refs_.emplace(slot_address.xy).second);         // Must be inserted
     ASSERT(new_buckets_.emplace(slot_address.xy, entry_id).second);  // Must be inserted
     if (entry.new_refs_.size() == 1U) ++new_entries_size_;
+    is_dirty_.exchange(true);
 }
 }  // namespace znode::net
