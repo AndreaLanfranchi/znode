@@ -112,6 +112,13 @@ bool NodeHub::stop() noexcept {
     return ret;
 }
 
+NodeService NodeHub::get_local_service() const {
+    NodeService ret{IPEndpoint(app_settings_.network.nat.address_, app_settings_.chain_config->default_port_)};
+    ret.time_ = Now<NodeSeconds>();
+    ret.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
+    return ret;
+}
+
 Task<void> NodeHub::node_factory_work() {
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "node_factory", "status", "started"});
 
@@ -407,10 +414,19 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
     // Randomly shutdown one node
     // TODO remove this when done testing
     uint32_t it_index{0};
-    std::optional<uint32_t> random_index;
+    std::optional<uint32_t> random_disconnect_index;
     if (this_is_running && current_active_outbound_connections_ >= app_settings_.network.min_outgoing_connections &&
         address_book_.size() > app_settings_.network.min_outgoing_connections && randomize<uint32_t>(0U, 250U) == 0) {
-        random_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
+        random_disconnect_index.emplace(randomize<uint32_t>(0U, gsl::narrow_cast<uint32_t>(nodes_.size()) - 1));
+    }
+
+    // Every 1 hour we send out a message advertising self
+    static auto last_advertisement{std::chrono::steady_clock::now()};
+    std::optional<MsgAddrPayload> self_advertise{std::nullopt};
+    if (this_is_running && std::chrono::steady_clock::now() - last_advertisement > 1h) {
+        last_advertisement = std::chrono::steady_clock::now();
+        self_advertise.emplace();
+        self_advertise->identifiers_.push_back(get_local_service());
     }
 
     for (auto iterator{nodes_.begin()}; iterator not_eq nodes_.end(); /* !!! no increment !!! */) {
@@ -420,9 +436,9 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
         } else if (not this_is_running) {
             (*iterator)->stop();
             if (--shutdown_count == 0) break;
-        } else if (random_index and it_index == random_index.value() and
+        } else if (random_disconnect_index and it_index == random_disconnect_index.value() and
                    (*iterator)->connection().type_ not_eq ConnectionType::kInbound and (*iterator)->fully_connected()) {
-            log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[random shutdown]", "remote",
+            log::Warning("Service", {"name", "Node Hub", "action", "handle_service_timer[random disconnect]", "remote",
                                      (*iterator)->to_string()})
                 << "Disconnecting ...";
             (*iterator)->stop();
@@ -434,13 +450,15 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
                 << "Disconnecting ...";
             (*iterator)->stop();
             if (--shutdown_count == 0) break;
+        } else if (self_advertise.has_value() && (*iterator)->connection_duration() > 15min) {
+            std::ignore = (*iterator)->push_message(self_advertise.value());
         }
         ++iterator;
         ++it_index;
     }
     if (not this_is_running and nodes_.empty()) {
         all_peers_shutdown_.notify_all();
-        interval = 0s; // Stop ticking
+        interval = 0s;  // Stop ticking
         return;
     }
     lock.unlock();
@@ -660,11 +678,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
                 std::ignore = address_book_.set_good(node_ptr->remote_endpoint(), node_ptr->version_info());
                 // Also send our address as advertisement
                 MsgAddrPayload payload{};
-                NodeService node_service{
-                    IPEndpoint(app_settings_.network.nat.address_, app_settings_.chain_config->default_port_)};
-                node_service.time_ = Now<NodeSeconds>();
-                node_service.services_ = static_cast<uint64_t>(NodeServicesType::kNodeNetwork);
-                payload.identifiers_.push_back(node_service);
+                payload.identifiers_.push_back(get_local_service());
                 std::ignore = node_ptr->push_message(payload);
             }
             break;
