@@ -144,10 +144,10 @@ void do_list_tables(const db::EnvConfig& config) {
     static const std::string fmt_row{" %3i %-24s %10u %2u %10u %10u %10u %12s %10s %10s"};
 
     auto env{db::open_env(config)};
-    auto txn{env.start_read()};
+    db::ROTxn txn(env);
 
-    auto dbTablesInfo{get_tablesInfo(txn)};
-    auto dbFreeInfo{get_freeInfo(txn)};
+    auto dbTablesInfo{get_tablesInfo(*txn)};
+    auto dbFreeInfo{get_freeInfo(*txn)};
 
     std::cout << "\n Database tables    : " << dbTablesInfo.tables.size()
               << "\n Database page size : " << to_human_bytes(env.get_pagesize(), true) << "\n"
@@ -188,7 +188,7 @@ void do_list_tables(const db::EnvConfig& config) {
               << " == A - B + C \n"
               << std::endl;
 
-    txn.commit();
+    txn.abort();
     env.close(config.shared);
 }
 
