@@ -312,7 +312,7 @@ int main(int argc, char* argv[]) {
         return 0;
 
     } catch (const std::exception& ex) {
-        std::cerr << "\nUnexpected " << typeid(ex).name() << " : " << ex.what() << "\n" << std::endl;
+        std::cerr << "\nUnexpected \"" << typeid(ex).name() << "\" : " << ex.what() << "\n" << std::endl;
     } catch (...) {
         std::cerr << "\nUnexpected undefined error\n" << std::endl;
     }
