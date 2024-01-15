@@ -28,6 +28,7 @@
 #include <core/common/cast.hpp>
 #include <core/common/misc.hpp>
 
+#include <infra/common/common.hpp>
 #include <infra/common/log.hpp>
 #include <infra/database/mdbx.hpp>
 #include <infra/database/mdbx_tables.hpp>
@@ -81,7 +82,7 @@ dbFreeInfo get_freeInfo(::mdbx::txn& txn) {
         std::memcpy(&txId, key.data(), sizeof(size_t));
         uint32_t pagesCount;
         std::memcpy(&pagesCount, value.data(), sizeof(uint32_t));
-        const size_t pagesSize = pagesCount * page_size;
+        const size_t pagesSize = static_cast<size_t>(static_cast<uint64_t>(pagesCount) * page_size);
         ret.pages += pagesCount;
         ret.size += pagesSize;
         ret.entries.push_back(dbFreeEntry{txId, pagesCount, pagesSize});
@@ -205,9 +206,8 @@ void do_list_address_types(const db::EnvConfig& config) {
     db::cursor_for_each(cursor, [&histogram](ByteView /*key*/, ByteView value) {
         ser::SDataStream data(value, ser::Scope::kStorage, 0);
         net::NodeServiceInfo info{};
-        if (!info.deserialize(data).has_error()) {
-            histogram[info.service_.endpoint_.address_.get_type()]++;
-        }
+        success_or_throw(info.deserialize(data));
+        histogram[info.service_.endpoint_.address_.get_type()]++;
     });
 
     // Sort histogram by usage (from most used to less used)

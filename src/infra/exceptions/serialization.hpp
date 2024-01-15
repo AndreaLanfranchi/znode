@@ -23,6 +23,7 @@
 #include <magic_enum.hpp>
 
 #include <core/serialization/base.hpp>
+#include <core/serialization/errors.hpp>
 
 namespace znode::ser {
 
