@@ -380,7 +380,7 @@ void AddressBook::save() const {
     if (empty() or not is_dirty_) return;
 
     bool expected{false};
-    if (not is_saving_.compare_exchange_strong(expected, false)) return;
+    if (not is_saving_.compare_exchange_strong(expected, true)) return;
 
     std::scoped_lock lock{mutex_};
     StopWatch sw(/*auto_start=*/true);
