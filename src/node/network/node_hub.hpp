@@ -66,6 +66,8 @@ class NodeHub : public con::Stoppable {
     bool start() noexcept override;     // Begins accepting connections
     bool stop() noexcept override;      // Stops accepting connections and stops all nodes
 
+    NodeService get_local_service() const;  // Returns a reference to the node service
+
   private:
     void initialize_acceptor();  // Initialize the socket acceptor with local endpoint
 

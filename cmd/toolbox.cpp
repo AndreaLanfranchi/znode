@@ -28,8 +28,11 @@
 #include <core/common/cast.hpp>
 #include <core/common/misc.hpp>
 
+#include <infra/common/common.hpp>
 #include <infra/common/log.hpp>
 #include <infra/database/mdbx.hpp>
+#include <infra/database/mdbx_tables.hpp>
+#include <infra/network/addresses.hpp>
 #include <infra/os/signals.hpp>
 
 namespace fs = std::filesystem;
@@ -79,7 +82,7 @@ dbFreeInfo get_freeInfo(::mdbx::txn& txn) {
         std::memcpy(&txId, key.data(), sizeof(size_t));
         uint32_t pagesCount;
         std::memcpy(&pagesCount, value.data(), sizeof(uint32_t));
-        const size_t pagesSize = pagesCount * page_size;
+        const size_t pagesSize = static_cast<size_t>(static_cast<uint64_t>(pagesCount) * page_size);
         ret.pages += pagesCount;
         ret.size += pagesSize;
         ret.entries.push_back(dbFreeEntry{txId, pagesCount, pagesSize});
@@ -136,15 +139,15 @@ dbTablesInfo get_tablesInfo(::mdbx::txn& txn) {
     return ret;
 }
 
-void do_tables(const db::EnvConfig& config) {
+void do_list_tables(const db::EnvConfig& config) {
     static const std::string fmt_hdr{" %3s %-24s %10s %2s %10s %10s %10s %12s %10s %10s"};
     static const std::string fmt_row{" %3i %-24s %10u %2u %10u %10u %10u %12s %10s %10s"};
 
     auto env{db::open_env(config)};
-    auto txn{env.start_read()};
+    db::ROTxn txn(env);
 
-    auto dbTablesInfo{get_tablesInfo(txn)};
-    auto dbFreeInfo{get_freeInfo(txn)};
+    auto dbTablesInfo{get_tablesInfo(*txn)};
+    auto dbFreeInfo{get_freeInfo(*txn)};
 
     std::cout << "\n Database tables    : " << dbTablesInfo.tables.size()
               << "\n Database page size : " << to_human_bytes(env.get_pagesize(), true) << "\n"
@@ -185,8 +188,50 @@ void do_tables(const db::EnvConfig& config) {
               << " == A - B + C \n"
               << std::endl;
 
-    txn.commit();
+    txn.abort();
     env.close(config.shared);
+}
+
+void do_list_address_types(const db::EnvConfig& config) {
+    auto env{db::open_env(config)};
+    auto txn{env.start_read()};
+    if (!db::has_map(txn, db::tables::kServices.name)) {
+        throw std::runtime_error("No \"Services\" table found");
+    }
+
+    std::unordered_map<net::IPAddressType, size_t> histogram;
+    auto cursor{db::open_cursor(txn, db::tables::kServices)};
+    cursor.to_first(/*throw_not_found=*/false);
+
+    db::cursor_for_each(cursor, [&histogram](ByteView /*key*/, ByteView value) {
+        ser::SDataStream data(value, ser::Scope::kStorage, 0);
+        net::NodeServiceInfo info{};
+        success_or_throw(info.deserialize(data));
+        histogram[info.service_.endpoint_.address_.get_type()]++;
+    });
+
+    // Sort histogram by usage (from most used to less used)
+    std::vector<std::pair<net::IPAddressType, size_t>> histogram_sorted;
+    std::copy(histogram.begin(), histogram.end(),
+              std::back_inserter<std::vector<std::pair<net::IPAddressType, size_t>>>(histogram_sorted));
+    std::sort(histogram_sorted.begin(), histogram_sorted.end(),
+              [](std::pair<net::IPAddressType, size_t>& a, std::pair<net::IPAddressType, size_t>& b) -> bool {
+                  return a.second == b.second ? a.first < b.first : a.second > b.second;
+              });
+
+    if (!histogram_sorted.empty()) {
+        std::cout << "\n"
+                  << (boost::format(" %-6s %8s") % "Type" % "Count") << "\n"
+                  << (boost::format(" %-6s %8s") % std::string(6, '-') % std::string(8, '-')) << "\n";
+        size_t total_usage_count{0};
+        for (const auto& [address_type, usage_count] : histogram_sorted) {
+            std::cout << (boost::format(" %-6s %8u") % magic_enum::enum_name(address_type) % usage_count) << "\n";
+            total_usage_count += usage_count;
+        }
+        std::cout << (boost::format(" %-6s %8s") % std::string(6, '-') % std::string(8, '-')) << "\n"
+                  << (boost::format(" %-6s %8u") % " " % total_usage_count) << "\n"
+                  << std::endl;
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -219,8 +264,9 @@ int main(int argc, char* argv[]) {
      * Subcommands
      */
 
-    // List tables and gives info about storage
     auto* cmd_tables = app_main.add_subcommand("tables", "List db and tables info");
+    auto* cmd_address_types = app_main.add_subcommand("addr_types", "List network addresses types");
+
     // auto cmd_tables_scan_opt = cmd_tables->add_flag("--scan", "Scan real data size (long)");
 
     /*
@@ -229,22 +275,21 @@ int main(int argc, char* argv[]) {
     CLI11_PARSE(app_main, argc, argv)
 
     try {
-
         // Locate the db directory we're interested into
         if (data_dir.empty()) {
             if (!*nodes_opt) {
                 data_dir = (DataDirectory::default_path() / DataDirectory::kChainDataName).string();
-			} else {
+            } else {
                 data_dir = (DataDirectory::default_path() / DataDirectory::kNodesName).string();
-			}
+            }
         } else {
             // Verify that the provided path is a directory
             if (!fs::is_directory(data_dir)) {
-				throw std::runtime_error("Invalid path: " + data_dir);
-			}
+                throw std::runtime_error("Invalid path: " + data_dir);
+            }
             // Verify datadir has either chaindata or nodes subdir
             if (!*nodes_opt) {
-				data_dir = (fs::path(data_dir) / DataDirectory::kChainDataName).string();
+                data_dir = (fs::path(data_dir) / DataDirectory::kChainDataName).string();
             } else {
                 data_dir = (fs::path(data_dir) / DataDirectory::kNodesName).string();
             }
@@ -260,12 +305,14 @@ int main(int argc, char* argv[]) {
 
         // Execute the requested subcommand
         if (*cmd_tables) {
-            do_tables(src_config);
+            do_list_tables(src_config);
+        } else if (*cmd_address_types) {
+            do_list_address_types(src_config);
         }
         return 0;
 
     } catch (const std::exception& ex) {
-        std::cerr << "\nUnexpected " << typeid(ex).name() << " : " << ex.what() << "\n" << std::endl;
+        std::cerr << "\nUnexpected \"" << typeid(ex).name() << "\" : " << ex.what() << "\n" << std::endl;
     } catch (...) {
         std::cerr << "\nUnexpected undefined error\n" << std::endl;
     }

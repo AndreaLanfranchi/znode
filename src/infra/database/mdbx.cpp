@@ -259,6 +259,7 @@ void Cursor::close() {
     ::mdbx_cursor_close(handle_);
     handle_ = nullptr;
 }
+
 MDBX_stat Cursor::get_map_stat() const {
     if (handle_ == nullptr) {
         mdbx::error::success_or_throw(EINVAL);
