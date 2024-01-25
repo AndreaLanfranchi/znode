@@ -83,8 +83,8 @@ class NodeHub : public con::Stoppable {
     //! \details This function will process messages targeting the address book
     Task<void> address_book_processor_work();
 
-    //! \brief Asynchronously connects to a remoote endpoint
-    Task<void> async_connect(Connection& connection);  // Connects to a remote endpoint
+    //! \brief Asynchronously connects to a remote endpoint
+    Task<void> async_connect(Connection& connection) const;  // Connects to a remote endpoint
 
     //! \brief Executes the dial-in acceptor work loop asynchronously
     Task<void> acceptor_work();
@@ -121,7 +121,7 @@ class NodeHub : public con::Stoppable {
     void feed_connections_from_cli();  // Feed node_factory_feed_ from command line --network.connect
     void feed_connections_from_dns();  // Feed node_factory_feed_ from DNS seeds configured for chain
     std::map<std::string, std::vector<IPEndpoint>, std::less<>> dns_resolve(const std::vector<std::string>& hosts,
-                                                                            const boost::asio::ip::tcp& version);
+                                                                            const boost::asio::ip::tcp& version) const;
 
     AppSettings& app_settings_;                       // Reference to global application settings
     boost::asio::io_context& asio_context_;           // Reference to global asio context

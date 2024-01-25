@@ -64,7 +64,7 @@ bool NodeHub::start() noexcept {
 
     // We need to determine our network address which will be used to advertise us to other nodes
     // If we have a NAT traversal option enabled we need to use the public address
-    auto resolve_task = asio::co_spawn(asio_context_, nat::resolve(app_settings_.network.nat), asio::use_future);
+    const auto resolve_task = asio::co_spawn(asio_context_, nat::resolve(app_settings_.network.nat), asio::use_future);
 
     asio::co_spawn(asio_context_, node_factory_work(), asio::detached);
     asio::co_spawn(asio_context_, acceptor_work(), asio::detached);
@@ -117,9 +117,9 @@ Task<void> NodeHub::node_factory_work() {
 
     while (node_factory_feed_.is_open()) {
         // Poll channel for any outstanding pending connection
-        boost::system::error_code error;
         std::shared_ptr<Connection> conn_ptr;
         if (not node_factory_feed_.try_receive(conn_ptr)) {
+            boost::system::error_code error;
             const auto& result = co_await node_factory_feed_.async_receive(error);
             if (error or not result.has_value()) continue;
             conn_ptr = result.value();
@@ -265,9 +265,9 @@ Task<void> NodeHub::address_book_processor_work() {
     std::ignore = log::Trace("Service", {"name", "Node Hub", "component", "address book", "status", "started"});
     while (is_running()) {
         // Poll channel for any queued address to connect to
-        boost::system::error_code error;
         WeakNodeAndPayload item{};
         if (not address_book_processor_feed_.try_receive(item)) {
+            boost::system::error_code error;
             const auto result = co_await address_book_processor_feed_.async_receive(error);
             if (error or not result.has_value()) continue;
             item = result.value();
@@ -276,7 +276,7 @@ Task<void> NodeHub::address_book_processor_work() {
         auto [weak_node_ptr, payload_ptr] = std::move(item);
 
         // Might have been disconnected during the wait in the queue
-        auto node_ptr{weak_node_ptr.lock()};
+        const auto node_ptr{weak_node_ptr.lock()};
         if (not node_ptr) continue;
 
         try {
@@ -289,8 +289,8 @@ Task<void> NodeHub::address_book_processor_work() {
                 } break;
                 case MessageType::kGetAddr: {
                     auto services{address_book_.get_random_services(kMaxAddrItems)};
-                    log::Trace("Service", {"name", "Node Hub", "action", "address book", "remote", node_ptr->to_string(),
-                                          "count", std::to_string(services.size())})
+                    log::Trace("Service", {"name", "Node Hub", "action", "address book", "remote",
+                                           node_ptr->to_string(), "count", std::to_string(services.size())})
                         << "Sending ...";
                     MsgAddrPayload payload{};
                     payload.identifiers_.swap(services);
@@ -308,7 +308,7 @@ Task<void> NodeHub::address_book_processor_work() {
     co_return;
 }
 
-Task<void> NodeHub::async_connect(Connection& connection) {
+Task<void> NodeHub::async_connect(Connection& connection) const {
     const auto protocol = connection.endpoint_.address_.get_type() == IPAddressType::kIPv4 ? tcp::v4() : tcp::v6();
     connection.socket_ptr_ = std::make_shared<tcp::socket>(asio_context_);
     connection.socket_ptr_->open(protocol);
@@ -353,9 +353,9 @@ Task<void> NodeHub::async_connect(Connection& connection) {
         connection.socket_ptr_->connect(connection.endpoint_.to_endpoint());
         //        timeout.cancel();
         set_common_socket_options(*connection.socket_ptr_);
-    } catch (const boost::system::system_error& error) {
+    } catch (const boost::system::system_error& /*error*/) {
         //        timeout.cancel();
-        throw error;
+        throw;
     }
     co_return;
 }
@@ -413,7 +413,7 @@ void NodeHub::on_service_timer_expired(con::Timer::duration& interval) {
     }
 
     for (auto iterator{nodes_.begin()}; iterator not_eq nodes_.end(); /* !!! no increment !!! */) {
-        if ((*iterator)->status() == ComponentStatus::kNotStarted and (*iterator).use_count() == 1) {
+        if ((*iterator)->status() == ComponentStatus::kNotStarted and iterator->use_count() == 1) {
             iterator = nodes_.erase(iterator);
             continue;
         } else if (not this_is_running) {
@@ -517,7 +517,7 @@ void NodeHub::feed_connections_from_dns() {
 }
 
 std::map<std::string, std::vector<IPEndpoint>, std::less<>> NodeHub::dns_resolve(const std::vector<std::string>& hosts,
-                                                                                 const tcp& version) {
+                                                                                 const tcp& version) const {
     std::map<std::string, std::vector<IPEndpoint>, std::less<>> ret{};
     tcp::resolver resolver(asio_context_);
     const auto network_port = gsl::narrow_cast<uint16_t>(app_settings_.chain_config->default_port_);
@@ -595,7 +595,7 @@ void NodeHub::on_node_connected(std::shared_ptr<Node> node_ptr) {
 
 void NodeHub::on_node_disconnected(const Node& node) {
     std::unique_lock lock(connected_addresses_mutex_);
-    if (auto item{connected_addresses_.find(*node.remote_endpoint().address_)};
+    if (const auto item{connected_addresses_.find(*node.remote_endpoint().address_)};
         item not_eq connected_addresses_.end()) {
         if (--item->second == 0) {
             connected_addresses_.erase(item);
@@ -651,8 +651,7 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
     auto logger = log::Trace("Service", {"name", "Node Hub", "action", __func__, "remote", node_ptr->to_string(),
                                          "command", command_from_message_type(payload_ptr->type())});
 
-    const auto msg_type{payload_ptr->type()};
-    switch (msg_type) {
+    switch (payload_ptr->type()) {
         using enum MessageType;
         case kVersion:
             if (node_ptr->connection().type_ != ConnectionType::kInbound) {
@@ -672,11 +671,11 @@ void NodeHub::on_node_received_message(std::shared_ptr<Node> node_ptr, std::shar
             std::ignore = address_book_processor_feed_.try_send(std::make_pair(node_ptr, std::move(payload_ptr)));
             break;
         case kGetHeaders: {
-            auto& payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
+            const auto& payload = dynamic_cast<MsgGetHeadersPayload&>(*payload_ptr);
             logger << "items=" << std::to_string(payload.hashes_.size());
         } break;
         case kInv: {
-            auto& payload = dynamic_cast<MsgInventoryPayload&>(*payload_ptr);
+            const auto& payload = dynamic_cast<MsgInventoryPayload&>(*payload_ptr);
             logger << "items=" << std::to_string(payload.items_.size());
         } break;
         default:
